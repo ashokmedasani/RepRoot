@@ -1,0 +1,99 @@
+<main class="landing-shell">
+  <nav class="landing-nav" aria-label="Landing page navigation">
+    <a class="brand" routerLink="/" aria-label="CoachFlow Studio home">
+      <span class="brand__mark">CF</span>
+      <span class="brand__text">{{ temporaryAppName }}</span>
+    </a>
+
+    <app-theme-switcher />
+  </nav>
+
+  <section class="hero" aria-labelledby="landing-title">
+    <div class="hero__content">
+      <p class="eyebrow">Trainer and client management platform</p>
+      <h1 id="landing-title">A professional workspace for trainers, clients, goals, and measurable progress.</h1>
+      <p class="hero__summary">
+        {{ temporaryAppName }} helps trainers manage leads, groups, clients, targets, and progress tracking from one
+        premium SaaS workspace. Clients can log in to view their profile, goals, daily targets, weekly targets,
+        monthly targets, and submit progress updates.
+      </p>
+
+      <div class="hero__actions">
+        <a class="primary-action" [routerLink]="nextPageRoute" aria-label="Go to trainer and client login page">
+          Let's Start
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-panel" aria-label="Platform overview preview">
+      <div class="hero-panel__header">
+        <span>Today</span>
+        <strong>Training Operations</strong>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card">
+          <span>Leads</span>
+          <strong>24</strong>
+          <small>6 ready for follow-up</small>
+        </article>
+        <article class="metric-card">
+          <span>Clients</span>
+          <strong>118</strong>
+          <small>82 active this month</small>
+        </article>
+        <article class="metric-card">
+          <span>Targets</span>
+          <strong>91%</strong>
+          <small>weekly completion</small>
+        </article>
+        <article class="metric-card">
+          <span>Progress</span>
+          <strong>43</strong>
+          <small>updates submitted</small>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="feature-section" aria-label="Platform capabilities">
+    <article class="feature-column">
+      <div class="section-heading">
+        <span class="section-heading__icon" aria-hidden="true">T</span>
+        <div>
+          <p class="eyebrow">For trainers</p>
+          <h2>Run the business side of coaching with clarity.</h2>
+        </div>
+      </div>
+
+      <div class="feature-list">
+        @for (feature of trainerFeatures; track feature.title) {
+          <div class="feature-card">
+            <strong>{{ feature.title }}</strong>
+            <p>{{ feature.description }}</p>
+          </div>
+        }
+      </div>
+    </article>
+
+    <article class="feature-column">
+      <div class="section-heading">
+        <span class="section-heading__icon" aria-hidden="true">C</span>
+        <div>
+          <p class="eyebrow">For clients</p>
+          <h2>Give every client a focused place to follow the plan.</h2>
+        </div>
+      </div>
+
+      <div class="feature-list">
+        @for (feature of clientFeatures; track feature.title) {
+          <div class="feature-card">
+            <strong>{{ feature.title }}</strong>
+            <p>{{ feature.description }}</p>
+          </div>
+        }
+      </div>
+    </article>
+  </section>
+</main>

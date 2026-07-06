@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.angular/
+.dev-server/
+__pycache__/
+*.py[cod]
+.venv/
+.env
+db.sqlite3
+postgres_data/
+backend/media/
+backend/staticfiles/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -1,0 +1,29 @@
+# frontend/package-lock.json
+
+## What this file does
+
+Locks exact installed frontend dependency versions.
+
+## Why this file exists
+
+The lockfile keeps installs reproducible across development machines and deployment builds.
+
+## Page or module
+
+Frontend dependency management.
+
+## Important changes
+
+- Includes `country-state-city` for global country and state/region dropdown data.
+
+## Business logic
+
+No direct business logic lives here.
+
+## Connected files
+
+- `frontend/package.json`
+
+## Future improvement notes
+
+Regenerate only through `npm install` when dependencies intentionally change.

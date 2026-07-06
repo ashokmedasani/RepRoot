@@ -1,0 +1,15 @@
+<div class="theme-switcher" aria-label="Theme selector">
+  @for (theme of themes; track theme.id) {
+    <button
+      type="button"
+      class="theme-option"
+      [class.theme-option--active]="activeTheme() === theme.id"
+      [attr.aria-pressed]="activeTheme() === theme.id"
+      [title]="theme.description"
+      (click)="selectTheme(theme.id)"
+    >
+      <span class="theme-option__swatch" [attr.data-theme-swatch]="theme.id"></span>
+      <span>{{ theme.label }}</span>
+    </button>
+  }
+</div>

@@ -1,0 +1,261 @@
+:root {
+  color-scheme: light;
+  --app-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --app-bg: #f7fbff;
+  --app-surface: #ffffff;
+  --app-surface-soft: #eef7ff;
+  --app-text: #122033;
+  --app-muted: #64748b;
+  --app-border: #d7e5f5;
+  --app-primary: #0b7de3;
+  --app-primary-strong: #075ea8;
+  --app-primary-soft: #dff0ff;
+  --app-accent: #20a3b8;
+  --app-success: #1f9d63;
+  --app-shadow: 0 24px 70px rgba(26, 62, 103, 0.12);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #101820;
+  --app-surface: #172230;
+  --app-surface-soft: #203144;
+  --app-text: #f6f9fc;
+  --app-muted: #adbac8;
+  --app-border: #2f4358;
+  --app-primary: #58a6ff;
+  --app-primary-strong: #8fc7ff;
+  --app-primary-soft: #193654;
+  --app-accent: #6ee7d8;
+  --app-success: #69db91;
+  --app-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme='green-wellness'] {
+  --app-bg: #f5fbf7;
+  --app-surface: #ffffff;
+  --app-surface-soft: #e8f7ef;
+  --app-text: #10231a;
+  --app-muted: #5b7367;
+  --app-border: #cfe7da;
+  --app-primary: #198754;
+  --app-primary-strong: #11643e;
+  --app-primary-soft: #dff5e9;
+  --app-accent: #4f9f8d;
+  --app-success: #2fb269;
+  --app-shadow: 0 24px 70px rgba(25, 135, 84, 0.12);
+}
+
+[data-theme='purple-premium'] {
+  --app-bg: #faf8ff;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f0eaff;
+  --app-text: #221838;
+  --app-muted: #716582;
+  --app-border: #ded3f4;
+  --app-primary: #6d3fd1;
+  --app-primary-strong: #4f2aa4;
+  --app-primary-soft: #ece3ff;
+  --app-accent: #b65fcf;
+  --app-success: #258f75;
+  --app-shadow: 0 24px 70px rgba(109, 63, 209, 0.14);
+}
+
+[data-theme='black-gold'] {
+  color-scheme: dark;
+  --app-bg: #10100d;
+  --app-surface: #191812;
+  --app-surface-soft: #252215;
+  --app-text: #fff8dd;
+  --app-muted: #c8b98a;
+  --app-border: #4b421f;
+  --app-primary: #d6a82d;
+  --app-primary-strong: #ffd76a;
+  --app-primary-soft: #372b0e;
+  --app-accent: #f4c84a;
+  --app-success: #e7be4b;
+  --app-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--app-bg);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--app-font-family);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+.photo-manager,
+.photo-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 22%, var(--app-border));
+  border-radius: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, var(--app-surface-soft), var(--app-surface));
+}
+
+.photo-frame,
+.photo-placeholder {
+  width: 6.5rem;
+  height: 6.5rem;
+  border-radius: 50%;
+}
+
+.photo-frame {
+  overflow: hidden;
+  border: 3px solid var(--app-surface);
+  box-shadow: 0 14px 35px color-mix(in srgb, var(--app-text) 14%, transparent);
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 2.3rem;
+  font-weight: 900;
+}
+
+.photo-copy {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.photo-copy p {
+  margin: 0;
+  color: var(--app-muted);
+  font-weight: 700;
+}
+
+.secondary-action {
+  width: fit-content;
+  min-height: 2.55rem;
+  border: 1px solid var(--app-primary);
+  border-radius: 0.7rem;
+  padding: 0 0.9rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 900;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.top-shell {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--app-border);
+  padding: 0.85rem 1.5rem;
+  background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.top-shell nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+}
+
+.top-shell nav a,
+.top-shell nav span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.72rem 0.95rem;
+  color: var(--app-muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.profile-hero {
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 1rem;
+  background: var(--app-surface);
+  box-shadow: 0 20px 55px color-mix(in srgb, var(--app-text) 7%, transparent);
+}
+
+.cover-band {
+  height: 8.5rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 86%, #ffffff), var(--app-accent)),
+    var(--app-primary);
+}
+
+.hero-content {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.2rem;
+  align-items: end;
+  padding: 0 1.25rem 1.25rem;
+}
+
+.hero-photo {
+  width: 9.25rem;
+  height: 9.25rem;
+  margin-top: -4.7rem;
+  border-width: 5px;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 1rem;
+}
+
+@media (max-width: 680px) {
+  .photo-manager,
+  .photo-field {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-content {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}

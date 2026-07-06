@@ -1,0 +1,145 @@
+<main class="setup-page">
+  <section class="setup-shell" aria-labelledby="profile-setup-title">
+    <div class="setup-intro">
+      <p class="eyebrow">Required first login step</p>
+      <h1 id="profile-setup-title">Trainer profile setup</h1>
+      <p class="warning">
+        Profile setup is required before using your trainer dashboard. This may take around 10-15 minutes. Your profile
+        helps organize your forms, groups, clients, and references.
+      </p>
+    </div>
+
+    @if (isLoading) {
+      <p class="status-message">Loading your trainer details...</p>
+    } @else {
+      <form class="setup-form" [formGroup]="setupForm" (ngSubmit)="saveProfileSetup()">
+        <div class="photo-field">
+          <div class="photo-frame">
+            @if (selectedPhotoPreview || profilePhotoUrl) {
+              <img [src]="selectedPhotoPreview || profilePhotoUrl" alt="Trainer profile photo">
+            } @else {
+              <div class="photo-placeholder">{{ setupForm.controls.first_name.value.slice(0, 1) || 'P' }}</div>
+            }
+          </div>
+          <div class="photo-copy">
+            <span class="field-label">Profile photo <small>Optional</small></span>
+            <p>
+              @if (selectedPhotoName) {
+                {{ selectedPhotoName }}
+              } @else if (profilePhotoUrl) {
+                Photo already available.
+              } @else {
+                Upload a clear headshot or brand photo.
+              }
+            </p>
+            <button type="button" class="secondary-action" (click)="profileSetupPhotoInput.click()">
+              {{ profilePhotoUrl || selectedPhotoPreview ? 'Change photo' : 'Upload photo' }}
+            </button>
+            <input #profileSetupPhotoInput class="visually-hidden" type="file" accept="image/*" (change)="handlePhotoSelected($event)">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">First name <span class="required">*</span></span>
+            <input type="text" formControlName="first_name" autocomplete="given-name">
+            @if (hasError('first_name')) {
+              <span class="field-help error-text">First name is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Last name <span class="required">*</span></span>
+            <input type="text" formControlName="last_name" autocomplete="family-name">
+            @if (hasError('last_name')) {
+              <span class="field-help error-text">Last name is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Birth month <span class="required">*</span></span>
+            <select formControlName="birth_month">
+              <option value="">Select month</option>
+              @for (month of months; track month.value) {
+                <option [value]="month.value">{{ month.label }}</option>
+              }
+            </select>
+            @if (hasError('birth_month')) {
+              <span class="field-help error-text">Birth month is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Birth year <span class="required">*</span></span>
+            <select formControlName="birth_year">
+              <option value="">Select year</option>
+              @for (year of years; track year) {
+                <option [value]="year">{{ year }}</option>
+              }
+            </select>
+            @if (hasError('birth_year')) {
+              <span class="field-help error-text">Birth year is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Gender <span class="required">*</span></span>
+            <select formControlName="gender">
+              <option value="">Select gender</option>
+              @for (gender of genders; track gender) {
+                <option [value]="gender">{{ gender }}</option>
+              }
+            </select>
+            @if (hasError('gender')) {
+              <span class="field-help error-text">Gender is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Country <span class="required">*</span></span>
+            <select formControlName="country">
+              <option value="">Select country</option>
+              @for (country of countries; track country.isoCode) {
+                <option [value]="country.name">{{ country.name }}</option>
+              }
+            </select>
+            @if (hasError('country')) {
+              <span class="field-help error-text">Country is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">State / Region <span class="required">*</span></span>
+            <select formControlName="state">
+              <option value="">Select state or region</option>
+              @for (state of stateOptions; track state) {
+                <option [value]="state">{{ state }}</option>
+              }
+            </select>
+            @if (hasError('state')) {
+              <span class="field-help error-text">State or region is required.</span>
+            }
+          </label>
+
+          <label>
+            <span class="field-label">Professional headline <small>Optional</small></span>
+            <input type="text" formControlName="professional_headline" maxlength="180">
+          </label>
+        </div>
+
+        <label>
+          <span class="field-label">About me <small>Optional</small></span>
+          <textarea formControlName="about_me" rows="5"></textarea>
+        </label>
+
+        <button type="submit" class="primary-action" [disabled]="isSaving">
+          {{ isSaving ? 'Saving profile...' : 'Save and continue' }}
+        </button>
+
+        @if (setupMessage) {
+          <p class="status-message error-message">{{ setupMessage }}</p>
+        }
+      </form>
+    }
+  </section>
+</main>
