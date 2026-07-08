@@ -1,9 +1,9 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { ClientApiService } from '../../../core/api/client-api.service';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-client-login',
@@ -41,31 +41,21 @@ export class ClientLoginComponent {
       next: (response) => {
         const client = response.client;
         this.clientName = `${client.first_name} ${client.last_name}`.trim();
+        window.sessionStorage.setItem('client-auth-token', response.token);
         window.sessionStorage.setItem('client-access', JSON.stringify(client));
         this.loginMessage = `Welcome ${this.clientName || client.username}. Client portal access confirmed.`;
         this.isSubmitting = false;
-        void this.router.navigate(['/client/profile']);
+
+        if (client.must_change_password) {
+          void this.router.navigate(['/client/change-password']);
+        } else {
+          void this.router.navigate(['/client/profile']);
+        }
       },
       error: (error: unknown) => {
-        this.loginMessage = this.formatApiError(error, 'Client login failed. Check username and password.');
+        this.loginMessage = formatApiError(error, 'Client login failed. Check username and password.');
         this.isSubmitting = false;
       }
     });
-  }
-
-  private formatApiError(error: unknown, fallbackMessage: string): string {
-    const responseError = error instanceof HttpErrorResponse ? error.error : error;
-    const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
-
-    if (apiError.message) {
-      return apiError.message;
-    }
-
-    if (!apiError.error || typeof apiError.error === 'string') {
-      return apiError.error || fallbackMessage;
-    }
-
-    const firstError = Object.values(apiError.error)[0];
-    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
   }
 }

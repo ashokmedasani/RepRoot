@@ -1,0 +1,37 @@
+<article class="panel chat-panel">
+  <div class="chat-header">
+    <div>
+      <h3>{{ mode === 'trainer' ? 'Client Chat' : 'Trainer Chat' }}</h3>
+      @if (description) {
+        <p>{{ description }}</p>
+      }
+    </div>
+    <span>{{ messages.length }} messages</span>
+  </div>
+
+  @if (errorMessage) {
+    <p class="chat-error">{{ errorMessage }}</p>
+  }
+
+  <div class="message-list">
+    @for (message of messages; track message.id) {
+      <div class="chat-bubble" [class.their-message]="message.sender !== ownSender">
+        <strong>{{ senderLabel(message) }}</strong>
+        <p>{{ message.text }}</p>
+        <small>{{ message.created_at | date: 'short' }}</small>
+      </div>
+    } @empty {
+      <p class="empty-chat">No messages yet. Send the first note.</p>
+    }
+  </div>
+
+  <form class="chat-compose" (ngSubmit)="sendMessage()">
+    <textarea
+      rows="3"
+      [placeholder]="mode === 'trainer' ? 'Write a message to the client' : 'Write a message to your trainer'"
+      [(ngModel)]="draft"
+      name="chatDraft"
+    ></textarea>
+    <button type="submit" class="primary-action" [disabled]="isSending">Send Message</button>
+  </form>
+</article>

@@ -4,12 +4,18 @@ from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
 from .models import (
+  ChatMessage,
   ClientAccess,
   ClientRegistrationForm,
   LeadSubmission,
+  ReferenceCategory,
+  TemplateAssignment,
+  TrackingEntry,
+  TrackingTemplate,
   TrainerGroup,
   TrainerLeadForm,
   TrainerProfile,
+  TrainerReference,
   UNIVERSAL_CORE_FIELDS,
 )
 
@@ -610,6 +616,327 @@ class ClientLoginSerializer(serializers.Serializer):
 
     attrs['client_access'] = client_access
     return attrs
+
+
+TEMPLATE_FIELD_TYPES = {
+  'number',
+  'short_text',
+  'long_text',
+  'yes_no',
+  'image',
+}
+
+YOUTUBE_HOSTS = ('youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be')
+
+
+def is_youtube_link(link: str) -> bool:
+  from urllib.parse import urlparse
+
+  try:
+    host = (urlparse(link).netloc or '').lower()
+  except ValueError:
+    return False
+
+  return host in YOUTUBE_HOSTS
+
+
+def normalize_template_fields(fields):
+  normalized_fields = []
+
+  for index, field in enumerate(fields or []):
+    label = str(field.get('label', '')).strip()
+    field_type = str(field.get('field_type', '')).strip()
+
+    if not label:
+      raise serializers.ValidationError({'fields': f'Field {index + 1} label is required.'})
+
+    if field_type not in TEMPLATE_FIELD_TYPES:
+      raise serializers.ValidationError({'fields': f'Field {index + 1} type is not supported.'})
+
+    normalized_fields.append(
+      {
+        'key': str(field.get('key') or f'field_{index + 1}').strip(),
+        'label': label,
+        'field_type': field_type,
+        'placeholder': str(field.get('placeholder', '')).strip(),
+      }
+    )
+
+  return normalized_fields
+
+
+class ReferenceCategorySerializer(serializers.ModelSerializer):
+  reference_count = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ReferenceCategory
+    fields = ['id', 'name', 'subcategories', 'reference_count', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'reference_count', 'created_at', 'updated_at']
+
+  def get_reference_count(self, obj):
+    return obj.references.count()
+
+  def validate_name(self, value):
+    name = value.strip()
+
+    if not name:
+      raise serializers.ValidationError('Category name is required.')
+
+    return name
+
+  def validate_subcategories(self, value):
+    if not isinstance(value, list):
+      raise serializers.ValidationError('Subcategories must be a list.')
+
+    return [str(subcategory).strip() for subcategory in value if str(subcategory).strip()]
+
+
+class TrainerReferenceSerializer(serializers.ModelSerializer):
+  category_name = serializers.CharField(source='category.name', read_only=True)
+  file_url = serializers.SerializerMethodField()
+  file_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = TrainerReference
+    fields = [
+      'id',
+      'category',
+      'category_name',
+      'subcategory',
+      'title',
+      'reference_type',
+      'description',
+      'link',
+      'file',
+      'file_url',
+      'file_name',
+      'tags',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'category_name', 'file_url', 'file_name', 'created_at', 'updated_at']
+    extra_kwargs = {'file': {'write_only': True, 'required': False}}
+
+  def get_file_url(self, obj):
+    if not obj.file:
+      return ''
+
+    request = self.context.get('request')
+    return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+
+  def get_file_name(self, obj):
+    return obj.file.name.rsplit('/', 1)[-1] if obj.file else ''
+
+  def validate_title(self, value):
+    title = value.strip()
+
+    if not title:
+      raise serializers.ValidationError('Title is required.')
+
+    return title
+
+  def to_internal_value(self, data):
+    # Multipart forms send tags as a comma-separated string.
+    if hasattr(data, 'getlist') or isinstance(data.get('tags'), str):
+      data = data.copy()
+      raw_tags = data.get('tags', '')
+
+      if isinstance(raw_tags, str):
+        data.setlist('tags', []) if hasattr(data, 'setlist') else None
+        parsed_tags = [tag.strip() for tag in raw_tags.split(',') if tag.strip()]
+        internal_value = super().to_internal_value(data)
+        internal_value['tags'] = parsed_tags
+        return internal_value
+
+    return super().to_internal_value(data)
+
+  def validate(self, attrs):
+    reference_type = attrs.get('reference_type') or (self.instance.reference_type if self.instance else '')
+    link = (attrs.get('link') if 'link' in attrs else (self.instance.link if self.instance else '')) or ''
+    file = attrs.get('file') if 'file' in attrs else (self.instance.file if self.instance else None)
+
+    if reference_type == TrainerReference.TYPE_VIDEO_LINK:
+      if not link:
+        raise serializers.ValidationError({'link': 'Video references require a YouTube link.'})
+
+      if not is_youtube_link(link):
+        raise serializers.ValidationError({'link': 'Videos must be YouTube links so they can be streamed in-app.'})
+
+      attrs['file'] = None
+
+    upload = attrs.get('file')
+
+    if upload and getattr(upload, 'content_type', '').startswith('video/'):
+      raise serializers.ValidationError({'file': 'Video uploads are not allowed. Submit a YouTube link instead.'})
+
+    if reference_type in (TrainerReference.TYPE_PDF, TrainerReference.TYPE_IMAGE, TrainerReference.TYPE_DOCUMENT):
+      if not file and not link:
+        raise serializers.ValidationError({'file': 'Upload a file or provide a link for this reference type.'})
+
+    return attrs
+
+
+class TrackingTemplateReferenceSerializer(serializers.ModelSerializer):
+  """Read-only, compact reference representation nested inside templates."""
+
+  category_name = serializers.CharField(source='category.name', read_only=True)
+  file_url = serializers.SerializerMethodField()
+
+  class Meta:
+    model = TrainerReference
+    fields = ['id', 'title', 'reference_type', 'category_name', 'subcategory', 'description', 'link', 'file_url', 'tags']
+    read_only_fields = fields
+
+  def get_file_url(self, obj):
+    if not obj.file:
+      return ''
+
+    request = self.context.get('request')
+    return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+
+
+class TrackingTemplateSerializer(serializers.ModelSerializer):
+  custom_fields = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+  reference_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+  references = TrackingTemplateReferenceSerializer(many=True, read_only=True)
+  assigned_count = serializers.SerializerMethodField()
+
+  class Meta:
+    model = TrackingTemplate
+    fields = [
+      'id',
+      'name',
+      'purpose',
+      'cadence',
+      'accent',
+      'fields',
+      'custom_fields',
+      'standard_key',
+      'references',
+      'reference_ids',
+      'assigned_count',
+      'is_active',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'fields', 'standard_key', 'references', 'assigned_count', 'is_active', 'created_at', 'updated_at']
+
+  def get_assigned_count(self, obj):
+    return obj.assignments.count()
+
+  def validate_name(self, value):
+    name = value.strip()
+
+    if not name:
+      raise serializers.ValidationError('Template name is required.')
+
+    return name
+
+  def validate(self, attrs):
+    if 'custom_fields' in attrs:
+      attrs['fields'] = normalize_template_fields(attrs.pop('custom_fields'))
+
+    return attrs
+
+  def create(self, validated_data):
+    reference_ids = validated_data.pop('reference_ids', None)
+    template = super().create(validated_data)
+    self.set_references(template, reference_ids)
+    return template
+
+  def update(self, instance, validated_data):
+    reference_ids = validated_data.pop('reference_ids', None)
+    template = super().update(instance, validated_data)
+    self.set_references(template, reference_ids)
+    return template
+
+  def set_references(self, template, reference_ids):
+    if reference_ids is None:
+      return
+
+    references = TrainerReference.objects.filter(trainer=template.trainer, id__in=reference_ids)
+    template.references.set(references)
+
+
+class ClientTrackingEntrySubmitSerializer(serializers.Serializer):
+  template_id = serializers.IntegerField()
+  entry_date = serializers.DateField()
+  answers = serializers.DictField(required=False, default=dict)
+  note = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class TemplateAssignmentSerializer(serializers.ModelSerializer):
+  template_id = serializers.IntegerField(source='template.id', read_only=True)
+  template_name = serializers.CharField(source='template.name', read_only=True)
+  template_cadence = serializers.CharField(source='template.cadence', read_only=True)
+  template_accent = serializers.CharField(source='template.accent', read_only=True)
+
+  class Meta:
+    model = TemplateAssignment
+    fields = ['id', 'template_id', 'template_name', 'template_cadence', 'template_accent', 'assigned_at']
+    read_only_fields = fields
+
+
+class TrackingEntrySerializer(serializers.ModelSerializer):
+  class Meta:
+    model = TrackingEntry
+    fields = [
+      'id',
+      'client',
+      'template',
+      'template_name',
+      'entry_date',
+      'answers',
+      'note',
+      'edited_by_trainer',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'client', 'template', 'template_name', 'edited_by_trainer', 'created_at', 'updated_at']
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = ChatMessage
+    fields = ['id', 'sender', 'text', 'created_at']
+    read_only_fields = ['id', 'sender', 'created_at']
+
+  def validate_text(self, value):
+    text = value.strip()
+
+    if not text:
+      raise serializers.ValidationError('Message text is required.')
+
+    return text
+
+
+class ClientPasswordChangeSerializer(serializers.Serializer):
+  current_password = serializers.CharField(write_only=True)
+  password = serializers.CharField(min_length=8, write_only=True)
+  confirm_password = serializers.CharField(min_length=8, write_only=True)
+
+  def validate(self, attrs):
+    try:
+      validate_password_strength(attrs['password'])
+    except serializers.ValidationError as error:
+      raise serializers.ValidationError({'password': error.detail[0]})
+
+    if attrs['password'] != attrs['confirm_password']:
+      raise serializers.ValidationError({'confirm_password': 'Passwords must match.'})
+
+    client_access = self.context['client_access']
+
+    if not check_password(attrs['current_password'], client_access.temporary_password):
+      raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
+
+    return attrs
+
+  def save(self):
+    client_access = self.context['client_access']
+    client_access.temporary_password = make_password(self.validated_data['password'])
+    client_access.must_change_password = False
+    client_access.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
+    return client_access
 
 
 class ClientAccessSerializer(serializers.ModelSerializer):

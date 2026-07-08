@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
 
-type TrainerSection = 'dashboard' | 'profile' | 'forms-groups' | 'clients' | 'references' | 'settings';
+type TrainerSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'references' | 'settings';
 
 @Component({
   selector: 'app-trainer-page-shell',

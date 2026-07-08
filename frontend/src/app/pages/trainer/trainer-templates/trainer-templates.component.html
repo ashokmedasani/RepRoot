@@ -1,0 +1,112 @@
+<app-trainer-page-shell
+  title="Tracking Templates"
+  subtitle="One set of templates for all your groups. Assign any template to any client, up to 5 templates total."
+  activeSection="templates"
+  maxWidth="96rem"
+  titleId="templates-title"
+>
+  @if (hasFreeSlot) {
+    <a page-actions routerLink="/trainer/templates/create" class="primary-action">+ Create Template</a>
+  } @else {
+    <span page-actions class="slots-full-note">All 5 template slots are used</span>
+  }
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (isLoading) {
+    <section class="panel">
+      <p>Loading templates...</p>
+    </section>
+  } @else {
+    <section class="panel slots-panel" aria-label="Template slots">
+      <div>
+        <h2>Template Slots</h2>
+        <p>Templates are trainer-level: every group and client can use the same {{ maxTemplates }} templates.</p>
+      </div>
+      <div class="slots-indicator">
+        <strong>{{ slotsUsed }} / {{ maxTemplates }}</strong>
+        <span>slots used</span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="standard-templates-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="standard-templates-title">Standard Templates</h2>
+          <p>Ready-made templates from CoachFlow. Adopt one and customize it instead of starting from scratch.</p>
+        </div>
+      </div>
+
+      <div class="template-grid">
+        @for (standard of standardTemplates; track standard.key) {
+          <article class="template-card" [class.green]="standard.accent === 'green'" [class.blue]="standard.accent === 'blue'" [class.orange]="standard.accent === 'orange'">
+            <div class="template-card-head">
+              <div>
+                <h3>{{ standard.name }}</h3>
+                <p>{{ cadenceLabel(standard.cadence) }}</p>
+              </div>
+              <span>{{ standard.fields.length }} fields</span>
+            </div>
+            <p class="template-purpose">{{ standard.purpose }}</p>
+            <ul class="field-preview">
+              @for (field of standard.fields; track field.key || field.label) {
+                <li>{{ field.label }}</li>
+              }
+            </ul>
+            @if (standard.adopted) {
+              <span class="adopted-pill">Added to your templates</span>
+            } @else {
+              <button type="button" class="secondary-action" [disabled]="!hasFreeSlot || isSaving" (click)="adoptStandard(standard)">
+                {{ hasFreeSlot ? 'Adopt Template' : 'No free slots' }}
+              </button>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="my-templates-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="my-templates-title">My Templates</h2>
+          <p>Fields are always optional for clients - templates guide check-ins, they never block anyone.</p>
+        </div>
+      </div>
+
+      <div class="template-grid">
+        @for (template of templates; track template.id) {
+          <article class="template-card" [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
+            <div class="template-card-head">
+              <div>
+                <h3>{{ template.name }}</h3>
+                <p>{{ cadenceLabel(template.cadence) }}</p>
+              </div>
+              <span>{{ template.fields.length }} fields</span>
+            </div>
+
+            @if (template.purpose) {
+              <p class="template-purpose">{{ template.purpose }}</p>
+            }
+
+            <div class="template-stats">
+              <span>{{ template.references.length }} references attached</span>
+              <span>{{ template.assigned_count }} clients assigned</span>
+            </div>
+
+            <div class="template-actions">
+              <a [routerLink]="['/trainer/templates', template.id, 'edit']" class="secondary-action">Edit</a>
+              <button type="button" class="danger-action" (click)="deleteTemplate(template)">Delete</button>
+            </div>
+          </article>
+        } @empty {
+          <article class="template-card empty-card">
+            <h3>No templates yet</h3>
+            <p>Adopt a standard template above or create your own to start tracking client progress.</p>
+          </article>
+        }
+      </div>
+    </section>
+  }
+</app-trainer-page-shell>

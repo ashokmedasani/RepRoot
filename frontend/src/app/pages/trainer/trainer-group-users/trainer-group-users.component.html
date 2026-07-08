@@ -208,13 +208,13 @@
           <div class="panel-header">
             <div>
               <h2>Tracking Templates</h2>
-              <p>Daily, weekly, and monthly target forms clients can fill in.</p>
+              <p>Templates are shared across all your groups. Assign them per client from each client profile.</p>
             </div>
-            <a [routerLink]="['/trainer/groups', group.id, 'tracking-template', 'create']" class="primary-action">Edit Template</a>
+            <a routerLink="/trainer/templates" class="primary-action">Manage Templates</a>
           </div>
 
           <div class="template-grid">
-            @for (template of trackingTemplates; track template.name) {
+            @for (template of trackingTemplates; track template.id) {
               <article
                 class="template-card"
                 [class.green]="template.accent === 'green'"
@@ -225,7 +225,7 @@
                 <div class="template-card-head">
                   <div>
                     <h3>{{ template.name }}</h3>
-                    <p>{{ template.cadence }}</p>
+                    <p>{{ cadenceLabel(template.cadence) }}</p>
                   </div>
                   <span>{{ template.fields.length }} fields</span>
                 </div>
@@ -234,25 +234,31 @@
                   <p class="template-purpose">{{ template.purpose }}</p>
                 }
 
-                @for (field of template.fields; track field.label) {
+                @for (field of template.fields; track field.key || field.label) {
                   <label class="template-input-row">
-                    <span>{{ field.label }} @if (field.required) { <b>*</b> }</span>
-                    <small>{{ fieldTypeLabel(field) }} - {{ field.required ? 'Required' : 'Optional' }}</small>
+                    <span>{{ field.label }}</span>
+                    <small>{{ fieldTypeLabel(field.field_type) }} - Optional</small>
 
-                    @if (field.fieldType === 'long_text') {
+                    @if (field.field_type === 'long_text') {
                       <textarea rows="3" [placeholder]="field.placeholder || 'Client response'" disabled></textarea>
-                    } @else if (field.fieldType === 'yes_no' || field.type === 'Yes / No') {
+                    } @else if (field.field_type === 'yes_no') {
                       <select disabled>
                         <option>Choose yes or no</option>
                       </select>
-                    } @else if (field.fieldType === 'image' || field.type === 'Image') {
+                    } @else if (field.field_type === 'image') {
                       <input type="file" disabled>
                     } @else {
-                      <input [type]="field.fieldType === 'number' || field.type === 'Number' ? 'number' : 'text'" [placeholder]="field.placeholder || 'Client response'" disabled>
+                      <input [type]="field.field_type === 'number' ? 'number' : 'text'" [placeholder]="field.placeholder || 'Client response'" disabled>
                     }
                   </label>
                 }
-                <a [routerLink]="['/trainer/groups', group.id, 'tracking-template', 'create']" class="ghost-action">Add Field</a>
+                <a [routerLink]="['/trainer/templates', template.id, 'edit']" class="ghost-action">Edit Template</a>
+              </article>
+            } @empty {
+              <article class="template-card">
+                <h3>No templates yet</h3>
+                <p>Create up to 5 trainer-level templates and assign them to clients in any group.</p>
+                <a routerLink="/trainer/templates" class="ghost-action">Open Templates</a>
               </article>
             }
           </div>
