@@ -1,0 +1,186 @@
+h1,
+h2 {
+  margin: 0;
+  color: var(--app-text);
+}
+
+h1 {
+  font-size: var(--app-h1-page);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.2rem;
+  background: var(--app-surface);
+  box-shadow: 0 20px 55px color-mix(in srgb, var(--app-text) 7%, transparent);
+}
+
+.account-panel {
+  grid-template-columns: 13rem minmax(0, 1fr);
+  align-items: start;
+  padding: 0;
+}
+
+.settings-menu {
+  display: grid;
+  gap: 0.35rem;
+  border-right: 1px solid var(--app-border);
+  padding: 1rem;
+}
+
+.settings-tab {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  padding: 0 0.9rem;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.settings-tab.active {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.account-content {
+  display: grid;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.account-section {
+  display: grid;
+  gap: 1rem;
+}
+
+.account-section + .account-section {
+  border-top: 1px solid var(--app-border);
+  padding-top: 1rem;
+}
+
+.settings-panel p,
+.account-section p {
+  max-width: 42rem;
+  margin: 0.4rem 0 0;
+  color: var(--app-muted);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.password-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--app-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.field-label {
+  color: var(--app-text);
+}
+
+input {
+  width: 100%;
+  min-height: var(--app-control-height);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.75rem 0.9rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+input:focus {
+  border-color: var(--app-primary);
+  outline: 2px solid color-mix(in srgb, var(--app-primary) 22%, transparent);
+}
+
+.danger-section {
+  border-color: color-mix(in srgb, #d92d20 28%, var(--app-border));
+}
+
+.primary-action,
+.danger-action {
+  min-height: 2.55rem;
+  border: 0;
+  border-radius: var(--app-radius-lg);
+  padding: 0 0.9rem;
+  background: #d92d20;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.primary-action {
+  background: var(--app-primary);
+}
+
+.danger-action {
+  width: fit-content;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.message {
+  margin: 0;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 600;
+}
+
+.error-message {
+  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
+  color: #d92d20;
+}
+
+@media (max-width: 680px) {
+  .settings-panel {
+    align-items: stretch;
+  }
+
+  .account-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-menu {
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .password-form {
+    grid-template-columns: 1fr;
+  }
+
+  .secondary-action,
+  .primary-action,
+  .danger-action {
+    width: 100%;
+  }
+}

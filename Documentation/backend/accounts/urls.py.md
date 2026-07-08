@@ -2,7 +2,7 @@
 
 ## What this file does
 
-Defines account and trainer API routes.
+Defines account, trainer, Forms & Groups, and public form API routes.
 
 ## Why this file exists
 
@@ -22,17 +22,25 @@ Backend accounts module.
 - `trainer/login/`
 - `trainer/profile/status/`
 - `trainer/profile/`
+- `trainer/forms-groups/`
+- `trainer/forms-groups/lead-form/`
+- `trainer/forms-groups/groups/`
+- `trainer/forms-groups/groups/<group_id>/registration-form/`
+- `trainer/forms-groups/groups/<group_id>/clients/`
+- `trainer/forms-groups/pending/<submission_id>/`
+- `trainer/forms-groups/pending/<submission_id>/create-client-access/`
+- `public/forms/<public_slug>/`
 - `trainer/password-reset/request-otp/`
 - `trainer/password-reset/verify-otp/`
 - `trainer/password-reset/confirm/`
 
 ## API flow
 
-Angular calls these routes through `TrainerAuthApiService`.
+Angular calls account routes through `TrainerAuthApiService` and Forms & Groups routes through `FormsGroupsApiService`.
 
 ## Business logic
 
-Profile routes are protected by token authentication in their view classes.
+Trainer profile and Forms & Groups management routes are protected by token authentication. Public form fetch and submit routes allow unauthenticated applicants.
 
 ## Connected files
 

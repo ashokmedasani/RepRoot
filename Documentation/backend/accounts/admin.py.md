@@ -2,11 +2,11 @@
 
 ## What this file does
 
-Registers trainer profiles in Django admin.
+Registers trainer profiles, recycled trainer accounts, and Forms & Groups records in Django admin.
 
 ## Why this file exists
 
-Local development and admin review need visibility into trainer profile records and setup completion.
+Local development and admin review need visibility into trainer profile records, setup completion, forms, groups, submissions, and converted client access records.
 
 ## Page or module
 
@@ -15,10 +15,15 @@ Backend accounts module.
 ## Important functions/classes/components
 
 - `TrainerProfileAdmin`: configures list display, search, and filters.
+- `TrainerLeadFormAdmin`: exposes public slug, active flag, and trainer lead form records.
+- `TrainerGroupAdmin`: exposes trainer groups and active flag.
+- `ClientRegistrationFormAdmin`: exposes group registration forms and active flag.
+- `LeadSubmissionAdmin`: exposes pending, approved, and deleted public submissions.
+- `ClientAccessAdmin`: exposes converted client access records and active flag.
 
 ## Data flow
 
-Admin users can inspect trainer profile records created during signup and updated during setup/Profile editing.
+Admin users can inspect trainer profile records, lead forms, group setup, public submissions, client access records, and lifecycle fields used for future aggregate reporting.
 
 ## Connected files
 
@@ -26,7 +31,7 @@ Admin users can inspect trainer profile records created during signup and update
 
 ## Business logic
 
-No behavior is changed here. The admin only exposes profile setup status and profile metadata for review.
+No behavior is changed here. The admin only exposes records for review and local troubleshooting.
 
 ## Assumptions made
 

@@ -14,18 +14,10 @@
       <small>Login or create a global trainer account.</small>
     </a>
 
-    <button type="button" class="entry-card" [class.entry-card--active]="selectedEntry === 'client'" (click)="selectEntry('client')">
+    <a class="entry-card" routerLink="/client/login" [class.entry-card--active]="selectedEntry === 'client'" (click)="selectEntry('client')">
       <span class="entry-card__icon">C</span>
       <strong>Client Portal</strong>
-      <small>For approved clients to view goals, targets, and progress later.</small>
-    </button>
+      <small>Login with the username and password created by your trainer.</small>
+    </a>
   </section>
-
-  @if (selectedEntry === 'client') {
-    <section class="notice-panel">
-      <p class="eyebrow">Client Portal</p>
-      <h2>Client login will open after trainer approval flow is designed.</h2>
-      <p>A client account will be created later only after a trainer approves and creates a client profile.</p>
-    </section>
-  }
 </main>

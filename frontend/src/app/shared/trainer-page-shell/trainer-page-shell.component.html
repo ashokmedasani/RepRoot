@@ -1,0 +1,46 @@
+<main class="trainer-shell">
+  <header class="trainer-topbar">
+    <a class="brand" routerLink="/">CoachFlow Studio</a>
+
+    <nav aria-label="Trainer navigation">
+      <span [class.active]="activeSection === 'dashboard'">Dashboard</span>
+      <a routerLink="/trainer/profile" [class.active]="activeSection === 'profile'">Profile</a>
+      <a routerLink="/trainer/forms-groups" [class.active]="activeSection === 'forms-groups'">Forms & Groups</a>
+      <a routerLink="/trainer/clients" [class.active]="activeSection === 'clients'">Clients</a>
+      <a routerLink="/trainer/references" [class.active]="activeSection === 'references'">References Library</a>
+      <a routerLink="/trainer/account-settings" [class.active]="activeSection === 'settings'">Settings</a>
+    </nav>
+
+    <button type="button" class="nav-action" [disabled]="isSigningOut" (click)="signOut()">
+      {{ isSigningOut ? 'Signing out...' : 'Sign Out' }}
+    </button>
+  </header>
+
+  <section
+    class="trainer-workspace"
+    [style.--trainer-shell-max-width]="maxWidth"
+    [attr.aria-labelledby]="titleId"
+  >
+    <header class="trainer-page-header">
+      <div>
+        @if (eyebrow) {
+          <p class="eyebrow">{{ eyebrow }}</p>
+        }
+        <h1 [id]="titleId">{{ title }}</h1>
+        @if (subtitle) {
+          <p class="page-subtitle">{{ subtitle }}</p>
+        }
+      </div>
+      <div class="page-actions">
+        <ng-content select="[page-actions]"></ng-content>
+      </div>
+    </header>
+
+    <ng-content></ng-content>
+  </section>
+
+  <footer class="trainer-footer">
+    <span>CoachFlow Studio</span>
+    <span>Trainer workspace</span>
+  </footer>
+</main>

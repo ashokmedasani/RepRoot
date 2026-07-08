@@ -39,7 +39,7 @@ def _verified_cache_key(token: str, purpose: str) -> str:
   return f'trainer-email-verified:{purpose}:{token}'
 
 
-def send_email_otp(email: str, purpose: str = 'signup') -> None:
+def send_email_otp(email: str, purpose: str = 'signup') -> str:
   cooldown_key = _otp_cooldown_cache_key(email, purpose)
   cooldown_until = cache.get(cooldown_key)
   current_time = time.time()
@@ -59,6 +59,8 @@ def send_email_otp(email: str, purpose: str = 'signup') -> None:
     recipient_list=[email],
     fail_silently=False,
   )
+
+  return otp
 
 
 def verify_email_otp(email: str, otp: str, purpose: str = 'signup') -> EmailVerificationResult | None:

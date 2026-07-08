@@ -1,10 +1,91 @@
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.hashers import check_password, make_password
 from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
-from .models import TrainerProfile
+from .models import (
+  ClientAccess,
+  ClientRegistrationForm,
+  LeadSubmission,
+  TrainerGroup,
+  TrainerLeadForm,
+  TrainerProfile,
+  UNIVERSAL_CORE_FIELDS,
+)
 
 User = get_user_model()
+
+FIELD_TYPES = {
+  'short_text',
+  'long_text',
+  'email',
+  'phone',
+  'number',
+  'dropdown',
+  'checkbox',
+  'radio',
+  'yes_no',
+  'date',
+  'location',
+  'address',
+}
+
+
+def normalize_dynamic_fields(fields):
+  normalized_fields = []
+
+  for index, field in enumerate(fields or []):
+    label = str(field.get('label', '')).strip()
+    field_type = str(field.get('field_type', '')).strip()
+
+    if not label:
+      raise serializers.ValidationError({'fields': f'Field {index + 1} label is required.'})
+
+    if field_type not in FIELD_TYPES:
+      raise serializers.ValidationError({'fields': f'Field {index + 1} type is not supported.'})
+
+    options = field.get('options', [])
+
+    if isinstance(options, str):
+      options = [option.strip() for option in options.split(',') if option.strip()]
+
+    if not isinstance(options, list):
+      options = []
+
+    normalized_fields.append(
+      {
+        'key': field.get('key') or f'custom_{index + 1}',
+        'label': label,
+        'field_type': field_type,
+        'required': bool(field.get('required', False)),
+        'placeholder': str(field.get('placeholder', '')).strip(),
+        'help_text': str(field.get('help_text', '')).strip(),
+        'options': [str(option).strip() for option in options if str(option).strip()],
+        'is_core': False,
+      }
+    )
+
+  return [field.copy() for field in UNIVERSAL_CORE_FIELDS] + normalized_fields
+
+
+def get_public_form_link(request, public_slug):
+  origin = request.headers.get('Origin') if request else ''
+  base_url = origin or request.build_absolute_uri('/').rstrip('/') if request else ''
+  return f'{base_url}/public/forms/{public_slug}' if base_url else f'/public/forms/{public_slug}'
+
+
+def validate_required_answers(fields, answers):
+  missing_fields = []
+
+  for field in fields:
+    key = field.get('key')
+    value = answers.get(key)
+
+    if field.get('required') and (value is None or str(value).strip() == ''):
+      missing_fields.append(field.get('label', key))
+
+  if missing_fields:
+    raise serializers.ValidationError({'answers': f'Required fields missing: {", ".join(missing_fields)}.'})
 
 
 def validate_password_strength(password: str) -> None:
@@ -334,3 +415,226 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     instance.profile_setup_completed = True
     instance.save()
     return instance
+
+
+class TrainerLeadFormSerializer(serializers.ModelSerializer):
+  public_link = serializers.SerializerMethodField()
+  custom_fields = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+
+  class Meta:
+    model = TrainerLeadForm
+    fields = ['id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
+    read_only_fields = ['public_slug', 'public_link', 'fields', 'is_active', 'created_at', 'updated_at']
+
+  def get_public_link(self, obj):
+    return get_public_form_link(self.context.get('request'), obj.public_slug)
+
+  def validate(self, attrs):
+    attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields', []))
+    attrs['title'] = attrs.get('title', 'Trainer Lead Form').strip() or 'Trainer Lead Form'
+    return attrs
+
+
+class PublicLeadFormSerializer(serializers.ModelSerializer):
+  trainer_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = TrainerLeadForm
+    fields = ['id', 'title', 'public_slug', 'trainer_name', 'fields']
+
+  def get_trainer_name(self, obj):
+    return obj.trainer.get_full_name() or obj.trainer.username
+
+
+class TrainerGroupSerializer(serializers.ModelSerializer):
+  has_registration_form = serializers.SerializerMethodField()
+  registration_form = serializers.SerializerMethodField()
+
+  class Meta:
+    model = TrainerGroup
+    fields = ['id', 'name', 'description', 'is_active', 'has_registration_form', 'registration_form', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'is_active', 'has_registration_form', 'registration_form', 'created_at', 'updated_at']
+
+  def get_has_registration_form(self, obj):
+    form = getattr(obj, 'client_registration_form', None)
+    return bool(form and form.is_active)
+
+  def get_registration_form(self, obj):
+    form = getattr(obj, 'client_registration_form', None)
+    return ClientRegistrationFormSerializer(form).data if form and form.is_active else None
+
+  def validate_name(self, value):
+    name = value.strip()
+
+    if not name:
+      raise serializers.ValidationError('Group Name is required.')
+
+    return name
+
+
+class ClientRegistrationFormSerializer(serializers.ModelSerializer):
+  custom_fields = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+
+  class Meta:
+    model = ClientRegistrationForm
+    fields = ['id', 'group', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'group', 'fields', 'is_active', 'created_at', 'updated_at']
+
+  def validate(self, attrs):
+    attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields', []))
+    return attrs
+
+
+class LeadSubmissionSerializer(serializers.ModelSerializer):
+  applicant_name = serializers.SerializerMethodField()
+  client_access = serializers.SerializerMethodField()
+
+  class Meta:
+    model = LeadSubmission
+    fields = [
+      'id',
+      'applicant_name',
+      'first_name',
+      'last_name',
+      'email',
+      'reference_id',
+      'answers',
+      'status',
+      'is_active',
+      'submitted_at',
+      'updated_at',
+      'converted_at',
+      'deleted_at',
+      'client_access',
+    ]
+    read_only_fields = fields
+
+  def get_applicant_name(self, obj):
+    return f'{obj.first_name} {obj.last_name}'.strip()
+
+  def get_client_access(self, obj):
+    try:
+      client_access = obj.client_access
+    except ClientAccess.DoesNotExist:
+      client_access = None
+
+    if client_access and client_access.is_active:
+      return {
+        'id': client_access.id,
+        'group': client_access.group_id,
+        'group_name': client_access.group.name,
+        'username': client_access.username,
+      }
+
+    return None
+
+
+class PublicLeadSubmissionSerializer(serializers.Serializer):
+  answers = serializers.DictField()
+
+  def validate(self, attrs):
+    lead_form = self.context['lead_form']
+    answers = attrs['answers']
+    validate_required_answers(lead_form.fields, answers)
+    attrs['first_name'] = str(answers.get('first_name', '')).strip()
+    attrs['last_name'] = str(answers.get('last_name', '')).strip()
+    attrs['email'] = str(answers.get('email', '')).strip().lower()
+
+    if not attrs['email']:
+      raise serializers.ValidationError({'email': 'Email Address is required.'})
+
+    return attrs
+
+
+class ClientAccessCreateSerializer(serializers.Serializer):
+  group_id = serializers.IntegerField()
+  username = serializers.CharField(max_length=150)
+  password = serializers.CharField(min_length=8, write_only=True)
+  confirm_password = serializers.CharField(min_length=8, write_only=True)
+  registration_answers = serializers.DictField(required=False)
+
+  def validate_username(self, value):
+    username = value.strip().lower()
+
+    if not username:
+      raise serializers.ValidationError('Client username is required.')
+
+    if ClientAccess.objects.filter(username__iexact=username, is_active=True).exists():
+      raise serializers.ValidationError('Client username is already taken.')
+
+    return username
+
+  def validate(self, attrs):
+    try:
+      validate_password_strength(attrs['password'])
+    except serializers.ValidationError as error:
+      raise serializers.ValidationError({'password': error.detail[0]})
+
+    if attrs['password'] != attrs['confirm_password']:
+      raise serializers.ValidationError({'confirm_password': 'Passwords must match.'})
+
+    return attrs
+
+
+class ClientLoginSerializer(serializers.Serializer):
+  username = serializers.CharField(max_length=150)
+  password = serializers.CharField(write_only=True)
+
+  def validate(self, attrs):
+    username = attrs['username'].strip().lower()
+    password = attrs['password']
+    access_records = ClientAccess.objects.filter(
+      username__iexact=username,
+      is_active=True,
+      lead_submission__status=LeadSubmission.STATUS_APPROVED,
+    ).select_related('trainer', 'group', 'lead_submission')
+
+    client_access = None
+
+    for access_record in access_records:
+      stored_password = access_record.temporary_password
+
+      if stored_password.startswith('pbkdf2_') and check_password(password, stored_password):
+        client_access = access_record
+        break
+
+      if stored_password == password:
+        access_record.temporary_password = make_password(password)
+        access_record.must_change_password = False
+        access_record.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
+        client_access = access_record
+        break
+
+    if client_access is None:
+      raise serializers.ValidationError('Invalid client username or password.')
+
+    attrs['client_access'] = client_access
+    return attrs
+
+
+class ClientAccessSerializer(serializers.ModelSerializer):
+  group_name = serializers.CharField(source='group.name', read_only=True)
+  trainer_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ClientAccess
+    fields = [
+      'id',
+      'group',
+      'group_name',
+      'trainer_name',
+      'lead_submission',
+      'first_name',
+      'last_name',
+      'email',
+      'username',
+      'registration_answers',
+      'must_change_password',
+      'is_active',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = fields
+
+  def get_trainer_name(self, obj):
+    return obj.trainer.get_full_name() or obj.trainer.username

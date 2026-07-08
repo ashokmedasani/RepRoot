@@ -1,0 +1,325 @@
+<app-trainer-page-shell
+  title="References / Resources"
+  subtitle="Store trainer-owned reusable exercises, nutrition plans, documents, images, links, and notes."
+  activeSection="references"
+  maxWidth="110rem"
+  titleId="references-title"
+>
+  <div page-actions class="header-actions">
+    <button type="button" class="ghost-action" (click)="addCategory()">+ Create Category</button>
+    <button type="button" class="primary-action" (click)="addReference()">+ Add New Reference</button>
+  </div>
+
+  @if (message()) {
+    <p class="message">{{ message() }}</p>
+  }
+
+  <section class="references-layout" aria-label="References library">
+    <aside class="panel category-panel">
+      <div class="panel-heading">
+        <h2>Categories</h2>
+        <button type="button" class="icon-button" title="Add category" (click)="addCategory()">+</button>
+      </div>
+
+      <label class="search-box">
+        <span class="visually-hidden">Search references</span>
+        <input
+          type="search"
+          [ngModel]="query()"
+          (ngModelChange)="setSearch($event)"
+          placeholder="Search references..."
+        >
+      </label>
+
+      <button
+        type="button"
+        class="category-button"
+        [class.active]="selectedCategory() === 'All References'"
+        (click)="selectCategory('All References')"
+      >
+        <span>All References</span>
+        <strong>{{ references().length }}</strong>
+      </button>
+
+      @for (category of categories(); track category.id) {
+        <button
+          type="button"
+          class="category-button"
+          [class.active]="selectedCategory() === category.name"
+          (click)="selectCategory(category.name)"
+        >
+          <span>{{ category.name }}</span>
+          <strong>{{ categoryCount(category.name) }}</strong>
+        </button>
+      } @empty {
+        <div class="empty-category">
+          <p>No categories yet.</p>
+          <button type="button" class="ghost-action" (click)="addCategory()">Create Category</button>
+        </div>
+      }
+
+      <div class="tips-box">
+        <h3>Library Rules</h3>
+        <p>Store reusable trainer resources here only. Videos must be YouTube or external links.</p>
+      </div>
+    </aside>
+
+    <section class="panel list-panel" aria-labelledby="library-list-title">
+      <div class="list-header">
+        <div>
+          <h2 id="library-list-title">{{ selectedCategory() }}</h2>
+          <p>{{ filteredReferences().length }} items</p>
+        </div>
+        <div class="quick-add">
+          <button type="button" [disabled]="!categories().length" (click)="addReference('Video Link')">Video Link</button>
+          <button type="button" [disabled]="!categories().length" (click)="addReference('PDF')">PDF</button>
+          <button type="button" [disabled]="!categories().length" (click)="addReference('Image')">Image</button>
+          <button type="button" [disabled]="!categories().length" (click)="addReference('Text Note')">Note</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Type</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (reference of filteredReferences(); track reference.id) {
+              <tr [class.selected]="selectedReferenceId() === reference.id">
+                <td>
+                  <button type="button" class="resource-title" (click)="selectReference(reference)">
+                    @if (reference.type === 'Image' && reference.fileDataUrl) {
+                      <img [src]="reference.fileDataUrl" [alt]="reference.title">
+                    } @else {
+                      <span class="resource-thumb">{{ resourceInitial(reference) }}</span>
+                    }
+                    <span>
+                      <strong>{{ reference.title }}</strong>
+                      <small>{{ reference.subcategory || reference.description || 'Reusable resource' }}</small>
+                    </span>
+                  </button>
+                </td>
+                <td>{{ reference.category }}</td>
+                <td><span class="type-pill">{{ reference.type }}</span></td>
+                <td>{{ reference.createdAt | date: 'mediumDate' }}</td>
+                <td>
+                  <div class="row-actions">
+                    <button type="button" title="Open reference" (click)="openReference(reference)">Open</button>
+                    <button type="button" title="Edit reference" (click)="editReference(reference)">Edit</button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">
+                  @if (categories().length) {
+                    No references found. Add a trainer resource to get started.
+                  } @else {
+                    Create your first category before adding references.
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="panel detail-panel">
+      @if (selectedReference(); as reference) {
+        <div class="detail-header">
+          <div>
+            <p class="eyebrow">{{ reference.type }}</p>
+            <h2>{{ reference.title }}</h2>
+          </div>
+          <button type="button" class="ghost-action" (click)="editReference(reference)">Edit</button>
+        </div>
+
+        <div class="preview-box">
+          @if (reference.type === 'Video Link' && youtubeEmbedResourceUrl(reference.link); as embedUrl) {
+            <iframe
+              [src]="embedUrl"
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            ></iframe>
+          } @else if (reference.type === 'Image' && reference.fileDataUrl) {
+            <img [src]="reference.fileDataUrl" [alt]="reference.title">
+          } @else {
+            <div class="file-preview">
+              <span>{{ resourceInitial(reference) }}</span>
+              <strong>{{ reference.fileName || reference.link || 'Text note' }}</strong>
+            </div>
+          }
+        </div>
+
+        <dl class="info-grid">
+          <div>
+            <dt>Category</dt>
+            <dd>{{ reference.category }}</dd>
+          </div>
+          <div>
+            <dt>Subcategory</dt>
+            <dd>{{ reference.subcategory || 'Not set' }}</dd>
+          </div>
+          <div>
+            <dt>Created date</dt>
+            <dd>{{ reference.createdAt | date: 'mediumDate' }}</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>{{ reference.fileName || reference.link || 'Note only' }}</dd>
+          </div>
+        </dl>
+
+        <section class="description-card">
+          <h3>Description</h3>
+          <p>{{ reference.description || 'No description added.' }}</p>
+        </section>
+
+        <section class="tags-card">
+          <h3>Tags</h3>
+          <div>
+            @for (tag of reference.tags; track tag) {
+              <span>{{ tag }}</span>
+            } @empty {
+              <small>No tags added.</small>
+            }
+          </div>
+        </section>
+
+        <div class="detail-actions">
+          <button type="button" class="primary-action" (click)="openReference(reference)">Open Link / File</button>
+          <button type="button" class="ghost-action" (click)="duplicateReference(reference)">Duplicate</button>
+          <button type="button" class="danger-action" (click)="deleteReference(reference)">Delete</button>
+        </div>
+      } @else {
+        <div class="empty-detail">
+          <h2>No reference selected</h2>
+          <p>Add or select a resource to view details.</p>
+        </div>
+      }
+    </aside>
+  </section>
+
+  @if (isEditorOpen()) {
+    <section class="editor-backdrop" aria-labelledby="reference-editor-title">
+      <form class="editor-panel" (ngSubmit)="saveReference()">
+        <div class="editor-header">
+          <h2 id="reference-editor-title">{{ form.id ? 'Edit Reference' : 'Add Reference' }}</h2>
+          <button type="button" class="icon-button" title="Close" (click)="isEditorOpen.set(false)">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Title</span>
+            <input type="text" [(ngModel)]="form.title" name="title" required>
+          </label>
+
+          <label>
+            <span>Type</span>
+            <select [(ngModel)]="form.type" name="type">
+              @for (type of types; track type) {
+                <option [value]="type">{{ type }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span>Category</span>
+            <select [(ngModel)]="form.category" name="category">
+              @for (category of categories(); track category.id) {
+                <option [value]="category.name">{{ category.name }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span>Subcategory</span>
+            <input list="reference-subcategories" type="text" [(ngModel)]="form.subcategory" name="subcategory">
+            <datalist id="reference-subcategories">
+              @for (subcategory of subcategories(); track subcategory) {
+                <option [value]="subcategory"></option>
+              }
+            </datalist>
+          </label>
+        </div>
+
+        <label>
+          <span>Description</span>
+          <textarea rows="4" [(ngModel)]="form.description" name="description"></textarea>
+        </label>
+
+        <label>
+          <span>{{ form.type === 'Video Link' ? 'YouTube or external video link' : 'Link' }}</span>
+          <input type="url" [(ngModel)]="form.link" name="link" placeholder="https://">
+        </label>
+
+        @if (form.type !== 'Video Link' && form.type !== 'Text Note') {
+          <label class="upload-box">
+            <span>Upload file</span>
+            <input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,application/pdf,image/*,text/plain"
+              (change)="handleFileUpload($event)"
+            >
+            @if (form.fileName) {
+              <small>{{ form.fileName }}</small>
+            }
+          </label>
+        }
+
+        <label>
+          <span>Tags</span>
+          <input type="text" [(ngModel)]="form.tagsText" name="tags" placeholder="back, strength, beginner">
+        </label>
+
+        <div class="editor-actions">
+          <button type="button" class="ghost-action" (click)="isEditorOpen.set(false)">Cancel</button>
+          <button type="submit" class="primary-action">Save Reference</button>
+        </div>
+      </form>
+    </section>
+  }
+
+  @if (isCategoryEditorOpen()) {
+    <section class="editor-backdrop" aria-labelledby="category-editor-title">
+      <form class="editor-panel category-editor" (ngSubmit)="saveCategory()">
+        <div class="editor-header">
+          <div>
+            <h2 id="category-editor-title">Create Category</h2>
+            <p>Use categories to organize trainer-owned reusable resources.</p>
+          </div>
+          <button type="button" class="icon-button" title="Close" (click)="isCategoryEditorOpen.set(false)">x</button>
+        </div>
+
+        <label>
+          <span>Category name</span>
+          <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Exercises" required>
+        </label>
+
+        <label>
+          <span>Subcategories</span>
+          <textarea
+            rows="5"
+            [(ngModel)]="categoryForm.subcategoriesText"
+            name="categorySubcategories"
+            placeholder="Back Exercises&#10;Chest Exercises&#10;Leg Exercises"
+          ></textarea>
+          <small>Add one per line or separate with commas. You can also type a new subcategory when adding a reference.</small>
+        </label>
+
+        <div class="editor-actions">
+          <button type="button" class="ghost-action" (click)="isCategoryEditorOpen.set(false)">Cancel</button>
+          <button type="submit" class="primary-action">Save Category</button>
+        </div>
+      </form>
+    </section>
+  }
+</app-trainer-page-shell>

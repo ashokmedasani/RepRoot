@@ -1,0 +1,277 @@
+<app-trainer-page-shell
+  title="Forms & Groups"
+  subtitle="Home / Forms & Groups"
+  activeSection="forms-groups"
+  maxWidth="92rem"
+  titleId="forms-title"
+>
+  <button page-actions type="button" class="ghost-action" (click)="loadOverview()">Refresh</button>
+
+    @if (message) {
+      <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    }
+
+    @if (isLoading) {
+      <section class="panel">
+        <p>Loading Forms & Groups...</p>
+      </section>
+    } @else if (overview) {
+      @if (!overview.has_lead_form) {
+        <section class="empty-state" aria-labelledby="empty-form-title">
+          <h2 id="empty-form-title">You haven't created a form yet.</h2>
+          <p>Please create your trainer lead form to view Forms & Groups.</p>
+          <div class="setup-note">
+            <p>This setup may take around 10-15 minutes. You will create:</p>
+            <ol>
+              <li>Public lead form</li>
+              <li>Minimum one group</li>
+              <li>Client creation form for that group</li>
+            </ol>
+          </div>
+          <a routerLink="/trainer/forms/create" class="primary-action">Create Form</a>
+        </section>
+      } @else {
+        <section class="panel lead-panel" aria-labelledby="lead-form-title">
+          <div class="lead-main">
+            <div class="panel-title">
+              <h2 id="lead-form-title">Public Lead Form (Form 1)</h2>
+              <span class="status-pill">Active</span>
+            </div>
+
+            <div class="form-name-block">
+              <span>Form Name</span>
+              <h3>{{ overview.lead_form?.title }}</h3>
+              <p>Share this form link with your potential clients.</p>
+            </div>
+
+            <div class="form-link-box">
+              <span>Form Link</span>
+              <div>
+                <a [href]="overview.lead_form?.public_link" target="_blank" rel="noreferrer">{{ overview.lead_form?.public_link }}</a>
+                <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>
+              </div>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-card total-stat">
+                <span>Total Requests</span>
+                <strong>{{ overview.pending_forms.length + overview.approved_forms.length + overview.deleted_forms.length }}</strong>
+              </div>
+              <div class="stat-card pending-stat">
+                <span>Pending</span>
+                <strong>{{ overview.pending_forms.length }}</strong>
+              </div>
+              <div class="stat-card approved-stat">
+                <span>Approved</span>
+                <strong>{{ overview.approved_forms.length }}</strong>
+              </div>
+              <div class="stat-card deleted-stat">
+                <span>Deleted</span>
+                <strong>{{ overview.deleted_forms.length }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <aside class="fields-card">
+            <div class="fields-header">
+              <h3>Form Fields</h3>
+              <span>3 required</span>
+            </div>
+            <ul>
+              <li>First Name (Required)</li>
+              <li>Last Name (Required)</li>
+              <li>Email Address (Required)</li>
+            </ul>
+            @if ((overview.lead_form?.fields?.length || 0) > 3) {
+              <p>{{ (overview.lead_form?.fields?.length || 0) - 3 }} more fields</p>
+            }
+          </aside>
+
+          <a routerLink="/trainer/forms/create" class="secondary-action edit-form-action">Edit Form</a>
+        </section>
+
+        <section class="panel requests-panel" aria-labelledby="requests-title">
+          <div class="section-heading">
+            <h2 id="requests-title">Form Requests</h2>
+            <label class="month-filter">
+              <span>Filter by Month</span>
+              <select [(ngModel)]="monthFilter" name="monthFilter">
+                <option value="">Last 6 months</option>
+                @for (month of monthOptions; track month.value) {
+                  <option [value]="month.value">{{ month.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="request-tabs" role="group" aria-label="Submission status">
+            <button type="button" [class.active]="selectedSubmissionView === 'pending'" (click)="setSubmissionView('pending')">
+              Pending ({{ submissionCount('pending') }})
+            </button>
+            <button type="button" [class.active]="selectedSubmissionView === 'approved'" (click)="setSubmissionView('approved')">
+              Approved ({{ submissionCount('approved') }})
+            </button>
+            <button type="button" [class.active]="selectedSubmissionView === 'deleted'" (click)="setSubmissionView('deleted')">
+              Deleted ({{ submissionCount('deleted') }})
+            </button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Applicant Name</th>
+                  <th>Email</th>
+                  <th>Submitted On</th>
+                  <th>Reference ID</th>
+                  <th>Group</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (submission of activeSubmissions; track submission.id; let index = $index) {
+                  <tr>
+                    <td>{{ index + 1 }}</td>
+                    <td>{{ submission.applicant_name }}</td>
+                    <td>{{ submission.email }}</td>
+                    <td>{{ submission.submitted_at | date: 'medium' }}</td>
+                    <td>{{ submission.reference_id }}</td>
+                    <td>
+                      <span [class.not-assigned]="!submission.client_access">{{ groupNameFor(submission) }}</span>
+                    </td>
+                    <td class="action-cell">
+                      @if (submission.client_access) {
+                        <a [routerLink]="['/trainer/clients', submission.client_access.id]" class="icon-action">View Profile</a>
+                      } @else {
+                        <button type="button" class="icon-action" title="View details" (click)="viewDetails(submission)">View</button>
+                      }
+                      @if (selectedSubmissionView === 'pending') {
+                        <button type="button" class="icon-action success-action" title="Create client access" (click)="startClientAccess(submission)">Create</button>
+                        <button type="button" class="icon-action danger-action" [disabled]="isSaving" title="Delete request" (click)="deletePending(submission)">Delete</button>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7">No {{ selectedSubmissionView }} forms found.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel groups-panel" aria-labelledby="groups-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="groups-title">Groups</h2>
+              <p>Organize your clients into groups based on their goals or programs.</p>
+            </div>
+            <a routerLink="/trainer/groups/create" class="primary-action group-create-action">Create Group</a>
+          </div>
+
+          <div class="group-list">
+            @for (group of overview.groups; track group.id) {
+              <article class="group-row">
+                <div class="group-summary">
+                  <span class="group-caret">&rsaquo;</span>
+                  <div>
+                    <h3>{{ group.name }}</h3>
+                    <p>{{ group.description || 'No description added yet.' }}</p>
+                  </div>
+                  <span class="status-pill">Active</span>
+                </div>
+                <div class="group-actions">
+                  <span>{{ group.has_registration_form ? 'Client creation form ready' : 'Client creation form needed' }}</span>
+                  <a [routerLink]="['/trainer/groups', group.id]" class="ghost-action">Open group</a>
+                  <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
+                </div>
+              </article>
+            } @empty {
+              <article class="group-row">
+                <div>
+                  <h3>No groups yet</h3>
+                  <p>Create a group to finish setup.</p>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @if (detailSubmission) {
+        <section class="panel detail-panel" aria-labelledby="detail-title">
+          <div class="section-heading">
+            <h2 id="detail-title">Request details</h2>
+            <button type="button" class="ghost-action" (click)="detailSubmission = null">Close</button>
+          </div>
+          <dl>
+            @for (answer of detailSubmission.answers | keyvalue; track answer.key) {
+              <div>
+                <dt>{{ answer.key }}</dt>
+                <dd>{{ answer.value }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+      }
+
+      @if (selectedSubmission) {
+        <section class="panel client-access-panel" aria-labelledby="client-access-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Approved client login</p>
+              <h2 id="client-access-title">Create client access for {{ selectedSubmission.applicant_name }}</h2>
+            </div>
+            <button type="button" class="ghost-action" (click)="selectedSubmission = null">Cancel</button>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              <span class="field-label">Group <span class="required">*</span></span>
+              <select [(ngModel)]="clientAccess.groupId" name="clientAccessGroup">
+                <option value="">Select group</option>
+                @for (group of overview.groups; track group.id) {
+                  <option [value]="group.id" [disabled]="!group.has_registration_form">{{ group.name }}</option>
+                }
+              </select>
+            </label>
+
+            <label>
+              <span class="field-label">Client username <span class="required">*</span></span>
+              <input type="text" [(ngModel)]="clientAccess.username" name="clientUsername" autocomplete="username">
+            </label>
+
+            <label>
+              <span class="field-label">Client password <span class="required">*</span></span>
+              <input type="password" [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password">
+            </label>
+
+            <label>
+              <span class="field-label">Confirm password <span class="required">*</span></span>
+              <input type="password" [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password">
+            </label>
+          </div>
+
+          @if (selectedRegistrationFields.length) {
+            <div class="dynamic-fields">
+              <h3>Client registration answers</h3>
+              @for (field of selectedRegistrationFields; track field.key || field.label) {
+                <label>
+                  <span class="field-label">{{ field.label }} @if (field.required) { <span class="required">*</span> }</span>
+                  @if (field.field_type === 'long_text' || field.field_type === 'address') {
+                    <textarea rows="3" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label"></textarea>
+                  } @else {
+                    <input [type]="fieldInputType(field)" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label" [readonly]="field.is_core">
+                  }
+                </label>
+              }
+            </div>
+          }
+
+          <button type="button" class="primary-action" [disabled]="isSaving" (click)="createClientAccess()">Create client access</button>
+        </section>
+      }
+    }
+</app-trainer-page-shell>

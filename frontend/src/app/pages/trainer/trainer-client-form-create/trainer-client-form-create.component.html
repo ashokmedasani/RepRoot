@@ -1,0 +1,49 @@
+<app-trainer-page-shell
+  title="Create the client creation form"
+  eyebrow="Step 3"
+  activeSection="forms-groups"
+  maxWidth="72rem"
+  titleId="client-form-title"
+>
+    <a page-actions class="ghost-link" routerLink="/trainer/forms-groups">Back to dashboard</a>
+
+    @if (isLoading) {
+      <p class="message">Loading client form builder...</p>
+    } @else if (group) {
+      <section class="setup-card group-context">
+        <span>Group</span>
+        <h2>{{ group.name }}</h2>
+        @if (group.description) {
+          <p>{{ group.description }}</p>
+        }
+      </section>
+
+      <section class="setup-card core-card">
+        <div>
+          <h2>Universal Core Fields</h2>
+          <p>These fields are required and will be auto-filled when you convert a form request into a client.</p>
+        </div>
+        <div class="core-grid">
+          <span>First Name</span>
+          <span>Last Name</span>
+          <span>Email Address</span>
+        </div>
+      </section>
+
+      <section class="setup-card">
+        <app-form-field-builder [customFields]="customFields"></app-form-field-builder>
+      </section>
+
+      @if (message) {
+        <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+      }
+
+      <div class="action-bar">
+        <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveForm()">
+          {{ isSaving ? 'Saving...' : 'Save client creation form' }}
+        </button>
+      </div>
+    } @else if (message) {
+      <p class="message error-message">{{ message }}</p>
+    }
+</app-trainer-page-shell>

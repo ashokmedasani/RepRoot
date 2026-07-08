@@ -1,0 +1,306 @@
+<app-trainer-page-shell
+  [title]="group ? 'Group: ' + group.name : 'Group details'"
+  eyebrow="Forms & Groups"
+  [subtitle]="group ? 'Manage approved users, registration forms, tracking templates, and group settings.' : 'Loading group details.'"
+  activeSection="forms-groups"
+  maxWidth="96rem"
+  titleId="group-users-title"
+>
+    <a page-actions routerLink="/trainer/forms-groups" class="secondary-action">Back</a>
+    @if (group) {
+      <button page-actions type="button" class="primary-action" (click)="setTab('settings')">Edit Group</button>
+    }
+
+    @if (isLoading) {
+      <section class="panel">
+        <p>Loading group workspace...</p>
+      </section>
+    } @else if (group) {
+      @if (message) {
+        <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+      }
+
+      <section class="summary-band" aria-label="Group summary">
+        <div>
+          <span class="status-pill">Active</span>
+          <h2>{{ group.name }}</h2>
+          <p>{{ group.description || 'No description added yet.' }}</p>
+        </div>
+        <div class="summary-stats">
+          <article>
+            <span>Total Clients</span>
+            <strong>{{ clients.length }}</strong>
+          </article>
+          <article>
+            <span>Active Clients</span>
+            <strong>{{ activeClients.length }}</strong>
+          </article>
+          <article>
+            <span>Pending Invites</span>
+            <strong>{{ pendingInvites }}</strong>
+          </article>
+          <article>
+            <span>Registration Form</span>
+            <strong>{{ group.has_registration_form ? 'Ready' : 'Needed' }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <nav class="group-tabs" aria-label="Group sections">
+        @for (tab of tabs; track tab.id) {
+          <button type="button" [class.active]="activeTab === tab.id" (click)="setTab(tab.id)">
+            {{ tab.label }}
+          </button>
+        }
+      </nav>
+
+      @if (activeTab === 'overview') {
+        <section class="workspace-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Overview</h2>
+                <p>Quick health check for this group.</p>
+              </div>
+            </div>
+            <div class="overview-cards">
+              <div>
+                <span>Approved users</span>
+                <strong>{{ activeClients.length }}</strong>
+                <p>Clients with portal access.</p>
+              </div>
+              <div>
+                <span>Form fields</span>
+                <strong>{{ registrationFields.length }}</strong>
+                <p>Registration fields saved for this group.</p>
+              </div>
+              <div>
+                <span>Tracking templates</span>
+                <strong>{{ trackingTemplates.length }}</strong>
+                <p>Daily, weekly, and monthly check-ins.</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Recent Approved Users</h2>
+                <p>Open a profile to check registration answers and access status.</p>
+              </div>
+              <button type="button" class="ghost-action" (click)="setTab('approved-users')">View All</button>
+            </div>
+            <div class="mini-list">
+              @for (client of clients.slice(0, 5); track client.id) {
+                <a [routerLink]="['/trainer/clients', client.id]">
+                  <span class="avatar">{{ initials(client) }}</span>
+                  <span>
+                    <strong>{{ client.first_name }} {{ client.last_name }}</strong>
+                    <small>{{ client.email }}</small>
+                  </span>
+                </a>
+              } @empty {
+                <p>No approved users yet.</p>
+              }
+            </div>
+          </article>
+        </section>
+      }
+
+      @if (activeTab === 'approved-users') {
+        <section>
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Approved Users</h2>
+                <p>{{ filteredClients.length }} users shown</p>
+              </div>
+              <button type="button" class="ghost-action" (click)="loadGroup(group.id)">Refresh</button>
+            </div>
+
+            <div class="filters">
+              <input type="search" placeholder="Search by name, email, or username" [(ngModel)]="searchTerm" name="searchTerm">
+              <select [(ngModel)]="statusFilter" name="statusFilter">
+                <option value="all">Status: All</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending password change</option>
+              </select>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Client Name</th>
+                    <th>Email</th>
+                    <th>Username</th>
+                    <th>Status</th>
+                    <th>Joined On</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (client of filteredClients; track client.id; let index = $index) {
+                    <tr>
+                      <td>{{ index + 1 }}</td>
+                      <td>
+                        <span class="client-name"><span class="avatar small">{{ initials(client) }}</span>{{ client.first_name }} {{ client.last_name }}</span>
+                      </td>
+                      <td>{{ client.email }}</td>
+                      <td>{{ client.username }}</td>
+                      <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
+                      <td>{{ client.created_at | date: 'mediumDate' }}</td>
+                      <td>
+                        <a [routerLink]="['/trainer/clients', client.id]" class="ghost-action compact">View Profile</a>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="7">No users found for this group.</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+        </section>
+      }
+
+      @if (activeTab === 'registration-form') {
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Client Registration Form</h2>
+              <p>Fields collected when a lead becomes a client in this group.</p>
+            </div>
+            <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
+          </div>
+
+          <div class="field-groups">
+            <article>
+              <h3>Universal Fields</h3>
+              @for (field of registrationFields.slice(0, 3); track field.key || field.label) {
+                <div class="field-row">
+                  <span>{{ field.label }}</span>
+                  <small>Required</small>
+                </div>
+              }
+            </article>
+            <article>
+              <h3>Custom Fields</h3>
+              @for (field of customRegistrationFields; track field.key || field.label) {
+                <div class="field-row">
+                  <span>{{ field.label }}</span>
+                  <small>{{ field.field_type }} - {{ field.required ? 'Required' : 'Optional' }}</small>
+                </div>
+              } @empty {
+                <p>No custom registration fields yet.</p>
+              }
+            </article>
+          </div>
+        </section>
+      }
+
+      @if (activeTab === 'tracking-templates') {
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Tracking Templates</h2>
+              <p>Daily, weekly, and monthly target forms clients can fill in.</p>
+            </div>
+            <a [routerLink]="['/trainer/groups', group.id, 'tracking-template', 'create']" class="primary-action">Edit Template</a>
+          </div>
+
+          <div class="template-grid">
+            @for (template of trackingTemplates; track template.name) {
+              <article
+                class="template-card"
+                [class.green]="template.accent === 'green'"
+                [class.blue]="template.accent === 'blue'"
+                [class.orange]="template.accent === 'orange'"
+                [class.purple]="template.accent === 'purple'"
+              >
+                <div class="template-card-head">
+                  <div>
+                    <h3>{{ template.name }}</h3>
+                    <p>{{ template.cadence }}</p>
+                  </div>
+                  <span>{{ template.fields.length }} fields</span>
+                </div>
+
+                @if (template.purpose) {
+                  <p class="template-purpose">{{ template.purpose }}</p>
+                }
+
+                @for (field of template.fields; track field.label) {
+                  <label class="template-input-row">
+                    <span>{{ field.label }} @if (field.required) { <b>*</b> }</span>
+                    <small>{{ fieldTypeLabel(field) }} - {{ field.required ? 'Required' : 'Optional' }}</small>
+
+                    @if (field.fieldType === 'long_text') {
+                      <textarea rows="3" [placeholder]="field.placeholder || 'Client response'" disabled></textarea>
+                    } @else if (field.fieldType === 'yes_no' || field.type === 'Yes / No') {
+                      <select disabled>
+                        <option>Choose yes or no</option>
+                      </select>
+                    } @else if (field.fieldType === 'image' || field.type === 'Image') {
+                      <input type="file" disabled>
+                    } @else {
+                      <input [type]="field.fieldType === 'number' || field.type === 'Number' ? 'number' : 'text'" [placeholder]="field.placeholder || 'Client response'" disabled>
+                    }
+                  </label>
+                }
+                <a [routerLink]="['/trainer/groups', group.id, 'tracking-template', 'create']" class="ghost-action">Add Field</a>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @if (activeTab === 'settings') {
+        <section class="settings-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Group Settings</h2>
+                <p>Edit the group name and description.</p>
+              </div>
+            </div>
+
+            <label>
+              <span class="field-label">Group Name</span>
+              <input type="text" [(ngModel)]="groupDraft.name" name="groupName">
+            </label>
+
+            <label>
+              <span class="field-label">Description</span>
+              <textarea rows="5" [(ngModel)]="groupDraft.description" name="groupDescription"></textarea>
+            </label>
+
+            <button type="button" class="primary-action" (click)="saveGroup()">Save Group</button>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Access Rules</h2>
+                <p>Trainer controls for this group.</p>
+              </div>
+            </div>
+            <div class="rules-list">
+              <span>Trainer can review every approved user profile.</span>
+              <span>Trainer can reset any client password.</span>
+              <span>Registration form fields apply to all clients in this group.</span>
+              <span>Tracking templates define daily, weekly, and monthly progress checks.</span>
+            </div>
+          </article>
+        </section>
+      }
+    } @else {
+      <section class="panel error-panel">
+        <p>{{ message || 'Group not found.' }}</p>
+      </section>
+    }
+</app-trainer-page-shell>

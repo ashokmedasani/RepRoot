@@ -2,7 +2,7 @@
 
 ## What this file does
 
-Defines database models for trainer account profile data.
+Defines database models for trainer account profile data and the Forms & Groups setup flow.
 
 ## Why this file exists
 
@@ -10,17 +10,24 @@ Django's built-in `User` model stores authentication and identity fields. `Train
 
 ## Page or module
 
-Backend accounts module for trainer signup, login, profile setup, and Profile / Portfolio.
+Backend accounts module for trainer signup, login, profile setup, Profile / Portfolio, public lead forms, groups, client registration forms, submitted leads, and client access records.
 
 ## Important functions/classes/components
 
 - `TrainerProfile`: one-to-one profile linked to Django's user model.
 - `profile_setup_completed`: controls whether a trainer must complete `/trainer/profile-setup`.
 - File fields: store profile photo, certification upload, transformation photo, and training photo.
+- `UNIVERSAL_CORE_FIELDS`: required First Name, Last Name, and Email Address fields reused by lead and client registration forms.
+- `TrainerLeadForm`: one public lead form per trainer with a non-deletable public slug.
+- `TrainerGroup`: trainer-owned client group with a five-group limit enforced by the API.
+- `ClientRegistrationForm`: one registration form per group.
+- `LeadSubmission`: submitted public form answers with generated applicant reference IDs.
+- `ClientAccess`: converted client access record with trainer-scoped unique email and username.
+- KPI lifecycle fields: `created_at`, `updated_at`, `status`, `converted_at`, `deleted_at`, and `is_active` are present where future aggregate reporting needs them.
 
 ## Data flow
 
-Trainer signup creates a Django `User` and linked `TrainerProfile`. Profile setup and Profile / Portfolio APIs update the same `TrainerProfile` row and update the user's first and last name through serializers.
+Trainer signup creates a Django `User` and linked `TrainerProfile`. Forms & Groups APIs create the trainer's lead form, groups, group registration forms, lead submissions, and conversion records. Future KPI dashboards can aggregate by trainer, form, group, status, active flags, and dates without reading private answers.
 
 ## Connected files
 
@@ -28,10 +35,12 @@ Trainer signup creates a Django `User` and linked `TrainerProfile`. Profile setu
 - `backend/accounts/views.py`
 - `backend/accounts/admin.py`
 - `backend/accounts/migrations/0004_trainerprofile_setup_portfolio.py`
+- `backend/accounts/migrations/0006_forms_groups_flow.py`
+- `backend/accounts/migrations/0007_clientaccess_is_active_clientaccess_updated_at_and_more.py`
 
 ## Business logic
 
-New trainer profiles start as incomplete. Saving required setup fields marks `profile_setup_completed` as true.
+New trainer profiles start as incomplete. Forms & Groups setup only checks whether the trainer has at least one active lead form, then requires at least one active group and a client registration form for selected groups. Deleted lead submissions are soft deleted with `status='deleted'`, `is_active=false`, and `deleted_at`.
 
 ## Assumptions made
 

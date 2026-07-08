@@ -1,0 +1,110 @@
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  color: var(--app-text);
+  font-size: 2rem;
+  letter-spacing: 0;
+}
+
+h2 {
+  color: var(--app-text);
+  font-size: 1.1rem;
+}
+
+.group-card {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  padding: 1.15rem;
+  margin-bottom: 1rem;
+  background: var(--app-surface);
+  box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+.intro-card {
+  border-color: color-mix(in srgb, var(--app-success) 34%, var(--app-border));
+  background: color-mix(in srgb, var(--app-success) 10%, var(--app-surface));
+}
+
+.intro-card p,
+.message {
+  color: var(--app-muted);
+  font-weight: 750;
+  line-height: 1.55;
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.examples span {
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--app-text);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+input,
+textarea {
+  width: 100%;
+  min-height: 2.85rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.ghost-link {
+  color: var(--app-primary-strong);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary-action {
+  min-height: 2.85rem;
+  border: 0;
+  border-radius: 0.65rem;
+  padding: 0 1rem;
+  background: var(--app-primary);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.action-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message {
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.error-message {
+  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
+  color: #d92d20;
+}
