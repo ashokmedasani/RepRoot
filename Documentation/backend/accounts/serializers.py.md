@@ -2,7 +2,7 @@
 
 ## What this file does
 
-Defines Django REST Framework serializers for trainer authentication, OTP flows, password reset, profile status, profile setup, and Profile / Portfolio data.
+Defines Django REST Framework serializers for trainer authentication, OTP flows, password reset, profile status, profile setup, Profile / Portfolio data, and Forms & Groups data.
 
 ## Why this file exists
 
@@ -10,7 +10,7 @@ Serializers validate API input, convert model data to API responses, and keep vi
 
 ## Page or module
 
-Backend accounts module for Page 2 trainer access and trainer profile pages.
+Backend accounts module for Page 2 trainer access, trainer profile pages, public lead forms, groups, submitted leads, and client access creation.
 
 ## Important functions/classes/components
 
@@ -19,20 +19,29 @@ Backend accounts module for Page 2 trainer access and trainer profile pages.
 - `PasswordResetConfirmSerializer`: validates reset token and updates password.
 - `TrainerProfileStatusSerializer`: returns `profile_setup_completed`.
 - `TrainerProfileSerializer`: reads and writes setup/Profile fields, updates first and last name on the linked user, and returns media URLs.
+- `normalize_dynamic_fields`: prepends universal First Name, Last Name, and Email Address fields to custom form fields.
+- `TrainerLeadFormSerializer`: saves Form 1 and returns the generated public link.
+- `TrainerGroupSerializer`: returns group details and registration form status.
+- `ClientRegistrationFormSerializer`: saves a group's client registration form.
+- `PublicLeadSubmissionSerializer`: validates public applicant submissions.
+- `ClientAccessCreateSerializer`: validates conversion payloads.
+- Dynamic field metadata supports text, phone, choice, date, location, and address field types. Choice options are preserved in the JSON field metadata.
+- Reporting fields such as `status`, `is_active`, `created_at`, `updated_at`, `converted_at`, and `deleted_at` are exposed where future aggregate views need them.
 
 ## Data flow
 
-Frontend sends auth/profile data to the API. Serializers validate the request, update the `User` and `TrainerProfile`, then return normalized response data.
+Frontend sends auth/profile/forms data to the API. Serializers validate the request, update the matching models, then return normalized response data.
 
 ## Business logic
 
-Profile setup requires first name, last name, gender, birth month, birth year, country, and state. Saving a profile marks setup as completed.
+Profile setup requires first name, last name, gender, birth month, birth year, country, and state. Forms & Groups serializers keep universal core fields required and non-removable while preserving aggregate-friendly lifecycle fields.
 
 ## Connected files
 
 - `backend/accounts/models.py`
 - `backend/accounts/views.py`
 - `frontend/src/app/core/api/trainer-auth-api.service.ts`
+- `frontend/src/app/core/api/forms-groups-api.service.ts`
 
 ## Future improvement notes
 

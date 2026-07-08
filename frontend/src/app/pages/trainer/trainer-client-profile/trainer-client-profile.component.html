@@ -1,0 +1,158 @@
+<app-trainer-page-shell
+  [title]="client ? client.first_name + ' ' + client.last_name : 'Client Profile'"
+  eyebrow="Approved User"
+  [subtitle]="client ? 'Reference ID: ' + (profile?.lead_submission?.reference_id || '') : 'Loading client profile.'"
+  activeSection="forms-groups"
+  maxWidth="92rem"
+  titleId="client-profile-title"
+>
+  <a page-actions routerLink="/trainer/clients" class="secondary-action">Back to Clients</a>
+  @if (profile?.group) {
+    <a page-actions [routerLink]="['/trainer/groups', profile?.group?.id]" class="secondary-action">Back to Group</a>
+  }
+
+  @if (isLoading) {
+    <section class="panel">
+      <p>Loading client profile...</p>
+    </section>
+  } @else if (client && profile) {
+    @if (message) {
+      <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    }
+
+    <section class="profile-hero-card">
+      <div class="identity-row">
+        <span class="avatar">{{ initials(client) }}</span>
+        <div>
+          <span class="hero-label">Client</span>
+          <h2>{{ client.first_name }} {{ client.last_name }}</h2>
+          <p>{{ client.username }} - {{ client.email }}</p>
+        </div>
+      </div>
+      <div class="hero-details">
+        <article>
+          <span>Form Number</span>
+          <strong>#{{ profile.lead_submission.id }}</strong>
+        </article>
+        <article>
+          <span>Reference ID</span>
+          <strong>{{ profile.lead_submission.reference_id }}</strong>
+        </article>
+        <article>
+          <span>Group Number</span>
+          <strong>#{{ profile.group.id }}</strong>
+        </article>
+        <article>
+          <span>Group</span>
+          <strong>{{ profile.group.name }}</strong>
+        </article>
+      </div>
+      <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+    </section>
+
+    <section class="profile-grid">
+      <article class="panel">
+        <h3>Account Details</h3>
+        <dl>
+          <div>
+            <dt>Username</dt>
+            <dd>{{ client.username }}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{{ client.email }}</dd>
+          </div>
+          <div>
+            <dt>Group</dt>
+            <dd>{{ client.group_name }}</dd>
+          </div>
+          <div>
+            <dt>Reference ID</dt>
+            <dd>{{ profile.lead_submission.reference_id }}</dd>
+          </div>
+          <div>
+            <dt>Submitted On</dt>
+            <dd>{{ profile.lead_submission.submitted_at | date: 'medium' }}</dd>
+          </div>
+          <div>
+            <dt>Joined On</dt>
+            <dd>{{ client.created_at | date: 'medium' }}</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="chat-layout">
+      <article class="panel chat-panel">
+        <div class="chat-header">
+          <div>
+            <h3>Client Chat</h3>
+            <p>Communicate with {{ client.first_name }} about check-ins, forms, and next steps.</p>
+          </div>
+          <span>{{ chatMessages.length }} messages</span>
+        </div>
+
+        <div class="message-list">
+          @for (chatMessage of chatMessages; track chatMessage.id) {
+            <div class="chat-bubble" [class.client-message]="chatMessage.sender === 'client'">
+              <strong>{{ chatMessage.sender === 'trainer' ? 'Trainer' : client.first_name }}</strong>
+              <p>{{ chatMessage.body }}</p>
+              <small>{{ chatMessage.sentAt | date: 'short' }}</small>
+            </div>
+          } @empty {
+            <p class="empty-chat">No messages yet. Send the first note to this client.</p>
+          }
+        </div>
+
+        <form class="chat-compose" (ngSubmit)="sendMessage()">
+          <textarea
+            rows="3"
+            placeholder="Write a message to the client"
+            [(ngModel)]="chatDraft"
+            name="chatDraft"
+          ></textarea>
+          <button type="submit" class="primary-action">Send Message</button>
+        </form>
+      </article>
+
+      <article class="panel access-panel">
+        <h3>Account Access</h3>
+        <p>{{ client.must_change_password ? 'Temporary password is active.' : 'Client can access the portal with the current password.' }}</p>
+        <button type="button" class="primary-action" (click)="resetClientPassword()">Reset Password</button>
+        @if (resetPasswordResult) {
+          <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
+        }
+      </article>
+    </section>
+
+    <section class="profile-grid wide">
+      <article class="panel">
+        <h3>Registration Answers</h3>
+        <dl class="answer-grid">
+          @for (field of profile.registration_fields; track field.key || field.label) {
+            <div>
+              <dt>{{ field.label }}</dt>
+              <dd>{{ fieldValue(field) }}</dd>
+            </div>
+          }
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h3>Lead Form Answers</h3>
+        <dl class="answer-grid">
+          @for (answer of profile.lead_submission.answers | keyvalue; track answer.key) {
+            <div>
+              <dt>{{ answer.key }}</dt>
+              <dd>{{ answer.value || 'Not added' }}</dd>
+            </div>
+          }
+        </dl>
+      </article>
+    </section>
+  } @else {
+    <section class="panel error-panel">
+      <p>{{ message || 'Client profile not found.' }}</p>
+    </section>
+  }
+</app-trainer-page-shell>

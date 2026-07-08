@@ -18,12 +18,13 @@ Template bindings read from the reactive profile form and call component handler
 
 ## Business logic
 
-Navigation labels show future app sections across the top, but only Profile is active and implemented. Existing profile photos are shown in the left profile-header photo position with a clear Change Photo action.
+Navigation includes a real Forms & Groups link after that page was implemented. Existing profile photos are shown in the left profile-header photo position with a clear Change Photo action.
 
 ## Connected files
 
 - `trainer-profile.component.ts`
 - `trainer-profile.component.scss`
+- `frontend/src/app/pages/trainer-forms-groups/trainer-forms-groups.component.ts`
 - `frontend/src/styles.scss`
 
 ## Future improvement notes

@@ -1,0 +1,35 @@
+# frontend/src/app/core/api/forms-groups-api.service.ts
+
+## What this file does
+
+Provides typed Angular HTTP methods for the Forms & Groups setup flow and public lead form flow.
+
+## Why this file exists
+
+The trainer Forms & Groups page and public applicant page need a focused API client separate from trainer authentication/profile calls.
+
+## Page or module
+
+Angular core API services.
+
+## Important functions/classes/components
+
+- `getOverview`: loads Form 1, groups, pending forms, approved forms, and maximum group count.
+- `saveLeadForm`: creates or edits the trainer public lead form.
+- `createGroup`: creates a trainer group.
+- `saveRegistrationForm`: creates or edits a group's client registration form.
+- `getGroupUsers`: loads active users created under one group.
+- `deletePendingForm`: deletes a pending applicant request.
+- `createClientAccess`: converts a pending applicant into client access.
+- `getPublicForm` and `submitPublicForm`: support unauthenticated applicants.
+- Dynamic field types include location and address in addition to text, phone, choice, number, and date types.
+
+## Data flow
+
+Protected trainer methods include the stored trainer auth token. Public form methods call unauthenticated backend routes. The dashboard uses one overview payload while guided setup pages reuse the create/update endpoints.
+
+## Connected files
+
+- `frontend/src/app/pages/trainer-forms-groups/trainer-forms-groups.component.ts`
+- `frontend/src/app/pages/public-lead-form/public-lead-form.component.ts`
+- `backend/accounts/views.py`

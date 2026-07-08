@@ -1,0 +1,59 @@
+<app-trainer-page-shell
+  title="Settings"
+  eyebrow="Settings"
+  activeSection="settings"
+  maxWidth="72rem"
+  titleId="account-settings-title"
+>
+    <div class="settings-grid">
+      <section class="settings-panel account-panel">
+        <div class="settings-menu" aria-label="Settings sections">
+          <button type="button" class="settings-tab active">Account</button>
+        </div>
+
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="change-password-title">
+            <div>
+              <h2 id="change-password-title">Change Password</h2>
+            </div>
+
+            <form class="password-form" (ngSubmit)="changePassword()">
+              <label>
+                <span class="field-label">Password</span>
+                <input type="password" name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password">
+              </label>
+              <label>
+                <span class="field-label">Confirm Password</span>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  autocomplete="new-password"
+                  [(ngModel)]="passwordForm.confirmPassword"
+                >
+              </label>
+              <button type="submit" class="primary-action" [disabled]="isChangingPassword || isDeleting">
+                {{ isChangingPassword ? 'Changing...' : 'Change password' }}
+              </button>
+            </form>
+          </section>
+
+          <section class="account-section danger-section" aria-labelledby="delete-account-title">
+            <div>
+              <h2 id="delete-account-title">Delete Account</h2>
+              <p>
+                Delete this trainer account from the active database. A copy of the account data is stored in recycle
+                space for the next recovery step.
+              </p>
+            </div>
+            <button type="button" class="danger-action" [disabled]="isChangingPassword || isDeleting" (click)="deleteAccount()">
+              {{ isDeleting ? 'Deleting...' : 'Delete account' }}
+            </button>
+          </section>
+        </div>
+      </section>
+
+      @if (accountMessage) {
+        <p class="message" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
+      }
+    </div>
+</app-trainer-page-shell>

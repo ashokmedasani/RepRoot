@@ -20,6 +20,20 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_USE_SSL
+        value: "False"
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
 
   - type: static
     name: fitness-app-frontend

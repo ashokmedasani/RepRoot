@@ -1,0 +1,74 @@
+<main class="client-page">
+  <header class="client-topbar">
+    <a routerLink="/" class="brand">CoachFlow Studio</a>
+    @if (client) {
+      <button type="button" (click)="signOut()">Sign out</button>
+    }
+  </header>
+
+  @if (client) {
+    <section class="profile-card">
+      <p class="eyebrow">Client Portal</p>
+      <h1>Welcome, {{ client.first_name }} {{ client.last_name }}</h1>
+      <p>Your trainer-approved account is active.</p>
+
+      <div class="detail-grid">
+        <article>
+          <span>Username</span>
+          <strong>{{ client.username }}</strong>
+        </article>
+        <article>
+          <span>Email</span>
+          <strong>{{ client.email }}</strong>
+        </article>
+        <article>
+          <span>Trainer</span>
+          <strong>{{ client.trainer_name }}</strong>
+        </article>
+        <article>
+          <span>Group</span>
+          <strong>{{ client.group_name }}</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="chat-card">
+      <div class="chat-header">
+        <div>
+          <p class="eyebrow">Trainer Chat</p>
+          <h2>{{ client.trainer_name || 'Trainer' }}</h2>
+          <p>Send questions, check-in notes, or updates directly to your trainer.</p>
+        </div>
+        <span>{{ chatMessages.length }} messages</span>
+      </div>
+
+      <div class="message-list">
+        @for (chatMessage of chatMessages; track chatMessage.id) {
+          <div class="chat-bubble" [class.trainer-message]="chatMessage.sender === 'trainer'">
+            <strong>{{ chatMessage.sender === 'trainer' ? (client.trainer_name || 'Trainer') : 'You' }}</strong>
+            <p>{{ chatMessage.body }}</p>
+            <small>{{ chatMessage.sentAt | date: 'short' }}</small>
+          </div>
+        } @empty {
+          <p class="empty-chat">No messages yet. Start a conversation with your trainer.</p>
+        }
+      </div>
+
+      <form class="chat-compose" (ngSubmit)="sendMessage()">
+        <textarea
+          rows="3"
+          placeholder="Write a message to your trainer"
+          [(ngModel)]="chatDraft"
+          name="chatDraft"
+        ></textarea>
+        <button type="submit" class="primary-action">Send Message</button>
+      </form>
+    </section>
+  } @else {
+    <section class="profile-card">
+      <p class="eyebrow">Client Portal</p>
+      <h1>Please login to continue.</h1>
+      <a routerLink="/client/login" class="primary-action">Client Login</a>
+    </section>
+  }
+</main>

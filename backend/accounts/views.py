@@ -1,20 +1,34 @@
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.contrib.auth.hashers import make_password
+from django.conf import settings
+from django.core.mail import send_mail
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import RecycledTrainerAccount, TrainerProfile
+from .models import ClientAccess, ClientRegistrationForm, LeadSubmission, RecycledTrainerAccount, TrainerGroup, TrainerLeadForm, TrainerProfile
 from .serializers import (
+  ClientAccessCreateSerializer,
+  ClientLoginSerializer,
+  ClientAccessSerializer,
+  ClientRegistrationFormSerializer,
   EmailAvailabilitySerializer,
   EmailOtpRequestSerializer,
   EmailOtpVerifySerializer,
+  LeadSubmissionSerializer,
   PasswordResetConfirmSerializer,
   PasswordResetOtpRequestSerializer,
   PasswordResetOtpVerifySerializer,
+  PublicLeadFormSerializer,
+  PublicLeadSubmissionSerializer,
   TrainerAccountSerializer,
+  TrainerGroupSerializer,
+  TrainerLeadFormSerializer,
   TrainerLoginSerializer,
   TrainerPasswordChangeSerializer,
   TrainerProfileSerializer,
@@ -29,6 +43,36 @@ User = get_user_model()
 
 def serialize_datetime(value):
   return value.isoformat() if value else None
+
+
+def generate_unique_slug():
+  while True:
+    slug = get_random_string(12).lower()
+
+    if not TrainerLeadForm.objects.filter(public_slug=slug).exists():
+      return slug
+
+
+def generate_reference_id():
+  while True:
+    reference_id = f'APP-{get_random_string(10).upper()}'
+
+    if not LeadSubmission.objects.filter(reference_id=reference_id).exists():
+      return reference_id
+
+
+def email_delivery_message(message: str) -> str:
+  if settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+    return f'{message} In local testing, check the Django backend terminal.'
+
+  return f'{message} Check your email inbox.'
+
+
+def local_debug_otp_payload(otp: str) -> dict:
+  if settings.DEBUG and settings.EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+    return {'dev_otp': otp}
+
+  return {}
 
 
 def build_trainer_account_snapshot(user):
@@ -140,7 +184,7 @@ class EmailOtpRequestView(APIView):
       )
 
     try:
-      send_email_otp(email)
+      otp = send_email_otp(email)
     except OtpCooldownError as error:
       return Response(
         {'message': f'Please wait {error.remaining_seconds} seconds before requesting another OTP.'},
@@ -150,7 +194,8 @@ class EmailOtpRequestView(APIView):
     return Response(
       {
         'email': email,
-        'message': 'Verification code sent. In local testing, check the Django backend terminal.',
+        'message': email_delivery_message('Verification code sent.'),
+        **local_debug_otp_payload(otp),
       }
     )
 
@@ -213,6 +258,22 @@ class TrainerLoginView(APIView):
     )
 
 
+class ClientLoginView(APIView):
+  permission_classes = [permissions.AllowAny]
+
+  def post(self, request):
+    serializer = ClientLoginSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    client_access = serializer.validated_data['client_access']
+
+    return Response(
+      {
+        'client': ClientAccessSerializer(client_access).data,
+        'message': 'Client login successful.',
+      }
+    )
+
+
 class PasswordResetOtpRequestView(APIView):
   permission_classes = [permissions.AllowAny]
 
@@ -231,7 +292,7 @@ class PasswordResetOtpRequestView(APIView):
       )
 
     try:
-      send_email_otp(email, purpose='password-reset')
+      otp = send_email_otp(email, purpose='password-reset')
     except OtpCooldownError as error:
       return Response(
         {'message': f'Please wait {error.remaining_seconds} seconds before requesting another OTP.'},
@@ -241,7 +302,8 @@ class PasswordResetOtpRequestView(APIView):
     return Response(
       {
         'email': email,
-        'message': 'Password reset code sent. In local testing, check the Django backend terminal.',
+        'message': email_delivery_message('Password reset code sent.'),
+        **local_debug_otp_payload(otp),
       }
     )
 
@@ -355,3 +417,371 @@ class TrainerPasswordChangeView(APIView):
     serializer.save(request.user)
     Token.objects.filter(user=request.user).delete()
     return Response({'message': 'Password changed successfully. Please sign in again.'})
+
+
+class FormsGroupsOverviewView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    lead_form = TrainerLeadForm.objects.filter(trainer=request.user, is_active=True).first()
+    groups = TrainerGroup.objects.filter(trainer=request.user, is_active=True).select_related('client_registration_form')
+    submissions = LeadSubmission.objects.filter(lead_form__trainer=request.user).select_related('client_access__group')
+    pending_submissions = submissions.filter(status=LeadSubmission.STATUS_PENDING)
+    approved_submissions = submissions.filter(status=LeadSubmission.STATUS_APPROVED)
+    deleted_submissions = submissions.filter(status=LeadSubmission.STATUS_DELETED)
+
+    return Response(
+      {
+        'has_lead_form': lead_form is not None,
+        'lead_form': TrainerLeadFormSerializer(lead_form, context={'request': request}).data if lead_form else None,
+        'groups': TrainerGroupSerializer(groups, many=True).data,
+        'pending_forms': LeadSubmissionSerializer(pending_submissions, many=True).data,
+        'approved_forms': LeadSubmissionSerializer(approved_submissions, many=True).data,
+        'deleted_forms': LeadSubmissionSerializer(deleted_submissions, many=True).data,
+        'max_groups': 5,
+      }
+    )
+
+
+class TrainerLeadFormView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    lead_form = TrainerLeadForm.objects.filter(trainer=request.user, is_active=True).first()
+    serializer = TrainerLeadFormSerializer(
+      lead_form,
+      data=request.data,
+      partial=lead_form is not None,
+      context={'request': request},
+    )
+    serializer.is_valid(raise_exception=True)
+
+    if lead_form:
+      serializer.save()
+    else:
+      serializer.save(trainer=request.user, public_slug=generate_unique_slug())
+
+    return Response(
+      {
+        'lead_form': TrainerLeadFormSerializer(serializer.instance, context={'request': request}).data,
+        'message': 'Public lead form saved successfully.',
+      },
+      status=status.HTTP_201_CREATED if lead_form is None else status.HTTP_200_OK,
+    )
+
+  def put(self, request):
+    return self.post(request)
+
+
+class TrainerGroupListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    if TrainerGroup.objects.filter(trainer=request.user, is_active=True).count() >= 5:
+      return Response({'message': 'Maximum groups limit reached.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = TrainerGroupSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      group = serializer.save(trainer=request.user)
+    except IntegrityError:
+      return Response({'message': 'Group Name must be unique for this trainer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'group': TrainerGroupSerializer(group).data,
+        'message': 'Group saved successfully.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class TrainerGroupDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get_group(self, request, group_id):
+    return TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, group_id):
+    group = self.get_group(request, group_id)
+
+    if group is None:
+      return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'group': TrainerGroupSerializer(group).data})
+
+  def put(self, request, group_id):
+    group = self.get_group(request, group_id)
+
+    if group is None:
+      return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = TrainerGroupSerializer(group, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      serializer.save()
+    except IntegrityError:
+      return Response({'message': 'Group Name must be unique for this trainer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'group': TrainerGroupSerializer(group).data, 'message': 'Group updated successfully.'})
+
+
+class ClientRegistrationFormView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, group_id):
+    group = TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+
+    if group is None:
+      return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    registration_form = getattr(group, 'client_registration_form', None)
+    serializer = ClientRegistrationFormSerializer(
+      registration_form,
+      data=request.data,
+      partial=registration_form is not None,
+    )
+    serializer.is_valid(raise_exception=True)
+    serializer.save(group=group)
+
+    return Response(
+      {
+        'registration_form': ClientRegistrationFormSerializer(serializer.instance).data,
+        'message': 'Client registration form saved successfully.',
+      },
+      status=status.HTTP_201_CREATED if registration_form is None else status.HTTP_200_OK,
+    )
+
+  def put(self, request, group_id):
+    return self.post(request, group_id)
+
+
+class PublicLeadFormView(APIView):
+  permission_classes = [permissions.AllowAny]
+
+  def get(self, request, public_slug):
+    lead_form = TrainerLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('trainer').first()
+
+    if lead_form is None:
+      return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response(PublicLeadFormSerializer(lead_form).data)
+
+  def post(self, request, public_slug):
+    lead_form = TrainerLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('trainer').first()
+
+    if lead_form is None:
+      return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = PublicLeadSubmissionSerializer(data=request.data, context={'lead_form': lead_form})
+    serializer.is_valid(raise_exception=True)
+
+    submission = LeadSubmission.objects.create(
+      lead_form=lead_form,
+      first_name=serializer.validated_data['first_name'],
+      last_name=serializer.validated_data['last_name'],
+      email=serializer.validated_data['email'],
+      reference_id=generate_reference_id(),
+      answers=serializer.validated_data['answers'],
+    )
+
+    send_mail(
+      subject='Your CoachFlow form reference ID',
+      message=f'Your form has been submitted successfully. Your reference ID is {submission.reference_id}. Please save this for future communication.',
+      from_email=None,
+      recipient_list=[submission.email],
+      fail_silently=False,
+    )
+
+    return Response(
+      {
+        'reference_id': submission.reference_id,
+        'message': f'Your form has been submitted successfully. Your reference ID is {submission.reference_id}. Please save this for future communication. A copy has been sent to your email.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class PendingLeadSubmissionView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def delete(self, request, submission_id):
+    submission = LeadSubmission.objects.filter(
+      id=submission_id,
+      lead_form__trainer=request.user,
+      status=LeadSubmission.STATUS_PENDING,
+      is_active=True,
+    ).first()
+
+    if submission is None:
+      return Response({'message': 'Pending form request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    submission.status = LeadSubmission.STATUS_DELETED
+    submission.is_active = False
+    submission.deleted_at = timezone.now()
+    submission.save(update_fields=['status', 'is_active', 'deleted_at', 'updated_at'])
+    return Response({'message': 'Pending form request deleted.'})
+
+
+class ClientAccessCreateView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, submission_id):
+    submission = LeadSubmission.objects.filter(
+      id=submission_id,
+      lead_form__trainer=request.user,
+      status=LeadSubmission.STATUS_PENDING,
+      is_active=True,
+    ).first()
+
+    if submission is None:
+      return Response({'message': 'Pending form request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ClientAccessCreateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    group = TrainerGroup.objects.filter(id=serializer.validated_data['group_id'], trainer=request.user, is_active=True).first()
+
+    if group is None:
+      return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    registration_form = getattr(group, 'client_registration_form', None)
+
+    if registration_form is None:
+      return Response({'message': 'Create client registration form for this group first.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    registration_answers = serializer.validated_data.get('registration_answers', {})
+    registration_answers['first_name'] = submission.first_name
+    registration_answers['last_name'] = submission.last_name
+    registration_answers['email'] = submission.email
+
+    from .serializers import validate_required_answers
+
+    validate_required_answers(registration_form.fields, registration_answers)
+
+    client_password = serializer.validated_data['password']
+
+    try:
+      with transaction.atomic():
+        client_access = ClientAccess.objects.create(
+          trainer=request.user,
+          group=group,
+          lead_submission=submission,
+          first_name=submission.first_name,
+          last_name=submission.last_name,
+          email=submission.email,
+          username=serializer.validated_data['username'],
+          temporary_password=make_password(client_password),
+          registration_answers=registration_answers,
+          must_change_password=False,
+        )
+        submission.status = LeadSubmission.STATUS_APPROVED
+        submission.converted_at = timezone.now()
+        submission.save(update_fields=['status', 'converted_at', 'updated_at'])
+    except IntegrityError:
+      return Response(
+        {'message': 'Same email or username already exists under this trainer.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    send_mail(
+      subject='Your CoachFlow client access',
+      message=(
+        f'Your client access has been created.\n\n'
+        f'Username: {client_access.username}\n'
+        f'Password: the password your trainer created for you.\n\n'
+        f'Use these details to log in to the client portal.'
+      ),
+      from_email=None,
+      recipient_list=[client_access.email],
+      fail_silently=False,
+    )
+
+    return Response(
+      {
+        'client_access': ClientAccessSerializer(client_access).data,
+        'message': 'Client access created. The client can log in with the username and password you created.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class GroupClientAccessListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request, group_id):
+    group = TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+
+    if group is None:
+      return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    clients = ClientAccess.objects.filter(trainer=request.user, group=group, is_active=True)
+
+    return Response(
+      {
+        'group': TrainerGroupSerializer(group).data,
+        'clients': ClientAccessSerializer(clients, many=True).data,
+      }
+    )
+
+
+class ClientAccessDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request, client_id):
+    client_access = ClientAccess.objects.filter(
+      id=client_id,
+      trainer=request.user,
+      is_active=True,
+    ).select_related('group', 'lead_submission', 'trainer').first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    group = client_access.group
+    registration_form = getattr(group, 'client_registration_form', None)
+
+    return Response(
+      {
+        'client': ClientAccessSerializer(client_access).data,
+        'group': TrainerGroupSerializer(group).data,
+        'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
+        'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
+      }
+    )
+
+
+class ClientAccessPasswordResetView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    temporary_password = f'{get_random_string(8)}!7'
+    client_access.temporary_password = make_password(temporary_password)
+    client_access.must_change_password = True
+    client_access.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
+
+    send_mail(
+      subject='Your CoachFlow client password reset',
+      message=(
+        f'Your trainer reset your CoachFlow client password.\n\n'
+        f'Username: {client_access.username}\n'
+        f'Temporary password: {temporary_password}\n\n'
+        f'Please log in and change your password.'
+      ),
+      from_email=None,
+      recipient_list=[client_access.email],
+      fail_silently=False,
+    )
+
+    return Response(
+      {
+        'temporary_password': temporary_password,
+        'message': 'Client password reset email sent.',
+      }
+    )

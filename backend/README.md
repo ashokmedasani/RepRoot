@@ -73,6 +73,22 @@ Or:
 .\scripts\run-server.ps1
 ```
 
+## Email OTP Delivery
+
+By default, local development prints OTP emails in the Django backend terminal. To deliver OTPs to a real inbox, set SMTP environment variables before starting Django:
+
+```powershell
+$env:EMAIL_HOST="smtp.gmail.com"
+$env:EMAIL_PORT="587"
+$env:EMAIL_HOST_USER="your-email@gmail.com"
+$env:EMAIL_HOST_PASSWORD="your-app-password"
+$env:EMAIL_USE_TLS="True"
+$env:DEFAULT_FROM_EMAIL="CoachFlow Studio <your-email@gmail.com>"
+python manage.py runserver 127.0.0.1:8000
+```
+
+For Gmail, use a Google App Password instead of your normal account password. In Render, add the same email variables on the backend service environment settings.
+
 ## Current API Endpoints
 
 - `GET /api/health/`

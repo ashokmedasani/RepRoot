@@ -1,0 +1,105 @@
+<app-trainer-page-shell
+  title="Clients"
+  eyebrow="Client Workspace"
+  subtitle="Review every approved client, open profiles, and continue conversations."
+  activeSection="clients"
+  maxWidth="96rem"
+  titleId="trainer-clients-title"
+>
+  <button page-actions type="button" class="secondary-action" (click)="loadClients()">Refresh</button>
+
+  @if (isLoading) {
+    <section class="panel">
+      <p>Loading clients...</p>
+    </section>
+  } @else {
+    @if (message) {
+      <p class="message error-message">{{ message }}</p>
+    }
+
+    <section class="summary-band" aria-label="Client summary">
+      <article>
+        <span>Total Clients</span>
+        <strong>{{ clients.length }}</strong>
+      </article>
+      <article>
+        <span>Active Clients</span>
+        <strong>{{ activeClients.length }}</strong>
+      </article>
+      <article>
+        <span>Pending Passwords</span>
+        <strong>{{ pendingClients.length }}</strong>
+      </article>
+      <article>
+        <span>Groups</span>
+        <strong>{{ groups.length }}</strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Client List</h2>
+          <p>{{ filteredClients.length }} clients shown</p>
+        </div>
+      </div>
+
+      <div class="filters">
+        <input type="search" placeholder="Search by name, email, username, or group" [(ngModel)]="searchTerm" name="searchTerm">
+        <select [(ngModel)]="groupFilter" name="groupFilter">
+          <option value="all">All groups</option>
+          @for (group of groups; track group.id) {
+            <option [value]="group.id">{{ group.name }}</option>
+          }
+        </select>
+        <select [(ngModel)]="statusFilter" name="statusFilter">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending password change</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Client Name</th>
+              <th>Email</th>
+              <th>Group</th>
+              <th>Username</th>
+              <th>Status</th>
+              <th>Joined On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (client of filteredClients; track client.id; let index = $index) {
+              <tr>
+                <td>{{ index + 1 }}</td>
+                <td>
+                  <a [routerLink]="['/trainer/clients', client.id]" class="client-name">
+                    <span class="avatar">{{ initials(client) }}</span>
+                    <span>{{ client.first_name }} {{ client.last_name }}</span>
+                  </a>
+                </td>
+                <td>{{ client.email }}</td>
+                <td>{{ client.group_name }}</td>
+                <td>{{ client.username }}</td>
+                <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
+                <td>{{ client.created_at | date: 'mediumDate' }}</td>
+                <td>
+                  <a [routerLink]="['/trainer/clients', client.id]" class="ghost-action compact">Open</a>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8">No clients found. Approve a form request and create client access first.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</app-trainer-page-shell>

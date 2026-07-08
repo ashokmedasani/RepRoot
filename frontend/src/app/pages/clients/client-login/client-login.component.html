@@ -1,0 +1,32 @@
+<main class="auth-page">
+  <header class="auth-topbar">
+    <a routerLink="/portal" class="brand">CoachFlow Studio</a>
+    <div class="top-action">
+      <span>Trainer workspace?</span>
+      <a routerLink="/trainer/login">Trainer login</a>
+    </div>
+  </header>
+
+  <section class="auth-card" aria-labelledby="client-login-title">
+    <p class="eyebrow">Client Portal</p>
+    <h1 id="client-login-title">Login with your trainer-approved access</h1>
+
+    <form class="auth-form" (ngSubmit)="verifyClientLogin()">
+      <label>
+        <span class="field-label">Username <span class="required">*</span></span>
+        <input name="clientUsername" type="text" [(ngModel)]="loginForm.username" autocomplete="username" required>
+      </label>
+
+      <label>
+        <span class="field-label">Password <span class="required">*</span></span>
+        <input name="clientPassword" type="password" [(ngModel)]="loginForm.password" autocomplete="current-password" required>
+      </label>
+
+      <button type="submit" class="primary-action" [disabled]="isSubmitting">Continue</button>
+
+      @if (loginMessage) {
+        <p class="form-message">{{ loginMessage }}</p>
+      }
+    </form>
+  </section>
+</main>

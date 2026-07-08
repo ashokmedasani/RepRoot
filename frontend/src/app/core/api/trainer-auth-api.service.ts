@@ -26,6 +26,7 @@ export interface EmailOtpRequestResponse {
   email: string;
   available?: boolean;
   message: string;
+  dev_otp?: string;
 }
 
 export interface EmailOtpVerifyResponse {
