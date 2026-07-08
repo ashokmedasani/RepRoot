@@ -32,14 +32,14 @@
   background: var(--app-primary);
   color: #ffffff;
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 700;
   box-shadow: 0 12px 28px color-mix(in srgb, var(--app-primary) 28%, transparent);
 }
 
 .brand__text {
   overflow-wrap: anywhere;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .hero {
@@ -57,9 +57,9 @@
 .eyebrow {
   margin: 0 0 0.75rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -72,9 +72,10 @@ p {
 h1 {
   margin-bottom: 1.2rem;
   color: var(--app-text);
-  font-size: clamp(2.65rem, 5vw, 5.4rem);
-  line-height: 0.98;
-  letter-spacing: 0;
+  font-size: var(--app-h1-hero);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .hero__summary {
@@ -96,13 +97,13 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 3.25rem;
+  min-height: var(--app-control-height);
   gap: 0.65rem;
-  border-radius: 0.65rem;
+  border-radius: var(--app-radius-md);
   padding: 0.9rem 1.3rem;
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 850;
+  font-weight: 700;
   text-decoration: none;
   box-shadow: 0 18px 38px color-mix(in srgb, var(--app-primary) 26%, transparent);
   transition: background 160ms ease, transform 160ms ease;
@@ -117,7 +118,7 @@ h1 {
 
 .hero-panel {
   border: 1px solid var(--app-border);
-  border-radius: 0.5rem;
+  border-radius: var(--app-radius-lg);
   padding: 1.1rem;
   background: color-mix(in srgb, var(--app-surface) 90%, transparent);
   box-shadow: var(--app-shadow);
@@ -145,7 +146,7 @@ h1 {
 .metric-card {
   min-height: 8.5rem;
   border: 1px solid var(--app-border);
-  border-radius: 0.5rem;
+  border-radius: var(--app-radius-lg);
   padding: 1rem;
   background: var(--app-surface);
 }
@@ -160,8 +161,15 @@ h1 {
   display: block;
   margin: 0.7rem 0 0.35rem;
   color: var(--app-text);
-  font-size: 2rem;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   line-height: 1;
+}
+
+.metric-card span,
+.metric-card small {
+  font-size: 0.85rem;
 }
 
 .feature-section {
@@ -173,7 +181,7 @@ h1 {
 
 .feature-column {
   border: 1px solid var(--app-border);
-  border-radius: 0.5rem;
+  border-radius: var(--app-radius-lg);
   padding: 1.25rem;
   background: var(--app-surface);
   box-shadow: 0 16px 50px color-mix(in srgb, var(--app-text) 7%, transparent);
@@ -192,18 +200,19 @@ h1 {
   height: 2.35rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 0.5rem;
+  border-radius: var(--app-radius-sm);
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 h2 {
   margin-bottom: 0;
   color: var(--app-text);
-  font-size: 1.45rem;
+  font-size: 1.35rem;
+  font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
 }
 
 .feature-list {
@@ -215,7 +224,7 @@ h2 {
 .feature-card {
   min-height: 8.25rem;
   border: 1px solid var(--app-border);
-  border-radius: 0.5rem;
+  border-radius: var(--app-radius-lg);
   padding: 1rem;
   background: var(--app-surface-soft);
 }
@@ -225,6 +234,7 @@ h2 {
   margin-bottom: 0.5rem;
   color: var(--app-text);
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .feature-card p {

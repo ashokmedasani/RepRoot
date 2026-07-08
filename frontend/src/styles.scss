@@ -13,6 +13,18 @@
   --app-accent: #20a3b8;
   --app-success: #1f9d63;
   --app-shadow: 0 24px 70px rgba(26, 62, 103, 0.12);
+
+  --app-radius-sm: 0.6rem;
+  --app-radius-md: 0.85rem;
+  --app-radius-lg: 1rem;
+  --app-radius-xl: 1.5rem;
+  --app-control-height: 3rem;
+  --app-h1-hero: clamp(2.4rem, 4.5vw, 4rem);
+  --app-h1-page: 1.9rem;
+  --app-h1-form: 1.6rem;
+  --app-tracking-tight: -0.02em;
+  --app-tracking-wide: 0.12em;
+  --app-eyebrow-size: 0.75rem;
 }
 
 [data-theme='dark'] {
@@ -92,6 +104,17 @@ body {
   background: var(--app-bg);
   color: var(--app-text);
   font-family: var(--app-font-family);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: var(--app-tracking-tight);
+  line-height: 1.15;
 }
 
 button,
@@ -146,7 +169,7 @@ a {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 2.3rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .photo-copy {
@@ -157,7 +180,7 @@ a {
 .photo-copy p {
   margin: 0;
   color: var(--app-muted);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .secondary-action {
@@ -168,7 +191,7 @@ a {
   padding: 0 0.9rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .visually-hidden {
@@ -208,7 +231,7 @@ a {
   padding: 0.72rem 0.95rem;
   color: var(--app-muted);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 600;
   text-decoration: none;
 }
 

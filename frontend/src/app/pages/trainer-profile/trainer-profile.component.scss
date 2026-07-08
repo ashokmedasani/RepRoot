@@ -8,7 +8,7 @@
 .brand {
   color: var(--app-text);
   font-size: 1.15rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -26,7 +26,7 @@ nav .active {
   background: var(--app-surface);
   color: var(--app-text);
   font-size: 0.88rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .profile-workspace {
@@ -46,8 +46,9 @@ nav .active {
 .eyebrow {
   margin: 0 0 0.35rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -59,8 +60,9 @@ h3 {
 }
 
 h1 {
-  font-size: 2.2rem;
-  letter-spacing: 0;
+  font-size: var(--app-h1-page);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 h2 {
@@ -92,7 +94,7 @@ label {
 .hero-copy span {
   margin: 0;
   color: var(--app-muted);
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.45;
 }
 
@@ -103,7 +105,7 @@ label {
 .section-block,
 .preview-panel {
   border: 1px solid var(--app-border);
-  border-radius: 1rem;
+  border-radius: var(--app-radius-lg);
   padding: 1.2rem;
   background: var(--app-surface);
   box-shadow: 0 20px 55px color-mix(in srgb, var(--app-text) 7%, transparent);
@@ -123,7 +125,7 @@ label {
   gap: 0.4rem;
   color: var(--app-text);
   font-size: 0.86rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .field-label {
@@ -136,7 +138,7 @@ label {
 .field-help {
   color: var(--app-muted);
   font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .required,
@@ -148,9 +150,9 @@ input,
 select,
 textarea {
   width: 100%;
-  min-height: 2.9rem;
+  min-height: var(--app-control-height);
   border: 1px solid var(--app-border);
-  border-radius: 0.7rem;
+  border-radius: var(--app-radius-lg);
   padding: 0.75rem 0.9rem;
   background: var(--app-surface);
   color: var(--app-text);
@@ -176,13 +178,13 @@ textarea:focus {
 
 .save-action,
 .primary-action {
-  min-height: 2.9rem;
+  min-height: var(--app-control-height);
   border: 0;
-  border-radius: 0.7rem;
+  border-radius: var(--app-radius-lg);
   padding: 0 1rem;
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .primary-action {
@@ -200,7 +202,7 @@ button:disabled {
   padding: 1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .error-message {
@@ -234,12 +236,12 @@ button:disabled {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 2rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .headline {
   color: var(--app-primary-strong);
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .preview-card p {
@@ -256,14 +258,16 @@ dl {
 
 dt {
   color: var(--app-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 dd {
   margin: 0.2rem 0 0;
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 600;
 }
 
 @media (max-width: 980px) {
