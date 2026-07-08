@@ -29,3 +29,7 @@ Loads `getMe`, `getTemplates`, and `getEntries` when a portal token exists; sign
 
 - `frontend/src/app/core/api/client-api.service.ts`
 - `frontend/src/app/shared/chat-panel/chat-panel.component.ts`
+
+## Update
+
+Resources now come from the references the trainer shared on each assignment (not from the template definition); the portal behavior is otherwise unchanged.

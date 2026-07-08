@@ -29,3 +29,7 @@ Loads profile, trainer templates, assignments, and entries in parallel; insights
 - `frontend/src/app/core/api/forms-groups-api.service.ts`
 - `frontend/src/app/core/api/templates-api.service.ts`
 - `frontend/src/app/shared/chat-panel/chat-panel.component.ts`
+
+## Update: share references per assignment
+
+Each assignment row shows how many references are shared and a Share References button that opens a category-grouped picker dialog (search + checkboxes). Assigning a template opens the dialog automatically so the trainer can share the relevant references right away; selections save via `updateAssignmentReferences`.

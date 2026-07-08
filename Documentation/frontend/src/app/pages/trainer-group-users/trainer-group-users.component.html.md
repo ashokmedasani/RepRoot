@@ -19,3 +19,7 @@ Renders the group users page.
 ## Update
 
 Tracking Templates tab renders trainer-level template cards (fields shown as optional previews) with Manage/Edit Template links to `/trainer/templates`.
+
+## Update 2
+
+Tracking Templates tab and section removed; tabs are Overview, Approved Users, Client Registration Form, and Settings.

@@ -28,3 +28,7 @@ Edit mode loads the template via `getTemplate` and pre-selects its attached refe
 - `frontend/src/app/core/api/templates-api.service.ts`
 - `frontend/src/app/core/api/references-api.service.ts`
 - `frontend/src/app/pages/trainer/trainer-templates/trainer-templates.component.ts`
+
+## Update
+
+The reference picker was removed from the builder - references are now shared per client at assignment time from the client profile. Save errors scroll the page to the message so failures are visible.

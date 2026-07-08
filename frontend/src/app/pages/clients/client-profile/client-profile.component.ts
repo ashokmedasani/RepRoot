@@ -64,7 +64,7 @@ export class ClientProfileComponent implements OnInit {
     const references: TemplateReference[] = [];
 
     for (const template of this.templates) {
-      for (const reference of template.references) {
+      for (const reference of template.references || []) {
         if (!seen.has(reference.id)) {
           seen.add(reference.id);
           references.push(reference);

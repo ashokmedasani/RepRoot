@@ -246,7 +246,6 @@ class TrackingTemplate(models.Model):
   accent = models.CharField(max_length=20, blank=True, default='green')
   fields = models.JSONField(default=list)
   standard_key = models.CharField(max_length=40, blank=True)
-  references = models.ManyToManyField(TrainerReference, blank=True, related_name='tracking_templates')
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
@@ -263,6 +262,7 @@ class TrackingTemplate(models.Model):
 class TemplateAssignment(models.Model):
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='template_assignments')
   template = models.ForeignKey(TrackingTemplate, on_delete=models.CASCADE, related_name='assignments')
+  references = models.ManyToManyField(TrainerReference, blank=True, related_name='template_assignments')
   assigned_at = models.DateTimeField(auto_now_add=True)
 
   class Meta:

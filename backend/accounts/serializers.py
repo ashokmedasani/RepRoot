@@ -777,7 +777,7 @@ class TrainerReferenceSerializer(serializers.ModelSerializer):
 
 
 class TrackingTemplateReferenceSerializer(serializers.ModelSerializer):
-  """Read-only, compact reference representation nested inside templates."""
+  """Read-only, compact reference representation shared with a client via an assignment."""
 
   category_name = serializers.CharField(source='category.name', read_only=True)
   file_url = serializers.SerializerMethodField()
@@ -797,8 +797,6 @@ class TrackingTemplateReferenceSerializer(serializers.ModelSerializer):
 
 class TrackingTemplateSerializer(serializers.ModelSerializer):
   custom_fields = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
-  reference_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
-  references = TrackingTemplateReferenceSerializer(many=True, read_only=True)
   assigned_count = serializers.SerializerMethodField()
 
   class Meta:
@@ -812,14 +810,12 @@ class TrackingTemplateSerializer(serializers.ModelSerializer):
       'fields',
       'custom_fields',
       'standard_key',
-      'references',
-      'reference_ids',
       'assigned_count',
       'is_active',
       'created_at',
       'updated_at',
     ]
-    read_only_fields = ['id', 'fields', 'standard_key', 'references', 'assigned_count', 'is_active', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'fields', 'standard_key', 'assigned_count', 'is_active', 'created_at', 'updated_at']
 
   def get_assigned_count(self, obj):
     return obj.assignments.count()
@@ -838,25 +834,6 @@ class TrackingTemplateSerializer(serializers.ModelSerializer):
 
     return attrs
 
-  def create(self, validated_data):
-    reference_ids = validated_data.pop('reference_ids', None)
-    template = super().create(validated_data)
-    self.set_references(template, reference_ids)
-    return template
-
-  def update(self, instance, validated_data):
-    reference_ids = validated_data.pop('reference_ids', None)
-    template = super().update(instance, validated_data)
-    self.set_references(template, reference_ids)
-    return template
-
-  def set_references(self, template, reference_ids):
-    if reference_ids is None:
-      return
-
-    references = TrainerReference.objects.filter(trainer=template.trainer, id__in=reference_ids)
-    template.references.set(references)
-
 
 class ClientTrackingEntrySubmitSerializer(serializers.Serializer):
   template_id = serializers.IntegerField()
@@ -870,10 +847,11 @@ class TemplateAssignmentSerializer(serializers.ModelSerializer):
   template_name = serializers.CharField(source='template.name', read_only=True)
   template_cadence = serializers.CharField(source='template.cadence', read_only=True)
   template_accent = serializers.CharField(source='template.accent', read_only=True)
+  references = TrackingTemplateReferenceSerializer(many=True, read_only=True)
 
   class Meta:
     model = TemplateAssignment
-    fields = ['id', 'template_id', 'template_name', 'template_cadence', 'template_accent', 'assigned_at']
+    fields = ['id', 'template_id', 'template_name', 'template_cadence', 'template_accent', 'references', 'assigned_at']
     read_only_fields = fields
 
 

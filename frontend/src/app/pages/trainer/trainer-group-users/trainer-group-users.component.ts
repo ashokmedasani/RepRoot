@@ -9,11 +9,10 @@ import {
   FormsGroupsApiService,
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
-import { TemplateFieldType, TemplatesApiService, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
 
-type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'tracking-templates' | 'settings';
+type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'settings';
 
 @Component({
   selector: 'app-trainer-group-users',
@@ -25,7 +24,6 @@ type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'tracking-
 export class TrainerGroupUsersComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
-  private readonly templatesApi = inject(TemplatesApiService);
 
   group: TrainerGroup | null = null;
   clients: ClientAccessRecord[] = [];
@@ -44,10 +42,8 @@ export class TrainerGroupUsersComponent implements OnInit {
     { id: 'overview', label: 'Overview' },
     { id: 'approved-users', label: 'Approved Users' },
     { id: 'registration-form', label: 'Client Registration Form' },
-    { id: 'tracking-templates', label: 'Tracking Templates' },
     { id: 'settings', label: 'Settings' }
   ];
-  trackingTemplates: TrackingTemplateRecord[] = [];
 
   ngOnInit(): void {
     const groupId = Number(this.route.snapshot.paramMap.get('groupId'));
@@ -58,7 +54,6 @@ export class TrainerGroupUsersComponent implements OnInit {
     }
 
     this.loadGroup(groupId);
-    this.loadTrackingTemplates();
   }
 
   get activeClients(): ClientAccessRecord[] {
@@ -167,32 +162,5 @@ export class TrainerGroupUsersComponent implements OnInit {
 
   initials(client: ClientAccessRecord): string {
     return initialsFor(client.first_name, client.last_name);
-  }
-
-  fieldTypeLabel(fieldType: TemplateFieldType): string {
-    const labels: Record<TemplateFieldType, string> = {
-      number: 'Number',
-      short_text: 'Short Text',
-      long_text: 'Long Text',
-      yes_no: 'Yes / No',
-      image: 'Image Upload'
-    };
-
-    return labels[fieldType] || 'Field';
-  }
-
-  cadenceLabel(cadence: string): string {
-    return cadence ? `${cadence.charAt(0).toUpperCase()}${cadence.slice(1)} check-in` : 'Check-in';
-  }
-
-  private loadTrackingTemplates(): void {
-    this.templatesApi.getTemplates().subscribe({
-      next: (response) => {
-        this.trackingTemplates = response.templates;
-      },
-      error: () => {
-        this.trackingTemplates = [];
-      }
-    });
   }
 }

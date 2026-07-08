@@ -47,6 +47,7 @@ from .serializers import (
   ReferenceCategorySerializer,
   TemplateAssignmentSerializer,
   TrackingEntrySerializer,
+  TrackingTemplateReferenceSerializer,
   TrackingTemplateSerializer,
   TrainerAccountSerializer,
   TrainerGroupSerializer,
@@ -1006,10 +1007,7 @@ class TrackingTemplateListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    templates = (
-      TrackingTemplate.objects.filter(trainer=request.user, is_active=True)
-      .prefetch_related('references__category', 'assignments')
-    )
+    templates = TrackingTemplate.objects.filter(trainer=request.user, is_active=True).prefetch_related('assignments')
     return Response(
       {
         'templates': TrackingTemplateSerializer(templates, many=True, context={'request': request}).data,
@@ -1095,8 +1093,12 @@ class ClientTemplateAssignmentListView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    assignments = client_access.template_assignments.filter(template__is_active=True).select_related('template')
-    return Response({'assignments': TemplateAssignmentSerializer(assignments, many=True).data})
+    assignments = (
+      client_access.template_assignments.filter(template__is_active=True)
+      .select_related('template')
+      .prefetch_related('references__category')
+    )
+    return Response({'assignments': TemplateAssignmentSerializer(assignments, many=True, context={'request': request}).data})
 
   def post(self, request, client_id):
     client_access = self.get_client(request, client_id)
@@ -1118,24 +1120,52 @@ class ClientTemplateAssignmentListView(APIView):
     if not created:
       return Response({'message': 'Template is already assigned to this client.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    set_assignment_references(assignment, request.user, request.data.get('reference_ids'))
+
     return Response(
       {
-        'assignment': TemplateAssignmentSerializer(assignment).data,
+        'assignment': TemplateAssignmentSerializer(assignment, context={'request': request}).data,
         'message': f'{template.name} assigned to {client_access.first_name}.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
+def set_assignment_references(assignment, trainer, reference_ids):
+  if reference_ids is None or not isinstance(reference_ids, list):
+    return
+
+  references = TrainerReference.objects.filter(trainer=trainer, id__in=reference_ids)
+  assignment.references.set(references)
+
+
 class ClientTemplateAssignmentDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
-  def delete(self, request, client_id, assignment_id):
-    assignment = TemplateAssignment.objects.filter(
+  def get_assignment(self, request, client_id, assignment_id):
+    return TemplateAssignment.objects.filter(
       id=assignment_id,
       client_id=client_id,
       client__trainer=request.user,
     ).select_related('template', 'client').first()
+
+  def put(self, request, client_id, assignment_id):
+    assignment = self.get_assignment(request, client_id, assignment_id)
+
+    if assignment is None:
+      return Response({'message': 'Template assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    set_assignment_references(assignment, request.user, request.data.get('reference_ids', []))
+
+    return Response(
+      {
+        'assignment': TemplateAssignmentSerializer(assignment, context={'request': request}).data,
+        'message': 'Shared references updated.',
+      }
+    )
+
+  def delete(self, request, client_id, assignment_id):
+    assignment = self.get_assignment(request, client_id, assignment_id)
 
     if assignment is None:
       return Response({'message': 'Template assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1274,13 +1304,18 @@ class ClientTemplateListView(APIView):
     assignments = (
       request.auth.template_assignments.filter(template__is_active=True)
       .select_related('template')
-      .prefetch_related('template__references__category')
+      .prefetch_related('references__category')
     )
     templates = []
 
     for assignment in assignments:
       template_data = TrackingTemplateSerializer(assignment.template, context={'request': request}).data
       template_data['assignment_id'] = assignment.id
+      template_data['references'] = TrackingTemplateReferenceSerializer(
+        assignment.references.all(),
+        many=True,
+        context={'request': request},
+      ).data
       templates.append(template_data)
 
     return Response({'templates': templates})

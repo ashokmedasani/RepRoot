@@ -63,9 +63,12 @@
             <div class="assignment-row" [class.green]="assignment.template_accent === 'green'" [class.blue]="assignment.template_accent === 'blue'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'">
               <div>
                 <strong>{{ assignment.template_name }}</strong>
-                <small>{{ assignment.template_cadence }} check-in - assigned {{ assignment.assigned_at | date: 'mediumDate' }}</small>
+                <small>{{ assignment.template_cadence }} check-in - assigned {{ assignment.assigned_at | date: 'mediumDate' }} - {{ assignment.references.length }} references shared</small>
               </div>
-              <button type="button" class="ghost-action" (click)="unassignTemplate(assignment)">Unassign</button>
+              <div class="assignment-actions">
+                <button type="button" class="secondary-action compact" (click)="openShareDialog(assignment)">Share References</button>
+                <button type="button" class="ghost-action" (click)="unassignTemplate(assignment)">Unassign</button>
+              </div>
             </div>
           } @empty {
             <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start recording progress.</p>
@@ -252,6 +255,61 @@
           @if (resetPasswordResult) {
             <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
           }
+        </div>
+      </section>
+    }
+
+    @if (sharingAssignment; as sharing) {
+      <section class="dialog-backdrop" aria-labelledby="share-dialog-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <div>
+              <h3 id="share-dialog-title">Share References - {{ sharing.template_name }}</h3>
+              <p>Pick only what {{ client.first_name }} needs for this template. You can change this anytime.</p>
+            </div>
+            <button type="button" class="icon-button" title="Close" (click)="closeShareDialog()">x</button>
+          </div>
+
+          <input
+            type="search"
+            class="reference-search"
+            placeholder="Search references..."
+            [(ngModel)]="referenceSearch"
+            name="shareReferenceSearch"
+          >
+
+          <div class="reference-picker">
+            @for (category of referenceCategories; track category.id) {
+              @if (referencesForCategory(category).length) {
+                <div class="picker-category">
+                  <h4>{{ category.name }}</h4>
+                  @for (reference of referencesForCategory(category); track reference.id) {
+                    <label class="picker-item">
+                      <input
+                        type="checkbox"
+                        [checked]="isSharedReference(reference)"
+                        (change)="toggleSharedReference(reference)"
+                      >
+                      <span>
+                        <strong>{{ reference.title }}</strong>
+                        <small>{{ reference.subcategory || reference.reference_type }}</small>
+                      </span>
+                    </label>
+                  }
+                </div>
+              }
+            } @empty {
+              <p class="empty-note">No references yet. Add resources in the References Library first.</p>
+            }
+          </div>
+
+          <div class="dialog-actions">
+            <span class="share-count">{{ shareSelectedIds.size }} selected</span>
+            <button type="button" class="ghost-action" (click)="closeShareDialog()">Cancel</button>
+            <button type="button" class="primary-action" [disabled]="isSavingShare" (click)="saveSharedReferences()">
+              {{ isSavingShare ? 'Saving...' : 'Share Selected' }}
+            </button>
+          </div>
         </div>
       </section>
     }

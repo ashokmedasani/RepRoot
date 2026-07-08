@@ -23,3 +23,7 @@ The Forms & Groups dashboard links to a separate page for viewing users created 
 ## Update: trainer-level templates
 
 The Tracking Templates tab now lists the trainer's shared templates from `TemplatesApiService` (read-only preview with a Manage Templates link) instead of per-group localStorage. Shared helpers `initialsFor` and `formatApiError` replaced the local copies, and the offline fallback group was removed.
+
+## Update 2
+
+The Tracking Templates tab was removed from the group workspace entirely - templates live only in the dedicated `/trainer/templates` section. The overview now shows a pending-invites card instead of a template count.

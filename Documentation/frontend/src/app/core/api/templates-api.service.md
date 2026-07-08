@@ -30,3 +30,7 @@ All methods send the trainer token header. Template records embed their attached
 - `frontend/src/app/pages/trainer/trainer-tracking-template-create/trainer-tracking-template-create.component.ts`
 - `frontend/src/app/pages/trainer/trainer-client-profile/trainer-client-profile.component.ts`
 - `backend/accounts/views.py`
+
+## Update: references shared per assignment
+
+`TemplatePayload` no longer carries `reference_ids`. `assignTemplate` accepts optional `referenceIds`, and `updateAssignmentReferences(clientId, assignmentId, referenceIds)` edits an existing assignment's shared references. `TemplateAssignmentRecord` includes the shared `references`; `TrackingTemplateRecord.references` is optional and only populated for the client portal.

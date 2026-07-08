@@ -55,3 +55,7 @@ Split portfolio media and certifications into nested serializers when they becom
 - `TrackingTemplateSerializer`: accepts `custom_fields` and `reference_ids`, exposes nested references and assigned count.
 - `TemplateAssignmentSerializer`, `TrackingEntrySerializer`, `ClientTrackingEntrySubmitSerializer` (client upsert payload).
 - `ChatMessageSerializer` and `ClientPasswordChangeSerializer` (verifies current password, clears `must_change_password`).
+
+## Update 2: references shared per assignment
+
+`TrackingTemplateSerializer` dropped `references`/`reference_ids`. `TemplateAssignmentSerializer` now nests the shared `references` (compact form with absolute file URLs).

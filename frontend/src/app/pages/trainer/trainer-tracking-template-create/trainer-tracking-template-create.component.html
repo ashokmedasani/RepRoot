@@ -1,7 +1,7 @@
 <app-trainer-page-shell
   [title]="isEditMode ? 'Edit Template' : 'Create Template'"
   eyebrow="Tracking Templates"
-  subtitle="Design the check-in form clients fill in, and attach only the references they need. Every field is optional for the client."
+  subtitle="Design the check-in form clients fill in. Every field is optional for the client."
   activeSection="templates"
   maxWidth="96rem"
   titleId="template-builder-title"
@@ -91,56 +91,13 @@
       </div>
 
       <aside class="builder-side">
-        <article class="panel">
-          <div class="section-heading">
-            <div>
-              <h2>Attached References</h2>
-              <p>Pick only what this template's clients need - they will see these in their portal.</p>
-            </div>
-            <span class="selected-count">{{ selectedReferenceIds.size }} selected</span>
-          </div>
-
-          <input
-            type="search"
-            class="reference-search"
-            placeholder="Search references..."
-            [(ngModel)]="referenceSearch"
-            name="referenceSearch"
-          >
-
-          <div class="reference-picker">
-            @for (category of categories; track category.id) {
-              @if (referencesForCategory(category).length) {
-                <div class="picker-category">
-                  <h3>{{ category.name }}</h3>
-                  @for (reference of referencesForCategory(category); track reference.id) {
-                    <label class="picker-item">
-                      <input
-                        type="checkbox"
-                        [checked]="isReferenceSelected(reference)"
-                        (change)="toggleReference(reference)"
-                      >
-                      <span>
-                        <strong>{{ reference.title }}</strong>
-                        <small>{{ reference.subcategory || reference.reference_type }}</small>
-                      </span>
-                    </label>
-                  }
-                </div>
-              }
-            } @empty {
-              <p class="empty-note">No references yet. Add resources in the References Library first.</p>
-            }
-          </div>
-        </article>
-
         <article class="panel summary-panel">
           <h2>Summary</h2>
           <ul>
             <li>{{ fields.length }} fields</li>
-            <li>{{ selectedReferenceIds.size }} references attached</li>
             <li>{{ templateInfo.cadence }} check-in</li>
           </ul>
+          <p class="side-note">References are shared per client when you assign this template from a client profile.</p>
           <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveTemplate()">
             {{ isSaving ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template' }}
           </button>

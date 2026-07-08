@@ -35,12 +35,12 @@ export interface TrackingTemplateRecord {
   accent: string;
   fields: TemplateField[];
   standard_key: string;
-  references: TemplateReference[];
   assigned_count: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   assignment_id?: number;
+  references?: TemplateReference[];
 }
 
 export interface StandardTemplateRecord {
@@ -59,7 +59,6 @@ export interface TemplatePayload {
   cadence: TemplateCadence;
   accent: string;
   custom_fields: TemplateField[];
-  reference_ids: number[];
 }
 
 export interface TemplateAssignmentRecord {
@@ -68,6 +67,7 @@ export interface TemplateAssignmentRecord {
   template_name: string;
   template_cadence: TemplateCadence;
   template_accent: string;
+  references: TemplateReference[];
   assigned_at: string;
 }
 
@@ -155,10 +155,26 @@ export class TemplatesApiService {
     );
   }
 
-  assignTemplate(clientId: number, templateId: number): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
+  assignTemplate(
+    clientId: number,
+    templateId: number,
+    referenceIds: number[] = []
+  ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
     return this.http.post<{ assignment: TemplateAssignmentRecord; message: string }>(
       `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/`,
-      { template_id: templateId },
+      { template_id: templateId, reference_ids: referenceIds },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateAssignmentReferences(
+    clientId: number,
+    assignmentId: number,
+    referenceIds: number[]
+  ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
+    return this.http.put<{ assignment: TemplateAssignmentRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
+      { reference_ids: referenceIds },
       { headers: this.getAuthHeaders() }
     );
   }

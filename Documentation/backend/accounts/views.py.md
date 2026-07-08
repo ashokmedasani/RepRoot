@@ -66,3 +66,9 @@ Add object-level permissions and audit logging before production profile publish
 - Assignments and entries: `ClientTemplateAssignmentListView`/`DetailView`, `ClientTrackingEntryListView` (filters `?template=`, `?month=YYYY-MM`), `TrainerTrackingEntryDetailView` (trainer edits mark `edited_by_trainer`).
 - Chat: `TrainerClientChatView` and `ClientChatView` (REST polling with `?after=<id>`, marks the other side's messages read).
 - Client portal (ClientTokenAuthentication): `ClientLoginView` now returns a token; `ClientPasswordChangeView`, `ClientMeView`, `ClientTemplateListView` (assigned templates with attached references), `ClientTrackingEntryView` (upsert per template and date).
+
+## Update 2: references shared per assignment
+
+- `ClientTemplateAssignmentListView.post` accepts `reference_ids` when assigning.
+- `ClientTemplateAssignmentDetailView.put` updates an assignment's shared references (`set_assignment_references` helper scopes them to the trainer).
+- `ClientTemplateListView` returns each template's references from the client's assignment, not the template.

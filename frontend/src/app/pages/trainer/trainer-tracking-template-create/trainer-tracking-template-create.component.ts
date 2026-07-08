@@ -3,11 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
-  ReferenceCategoryRecord,
-  ReferencesApiService,
-  TrainerReferenceRecord
-} from '../../../core/api/references-api.service';
-import {
   TemplateCadence,
   TemplateField,
   TemplateFieldType,
@@ -29,7 +24,6 @@ interface BuilderField extends TemplateField {
 })
 export class TrainerTrackingTemplateCreateComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
-  private readonly referencesApi = inject(ReferencesApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -46,11 +40,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
     accent: 'green'
   };
   fields: BuilderField[] = [];
-
-  categories: ReferenceCategoryRecord[] = [];
-  references: TrainerReferenceRecord[] = [];
-  selectedReferenceIds = new Set<number>();
-  referenceSearch = '';
 
   readonly fieldTypes: { value: TemplateFieldType; label: string }[] = [
     { value: 'number', label: 'Number' },
@@ -70,7 +59,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
 
   ngOnInit(): void {
     this.templateId = Number(this.route.snapshot.paramMap.get('templateId')) || 0;
-    this.loadReferenceLibrary();
 
     if (this.templateId) {
       this.loadTemplate();
@@ -82,25 +70,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
 
   get isEditMode(): boolean {
     return this.templateId > 0;
-  }
-
-  get filteredReferences(): TrainerReferenceRecord[] {
-    const search = this.referenceSearch.trim().toLowerCase();
-
-    if (!search) {
-      return this.references;
-    }
-
-    return this.references.filter((reference) =>
-      [reference.title, reference.category_name, reference.subcategory, reference.tags.join(' ')]
-        .join(' ')
-        .toLowerCase()
-        .includes(search)
-    );
-  }
-
-  referencesForCategory(category: ReferenceCategoryRecord): TrainerReferenceRecord[] {
-    return this.filteredReferences.filter((reference) => reference.category === category.id);
   }
 
   addField(): void {
@@ -124,18 +93,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
     this.fields = reordered;
   }
 
-  toggleReference(reference: TrainerReferenceRecord): void {
-    if (this.selectedReferenceIds.has(reference.id)) {
-      this.selectedReferenceIds.delete(reference.id);
-    } else {
-      this.selectedReferenceIds.add(reference.id);
-    }
-  }
-
-  isReferenceSelected(reference: TrainerReferenceRecord): boolean {
-    return this.selectedReferenceIds.has(reference.id);
-  }
-
   fieldTypeLabel(fieldType: TemplateFieldType): string {
     return this.fieldTypes.find((type) => type.value === fieldType)?.label || 'Field';
   }
@@ -152,6 +109,7 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
     if (!this.fields.length) {
       this.messageType = 'error';
       this.message = 'Add at least one field for clients to fill in.';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -165,8 +123,7 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
         label: field.label,
         field_type: field.field_type,
         placeholder: field.placeholder
-      })),
-      reference_ids: Array.from(this.selectedReferenceIds)
+      }))
     };
     const request = this.isEditMode
       ? this.templatesApi.updateTemplate(this.templateId, payload)
@@ -182,6 +139,7 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Template could not be saved.');
         this.isSaving = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     });
   }
@@ -197,7 +155,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
           accent: template.accent || 'green'
         };
         this.fields = template.fields.map((field) => ({ ...field, localId: this.createLocalId() }));
-        this.selectedReferenceIds = new Set(template.references.map((reference) => reference.id));
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -205,17 +162,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
         this.message = formatApiError(error, 'Template could not be loaded.');
         this.isLoading = false;
       }
-    });
-  }
-
-  private loadReferenceLibrary(): void {
-    this.referencesApi.getCategories().subscribe({
-      next: (response) => (this.categories = response.categories),
-      error: () => (this.categories = [])
-    });
-    this.referencesApi.getReferences().subscribe({
-      next: (response) => (this.references = response.references),
-      error: () => (this.references = [])
     });
   }
 

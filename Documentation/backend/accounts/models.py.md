@@ -58,3 +58,7 @@ Move portfolio media and certifications into separate models when approval, orde
 - `TrackingEntry`: one client entry per template per date; keeps `template_name` snapshot and survives template deletion (SET_NULL).
 - `ChatMessage`: trainer-client chat messages with sender and read flag.
 - `ClientAuthToken`: opaque portal token per client (see `client_auth.py`).
+
+## Update 2: references shared per assignment
+
+`TrackingTemplate` no longer has a `references` field. `TemplateAssignment.references` (M2M to `TrainerReference`) now stores which references a trainer shared with a specific client for that template.

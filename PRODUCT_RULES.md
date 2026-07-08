@@ -153,10 +153,10 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - A trainer can have at most 5 templates.
 - Three standard templates ship with the platform and can be adopted with one click: Nutrition Details, Vitamins & Supplements, and Daily Progress Check-in. Adopted templates count toward the 5-template limit and can be customized.
 - Nothing in a template is mandatory for clients. Template fields never carry required flags, and a missed day never blocks the client or the app.
-- Templates are managed in a dedicated Templates section (`/trainer/templates`). Group pages show the shared templates read-only.
+- Templates are managed only in the dedicated Templates section (`/trainer/templates`). Group pages do not show a templates tab.
 - Templates are assigned per client. Assignments can be added or removed at any time; unassigning or deleting a template never deletes the client's past entries (entries keep a template-name snapshot).
 - The trainer References Library is stored server-side (categories with subcategories, plus references). Video references must be YouTube links and are streamed inside the app; PDFs and images upload as real files to Django media storage. Video file uploads are not allowed.
-- Each template carries a curated set of attached references chosen from the library, so a client receives only the resources relevant to their goal.
+- References are NOT attached to templates. They are shared per client at assignment time: when a trainer assigns a template to a client, they pick which references to share (a Share References dialog on the assignment, editable anytime), so each client receives only the resources relevant to their goal.
 - Clients authenticate with a real portal token (`Authorization: ClientToken <key>` via the `ClientAuthToken` model), stored in sessionStorage. Client login returns the token.
 - Clients with a temporary password are routed to `/client/change-password`; changing the password clears `must_change_password`.
 - The client portal (`/client/profile`) has four sections: My Templates (fill in and submit entries, one entry per template per date with same-day upsert), My Details (registration and lead-form answers, read-only), Resources (attached references with in-app YouTube streaming), and Trainer Chat.

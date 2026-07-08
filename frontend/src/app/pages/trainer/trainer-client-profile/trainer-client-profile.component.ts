@@ -9,6 +9,11 @@ import {
   FormsGroupsApiService
 } from '../../../core/api/forms-groups-api.service';
 import {
+  ReferenceCategoryRecord,
+  ReferencesApiService,
+  TrainerReferenceRecord
+} from '../../../core/api/references-api.service';
+import {
   TemplateAssignmentRecord,
   TemplatesApiService,
   TrackingEntryRecord,
@@ -56,6 +61,7 @@ export class TrainerClientProfileComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
+  private readonly referencesApi = inject(ReferencesApiService);
 
   profile: ClientAccessDetailResponse | null = null;
   isLoading = true;
@@ -68,6 +74,13 @@ export class TrainerClientProfileComponent implements OnInit {
   templates: TrackingTemplateRecord[] = [];
   selectedTemplateId: number | null = null;
   isAssigning = false;
+
+  referenceCategories: ReferenceCategoryRecord[] = [];
+  referenceLibrary: TrainerReferenceRecord[] = [];
+  sharingAssignment: TemplateAssignmentRecord | null = null;
+  shareSelectedIds = new Set<number>();
+  referenceSearch = '';
+  isSavingShare = false;
 
   entries: TrackingEntryRecord[] = [];
   editingEntry: TrackingEntryRecord | null = null;
@@ -147,11 +160,79 @@ export class TrainerClientProfileComponent implements OnInit {
         this.selectedTemplateId = null;
         this.isAssigning = false;
         this.loadAssignments(client.id);
+        this.openShareDialog(response.assignment);
       },
       error: (error: unknown) => {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Template could not be assigned.');
         this.isAssigning = false;
+      }
+    });
+  }
+
+  openShareDialog(assignment: TemplateAssignmentRecord): void {
+    this.sharingAssignment = assignment;
+    this.shareSelectedIds = new Set((assignment.references || []).map((reference) => reference.id));
+    this.referenceSearch = '';
+  }
+
+  closeShareDialog(): void {
+    this.sharingAssignment = null;
+    this.shareSelectedIds = new Set<number>();
+  }
+
+  toggleSharedReference(reference: TrainerReferenceRecord): void {
+    if (this.shareSelectedIds.has(reference.id)) {
+      this.shareSelectedIds.delete(reference.id);
+    } else {
+      this.shareSelectedIds.add(reference.id);
+    }
+  }
+
+  isSharedReference(reference: TrainerReferenceRecord): boolean {
+    return this.shareSelectedIds.has(reference.id);
+  }
+
+  get filteredReferenceLibrary(): TrainerReferenceRecord[] {
+    const search = this.referenceSearch.trim().toLowerCase();
+
+    if (!search) {
+      return this.referenceLibrary;
+    }
+
+    return this.referenceLibrary.filter((reference) =>
+      [reference.title, reference.category_name, reference.subcategory, reference.tags.join(' ')]
+        .join(' ')
+        .toLowerCase()
+        .includes(search)
+    );
+  }
+
+  referencesForCategory(category: ReferenceCategoryRecord): TrainerReferenceRecord[] {
+    return this.filteredReferenceLibrary.filter((reference) => reference.category === category.id);
+  }
+
+  saveSharedReferences(): void {
+    const client = this.client;
+    const assignment = this.sharingAssignment;
+
+    if (!client || !assignment || this.isSavingShare) {
+      return;
+    }
+
+    this.isSavingShare = true;
+    this.templatesApi.updateAssignmentReferences(client.id, assignment.id, Array.from(this.shareSelectedIds)).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSavingShare = false;
+        this.closeShareDialog();
+        this.loadAssignments(client.id);
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Shared references could not be updated.');
+        this.isSavingShare = false;
       }
     });
   }
@@ -277,6 +358,18 @@ export class TrainerClientProfileComponent implements OnInit {
     });
     this.loadAssignments(clientId);
     this.loadEntries(clientId);
+    this.loadReferenceLibrary();
+  }
+
+  private loadReferenceLibrary(): void {
+    this.referencesApi.getCategories().subscribe({
+      next: (response) => (this.referenceCategories = response.categories),
+      error: () => (this.referenceCategories = [])
+    });
+    this.referencesApi.getReferences().subscribe({
+      next: (response) => (this.referenceLibrary = response.references),
+      error: () => (this.referenceLibrary = [])
+    });
   }
 
   private loadAssignments(clientId: number): void {
