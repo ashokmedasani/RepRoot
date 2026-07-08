@@ -3,20 +3,38 @@ from django.contrib.auth.hashers import make_password
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ClientAccess, ClientRegistrationForm, LeadSubmission, RecycledTrainerAccount, TrainerGroup, TrainerLeadForm, TrainerProfile
+from .models import (
+  ChatMessage,
+  ClientAccess,
+  ClientRegistrationForm,
+  LeadSubmission,
+  RecycledTrainerAccount,
+  ReferenceCategory,
+  TemplateAssignment,
+  TrackingEntry,
+  TrackingTemplate,
+  TrainerGroup,
+  TrainerLeadForm,
+  TrainerProfile,
+  TrainerReference,
+)
 from .serializers import (
+  ChatMessageSerializer,
   ClientAccessCreateSerializer,
   ClientLoginSerializer,
   ClientAccessSerializer,
+  ClientPasswordChangeSerializer,
   ClientRegistrationFormSerializer,
+  ClientTrackingEntrySubmitSerializer,
   EmailAvailabilitySerializer,
   EmailOtpRequestSerializer,
   EmailOtpVerifySerializer,
@@ -26,6 +44,10 @@ from .serializers import (
   PasswordResetOtpVerifySerializer,
   PublicLeadFormSerializer,
   PublicLeadSubmissionSerializer,
+  ReferenceCategorySerializer,
+  TemplateAssignmentSerializer,
+  TrackingEntrySerializer,
+  TrackingTemplateSerializer,
   TrainerAccountSerializer,
   TrainerGroupSerializer,
   TrainerLeadFormSerializer,
@@ -33,10 +55,15 @@ from .serializers import (
   TrainerPasswordChangeSerializer,
   TrainerProfileSerializer,
   TrainerProfileStatusSerializer,
+  TrainerReferenceSerializer,
   TrainerSignupSerializer,
   UsernameAvailabilitySerializer,
 )
+from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
 from .email_verification import OtpCooldownError, send_email_otp, verify_email_otp
+from .standard_templates import STANDARD_TEMPLATES, get_standard_template
+
+MAX_TRACKING_TEMPLATES = 5
 
 User = get_user_model()
 
@@ -265,9 +292,11 @@ class ClientLoginView(APIView):
     serializer = ClientLoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     client_access = serializer.validated_data['client_access']
+    token = issue_client_token(client_access)
 
     return Response(
       {
+        'token': token.key,
         'client': ClientAccessSerializer(client_access).data,
         'message': 'Client login successful.',
       }
@@ -785,3 +814,559 @@ class ClientAccessPasswordResetView(APIView):
         'message': 'Client password reset email sent.',
       }
     )
+
+
+class TrainerReferenceCategoryListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    categories = ReferenceCategory.objects.filter(trainer=request.user)
+    return Response({'categories': ReferenceCategorySerializer(categories, many=True).data})
+
+  def post(self, request):
+    serializer = ReferenceCategorySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      category = serializer.save(trainer=request.user)
+    except IntegrityError:
+      return Response({'message': 'Category name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'category': ReferenceCategorySerializer(category).data,
+        'message': 'Category saved successfully.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class TrainerReferenceCategoryDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get_category(self, request, category_id):
+    return ReferenceCategory.objects.filter(id=category_id, trainer=request.user).first()
+
+  def put(self, request, category_id):
+    category = self.get_category(request, category_id)
+
+    if category is None:
+      return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ReferenceCategorySerializer(category, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      serializer.save()
+    except IntegrityError:
+      return Response({'message': 'Category name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'category': ReferenceCategorySerializer(category).data, 'message': 'Category updated successfully.'})
+
+  def delete(self, request, category_id):
+    category = self.get_category(request, category_id)
+
+    if category is None:
+      return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+      category.delete()
+    except ProtectedError:
+      return Response(
+        {'message': 'Category still has references. Move or delete them first.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    return Response({'message': 'Category deleted.'})
+
+
+class TrainerReferenceListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+  parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+  def get(self, request):
+    references = TrainerReference.objects.filter(trainer=request.user).select_related('category')
+    return Response({'references': TrainerReferenceSerializer(references, many=True, context={'request': request}).data})
+
+  def post(self, request):
+    serializer = TrainerReferenceSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    category = serializer.validated_data.get('category')
+
+    if category is None or category.trainer_id != request.user.id:
+      return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    reference = serializer.save(trainer=request.user)
+
+    return Response(
+      {
+        'reference': TrainerReferenceSerializer(reference, context={'request': request}).data,
+        'message': 'Reference saved successfully.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class TrainerReferenceDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+  parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+  def get_reference(self, request, reference_id):
+    return TrainerReference.objects.filter(id=reference_id, trainer=request.user).select_related('category').first()
+
+  def get(self, request, reference_id):
+    reference = self.get_reference(request, reference_id)
+
+    if reference is None:
+      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'reference': TrainerReferenceSerializer(reference, context={'request': request}).data})
+
+  def put(self, request, reference_id):
+    reference = self.get_reference(request, reference_id)
+
+    if reference is None:
+      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = TrainerReferenceSerializer(reference, data=request.data, partial=True, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    category = serializer.validated_data.get('category')
+
+    if category is not None and category.trainer_id != request.user.id:
+      return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer.save()
+
+    return Response(
+      {
+        'reference': TrainerReferenceSerializer(reference, context={'request': request}).data,
+        'message': 'Reference updated successfully.',
+      }
+    )
+
+  def delete(self, request, reference_id):
+    reference = self.get_reference(request, reference_id)
+
+    if reference is None:
+      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    reference.delete()
+    return Response({'message': 'Reference deleted.'})
+
+
+class StandardTemplateListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    adopted_keys = set(
+      TrackingTemplate.objects.filter(trainer=request.user, is_active=True)
+      .exclude(standard_key='')
+      .values_list('standard_key', flat=True)
+    )
+    standard_templates = [{**template, 'adopted': template['key'] in adopted_keys} for template in STANDARD_TEMPLATES]
+    return Response({'standard_templates': standard_templates})
+
+
+class StandardTemplateAdoptView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    key = str(request.data.get('key', '')).strip()
+    standard_template = get_standard_template(key)
+
+    if standard_template is None:
+      return Response({'message': 'Standard template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if TrackingTemplate.objects.filter(trainer=request.user, is_active=True).count() >= MAX_TRACKING_TEMPLATES:
+      return Response({'message': 'Maximum of 5 templates reached.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      template = TrackingTemplate.objects.create(
+        trainer=request.user,
+        name=standard_template['name'],
+        purpose=standard_template['purpose'],
+        cadence=standard_template['cadence'],
+        accent=standard_template['accent'],
+        fields=standard_template['fields'],
+        standard_key=key,
+      )
+    except IntegrityError:
+      return Response({'message': 'A template with this name already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'template': TrackingTemplateSerializer(template, context={'request': request}).data,
+        'message': f'{template.name} template added.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class TrackingTemplateListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    templates = (
+      TrackingTemplate.objects.filter(trainer=request.user, is_active=True)
+      .prefetch_related('references__category', 'assignments')
+    )
+    return Response(
+      {
+        'templates': TrackingTemplateSerializer(templates, many=True, context={'request': request}).data,
+        'max_templates': MAX_TRACKING_TEMPLATES,
+      }
+    )
+
+  def post(self, request):
+    if TrackingTemplate.objects.filter(trainer=request.user, is_active=True).count() >= MAX_TRACKING_TEMPLATES:
+      return Response({'message': 'Maximum of 5 templates reached.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = TrackingTemplateSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      template = serializer.save(trainer=request.user)
+    except IntegrityError:
+      return Response({'message': 'Template name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'template': TrackingTemplateSerializer(template, context={'request': request}).data,
+        'message': 'Template saved successfully.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class TrackingTemplateDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get_template(self, request, template_id):
+    return TrackingTemplate.objects.filter(id=template_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, template_id):
+    template = self.get_template(request, template_id)
+
+    if template is None:
+      return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'template': TrackingTemplateSerializer(template, context={'request': request}).data})
+
+  def put(self, request, template_id):
+    template = self.get_template(request, template_id)
+
+    if template is None:
+      return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = TrackingTemplateSerializer(template, data=request.data, partial=True, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+
+    try:
+      serializer.save()
+    except IntegrityError:
+      return Response({'message': 'Template name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'template': TrackingTemplateSerializer(template, context={'request': request}).data,
+        'message': 'Template updated successfully.',
+      }
+    )
+
+  def delete(self, request, template_id):
+    template = self.get_template(request, template_id)
+
+    if template is None:
+      return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    template.delete()
+    return Response({'message': 'Template deleted. Past client entries are kept.'})
+
+
+class ClientTemplateAssignmentListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get_client(self, request, client_id):
+    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignments = client_access.template_assignments.filter(template__is_active=True).select_related('template')
+    return Response({'assignments': TemplateAssignmentSerializer(assignments, many=True).data})
+
+  def post(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    template = TrackingTemplate.objects.filter(
+      id=request.data.get('template_id'),
+      trainer=request.user,
+      is_active=True,
+    ).first()
+
+    if template is None:
+      return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment, created = TemplateAssignment.objects.get_or_create(client=client_access, template=template)
+
+    if not created:
+      return Response({'message': 'Template is already assigned to this client.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+      {
+        'assignment': TemplateAssignmentSerializer(assignment).data,
+        'message': f'{template.name} assigned to {client_access.first_name}.',
+      },
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ClientTemplateAssignmentDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def delete(self, request, client_id, assignment_id):
+    assignment = TemplateAssignment.objects.filter(
+      id=assignment_id,
+      client_id=client_id,
+      client__trainer=request.user,
+    ).select_related('template', 'client').first()
+
+    if assignment is None:
+      return Response({'message': 'Template assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment.delete()
+    return Response({'message': 'Template unassigned. Past entries are kept.'})
+
+
+class ClientTrackingEntryListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    entries = client_access.tracking_entries.all()
+    template_id = request.query_params.get('template')
+    month = request.query_params.get('month')
+
+    if template_id:
+      entries = entries.filter(template_id=template_id)
+
+    if month:
+      try:
+        year_value, month_value = month.split('-')
+        entries = entries.filter(entry_date__year=int(year_value), entry_date__month=int(month_value))
+      except ValueError:
+        return Response({'message': 'Month filter must use the YYYY-MM format.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'entries': TrackingEntrySerializer(entries, many=True).data})
+
+
+class TrainerTrackingEntryDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, entry_id):
+    entry = TrackingEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+
+    if entry is None:
+      return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = TrackingEntrySerializer(entry, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(edited_by_trainer=True)
+
+    return Response(
+      {
+        'entry': TrackingEntrySerializer(entry).data,
+        'message': 'Entry updated successfully.',
+      }
+    )
+
+
+class TrainerClientChatView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get_client(self, request, client_id):
+    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    messages = ChatMessage.objects.filter(trainer=request.user, client=client_access)
+    after_id = request.query_params.get('after')
+
+    if after_id:
+      messages = messages.filter(id__gt=after_id)
+
+    ChatMessage.objects.filter(
+      trainer=request.user,
+      client=client_access,
+      sender=ChatMessage.SENDER_CLIENT,
+      is_read=False,
+    ).update(is_read=True)
+
+    return Response({'messages': ChatMessageSerializer(messages, many=True).data})
+
+  def post(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ChatMessageSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    message = serializer.save(trainer=request.user, client=client_access, sender=ChatMessage.SENDER_TRAINER)
+
+    return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)
+
+
+class ClientPasswordChangeView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def post(self, request):
+    serializer = ClientPasswordChangeSerializer(data=request.data, context={'client_access': request.auth})
+    serializer.is_valid(raise_exception=True)
+    client_access = serializer.save()
+
+    return Response(
+      {
+        'client': ClientAccessSerializer(client_access).data,
+        'message': 'Password changed successfully.',
+      }
+    )
+
+
+class ClientMeView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    client_access = request.auth
+    registration_form = getattr(client_access.group, 'client_registration_form', None)
+
+    return Response(
+      {
+        'client': ClientAccessSerializer(client_access).data,
+        'group': TrainerGroupSerializer(client_access.group).data,
+        'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
+        'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
+      }
+    )
+
+
+class ClientTemplateListView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    assignments = (
+      request.auth.template_assignments.filter(template__is_active=True)
+      .select_related('template')
+      .prefetch_related('template__references__category')
+    )
+    templates = []
+
+    for assignment in assignments:
+      template_data = TrackingTemplateSerializer(assignment.template, context={'request': request}).data
+      template_data['assignment_id'] = assignment.id
+      templates.append(template_data)
+
+    return Response({'templates': templates})
+
+
+class ClientTrackingEntryView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    entries = request.auth.tracking_entries.all()
+    template_id = request.query_params.get('template')
+    month = request.query_params.get('month')
+
+    if template_id:
+      entries = entries.filter(template_id=template_id)
+
+    if month:
+      try:
+        year_value, month_value = month.split('-')
+        entries = entries.filter(entry_date__year=int(year_value), entry_date__month=int(month_value))
+      except ValueError:
+        return Response({'message': 'Month filter must use the YYYY-MM format.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'entries': TrackingEntrySerializer(entries, many=True).data})
+
+  def post(self, request):
+    serializer = ClientTrackingEntrySubmitSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    client_access = request.auth
+    template = TrackingTemplate.objects.filter(
+      id=serializer.validated_data['template_id'],
+      trainer=client_access.trainer,
+      is_active=True,
+      assignments__client=client_access,
+    ).first()
+
+    if template is None:
+      return Response({'message': 'Template is not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
+
+    entry, created = TrackingEntry.objects.update_or_create(
+      client=client_access,
+      template=template,
+      entry_date=serializer.validated_data['entry_date'],
+      defaults={
+        'template_name': template.name,
+        'answers': serializer.validated_data['answers'],
+        'note': serializer.validated_data['note'],
+        'edited_by_trainer': False,
+      },
+    )
+
+    return Response(
+      {
+        'entry': TrackingEntrySerializer(entry).data,
+        'message': 'Entry submitted successfully.' if created else 'Entry updated successfully.',
+      },
+      status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
+class ClientChatView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    client_access = request.auth
+    messages = ChatMessage.objects.filter(trainer=client_access.trainer, client=client_access)
+    after_id = request.query_params.get('after')
+
+    if after_id:
+      messages = messages.filter(id__gt=after_id)
+
+    ChatMessage.objects.filter(
+      trainer=client_access.trainer,
+      client=client_access,
+      sender=ChatMessage.SENDER_TRAINER,
+      is_read=False,
+    ).update(is_read=True)
+
+    return Response({'messages': ChatMessageSerializer(messages, many=True).data})
+
+  def post(self, request):
+    client_access = request.auth
+    serializer = ChatMessageSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    message = serializer.save(trainer=client_access.trainer, client=client_access, sender=ChatMessage.SENDER_CLIENT)
+
+    return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)

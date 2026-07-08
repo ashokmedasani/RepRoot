@@ -10,60 +10,216 @@
     <section class="profile-card">
       <p class="eyebrow">Client Portal</p>
       <h1>Welcome, {{ client.first_name }} {{ client.last_name }}</h1>
-      <p>Your trainer-approved account is active.</p>
+      <p>Record your progress, watch your trainer's resources, and stay in touch.</p>
 
-      <div class="detail-grid">
-        <article>
-          <span>Username</span>
-          <strong>{{ client.username }}</strong>
-        </article>
-        <article>
-          <span>Email</span>
-          <strong>{{ client.email }}</strong>
-        </article>
-        <article>
-          <span>Trainer</span>
-          <strong>{{ client.trainer_name }}</strong>
-        </article>
-        <article>
-          <span>Group</span>
-          <strong>{{ client.group_name }}</strong>
-        </article>
-      </div>
-    </section>
-
-    <section class="chat-card">
-      <div class="chat-header">
-        <div>
-          <p class="eyebrow">Trainer Chat</p>
-          <h2>{{ client.trainer_name || 'Trainer' }}</h2>
-          <p>Send questions, check-in notes, or updates directly to your trainer.</p>
-        </div>
-        <span>{{ chatMessages.length }} messages</span>
-      </div>
-
-      <div class="message-list">
-        @for (chatMessage of chatMessages; track chatMessage.id) {
-          <div class="chat-bubble" [class.trainer-message]="chatMessage.sender === 'trainer'">
-            <strong>{{ chatMessage.sender === 'trainer' ? (client.trainer_name || 'Trainer') : 'You' }}</strong>
-            <p>{{ chatMessage.body }}</p>
-            <small>{{ chatMessage.sentAt | date: 'short' }}</small>
-          </div>
-        } @empty {
-          <p class="empty-chat">No messages yet. Start a conversation with your trainer.</p>
+      <nav class="portal-tabs" aria-label="Portal sections">
+        @for (tab of tabs; track tab.id) {
+          <button type="button" [class.active]="activeTab === tab.id" (click)="setTab(tab.id)">
+            {{ tab.label }}
+          </button>
         }
-      </div>
-
-      <form class="chat-compose" (ngSubmit)="sendMessage()">
-        <textarea
-          rows="3"
-          placeholder="Write a message to your trainer"
-          [(ngModel)]="chatDraft"
-          name="chatDraft"
-        ></textarea>
-        <button type="submit" class="primary-action">Send Message</button>
-      </form>
+      </nav>
     </section>
+
+    @if (message) {
+      <p class="portal-message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    }
+
+    @if (activeTab === 'templates') {
+      @for (template of templates; track template.id) {
+        <section class="portal-card template-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">{{ template.cadence }} check-in</p>
+              <h2>{{ template.name }}</h2>
+              @if (template.purpose) {
+                <p>{{ template.purpose }}</p>
+              }
+            </div>
+            <span class="count-pill">{{ template.fields.length }} fields</span>
+          </div>
+
+          <form class="entry-form" (ngSubmit)="submitEntry(template)">
+            <label class="date-field">
+              <span>Entry date</span>
+              <input type="date" [(ngModel)]="draftFor(template).entryDate" [name]="'entryDate' + template.id">
+            </label>
+
+            <div class="field-grid">
+              @for (field of template.fields; track field.key || field.label) {
+                <label>
+                  <span>{{ field.label }}</span>
+                  @if (field.field_type === 'long_text') {
+                    <textarea
+                      rows="3"
+                      [placeholder]="field.placeholder || 'Your update'"
+                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                      [name]="'answer' + template.id + (field.key || field.label)"
+                    ></textarea>
+                  } @else if (field.field_type === 'yes_no') {
+                    <select
+                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                      [name]="'answer' + template.id + (field.key || field.label)"
+                    >
+                      <option value="">Choose</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  } @else if (field.field_type === 'image') {
+                    <input type="file" accept="image/*" (change)="handleEntryImage($event, template, field.key || field.label)">
+                    @if (isImageValue(draftFor(template).answers[field.key || field.label])) {
+                      <img [src]="draftFor(template).answers[field.key || field.label]" alt="Selected photo" class="entry-image-preview">
+                    }
+                  } @else {
+                    <input
+                      [type]="field.field_type === 'number' ? 'number' : 'text'"
+                      [placeholder]="field.placeholder || 'Your update'"
+                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                      [name]="'answer' + template.id + (field.key || field.label)"
+                    >
+                  }
+                </label>
+              }
+              <label>
+                <span>How are you feeling? (optional)</span>
+                <textarea
+                  rows="2"
+                  placeholder="Anything your trainer should know today"
+                  [(ngModel)]="draftFor(template).note"
+                  [name]="'note' + template.id"
+                ></textarea>
+              </label>
+            </div>
+
+            <button type="submit" class="primary-action" [disabled]="savingTemplateId === template.id">
+              {{ savingTemplateId === template.id ? 'Submitting...' : 'Submit Entry' }}
+            </button>
+          </form>
+
+          @if (entriesFor(template).length) {
+            <div class="recent-entries">
+              <h3>Recent entries</h3>
+              @for (entry of entriesFor(template); track entry.id) {
+                <div class="entry-row">
+                  <span>{{ entry.entry_date | date: 'mediumDate' }}</span>
+                  <p>{{ answerSummary(entry) }}</p>
+                  @if (entry.edited_by_trainer) {
+                    <small>Adjusted by trainer</small>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </section>
+      } @empty {
+        <section class="portal-card">
+          <h2>No templates assigned yet</h2>
+          <p>Your trainer has not assigned a check-in template yet. Check back soon or send them a message.</p>
+        </section>
+      }
+    }
+
+    @if (activeTab === 'details') {
+      <section class="portal-card">
+        <h2>Account</h2>
+        <div class="detail-grid">
+          <article>
+            <span>Username</span>
+            <strong>{{ client.username }}</strong>
+          </article>
+          <article>
+            <span>Email</span>
+            <strong>{{ client.email }}</strong>
+          </article>
+          <article>
+            <span>Trainer</span>
+            <strong>{{ client.trainer_name }}</strong>
+          </article>
+          <article>
+            <span>Group</span>
+            <strong>{{ client.group_name }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="portal-card">
+        <h2>Your registration details</h2>
+        <p>What you and your trainer recorded when your account was created.</p>
+        <div class="detail-grid answers">
+          @for (answer of registrationAnswers(); track answer.label) {
+            <article>
+              <span>{{ answer.label }}</span>
+              <strong>{{ answer.value }}</strong>
+            </article>
+          } @empty {
+            <p>No registration details recorded.</p>
+          }
+        </div>
+      </section>
+
+      <section class="portal-card">
+        <h2>Your original application</h2>
+        <p>The lead form you submitted to your trainer.</p>
+        <div class="detail-grid answers">
+          @for (answer of leadAnswers(); track answer.key) {
+            <article>
+              <span>{{ answer.key }}</span>
+              <strong>{{ answer.value }}</strong>
+            </article>
+          } @empty {
+            <p>No application answers found.</p>
+          }
+        </div>
+      </section>
+    }
+
+    @if (activeTab === 'resources') {
+      @for (reference of resources; track reference.id) {
+        <section class="portal-card resource-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">{{ reference.category_name }}{{ reference.subcategory ? ' - ' + reference.subcategory : '' }}</p>
+              <h2>{{ reference.title }}</h2>
+              @if (reference.description) {
+                <p>{{ reference.description }}</p>
+              }
+            </div>
+          </div>
+
+          @if (reference.reference_type === 'video_link' && youtubeEmbedResourceUrl(reference.link); as embedUrl) {
+            <div class="video-frame">
+              <iframe
+                [src]="embedUrl"
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+              ></iframe>
+            </div>
+          } @else if (reference.reference_type === 'image' && reference.file_url) {
+            <img [src]="reference.file_url" [alt]="reference.title" class="resource-image">
+          } @else if (reference.reference_type === 'text_note') {
+            <p class="note-body">{{ reference.description || 'Note from your trainer.' }}</p>
+          } @else {
+            <button type="button" class="primary-action" (click)="openResource(reference)">Open {{ reference.reference_type === 'pdf' ? 'PDF' : 'Resource' }}</button>
+          }
+        </section>
+      } @empty {
+        <section class="portal-card">
+          <h2>No resources yet</h2>
+          <p>When your trainer attaches videos, PDFs, or notes to your templates, they show up here.</p>
+        </section>
+      }
+    }
+
+    @if (activeTab === 'chat') {
+      <section class="chat-wrap">
+        <app-chat-panel
+          mode="client"
+          [counterpartName]="client.trainer_name || 'Trainer'"
+          description="Send questions, check-in notes, or updates directly to your trainer."
+        />
+      </section>
+    }
   } @else {
     <section class="profile-card">
       <p class="eyebrow">Client Portal</p>

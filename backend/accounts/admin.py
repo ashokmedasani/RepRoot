@@ -1,13 +1,20 @@
 from django.contrib import admin
 
 from .models import (
+  ChatMessage,
   ClientAccess,
+  ClientAuthToken,
   ClientRegistrationForm,
   LeadSubmission,
   RecycledTrainerAccount,
+  ReferenceCategory,
+  TemplateAssignment,
+  TrackingEntry,
+  TrackingTemplate,
   TrainerGroup,
   TrainerLeadForm,
   TrainerProfile,
+  TrainerReference,
 )
 
 
@@ -58,3 +65,50 @@ class ClientAccessAdmin(admin.ModelAdmin):
   list_display = ('username', 'trainer', 'group', 'is_active', 'must_change_password', 'created_at', 'updated_at')
   search_fields = ('username', 'email', 'trainer__username', 'group__name')
   list_filter = ('is_active', 'must_change_password')
+
+
+@admin.register(ReferenceCategory)
+class ReferenceCategoryAdmin(admin.ModelAdmin):
+  list_display = ('name', 'trainer', 'created_at', 'updated_at')
+  search_fields = ('name', 'trainer__username', 'trainer__email')
+
+
+@admin.register(TrainerReference)
+class TrainerReferenceAdmin(admin.ModelAdmin):
+  list_display = ('title', 'trainer', 'category', 'reference_type', 'created_at')
+  search_fields = ('title', 'trainer__username', 'category__name', 'subcategory')
+  list_filter = ('reference_type',)
+
+
+@admin.register(TrackingTemplate)
+class TrackingTemplateAdmin(admin.ModelAdmin):
+  list_display = ('name', 'trainer', 'cadence', 'standard_key', 'is_active', 'created_at')
+  search_fields = ('name', 'trainer__username', 'trainer__email')
+  list_filter = ('cadence', 'is_active')
+
+
+@admin.register(TemplateAssignment)
+class TemplateAssignmentAdmin(admin.ModelAdmin):
+  list_display = ('template', 'client', 'assigned_at')
+  search_fields = ('template__name', 'client__username', 'client__email')
+
+
+@admin.register(TrackingEntry)
+class TrackingEntryAdmin(admin.ModelAdmin):
+  list_display = ('client', 'template_name', 'entry_date', 'edited_by_trainer', 'updated_at')
+  search_fields = ('client__username', 'client__email', 'template_name')
+  list_filter = ('edited_by_trainer',)
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+  list_display = ('client', 'trainer', 'sender', 'is_read', 'created_at')
+  search_fields = ('client__username', 'trainer__username', 'text')
+  list_filter = ('sender', 'is_read')
+
+
+@admin.register(ClientAuthToken)
+class ClientAuthTokenAdmin(admin.ModelAdmin):
+  list_display = ('client', 'created_at')
+  search_fields = ('client__username', 'client__email')
+  readonly_fields = ('key', 'created_at')

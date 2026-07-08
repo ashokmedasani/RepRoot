@@ -147,6 +147,23 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - Trainer profile country and state/region dropdowns use global country/state data from the frontend `country-state-city` package.
 - Dashboard is not implemented yet.
 
+## Tracking Templates, References, Client Portal, Chat, and Insights
+
+- Tracking templates are trainer-level, not group-level. One set of templates is available across all of a trainer's groups.
+- A trainer can have at most 5 templates.
+- Three standard templates ship with the platform and can be adopted with one click: Nutrition Details, Vitamins & Supplements, and Daily Progress Check-in. Adopted templates count toward the 5-template limit and can be customized.
+- Nothing in a template is mandatory for clients. Template fields never carry required flags, and a missed day never blocks the client or the app.
+- Templates are managed in a dedicated Templates section (`/trainer/templates`). Group pages show the shared templates read-only.
+- Templates are assigned per client. Assignments can be added or removed at any time; unassigning or deleting a template never deletes the client's past entries (entries keep a template-name snapshot).
+- The trainer References Library is stored server-side (categories with subcategories, plus references). Video references must be YouTube links and are streamed inside the app; PDFs and images upload as real files to Django media storage. Video file uploads are not allowed.
+- Each template carries a curated set of attached references chosen from the library, so a client receives only the resources relevant to their goal.
+- Clients authenticate with a real portal token (`Authorization: ClientToken <key>` via the `ClientAuthToken` model), stored in sessionStorage. Client login returns the token.
+- Clients with a temporary password are routed to `/client/change-password`; changing the password clears `must_change_password`.
+- The client portal (`/client/profile`) has four sections: My Templates (fill in and submit entries, one entry per template per date with same-day upsert), My Details (registration and lead-form answers, read-only), Resources (attached references with in-app YouTube streaming), and Trainer Chat.
+- Client tracking entries appear in the trainer's client profile, and the trainer can edit any entry at any time; trainer edits are flagged `edited_by_trainer`.
+- Trainer-client chat is stored in the backend (`ChatMessage`) and polled over REST every 5 seconds while a chat panel is open. No websockets in Version 1.
+- The trainer client profile consolidates identity and password reset into a single Account & Access dialog and includes an Insights section computed from entries: 30-day check-in consistency, numeric field trends, and recent client notes by date.
+
 ## UI Design Philosophy
 
 The application must feel like a premium SaaS application:

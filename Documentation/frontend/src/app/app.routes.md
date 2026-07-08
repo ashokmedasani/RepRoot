@@ -47,3 +47,8 @@ Old trainer access routes redirect to the current route format for compatibility
 ## Future improvement notes
 
 Add route guards once dashboard and other protected pages are implemented.
+
+## Update: templates and client portal routes
+
+- `trainer/templates`, `trainer/templates/create`, `trainer/templates/:templateId/edit` (dedicated Templates section); the old `trainer/groups/:groupId/tracking-template/create` route redirects to `trainer/templates`.
+- `client/change-password` for the forced password change after a temporary password.

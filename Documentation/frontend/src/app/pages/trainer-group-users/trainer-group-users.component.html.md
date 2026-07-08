@@ -15,3 +15,7 @@ Renders the group users page.
 
 - `trainer-group-users.component.ts`
 - `trainer-group-users.component.scss`
+
+## Update
+
+Tracking Templates tab renders trainer-level template cards (fields shown as optional previews) with Manage/Edit Template links to `/trainer/templates`.

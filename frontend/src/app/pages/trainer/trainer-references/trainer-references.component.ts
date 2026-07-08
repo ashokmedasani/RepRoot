@@ -1,53 +1,71 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
+import { inject } from '@angular/core';
 
+import {
+  ReferenceCategoryRecord,
+  ReferencePayload,
+  ReferenceType,
+  ReferencesApiService,
+  TrainerReferenceRecord
+} from '../../../core/api/references-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
 
-type ReferenceType = 'Video Link' | 'PDF' | 'Image' | 'Document' | 'Text Note' | 'External Link';
+type ReferenceTypeLabel = 'Video Link' | 'PDF' | 'Image' | 'Document' | 'Text Note' | 'External Link';
 
-interface TrainerReference {
-  id: string;
+const TYPE_LABELS: Record<ReferenceType, ReferenceTypeLabel> = {
+  video_link: 'Video Link',
+  pdf: 'PDF',
+  image: 'Image',
+  document: 'Document',
+  text_note: 'Text Note',
+  external_link: 'External Link'
+};
+
+const TYPE_VALUES: Record<ReferenceTypeLabel, ReferenceType> = {
+  'Video Link': 'video_link',
+  'PDF': 'pdf',
+  'Image': 'image',
+  'Document': 'document',
+  'Text Note': 'text_note',
+  'External Link': 'external_link'
+};
+
+interface TrainerReferenceView {
+  id: number;
   title: string;
   category: string;
+  categoryId: number;
   subcategory: string;
-  type: ReferenceType;
+  type: ReferenceTypeLabel;
   description: string;
   link: string;
   fileName: string;
-  fileDataUrl: string;
+  fileUrl: string;
   tags: string[];
   createdAt: string;
 }
 
-interface ReferenceCategory {
-  id: string;
-  name: string;
-  subcategories: string[];
-  createdAt: string;
-}
-
 interface ReferenceForm {
-  id: string;
+  id: number;
   title: string;
-  category: string;
+  categoryId: number | null;
   subcategory: string;
-  type: ReferenceType;
+  type: ReferenceTypeLabel;
   description: string;
   link: string;
   tagsText: string;
   fileName: string;
-  fileDataUrl: string;
+  file: File | null;
 }
 
 interface CategoryForm {
   name: string;
   subcategoriesText: string;
 }
-
-const STORAGE_KEY_PREFIX = 'coachflow-trainer-references';
-const CATEGORY_STORAGE_KEY_PREFIX = 'coachflow-trainer-reference-categories';
 
 @Component({
   selector: 'app-trainer-references',
@@ -56,18 +74,20 @@ const CATEGORY_STORAGE_KEY_PREFIX = 'coachflow-trainer-reference-categories';
   templateUrl: './trainer-references.component.html',
   styleUrl: './trainer-references.component.scss'
 })
-export class TrainerReferencesComponent {
-  constructor(private readonly sanitizer: DomSanitizer) {}
+export class TrainerReferencesComponent implements OnInit {
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly referencesApi = inject(ReferencesApiService);
 
-  readonly types: ReferenceType[] = ['Video Link', 'PDF', 'Image', 'Document', 'Text Note', 'External Link'];
-  readonly references = signal<TrainerReference[]>(this.loadReferences());
-  readonly categories = signal<ReferenceCategory[]>(this.loadCategories(this.references()));
+  readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF', 'Image', 'Document', 'Text Note', 'External Link'];
+  readonly references = signal<TrainerReferenceView[]>([]);
+  readonly categories = signal<ReferenceCategoryRecord[]>([]);
   readonly selectedCategory = signal('All References');
-  readonly selectedReferenceId = signal(this.references()[0]?.id || '');
+  readonly selectedReferenceId = signal(0);
   readonly query = signal('');
   readonly message = signal('');
   readonly isEditorOpen = signal(false);
   readonly isCategoryEditorOpen = signal(false);
+  readonly isSaving = signal(false);
 
   readonly categoryNames = computed(() => this.categories().map((category) => category.name));
   readonly subcategories = computed(() =>
@@ -107,20 +127,24 @@ export class TrainerReferencesComponent {
     return references.find((reference) => reference.id === selectedId) || references[0] || null;
   });
 
+  ngOnInit(): void {
+    this.loadLibrary();
+  }
+
   selectCategory(category: string): void {
     this.selectedCategory.set(category);
-    this.selectedReferenceId.set('');
+    this.selectedReferenceId.set(0);
   }
 
   setSearch(value: string): void {
     this.query.set(value);
   }
 
-  selectReference(reference: TrainerReference): void {
+  selectReference(reference: TrainerReferenceView): void {
     this.selectedReferenceId.set(reference.id);
   }
 
-  addReference(type: ReferenceType = 'Video Link'): void {
+  addReference(type: ReferenceTypeLabel = 'Video Link'): void {
     if (!this.categories().length) {
       this.addCategory();
       this.message.set('Create a category first, then add references inside it.');
@@ -145,66 +169,81 @@ export class TrainerReferencesComponent {
       return;
     }
 
-    const exists = this.categories().some((category) => category.name.toLowerCase() === name.toLowerCase());
-
-    if (exists) {
-      this.message.set('That category already exists.');
-      return;
-    }
-
-    const category: ReferenceCategory = {
-      id: crypto.randomUUID(),
-      name,
-      subcategories: this.parseSubcategories(this.categoryForm.subcategoriesText),
-      createdAt: new Date().toISOString()
-    };
-
-    this.persistCategories([...this.categories(), category]);
-    this.selectedCategory.set(name);
-    this.isCategoryEditorOpen.set(false);
-    this.message.set('Category created.');
+    this.isSaving.set(true);
+    this.referencesApi.createCategory(name, this.parseSubcategories(this.categoryForm.subcategoriesText)).subscribe({
+      next: (response) => {
+        this.categories.set([...this.categories(), response.category]);
+        this.selectedCategory.set(response.category.name);
+        this.isCategoryEditorOpen.set(false);
+        this.isSaving.set(false);
+        this.message.set(response.message);
+      },
+      error: (error: unknown) => {
+        this.isSaving.set(false);
+        this.message.set(formatApiError(error, 'Category could not be saved.'));
+      }
+    });
   }
 
-  editReference(reference: TrainerReference): void {
+  editReference(reference: TrainerReferenceView): void {
     this.form = {
       id: reference.id,
       title: reference.title,
-      category: reference.category,
+      categoryId: reference.categoryId,
       subcategory: reference.subcategory,
       type: reference.type,
       description: reference.description,
       link: reference.link,
       tagsText: reference.tags.join(', '),
       fileName: reference.fileName,
-      fileDataUrl: reference.fileDataUrl
+      file: null
     };
     this.isEditorOpen.set(true);
     this.message.set('');
   }
 
-  duplicateReference(reference: TrainerReference): void {
-    const copy = {
-      ...reference,
-      id: crypto.randomUUID(),
+  duplicateReference(reference: TrainerReferenceView): void {
+    const payload: ReferencePayload = {
+      category: reference.categoryId,
+      subcategory: reference.subcategory,
       title: `${reference.title} Copy`,
-      createdAt: new Date().toISOString()
+      reference_type: TYPE_VALUES[reference.type],
+      description: reference.description,
+      link: reference.link || reference.fileUrl,
+      tags: reference.tags
     };
-    this.persist([copy, ...this.references()]);
-    this.selectedReferenceId.set(copy.id);
-    this.message.set('Reference duplicated.');
+
+    this.referencesApi.createReference(payload).subscribe({
+      next: (response) => {
+        this.references.set([this.toView(response.reference), ...this.references()]);
+        this.selectedReferenceId.set(response.reference.id);
+        this.message.set('Reference duplicated.');
+      },
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Reference could not be duplicated.'));
+      }
+    });
   }
 
-  deleteReference(reference: TrainerReference): void {
+  deleteReference(reference: TrainerReferenceView): void {
     const confirmed = window.confirm(`Delete ${reference.title}?`);
 
     if (!confirmed) {
       return;
     }
 
-    const remaining = this.references().filter((item) => item.id !== reference.id);
-    this.persist(remaining);
-    this.selectedReferenceId.set(remaining[0]?.id || '');
-    this.message.set('Reference deleted.');
+    this.referencesApi.deleteReference(reference.id).subscribe({
+      next: () => {
+        const remaining = this.references().filter((item) => item.id !== reference.id);
+        this.references.set(remaining);
+        this.selectedReferenceId.set(remaining[0]?.id || 0);
+        this.message.set('Reference deleted.');
+        this.loadCategoriesOnly();
+      },
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Reference could not be deleted.'));
+      }
+    });
   }
 
   saveReference(): void {
@@ -215,36 +254,44 @@ export class TrainerReferencesComponent {
       return;
     }
 
-    const tags = this.form.tagsText
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-    const nextReference: TrainerReference = {
-      id: this.form.id || crypto.randomUUID(),
-      title: this.form.title.trim(),
-      category: this.form.category,
+    const payload: ReferencePayload = {
+      category: this.form.categoryId as number,
       subcategory: this.form.subcategory.trim(),
-      type: this.form.type,
+      title: this.form.title.trim(),
+      reference_type: TYPE_VALUES[this.form.type],
       description: this.form.description.trim(),
       link: this.form.link.trim(),
-      fileName: this.form.fileName,
-      fileDataUrl: this.form.fileDataUrl,
-      tags,
-      createdAt: this.form.id
-        ? this.references().find((reference) => reference.id === this.form.id)?.createdAt || new Date().toISOString()
-        : new Date().toISOString()
+      tags: this.form.tagsText
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      file: this.form.file
     };
-    const references = this.references();
-    const exists = references.some((reference) => reference.id === nextReference.id);
-    const updated = exists
-      ? references.map((reference) => (reference.id === nextReference.id ? nextReference : reference))
-      : [nextReference, ...references];
+    const isUpdate = Boolean(this.form.id);
+    const request = isUpdate
+      ? this.referencesApi.updateReference(this.form.id, payload)
+      : this.referencesApi.createReference(payload);
 
-    this.persist(updated);
-    this.selectedCategory.set('All References');
-    this.selectedReferenceId.set(nextReference.id);
-    this.isEditorOpen.set(false);
-    this.message.set(exists ? 'Reference updated.' : 'Reference added.');
+    this.isSaving.set(true);
+    request.subscribe({
+      next: (response) => {
+        const view = this.toView(response.reference);
+        const references = this.references();
+        this.references.set(
+          isUpdate ? references.map((reference) => (reference.id === view.id ? view : reference)) : [view, ...references]
+        );
+        this.selectedCategory.set('All References');
+        this.selectedReferenceId.set(view.id);
+        this.isEditorOpen.set(false);
+        this.isSaving.set(false);
+        this.message.set(response.message);
+        this.loadCategoriesOnly();
+      },
+      error: (error: unknown) => {
+        this.isSaving.set(false);
+        this.message.set(formatApiError(error, 'Reference could not be saved.'));
+      }
+    });
   }
 
   handleFileUpload(event: Event): void {
@@ -256,29 +303,25 @@ export class TrainerReferencesComponent {
     }
 
     if (file.type.startsWith('video/')) {
-      this.message.set('Video upload is not supported. Add a YouTube or external video link instead.');
+      this.message.set('Video upload is not supported. Add a YouTube video link instead.');
       input.value = '';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.form.fileName = file.name;
-      this.form.fileDataUrl = String(reader.result || '');
+    this.form.file = file;
+    this.form.fileName = file.name;
 
-      if (file.type === 'application/pdf') {
-        this.form.type = 'PDF';
-      } else if (file.type.startsWith('image/')) {
-        this.form.type = 'Image';
-      } else if (this.form.type === 'Video Link') {
-        this.form.type = 'Document';
-      }
-    };
-    reader.readAsDataURL(file);
+    if (file.type === 'application/pdf') {
+      this.form.type = 'PDF';
+    } else if (file.type.startsWith('image/')) {
+      this.form.type = 'Image';
+    } else if (this.form.type === 'Video Link') {
+      this.form.type = 'Document';
+    }
   }
 
-  openReference(reference: TrainerReference): void {
-    const url = reference.fileDataUrl || reference.link;
+  openReference(reference: TrainerReferenceView): void {
+    const url = reference.fileUrl || reference.link;
 
     if (!url) {
       return;
@@ -303,8 +346,46 @@ export class TrainerReferencesComponent {
     return embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl) : null;
   }
 
-  resourceInitial(reference: TrainerReference): string {
+  resourceInitial(reference: TrainerReferenceView): string {
     return reference.title.trim().charAt(0).toUpperCase() || 'R';
+  }
+
+  private loadLibrary(): void {
+    this.referencesApi.getCategories().subscribe({
+      next: (response) => this.categories.set(response.categories),
+      error: (error: unknown) => this.message.set(formatApiError(error, 'Categories could not be loaded.'))
+    });
+    this.referencesApi.getReferences().subscribe({
+      next: (response) => {
+        const views = response.references.map((reference) => this.toView(reference));
+        this.references.set(views);
+        this.selectedReferenceId.set(views[0]?.id || 0);
+      },
+      error: (error: unknown) => this.message.set(formatApiError(error, 'References could not be loaded.'))
+    });
+  }
+
+  private loadCategoriesOnly(): void {
+    this.referencesApi.getCategories().subscribe({
+      next: (response) => this.categories.set(response.categories)
+    });
+  }
+
+  private toView(reference: TrainerReferenceRecord): TrainerReferenceView {
+    return {
+      id: reference.id,
+      title: reference.title,
+      category: reference.category_name,
+      categoryId: reference.category,
+      subcategory: reference.subcategory,
+      type: TYPE_LABELS[reference.reference_type],
+      description: reference.description,
+      link: reference.link,
+      fileName: reference.file_name,
+      fileUrl: reference.file_url,
+      tags: reference.tags,
+      createdAt: reference.created_at
+    };
   }
 
   private validateForm(): string {
@@ -312,43 +393,55 @@ export class TrainerReferencesComponent {
       return 'Add a title for this reference.';
     }
 
-    if (!this.form.category) {
+    if (!this.form.categoryId) {
       return 'Choose a category.';
     }
 
     if (this.form.type === 'Video Link') {
       if (!this.form.link.trim()) {
-        return 'Paste a YouTube or external video link.';
+        return 'Paste a YouTube video link.';
       }
 
-      if (this.form.fileDataUrl) {
-        return 'Video uploads are not supported. Keep videos as links only.';
+      if (this.form.file) {
+        return 'Video uploads are not supported. Keep videos as YouTube links only.';
+      }
+
+      if (!this.youtubeId(this.form.link.trim())) {
+        return 'Videos must be YouTube links so they can be streamed in-app.';
       }
     }
 
-    if (this.form.type !== 'Text Note' && this.form.type !== 'Video Link' && !this.form.link.trim() && !this.form.fileDataUrl) {
+    if (
+      this.form.type !== 'Text Note' &&
+      this.form.type !== 'Video Link' &&
+      !this.form.link.trim() &&
+      !this.form.file &&
+      !this.form.fileName
+    ) {
       return 'Add a link or upload a file.';
     }
 
     return '';
   }
 
-  private emptyForm(type: ReferenceType = 'Video Link'): ReferenceForm {
+  private emptyForm(type: ReferenceTypeLabel = 'Video Link'): ReferenceForm {
     const selectedCategory = this.selectedCategory();
-    const category = selectedCategory !== 'All References' ? selectedCategory : this.categoryNames()[0] || '';
-    const subcategories = this.categories().find((item) => item.name === category)?.subcategories || [];
+    const category =
+      selectedCategory !== 'All References'
+        ? this.categories().find((item) => item.name === selectedCategory)
+        : this.categories()[0];
 
     return {
-      id: '',
+      id: 0,
       title: '',
-      category,
-      subcategory: subcategories[0] || '',
+      categoryId: category?.id || null,
+      subcategory: category?.subcategories[0] || '',
       type,
       description: '',
       link: '',
       tagsText: '',
       fileName: '',
-      fileDataUrl: ''
+      file: null
     };
   }
 
@@ -357,58 +450,6 @@ export class TrainerReferencesComponent {
       name: '',
       subcategoriesText: ''
     };
-  }
-
-  private loadReferences(): TrainerReference[] {
-    const saved = window.localStorage.getItem(this.storageKey());
-
-    if (saved) {
-      try {
-        return JSON.parse(saved) as TrainerReference[];
-      } catch {
-        window.localStorage.removeItem(this.storageKey());
-      }
-    }
-
-    return [];
-  }
-
-  private persist(references: TrainerReference[]): void {
-    this.references.set(references);
-    window.localStorage.setItem(this.storageKey(), JSON.stringify(references));
-  }
-
-  private loadCategories(references: TrainerReference[]): ReferenceCategory[] {
-    const saved = window.localStorage.getItem(this.categoryStorageKey());
-
-    if (saved) {
-      try {
-        return JSON.parse(saved) as ReferenceCategory[];
-      } catch {
-        window.localStorage.removeItem(this.categoryStorageKey());
-      }
-    }
-
-    const categoryNames = Array.from(new Set(references.map((reference) => reference.category).filter(Boolean)));
-
-    return categoryNames.map((name) => ({
-      id: crypto.randomUUID(),
-      name,
-      subcategories: Array.from(
-        new Set(
-          references
-            .filter((reference) => reference.category === name)
-            .map((reference) => reference.subcategory)
-            .filter(Boolean)
-        )
-      ),
-      createdAt: new Date().toISOString()
-    }));
-  }
-
-  private persistCategories(categories: ReferenceCategory[]): void {
-    this.categories.set(categories);
-    window.localStorage.setItem(this.categoryStorageKey(), JSON.stringify(categories));
   }
 
   private parseSubcategories(value: string): string[] {
@@ -420,53 +461,6 @@ export class TrainerReferencesComponent {
           .filter(Boolean)
       )
     );
-  }
-
-  private storageKey(): string {
-    const trainerId = window.localStorage.getItem('trainer-account-id');
-
-    if (trainerId) {
-      return `${STORAGE_KEY_PREFIX}-trainer-${trainerId}`;
-    }
-
-    const username = window.localStorage.getItem('trainer-account-username');
-
-    if (username) {
-      return `${STORAGE_KEY_PREFIX}-username-${this.hashStorageIdentity(username)}`;
-    }
-
-    const token = window.localStorage.getItem('trainer-auth-token') || 'guest';
-
-    return `${STORAGE_KEY_PREFIX}-token-${this.hashStorageIdentity(token)}`;
-  }
-
-  private categoryStorageKey(): string {
-    const trainerId = window.localStorage.getItem('trainer-account-id');
-
-    if (trainerId) {
-      return `${CATEGORY_STORAGE_KEY_PREFIX}-trainer-${trainerId}`;
-    }
-
-    const username = window.localStorage.getItem('trainer-account-username');
-
-    if (username) {
-      return `${CATEGORY_STORAGE_KEY_PREFIX}-username-${this.hashStorageIdentity(username)}`;
-    }
-
-    const token = window.localStorage.getItem('trainer-auth-token') || 'guest';
-
-    return `${CATEGORY_STORAGE_KEY_PREFIX}-token-${this.hashStorageIdentity(token)}`;
-  }
-
-  private hashStorageIdentity(value: string): string {
-    let hash = 0;
-
-    for (let index = 0; index < value.length; index += 1) {
-      hash = (hash << 5) - hash + value.charCodeAt(index);
-      hash |= 0;
-    }
-
-    return Math.abs(hash).toString(36);
   }
 
   private youtubeId(link: string): string {

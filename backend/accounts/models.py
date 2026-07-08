@@ -175,6 +175,162 @@ class ClientAccess(models.Model):
     return f'{self.username} for {self.trainer.username}'
 
 
+class ReferenceCategory(models.Model):
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reference_categories')
+  name = models.CharField(max_length=120)
+  subcategories = models.JSONField(default=list)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'reference_categories'
+    ordering = ['created_at']
+    unique_together = ('trainer', 'name')
+
+  def __str__(self) -> str:
+    return f'{self.name} ({self.trainer.username})'
+
+
+class TrainerReference(models.Model):
+  TYPE_VIDEO_LINK = 'video_link'
+  TYPE_PDF = 'pdf'
+  TYPE_IMAGE = 'image'
+  TYPE_DOCUMENT = 'document'
+  TYPE_TEXT_NOTE = 'text_note'
+  TYPE_EXTERNAL_LINK = 'external_link'
+
+  REFERENCE_TYPE_CHOICES = [
+    (TYPE_VIDEO_LINK, 'Video Link'),
+    (TYPE_PDF, 'PDF'),
+    (TYPE_IMAGE, 'Image'),
+    (TYPE_DOCUMENT, 'Document'),
+    (TYPE_TEXT_NOTE, 'Text Note'),
+    (TYPE_EXTERNAL_LINK, 'External Link'),
+  ]
+
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_references')
+  category = models.ForeignKey(ReferenceCategory, on_delete=models.PROTECT, related_name='references')
+  subcategory = models.CharField(max_length=120, blank=True)
+  title = models.CharField(max_length=180)
+  reference_type = models.CharField(max_length=20, choices=REFERENCE_TYPE_CHOICES)
+  description = models.TextField(blank=True)
+  link = models.URLField(blank=True)
+  file = models.FileField(upload_to='trainer-references/', blank=True)
+  tags = models.JSONField(default=list)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'trainer_references'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.title} ({self.trainer.username})'
+
+
+class TrackingTemplate(models.Model):
+  CADENCE_DAILY = 'daily'
+  CADENCE_WEEKLY = 'weekly'
+  CADENCE_MONTHLY = 'monthly'
+
+  CADENCE_CHOICES = [
+    (CADENCE_DAILY, 'Daily'),
+    (CADENCE_WEEKLY, 'Weekly'),
+    (CADENCE_MONTHLY, 'Monthly'),
+  ]
+
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tracking_templates')
+  name = models.CharField(max_length=120)
+  purpose = models.TextField(blank=True)
+  cadence = models.CharField(max_length=10, choices=CADENCE_CHOICES, default=CADENCE_DAILY)
+  accent = models.CharField(max_length=20, blank=True, default='green')
+  fields = models.JSONField(default=list)
+  standard_key = models.CharField(max_length=40, blank=True)
+  references = models.ManyToManyField(TrainerReference, blank=True, related_name='tracking_templates')
+  is_active = models.BooleanField(default=True, db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'tracking_templates'
+    ordering = ['created_at']
+    unique_together = ('trainer', 'name')
+
+  def __str__(self) -> str:
+    return f'{self.name} ({self.trainer.username})'
+
+
+class TemplateAssignment(models.Model):
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='template_assignments')
+  template = models.ForeignKey(TrackingTemplate, on_delete=models.CASCADE, related_name='assignments')
+  assigned_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'template_assignments'
+    ordering = ['assigned_at']
+    unique_together = ('client', 'template')
+
+  def __str__(self) -> str:
+    return f'{self.template.name} -> {self.client.username}'
+
+
+class TrackingEntry(models.Model):
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='tracking_entries')
+  template = models.ForeignKey(TrackingTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='entries')
+  template_name = models.CharField(max_length=120)
+  entry_date = models.DateField()
+  answers = models.JSONField(default=dict)
+  note = models.TextField(blank=True)
+  edited_by_trainer = models.BooleanField(default=False)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'tracking_entries'
+    ordering = ['-entry_date', '-updated_at']
+    unique_together = ('client', 'template', 'entry_date')
+
+  def __str__(self) -> str:
+    return f'{self.client.username} {self.template_name} {self.entry_date}'
+
+
+class ChatMessage(models.Model):
+  SENDER_TRAINER = 'trainer'
+  SENDER_CLIENT = 'client'
+
+  SENDER_CHOICES = [
+    (SENDER_TRAINER, 'Trainer'),
+    (SENDER_CLIENT, 'Client'),
+  ]
+
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_messages')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='chat_messages')
+  sender = models.CharField(max_length=10, choices=SENDER_CHOICES)
+  text = models.TextField()
+  is_read = models.BooleanField(default=False)
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'chat_messages'
+    ordering = ['created_at']
+    indexes = [models.Index(fields=['client', 'created_at'])]
+
+  def __str__(self) -> str:
+    return f'{self.sender} -> {self.client.username} at {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class ClientAuthToken(models.Model):
+  client = models.OneToOneField(ClientAccess, on_delete=models.CASCADE, related_name='auth_token')
+  key = models.CharField(max_length=40, unique=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'client_auth_tokens'
+
+  def __str__(self) -> str:
+    return f'Token for {self.client.username}'
+
+
 class RecycledTrainerAccount(models.Model):
   original_user_id = models.PositiveIntegerField(db_index=True)
   email = models.EmailField(db_index=True)

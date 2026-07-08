@@ -46,3 +46,12 @@ Profile setup requires first name, last name, gender, birth month, birth year, c
 ## Future improvement notes
 
 Split portfolio media and certifications into nested serializers when they become multi-record features.
+
+## Update: templates, references, and client portal
+
+- `normalize_template_fields` + `TEMPLATE_FIELD_TYPES`: template field whitelist (number, short_text, long_text, yes_no, image); no required flags - template fields are never mandatory.
+- `is_youtube_link`: enforces the YouTube-only rule for video references.
+- `ReferenceCategorySerializer`, `TrainerReferenceSerializer` (multipart file upload, tags as comma string), `TrackingTemplateReferenceSerializer` (compact nested form).
+- `TrackingTemplateSerializer`: accepts `custom_fields` and `reference_ids`, exposes nested references and assigned count.
+- `TemplateAssignmentSerializer`, `TrackingEntrySerializer`, `ClientTrackingEntrySubmitSerializer` (client upsert payload).
+- `ChatMessageSerializer` and `ClientPasswordChangeSerializer` (verifies current password, clears `must_change_password`).

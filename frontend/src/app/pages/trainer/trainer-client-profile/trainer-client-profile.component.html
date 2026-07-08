@@ -31,125 +31,268 @@
       </div>
       <div class="hero-details">
         <article>
-          <span>Form Number</span>
-          <strong>#{{ profile.lead_submission.id }}</strong>
-        </article>
-        <article>
-          <span>Reference ID</span>
-          <strong>{{ profile.lead_submission.reference_id }}</strong>
-        </article>
-        <article>
-          <span>Group Number</span>
-          <strong>#{{ profile.group.id }}</strong>
-        </article>
-        <article>
           <span>Group</span>
           <strong>{{ profile.group.name }}</strong>
         </article>
+        <article>
+          <span>Templates</span>
+          <strong>{{ assignments.length }} assigned</strong>
+        </article>
+        <article>
+          <span>Entries</span>
+          <strong>{{ entries.length }} submitted</strong>
+        </article>
       </div>
-      <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+      <div class="hero-side">
+        <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+        <button type="button" class="secondary-action" (click)="openAccountDialog()">Account &amp; Access</button>
+      </div>
     </section>
 
-    <section class="profile-grid">
-      <article class="panel">
-        <h3>Account Details</h3>
-        <dl>
+    <section class="workspace-grid">
+      <article class="panel templates-panel">
+        <div class="panel-heading">
           <div>
-            <dt>Username</dt>
-            <dd>{{ client.username }}</dd>
+            <h3>Assigned Templates</h3>
+            <p>Choose which check-in templates {{ client.first_name }} should follow. Change them anytime - past entries are always kept.</p>
           </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{{ client.email }}</dd>
-          </div>
-          <div>
-            <dt>Group</dt>
-            <dd>{{ client.group_name }}</dd>
-          </div>
-          <div>
-            <dt>Reference ID</dt>
-            <dd>{{ profile.lead_submission.reference_id }}</dd>
-          </div>
-          <div>
-            <dt>Submitted On</dt>
-            <dd>{{ profile.lead_submission.submitted_at | date: 'medium' }}</dd>
-          </div>
-          <div>
-            <dt>Joined On</dt>
-            <dd>{{ client.created_at | date: 'medium' }}</dd>
-          </div>
-        </dl>
-      </article>
-    </section>
-
-    <section class="chat-layout">
-      <article class="panel chat-panel">
-        <div class="chat-header">
-          <div>
-            <h3>Client Chat</h3>
-            <p>Communicate with {{ client.first_name }} about check-ins, forms, and next steps.</p>
-          </div>
-          <span>{{ chatMessages.length }} messages</span>
         </div>
 
-        <div class="message-list">
-          @for (chatMessage of chatMessages; track chatMessage.id) {
-            <div class="chat-bubble" [class.client-message]="chatMessage.sender === 'client'">
-              <strong>{{ chatMessage.sender === 'trainer' ? 'Trainer' : client.first_name }}</strong>
-              <p>{{ chatMessage.body }}</p>
-              <small>{{ chatMessage.sentAt | date: 'short' }}</small>
+        <div class="assignment-list">
+          @for (assignment of assignments; track assignment.id) {
+            <div class="assignment-row" [class.green]="assignment.template_accent === 'green'" [class.blue]="assignment.template_accent === 'blue'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'">
+              <div>
+                <strong>{{ assignment.template_name }}</strong>
+                <small>{{ assignment.template_cadence }} check-in - assigned {{ assignment.assigned_at | date: 'mediumDate' }}</small>
+              </div>
+              <button type="button" class="ghost-action" (click)="unassignTemplate(assignment)">Unassign</button>
             </div>
           } @empty {
-            <p class="empty-chat">No messages yet. Send the first note to this client.</p>
+            <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start recording progress.</p>
           }
         </div>
 
-        <form class="chat-compose" (ngSubmit)="sendMessage()">
-          <textarea
-            rows="3"
-            placeholder="Write a message to the client"
-            [(ngModel)]="chatDraft"
-            name="chatDraft"
-          ></textarea>
-          <button type="submit" class="primary-action">Send Message</button>
-        </form>
+        <div class="assign-row">
+          <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
+            <option [ngValue]="null">Select a template to assign</option>
+            @for (template of availableTemplates; track template.id) {
+              <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
+            }
+          </select>
+          <button type="button" class="primary-action" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
+            Assign Template
+          </button>
+        </div>
       </article>
 
-      <article class="panel access-panel">
-        <h3>Account Access</h3>
-        <p>{{ client.must_change_password ? 'Temporary password is active.' : 'Client can access the portal with the current password.' }}</p>
-        <button type="button" class="primary-action" (click)="resetClientPassword()">Reset Password</button>
-        @if (resetPasswordResult) {
-          <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
+      <article class="panel">
+        <h3>Intake Details</h3>
+        <p>Everything from the lead form and registration form in one place.</p>
+        <dl class="answer-grid">
+          @for (detail of intakeDetails; track detail.label) {
+            <div>
+              <dt>{{ detail.label }} <em>{{ detail.source === 'lead-form' ? 'lead form' : 'registration' }}</em></dt>
+              <dd>{{ detail.value }}</dd>
+            </div>
+          } @empty {
+            <p class="empty-note">No intake answers recorded.</p>
+          }
+        </dl>
+      </article>
+    </section>
+
+    <section class="panel entries-panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Tracking Entries</h3>
+          <p>Everything {{ client.first_name }} submitted. You can correct any entry - edits are marked.</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Template</th>
+              <th>Values</th>
+              <th>Note</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of entries; track entry.id) {
+              <tr>
+                <td>{{ entry.entry_date | date: 'mediumDate' }}</td>
+                <td>{{ entry.template_name }}</td>
+                <td class="values-cell">{{ answerPreview(entry) }}</td>
+                <td class="values-cell">{{ entry.note || '-' }}</td>
+                <td>
+                  @if (entry.edited_by_trainer) {
+                    <span class="edited-pill">Edited by you</span>
+                  } @else {
+                    <span class="client-pill">Client entry</span>
+                  }
+                </td>
+                <td>
+                  <button type="button" class="ghost-action compact" (click)="startEntryEdit(entry)">Edit</button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6">No entries yet. Entries appear here as soon as {{ client.first_name }} submits a check-in.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel insights-panel">
+      <div class="panel-heading">
+        <div>
+          <h3>Insights</h3>
+          <p>How {{ client.first_name }} is doing, computed from their submitted entries.</p>
+        </div>
+      </div>
+
+      <div class="insights-grid">
+        <div class="insight-block">
+          <h4>Check-in consistency (last 30 days)</h4>
+          <div class="consistency-strip">
+            @for (day of consistencyDays; track day.date) {
+              <span class="day-dot" [class.filled]="day.hasEntry" [title]="day.date"></span>
+            }
+          </div>
+        </div>
+
+        @for (trend of numericTrends; track trend.key) {
+          <div class="insight-block">
+            <h4>{{ trend.label }}</h4>
+            <div class="trend-row">
+              <svg viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden="true">
+                <polyline [attr.points]="trend.points" />
+              </svg>
+              <div>
+                <strong>{{ trend.latest }}</strong>
+                <small [class.negative]="trend.change < 0">{{ trend.change > 0 ? '+' : '' }}{{ trend.change }} since first entry</small>
+              </div>
+            </div>
+          </div>
         }
-      </article>
+      </div>
+
+      <div class="notes-timeline">
+        <h4>How {{ client.first_name }} is feeling</h4>
+        @for (entry of recentNotes; track entry.id) {
+          <div class="note-row">
+            <span>{{ entry.entry_date | date: 'mediumDate' }}</span>
+            <p>{{ entry.note }}</p>
+          </div>
+        } @empty {
+          <p class="empty-note">No notes yet. Client notes from check-ins show up here.</p>
+        }
+      </div>
     </section>
 
-    <section class="profile-grid wide">
-      <article class="panel">
-        <h3>Registration Answers</h3>
-        <dl class="answer-grid">
-          @for (field of profile.registration_fields; track field.key || field.label) {
-            <div>
-              <dt>{{ field.label }}</dt>
-              <dd>{{ fieldValue(field) }}</dd>
-            </div>
-          }
-        </dl>
-      </article>
+    <app-chat-panel
+      mode="trainer"
+      [clientId]="client.id"
+      [counterpartName]="client.first_name"
+      [description]="'Communicate with ' + client.first_name + ' about check-ins, forms, and next steps.'"
+    />
 
-      <article class="panel">
-        <h3>Lead Form Answers</h3>
-        <dl class="answer-grid">
-          @for (answer of profile.lead_submission.answers | keyvalue; track answer.key) {
+    @if (isAccountDialogOpen) {
+      <section class="dialog-backdrop" aria-labelledby="account-dialog-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <h3 id="account-dialog-title">Account &amp; Access</h3>
+            <button type="button" class="icon-button" title="Close" (click)="closeAccountDialog()">x</button>
+          </div>
+
+          <dl class="answer-grid">
             <div>
-              <dt>{{ answer.key }}</dt>
-              <dd>{{ answer.value || 'Not added' }}</dd>
+              <dt>Username</dt>
+              <dd>{{ client.username }}</dd>
             </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ client.email }}</dd>
+            </div>
+            <div>
+              <dt>Group</dt>
+              <dd>{{ client.group_name }}</dd>
+            </div>
+            <div>
+              <dt>Reference ID</dt>
+              <dd>{{ profile.lead_submission.reference_id }}</dd>
+            </div>
+            <div>
+              <dt>Submitted On</dt>
+              <dd>{{ profile.lead_submission.submitted_at | date: 'medium' }}</dd>
+            </div>
+            <div>
+              <dt>Joined On</dt>
+              <dd>{{ client.created_at | date: 'medium' }}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{{ client.is_active ? 'Active' : 'Inactive' }}</dd>
+            </div>
+            <div>
+              <dt>Password</dt>
+              <dd>{{ client.must_change_password ? 'Temporary password active' : 'Client-managed password' }}</dd>
+            </div>
+          </dl>
+
+          <div class="dialog-actions">
+            <button type="button" class="primary-action" (click)="resetClientPassword()">Reset Password</button>
+          </div>
+          @if (resetPasswordResult) {
+            <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
           }
-        </dl>
-      </article>
-    </section>
+        </div>
+      </section>
+    }
+
+    @if (editingEntry) {
+      <section class="dialog-backdrop" aria-labelledby="entry-dialog-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <div>
+              <h3 id="entry-dialog-title">Edit Entry - {{ editingEntry.template_name }}</h3>
+              <p>{{ editingEntry.entry_date | date: 'fullDate' }}</p>
+            </div>
+            <button type="button" class="icon-button" title="Close" (click)="cancelEntryEdit()">x</button>
+          </div>
+
+          <div class="entry-edit-grid">
+            @for (draft of entryDraftAnswers; track draft.key) {
+              <label>
+                <span>{{ draft.label }}</span>
+                @if (isImageValue(draft.value)) {
+                  <img [src]="draft.value" [alt]="draft.label" class="entry-image-preview">
+                } @else {
+                  <input type="text" [(ngModel)]="draft.value" [name]="'entryAnswer' + draft.key">
+                }
+              </label>
+            }
+            <label>
+              <span>Note</span>
+              <textarea rows="3" [(ngModel)]="entryDraftNote" name="entryNote"></textarea>
+            </label>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="ghost-action" (click)="cancelEntryEdit()">Cancel</button>
+            <button type="button" class="primary-action" [disabled]="isSavingEntry" (click)="saveEntryEdit()">
+              {{ isSavingEntry ? 'Saving...' : 'Save Entry' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    }
   } @else {
     <section class="panel error-panel">
       <p>{{ message || 'Client profile not found.' }}</p>

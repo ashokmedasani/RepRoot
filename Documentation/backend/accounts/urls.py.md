@@ -50,3 +50,10 @@ Trainer profile and Forms & Groups management routes are protected by token auth
 ## Future improvement notes
 
 Move profile URLs to a dedicated trainer app if trainer features become large enough to split from account access.
+
+## Update: templates, references, chat, and client portal routes
+
+- `trainer/references/categories/`, `trainer/references/` (+ detail routes).
+- `trainer/templates/standard/`, `trainer/templates/adopt-standard/`, `trainer/templates/` (+ detail).
+- `trainer/forms-groups/clients/<id>/assignments/` (+ detail), `.../entries/`, `trainer/entries/<id>/`, `trainer/clients/<id>/chat/`.
+- Client portal: `client/change-password/`, `client/me/`, `client/templates/`, `client/entries/`, `client/chat/`.
