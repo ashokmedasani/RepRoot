@@ -161,6 +161,8 @@ class ClientAccess(models.Model):
   username = models.CharField(max_length=150)
   temporary_password = models.CharField(max_length=128)
   registration_answers = models.JSONField(default=dict)
+  trainer_notes = models.TextField(blank=True)
+  trainer_notes_updated_at = models.DateTimeField(null=True, blank=True)
   must_change_password = models.BooleanField(default=True)
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)

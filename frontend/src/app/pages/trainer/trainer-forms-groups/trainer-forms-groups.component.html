@@ -245,12 +245,12 @@
 
             <label>
               <span class="field-label">Client password <span class="required">*</span></span>
-              <input type="password" [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password">
+              <app-password-input [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password" />
             </label>
 
             <label>
               <span class="field-label">Confirm password <span class="required">*</span></span>
-              <input type="password" [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password">
+              <app-password-input [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password" />
             </label>
           </div>
 

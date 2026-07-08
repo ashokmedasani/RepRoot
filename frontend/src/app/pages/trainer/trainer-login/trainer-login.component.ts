@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-trainer-login',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './trainer-login.component.html',
   styleUrl: './trainer-login.component.scss'
 })

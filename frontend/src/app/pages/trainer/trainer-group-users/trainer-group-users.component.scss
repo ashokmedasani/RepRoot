@@ -9,13 +9,13 @@ p {
 .summary-band,
 .profile-panel {
   border: 1px solid var(--app-border);
-  border-radius: 0.8rem;
+  border-radius: var(--app-panel-radius);
   background: var(--app-surface);
-  box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 6%, transparent);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .panel {
-  padding: 1.15rem;
+  padding: var(--app-panel-padding);
 }
 
 .message {
@@ -38,7 +38,7 @@ p {
   grid-template-columns: minmax(0, 1fr) minmax(28rem, 1.4fr);
   gap: 1.25rem;
   align-items: stretch;
-  padding: 1.15rem;
+  padding: var(--app-panel-padding);
 }
 
 .summary-band h2 {

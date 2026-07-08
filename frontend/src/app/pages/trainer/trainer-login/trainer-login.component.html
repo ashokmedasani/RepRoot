@@ -22,7 +22,7 @@
 
       <label>
         <span class="field-label">Password <span class="required">*</span></span>
-        <input name="loginPassword" type="password" [(ngModel)]="loginForm.password" autocomplete="current-password" required>
+        <app-password-input name="loginPassword" [(ngModel)]="loginForm.password" autocomplete="current-password" [required]="true" />
       </label>
 
       <a routerLink="/trainer/forgot-password" class="forgot-link">Forgot password?</a>

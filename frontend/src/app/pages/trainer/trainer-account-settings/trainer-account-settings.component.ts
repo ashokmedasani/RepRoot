@@ -5,11 +5,12 @@ import { Router } from '@angular/router';
 
 import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-trainer-account-settings',
   standalone: true,
-  imports: [FormsModule, TrainerPageShellComponent],
+  imports: [FormsModule, TrainerPageShellComponent, PasswordInputComponent],
   templateUrl: './trainer-account-settings.component.html',
   styleUrl: './trainer-account-settings.component.scss'
 })

@@ -139,6 +139,8 @@ export interface ClientAccessDetailResponse {
   group: TrainerGroup;
   registration_fields: DynamicField[];
   lead_submission: LeadSubmission;
+  trainer_notes: string;
+  trainer_notes_updated_at: string | null;
 }
 
 export interface MessageResponse {
@@ -219,6 +221,17 @@ export class FormsGroupsApiService {
     return this.http.get<ClientAccessDetailResponse>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  saveTrainerNotes(
+    clientId: number,
+    notes: string
+  ): Observable<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }> {
+    return this.http.put<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/notes/`,
+      { notes },
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   resetClientPassword(clientId: number): Observable<{ temporary_password: string; message: string }> {

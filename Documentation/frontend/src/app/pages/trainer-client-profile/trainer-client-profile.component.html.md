@@ -5,3 +5,7 @@ Client profile template: hero card with Account & Access button, assigned-templa
 ## Update
 
 Added the Share References dialog and per-assignment share actions.
+
+## Update
+
+Two-panel layout with detail tabs and four dialogs (Account & Access, Share References, Add Entry, Edit Entry).

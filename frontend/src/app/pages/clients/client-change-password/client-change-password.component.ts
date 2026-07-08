@@ -4,11 +4,12 @@ import { Router, RouterLink } from '@angular/router';
 
 import { ClientApiService } from '../../../core/api/client-api.service';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-client-change-password',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './client-change-password.component.html',
   styleUrl: './client-change-password.component.scss'
 })

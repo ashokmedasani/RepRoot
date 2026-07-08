@@ -19,7 +19,7 @@
 
       <label>
         <span class="field-label">Password <span class="required">*</span></span>
-        <input name="clientPassword" type="password" [(ngModel)]="loginForm.password" autocomplete="current-password" required>
+        <app-password-input name="clientPassword" [(ngModel)]="loginForm.password" autocomplete="current-password" [required]="true" />
       </label>
 
       <button type="submit" class="primary-action" [disabled]="isSubmitting">Continue</button>

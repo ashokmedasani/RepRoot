@@ -77,6 +77,14 @@ export const routes: Routes = [
     title: 'Forgot Password'
   },
   {
+    path: 'trainer/dashboard',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-dashboard/trainer-dashboard.component').then(
+        (module) => module.TrainerDashboardComponent
+      ),
+    title: 'Dashboard'
+  },
+  {
     path: 'trainer/profile-setup',
     loadComponent: () =>
       import('./pages/trainer/trainer-profile-setup/trainer-profile-setup.component').then(
@@ -177,11 +185,8 @@ export const routes: Routes = [
   },
   {
     path: 'trainer/groups/:groupId/users',
-    loadComponent: () =>
-      import('./pages/trainer/trainer-group-users/trainer-group-users.component').then(
-        (module) => module.TrainerGroupUsersComponent
-      ),
-    title: 'Group Users'
+    redirectTo: 'trainer/groups/:groupId',
+    pathMatch: 'full'
   },
   {
     path: 'trainer/account-settings',

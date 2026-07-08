@@ -54,7 +54,7 @@ label {
   border-radius: var(--app-radius-lg);
   padding: 1.2rem;
   background: var(--app-surface);
-  box-shadow: 0 20px 55px color-mix(in srgb, var(--app-text) 7%, transparent);
+  box-shadow: var(--app-shadow);
 }
 
 .section-block {

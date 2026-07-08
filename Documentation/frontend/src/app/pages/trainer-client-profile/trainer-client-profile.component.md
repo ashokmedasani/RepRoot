@@ -33,3 +33,7 @@ Loads profile, trainer templates, assignments, and entries in parallel; insights
 ## Update: share references per assignment
 
 Each assignment row shows how many references are shared and a Share References button that opens a category-grouped picker dialog (search + checkboxes). Assigning a template opens the dialog automatically so the trainer can share the relevant references right away; selections save via `updateAssignmentReferences`.
+
+## Update: FitCoach-style two-panel layout
+
+Left column: identity card (avatar, group link, contact info from intake answers, Edit User dialog), private Trainer Notes card (edit in place, last-updated stamp), clickable Assigned Templates rows, Client Activity stats (total entries this month, last entry, streak, completion %) with recent entries, and chat. Right column: template detail panel with Overview (shared reference cards, template notes, structure, today + 7-day trend table), Data Entries (per-template table with edit), and Progress (consistency strip, numeric trends, client notes) tabs, plus Share References and Add Entry (trainer-recorded, upserts per date) actions.

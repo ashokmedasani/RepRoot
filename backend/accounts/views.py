@@ -778,6 +778,30 @@ class ClientAccessDetailView(APIView):
         'group': TrainerGroupSerializer(group).data,
         'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
         'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
+        'trainer_notes': client_access.trainer_notes,
+        'trainer_notes_updated_at': serialize_datetime(client_access.trainer_notes_updated_at),
+      }
+    )
+
+
+class ClientTrainerNotesView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    client_access.trainer_notes = str(request.data.get('notes', '')).strip()
+    client_access.trainer_notes_updated_at = timezone.now()
+    client_access.save(update_fields=['trainer_notes', 'trainer_notes_updated_at', 'updated_at'])
+
+    return Response(
+      {
+        'trainer_notes': client_access.trainer_notes,
+        'trainer_notes_updated_at': serialize_datetime(client_access.trainer_notes_updated_at),
+        'message': 'Trainer notes saved.',
       }
     )
 
@@ -1198,6 +1222,44 @@ class ClientTrackingEntryListView(APIView):
         return Response({'message': 'Month filter must use the YYYY-MM format.'}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({'entries': TrackingEntrySerializer(entries, many=True).data})
+
+  def post(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ClientTrackingEntrySubmitSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    template = TrackingTemplate.objects.filter(
+      id=serializer.validated_data['template_id'],
+      trainer=request.user,
+      is_active=True,
+      assignments__client=client_access,
+    ).first()
+
+    if template is None:
+      return Response({'message': 'Template is not assigned to this client.'}, status=status.HTTP_404_NOT_FOUND)
+
+    entry, created = TrackingEntry.objects.update_or_create(
+      client=client_access,
+      template=template,
+      entry_date=serializer.validated_data['entry_date'],
+      defaults={
+        'template_name': template.name,
+        'answers': serializer.validated_data['answers'],
+        'note': serializer.validated_data['note'],
+        'edited_by_trainer': True,
+      },
+    )
+
+    return Response(
+      {
+        'entry': TrackingEntrySerializer(entry).data,
+        'message': 'Entry recorded.' if created else 'Entry updated.',
+      },
+      status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
 
 
 class TrainerTrackingEntryDetailView(APIView):

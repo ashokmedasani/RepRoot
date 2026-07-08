@@ -1,0 +1,179 @@
+h2,
+p {
+  margin: 0;
+}
+
+.panel {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
+  padding: var(--app-panel-padding);
+}
+
+.panel h2 {
+  color: var(--app-text);
+  font-size: 1rem;
+}
+
+.panel p {
+  color: var(--app-muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.stat-tile {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
+  padding: 0.9rem 1rem;
+}
+
+.stat-tile span {
+  color: var(--app-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-tile strong {
+  display: block;
+  margin: 0.25rem 0 0.15rem;
+  color: var(--app-text);
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.stat-tile p {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.mini-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.mini-list a {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 0.55rem 0.65rem;
+  background: var(--app-surface-soft);
+  text-decoration: none;
+}
+
+.mini-list strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 0.9rem;
+}
+
+.mini-list small {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.avatar {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--app-primary) 16%, var(--app-surface));
+  color: var(--app-primary-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.template-avatar {
+  border-radius: 0.5rem;
+}
+
+.template-avatar.green {
+  background: color-mix(in srgb, var(--app-success) 16%, var(--app-surface));
+  color: var(--app-success);
+}
+
+.template-avatar.orange {
+  background: color-mix(in srgb, #f79009 16%, var(--app-surface));
+  color: #b54708;
+}
+
+.template-avatar.purple {
+  background: color-mix(in srgb, #7a5af8 16%, var(--app-surface));
+  color: #7a5af8;
+}
+
+.ghost-action.compact {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 0 0.6rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.empty-note {
+  color: var(--app-muted);
+  font-weight: 600;
+}
+
+.message {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 0.7rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
+  background: color-mix(in srgb, #d92d20 7%, var(--app-surface));
+}
+
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

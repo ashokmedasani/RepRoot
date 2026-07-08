@@ -75,7 +75,7 @@
 
       <label class="wide-field">
         <span class="field-label">Password <span class="required">*</span></span>
-        <input name="password" type="password" [(ngModel)]="signupForm.password" (ngModelChange)="handlePasswordChange()" autocomplete="new-password" required>
+        <app-password-input name="password" [(ngModel)]="signupForm.password" (ngModelChange)="handlePasswordChange()" autocomplete="new-password" [required]="true" />
         <span class="field-help">Minimum 8 characters and 1 special character.</span>
         @if (fieldErrors.password) {
           <span class="field-help error-text">{{ fieldErrors.password }}</span>
@@ -84,7 +84,7 @@
 
       <label class="wide-field">
         <span class="field-label">Confirm Password <span class="required">*</span></span>
-        <input name="confirmPassword" type="password" [(ngModel)]="signupForm.confirmPassword" (ngModelChange)="handleConfirmPasswordChange()" autocomplete="new-password" required>
+        <app-password-input name="confirmPassword" [(ngModel)]="signupForm.confirmPassword" (ngModelChange)="handleConfirmPasswordChange()" autocomplete="new-password" [required]="true" />
         @if (fieldErrors.confirmPassword) {
           <span class="field-help error-text">{{ fieldErrors.confirmPassword }}</span>
         }

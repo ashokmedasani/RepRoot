@@ -1,0 +1,111 @@
+<app-trainer-page-shell
+  title="Dashboard"
+  subtitle="A quick look at your groups, clients, requests, and templates."
+  activeSection="dashboard"
+  maxWidth="96rem"
+  titleId="dashboard-title"
+>
+  @if (message) {
+    <p class="message error-message">{{ message }}</p>
+  }
+
+  @if (isLoading) {
+    <section class="panel">
+      <p>Loading dashboard...</p>
+    </section>
+  } @else if (overview) {
+    <section class="stats-grid" aria-label="Key stats">
+      <article class="stat-tile">
+        <span>Groups</span>
+        <strong>{{ overview.groups.length }} / {{ overview.max_groups }}</strong>
+        <p>Client groups by goal</p>
+      </article>
+      <article class="stat-tile">
+        <span>Approved Clients</span>
+        <strong>{{ overview.approved_forms.length }}</strong>
+        <p>Clients with portal access</p>
+      </article>
+      <article class="stat-tile">
+        <span>Pending Requests</span>
+        <strong>{{ overview.pending_forms.length }}</strong>
+        <p>Lead form submissions to review</p>
+      </article>
+      <article class="stat-tile">
+        <span>Templates</span>
+        <strong>{{ templates.length }} / {{ maxTemplates }}</strong>
+        <p>Tracking templates in use</p>
+      </article>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Pending Requests</h2>
+            <p>New applicants waiting for your review.</p>
+          </div>
+          <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
+        </div>
+        <div class="mini-list">
+          @for (submission of pendingRequests.slice(0, 5); track submission.id) {
+            <a routerLink="/trainer/forms-groups">
+              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
+              <span>
+                <strong>{{ submission.applicant_name }}</strong>
+                <small>{{ submission.email }} - {{ submission.submitted_at | date: 'mediumDate' }}</small>
+              </span>
+            </a>
+          } @empty {
+            <p class="empty-note">No pending requests right now.</p>
+          }
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Recent Clients</h2>
+            <p>Latest approved clients across all groups.</p>
+          </div>
+          <a routerLink="/trainer/clients" class="ghost-action compact">View All</a>
+        </div>
+        <div class="mini-list">
+          @for (submission of recentClients; track submission.id) {
+            <a [routerLink]="['/trainer/clients', submission.client_access?.id]">
+              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
+              <span>
+                <strong>{{ submission.applicant_name }}</strong>
+                <small>{{ submission.client_access?.group_name }}</small>
+              </span>
+            </a>
+          } @empty {
+            <p class="empty-note">No approved clients yet.</p>
+          }
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Templates</h2>
+            <p>Your shared tracking templates.</p>
+          </div>
+          <a routerLink="/trainer/templates" class="ghost-action compact">Manage</a>
+        </div>
+        <div class="mini-list">
+          @for (template of templates; track template.id) {
+            <a [routerLink]="['/trainer/templates', template.id, 'edit']">
+              <span class="avatar template-avatar" [class.green]="template.accent === 'green'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">{{ template.name.charAt(0) }}</span>
+              <span>
+                <strong>{{ template.name }}</strong>
+                <small>{{ template.cadence }} - {{ template.fields.length }} fields - {{ template.assigned_count }} clients</small>
+              </span>
+            </a>
+          } @empty {
+            <p class="empty-note">No templates yet. Adopt a standard template to get started.</p>
+          }
+        </div>
+      </article>
+    </section>
+  }
+</app-trainer-page-shell>

@@ -12,13 +12,14 @@ import {
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 type SubmissionView = 'pending' | 'approved' | 'deleted';
 
 @Component({
   selector: 'app-trainer-forms-groups',
   standalone: true,
-  imports: [DatePipe, KeyValuePipe, FormsModule, RouterLink, TrainerPageShellComponent],
+  imports: [DatePipe, KeyValuePipe, FormsModule, RouterLink, TrainerPageShellComponent, PasswordInputComponent],
   templateUrl: './trainer-forms-groups.component.html',
   styleUrl: './trainer-forms-groups.component.scss'
 })

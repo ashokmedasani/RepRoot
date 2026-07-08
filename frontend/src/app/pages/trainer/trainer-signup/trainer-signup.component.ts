@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { TrainerAuthApiService, TrainerSignupPayload } from '../../../core/api/trainer-auth-api.service';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 type EmailOtpStatus = 'idle' | 'sending' | 'sent' | 'verified' | 'failed';
 type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
@@ -11,7 +12,7 @@ type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
 @Component({
   selector: 'app-trainer-signup',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './trainer-signup.component.html',
   styleUrl: './trainer-signup.component.scss'
 })

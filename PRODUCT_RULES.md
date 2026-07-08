@@ -164,6 +164,16 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - Trainer-client chat is stored in the backend (`ChatMessage`) and polled over REST every 5 seconds while a chat panel is open. No websockets in Version 1.
 - The trainer client profile consolidates identity and password reset into a single Account & Access dialog and includes an Insights section computed from entries: 30-day check-in consistency, numeric field trends, and recent client notes by date.
 
+## Redesign Decisions (FitCoach-style)
+
+- The trainer workspace uses a fixed left sidebar (brand, icon navigation, Sign Out at bottom); it collapses to a horizontal bar on small screens.
+- A real Dashboard page exists at `/trainer/dashboard` with stat tiles and quick lists.
+- Compact design tokens: panel radius 0.75rem, panel padding 1rem, subtle shadows (`--app-shadow-sm`), page h1 1.45rem. Heavy blur shadows are retired.
+- The client profile is a two-panel layout: identity card, private Trainer Notes (stored on `ClientAccess.trainer_notes`, never sent to the client portal), clickable Assigned Templates, Client Activity stats (entries this month, last entry, streak, completion %), and chat on the left; a template detail panel with Overview / Data Entries / Progress tabs on the right.
+- Trainers can record an entry on behalf of a client (marked as trainer-recorded, upserts by date).
+- Every password field uses the shared `app-password-input` component with a show/hide eye toggle.
+- Duplicate route `trainer/groups/:groupId/users` redirects to the group detail route.
+
 ## UI Design Philosophy
 
 The application must feel like a premium SaaS application:

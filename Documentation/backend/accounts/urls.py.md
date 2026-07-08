@@ -57,3 +57,7 @@ Move profile URLs to a dedicated trainer app if trainer features become large en
 - `trainer/templates/standard/`, `trainer/templates/adopt-standard/`, `trainer/templates/` (+ detail).
 - `trainer/forms-groups/clients/<id>/assignments/` (+ detail), `.../entries/`, `trainer/entries/<id>/`, `trainer/clients/<id>/chat/`.
 - Client portal: `client/change-password/`, `client/me/`, `client/templates/`, `client/entries/`, `client/chat/`.
+
+## Update 3
+
+Added `trainer/forms-groups/clients/<id>/notes/`.

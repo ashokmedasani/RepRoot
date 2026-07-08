@@ -20,16 +20,11 @@
             <form class="password-form" (ngSubmit)="changePassword()">
               <label>
                 <span class="field-label">Password</span>
-                <input type="password" name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password">
+                <app-password-input name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password" />
               </label>
               <label>
                 <span class="field-label">Confirm Password</span>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  autocomplete="new-password"
-                  [(ngModel)]="passwordForm.confirmPassword"
-                >
+                <app-password-input name="confirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" />
               </label>
               <button type="submit" class="primary-action" [disabled]="isChangingPassword || isDeleting">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}

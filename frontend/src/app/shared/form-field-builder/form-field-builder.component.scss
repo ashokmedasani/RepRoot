@@ -34,15 +34,15 @@ p {
 .field-card,
 .empty-state {
   border: 1px solid var(--app-border);
-  border-radius: 0.9rem;
+  border-radius: var(--app-panel-radius);
   background: var(--app-surface);
-  box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 6%, transparent);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .core-fields-card,
 .recommended-section,
 .custom-builder {
-  padding: 1.15rem;
+  padding: var(--app-panel-padding);
 }
 
 .core-fields-card {
@@ -92,7 +92,7 @@ p {
 .core-grid article,
 .template-card {
   border: 1px solid var(--app-border);
-  border-radius: 0.8rem;
+  border-radius: var(--app-panel-radius);
   background: var(--app-surface);
 }
 
@@ -209,7 +209,7 @@ p {
 .settings-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid color-mix(in srgb, var(--app-primary) 22%, var(--app-border));
-  border-radius: 0.8rem;
+  border-radius: var(--app-panel-radius);
   padding: 0.9rem;
   background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface));
 }
@@ -257,7 +257,7 @@ textarea:focus {
   display: grid;
   gap: 0.65rem;
   border: 1px solid var(--app-border);
-  border-radius: 0.8rem;
+  border-radius: var(--app-panel-radius);
   padding: 1rem;
   background: var(--app-surface-soft);
 }
