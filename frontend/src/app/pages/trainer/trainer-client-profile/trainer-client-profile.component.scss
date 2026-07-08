@@ -33,8 +33,9 @@ p {
 
 .hero-label {
   color: var(--app-primary-strong);
-  font-size: 0.76rem;
-  font-weight: 950;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -54,7 +55,7 @@ p {
 .hero-details span {
   color: var(--app-muted);
   font-size: 0.74rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -62,7 +63,7 @@ p {
   display: block;
   margin-top: 0.22rem;
   color: var(--app-text);
-  font-weight: 950;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -75,7 +76,7 @@ p {
   background: color-mix(in srgb, var(--app-primary) 18%, var(--app-surface));
   color: var(--app-primary-strong);
   font-size: 1.25rem;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 h2,
@@ -88,7 +89,7 @@ dd {
 .panel p,
 dt {
   color: var(--app-muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .profile-grid {
@@ -119,7 +120,7 @@ dt {
 
 dd {
   margin: 0.18rem 0 0;
-  font-weight: 900;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -130,7 +131,7 @@ dd {
   background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
   color: var(--app-success);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .primary-action,
@@ -141,7 +142,7 @@ dd {
   min-height: 2.5rem;
   border-radius: 0.65rem;
   padding: 0 0.9rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -188,7 +189,7 @@ dd {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -226,14 +227,14 @@ dd {
 .chat-bubble p {
   margin-top: 0.25rem;
   color: var(--app-text);
-  font-weight: 750;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .chat-bubble small,
 .empty-chat {
   color: var(--app-muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .chat-compose {
@@ -265,7 +266,7 @@ textarea {
   padding: 0.75rem;
   background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .error-message,

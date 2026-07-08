@@ -24,7 +24,7 @@ p {
   padding: 0.85rem 1rem;
   background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .error-message,
@@ -51,7 +51,7 @@ p {
 .panel p,
 .profile-panel p {
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.55;
 }
 
@@ -75,7 +75,7 @@ dt,
 small {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .summary-stats strong,
@@ -96,7 +96,7 @@ small {
   background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
   color: var(--app-success);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .group-tabs,
@@ -115,7 +115,7 @@ small {
   padding: 0.85rem 0.95rem;
   background: transparent;
   color: var(--app-muted);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .group-tabs button.active,
@@ -208,7 +208,7 @@ label {
 
 .field-label {
   color: var(--app-text);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .table-wrap {
@@ -231,13 +231,13 @@ td {
 th {
   color: var(--app-muted);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 td {
   color: var(--app-text);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 tr.selected {
@@ -258,7 +258,7 @@ tr.selected {
   border-radius: 50%;
   background: color-mix(in srgb, var(--app-primary) 18%, var(--app-surface));
   color: var(--app-primary-strong);
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .avatar.small {
@@ -327,7 +327,7 @@ dl {
 dd {
   margin: 0.15rem 0 0;
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .answers-card {
@@ -347,7 +347,7 @@ dd {
   border-bottom: 1px solid var(--app-border);
   padding: 0.65rem 0;
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .field-row:last-child {
@@ -389,7 +389,7 @@ dd {
 .template-card-head p,
 .template-purpose {
   color: var(--app-muted);
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.45;
 }
 
@@ -401,7 +401,7 @@ dd {
   background: var(--app-surface);
   color: var(--app-primary-strong);
   font-size: 0.76rem;
-  font-weight: 950;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -421,7 +421,7 @@ dd {
 
 .template-input-row span {
   color: var(--app-text);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .template-input-row b {
@@ -455,7 +455,7 @@ dd {
   padding: 0.7rem;
   background: var(--app-surface-soft);
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .primary-action,
@@ -467,7 +467,7 @@ dd {
   min-height: 2.5rem;
   border-radius: 0.65rem;
   padding: 0 0.9rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 

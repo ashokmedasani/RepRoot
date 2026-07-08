@@ -28,7 +28,7 @@ p {
   margin-bottom: 1rem;
   padding: 0.85rem 1rem;
   color: var(--app-primary-strong);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .error-message {
@@ -75,17 +75,17 @@ p {
   background: var(--app-primary);
   color: #ffffff;
   font-size: 0.85rem;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .step-rail strong {
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .step-rail small {
   grid-column: 2;
   color: var(--app-muted);
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .tip-card {
@@ -108,7 +108,7 @@ p {
 .preview-card p {
   color: var(--app-muted);
   font-size: 0.88rem;
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -157,7 +157,7 @@ label span,
 .checkbox-label {
   color: var(--app-text);
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 input,
@@ -229,7 +229,7 @@ textarea {
 .drag-handle {
   padding-bottom: 0.78rem;
   color: var(--app-muted);
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .checkbox-label,
@@ -262,7 +262,7 @@ textarea {
   min-height: 2.45rem;
   border-radius: 0.62rem;
   padding: 0 0.8rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -303,7 +303,7 @@ textarea {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 0.78rem;
-  font-weight: 950;
+  font-weight: 700;
   white-space: nowrap;
 }
 

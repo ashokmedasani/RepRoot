@@ -23,8 +23,9 @@ p {
 
 h1 {
   color: var(--app-text);
-  font-size: 2rem;
-  letter-spacing: 0;
+  font-size: var(--app-h1-page);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 h2 {
@@ -41,15 +42,16 @@ h3 {
 .group-row p,
 .message {
   color: var(--app-muted);
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.5;
 }
 
 .eyebrow {
   margin: 0 0 0.35rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -76,7 +78,7 @@ h3 {
   padding: 0.9rem;
   background: var(--app-surface-soft);
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .setup-note ol {
@@ -106,7 +108,7 @@ h3 {
 .form-link-box span {
   color: var(--app-text);
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .form-name-block h3 {
@@ -132,7 +134,7 @@ h3 {
 
 .form-link-box a {
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
   overflow-wrap: anywhere;
   text-decoration: none;
 }
@@ -153,7 +155,7 @@ h3 {
   display: block;
   color: var(--app-muted);
   font-size: 0.8rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .stat-card strong {
@@ -197,7 +199,7 @@ h3 {
 .fields-card p {
   color: var(--app-muted);
   font-size: 0.82rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .fields-card ul {
@@ -210,14 +212,14 @@ h3 {
 
 .fields-card li {
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .fields-card li::before {
   content: '+';
   margin-right: 0.55rem;
   color: var(--app-success);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .edit-form-action {
@@ -232,7 +234,7 @@ h3 {
   background: color-mix(in srgb, var(--app-success) 16%, var(--app-surface));
   color: color-mix(in srgb, var(--app-success) 72%, var(--app-text));
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .requests-panel {
@@ -253,7 +255,7 @@ h3 {
   padding: 0 0.9rem;
   background: var(--app-surface);
   color: var(--app-text);
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .request-tabs button.active {
@@ -267,7 +269,7 @@ h3 {
   align-items: center;
   gap: 0.6rem;
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .table-wrap {
@@ -293,12 +295,12 @@ td {
 th {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 td {
   color: var(--app-text);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 tr:last-child td {
@@ -307,7 +309,7 @@ tr:last-child td {
 
 .not-assigned {
   color: #f59f00;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .action-cell {
@@ -341,7 +343,7 @@ tr:last-child td {
 .group-caret {
   color: var(--app-success);
   font-size: 1.4rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .group-actions {
@@ -352,7 +354,7 @@ tr:last-child td {
 .group-actions span {
   color: var(--app-muted);
   font-size: 0.82rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .primary-action,
@@ -365,7 +367,7 @@ tr:last-child td {
   min-height: 2.45rem;
   border-radius: 0.6rem;
   padding: 0 0.85rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -406,7 +408,7 @@ tr:last-child td {
   margin-bottom: 1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .error-message {
@@ -423,13 +425,13 @@ dl {
 dt {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 dd {
   margin: 0.15rem 0 0;
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .form-grid {
@@ -448,7 +450,7 @@ label {
   display: grid;
   gap: 0.4rem;
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 input,

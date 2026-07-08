@@ -6,8 +6,8 @@ p {
 
 h1 {
   color: var(--app-text);
-  font-size: 2rem;
-  letter-spacing: 0;
+  font-size: var(--app-h1-page);
+  letter-spacing: var(--app-tracking-tight);
 }
 
 h2 {
@@ -34,7 +34,7 @@ h2 {
 .intro-card p,
 .message {
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.55;
 }
 
@@ -50,7 +50,7 @@ h2 {
   background: var(--app-surface);
   color: var(--app-text);
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 label {
@@ -58,7 +58,7 @@ label {
   gap: 0.4rem;
   color: var(--app-text);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 input,
@@ -78,7 +78,7 @@ textarea {
 
 .ghost-link {
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -89,7 +89,7 @@ textarea {
   padding: 0 1rem;
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .action-bar {

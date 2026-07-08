@@ -59,7 +59,7 @@ p,
 small,
 .list-header p {
   color: var(--app-muted);
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -69,7 +69,7 @@ small,
   margin-bottom: 1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .search-box {
@@ -103,7 +103,7 @@ textarea {
   padding: 0 0.75rem;
   background: transparent;
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .category-button.active {
@@ -160,7 +160,7 @@ textarea {
   min-height: 2.45rem;
   border-radius: 0.6rem;
   padding: 0 0.85rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -215,12 +215,12 @@ td {
 th {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 td {
   color: var(--app-text);
-  font-weight: 760;
+  font-weight: 600;
 }
 
 tr.selected {
@@ -256,7 +256,7 @@ tr.selected {
   place-items: center;
   background: linear-gradient(135deg, var(--app-primary), var(--app-accent));
   color: #ffffff;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .resource-title span span,
@@ -279,7 +279,7 @@ tr.selected {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .detail-panel {
@@ -290,8 +290,9 @@ tr.selected {
 .eyebrow {
   margin-bottom: 0.3rem;
   color: var(--app-primary-strong);
-  font-size: 0.75rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -329,7 +330,7 @@ tr.selected {
   border-radius: 50%;
   background: var(--app-primary);
   font-size: 1.6rem;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .info-grid {
@@ -341,13 +342,13 @@ tr.selected {
 dt {
   color: var(--app-muted);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 dd {
   margin: 0.15rem 0 0;
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -418,7 +419,7 @@ label {
   display: grid;
   gap: 0.4rem;
   color: var(--app-text);
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .upload-box {

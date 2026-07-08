@@ -17,7 +17,7 @@
 .brand {
   color: var(--app-text);
   font-size: 1.35rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -34,7 +34,7 @@
   padding: 0.7rem 1rem;
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 850;
+  font-weight: 700;
   text-decoration: none;
   text-transform: uppercase;
 }
@@ -51,8 +51,9 @@
 .eyebrow {
   margin: 0 0 0.55rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -60,7 +61,7 @@ h1 {
   margin: 0 0 1.45rem;
   color: var(--app-text);
   font-size: 1.6rem;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -77,7 +78,7 @@ label {
   gap: 0.45rem;
   color: var(--app-text);
   font-size: 0.85rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .field-label {
@@ -108,13 +109,13 @@ input:focus {
   background: var(--app-primary);
   color: #ffffff;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 .required {
   color: #d92d20;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 button:disabled {
@@ -128,7 +129,7 @@ button:disabled {
   padding: 0.85rem 1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 @media (max-width: 620px) {

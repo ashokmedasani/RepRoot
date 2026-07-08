@@ -16,7 +16,7 @@
 .client-topbar button,
 .primary-action {
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -58,14 +58,15 @@ h2 {
 p {
   margin-top: 0.5rem;
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .eyebrow {
   margin: 0 0 0.4rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -86,7 +87,7 @@ p {
 .detail-grid span {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .detail-grid strong {
@@ -121,7 +122,7 @@ p {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -159,14 +160,14 @@ p {
 .chat-bubble p {
   margin-top: 0.25rem;
   color: var(--app-text);
-  font-weight: 750;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .chat-bubble small,
 .empty-chat {
   color: var(--app-muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .chat-compose {

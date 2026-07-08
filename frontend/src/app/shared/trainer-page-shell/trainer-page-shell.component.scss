@@ -28,7 +28,7 @@
 .brand {
   color: var(--app-text);
   font-size: 1.15rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -48,7 +48,7 @@ nav span {
   padding: 0.72rem 0.95rem;
   color: var(--app-muted);
   font-size: 0.88rem;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -67,7 +67,7 @@ nav .active {
   background: var(--app-surface);
   color: var(--app-text);
   font-size: 0.88rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .trainer-workspace {
@@ -88,8 +88,9 @@ nav .active {
 .eyebrow {
   margin: 0 0 0.35rem;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -100,15 +101,16 @@ h1,
 
 h1 {
   color: var(--app-text);
-  font-size: 2.15rem;
+  font-size: var(--app-h1-page);
+  font-weight: 700;
   line-height: 1.12;
-  letter-spacing: 0;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .page-subtitle {
   margin-top: 0.35rem;
   color: var(--app-muted);
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -128,7 +130,7 @@ h1 {
   padding: 1rem 1.5rem;
   color: var(--app-muted);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 button:disabled {

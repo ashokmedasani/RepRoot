@@ -12,7 +12,7 @@
 .public-topbar a {
   color: var(--app-text);
   font-size: 1.1rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -41,8 +41,9 @@
 .eyebrow {
   margin: 0;
   color: var(--app-primary-strong);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -53,13 +54,14 @@ p {
 
 h1 {
   color: var(--app-text);
-  font-size: 2rem;
-  letter-spacing: 0;
+  font-size: var(--app-h1-page);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 p {
   color: var(--app-muted);
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.55;
 }
 
@@ -68,7 +70,7 @@ label {
   gap: 0.4rem;
   color: var(--app-text);
   font-size: 0.9rem;
-  font-weight: 780;
+  font-weight: 700;
 }
 
 .field-label {
@@ -81,7 +83,7 @@ label {
 .field-help {
   color: var(--app-muted);
   font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .required,
@@ -139,7 +141,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .option-list input {
@@ -154,7 +156,7 @@ textarea:focus {
   padding: 0 1rem;
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 button:disabled {
@@ -168,7 +170,7 @@ button:disabled {
   padding: 1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .error-message {

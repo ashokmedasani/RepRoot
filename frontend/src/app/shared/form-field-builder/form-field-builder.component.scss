@@ -24,7 +24,7 @@ h3 {
 
 p {
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.5;
 }
 
@@ -61,9 +61,9 @@ p {
 .eyebrow,
 .field-kicker {
   color: var(--app-primary-strong);
-  font-size: 0.76rem;
-  font-weight: 950;
-  letter-spacing: 0;
+  font-size: var(--app-eyebrow-size);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-wide);
   text-transform: uppercase;
 }
 
@@ -74,7 +74,7 @@ p {
   background: var(--app-surface);
   color: var(--app-primary-strong);
   font-size: 0.78rem;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .core-grid,
@@ -111,7 +111,7 @@ p {
   border-radius: 0.7rem;
   background: var(--app-surface-soft);
   color: var(--app-primary-strong);
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .core-icon {
@@ -121,13 +121,13 @@ p {
 
 .core-grid strong {
   color: var(--app-text);
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .core-grid small {
   grid-column: 2;
   color: var(--app-muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .recommendation-grid {
@@ -159,7 +159,7 @@ p {
 .add-button,
 .field-actions button {
   border-radius: 0.65rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .template-card button,
@@ -227,7 +227,7 @@ label {
 .preview-label {
   color: var(--app-text);
   font-size: 0.83rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 input,
@@ -303,7 +303,7 @@ textarea:focus {
   gap: 0.45rem;
   margin: 0;
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .option-preview input {

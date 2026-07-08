@@ -33,7 +33,7 @@ p {
 th {
   color: var(--app-muted);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -60,7 +60,7 @@ th {
 .panel-header p,
 .panel > p {
   color: var(--app-muted);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .filters {
@@ -100,7 +100,7 @@ td {
 
 td {
   color: var(--app-text);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .client-name {
@@ -108,7 +108,7 @@ td {
   align-items: center;
   gap: 0.55rem;
   color: var(--app-text);
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -121,7 +121,7 @@ td {
   background: color-mix(in srgb, var(--app-primary) 18%, var(--app-surface));
   color: var(--app-primary-strong);
   font-size: 0.76rem;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .status-pill {
@@ -134,7 +134,7 @@ td {
   background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
   color: var(--app-success);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .secondary-action,
@@ -148,7 +148,7 @@ td {
   padding: 0 0.9rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -164,7 +164,7 @@ td {
   padding: 0.85rem 1rem;
   background: color-mix(in srgb, #d92d20 7%, var(--app-surface));
   color: var(--app-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {
