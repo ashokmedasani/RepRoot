@@ -94,8 +94,8 @@
               <tr [class.selected]="selectedReferenceId() === reference.id">
                 <td>
                   <button type="button" class="resource-title" (click)="selectReference(reference)">
-                    @if (reference.type === 'Image' && reference.fileDataUrl) {
-                      <img [src]="reference.fileDataUrl" [alt]="reference.title">
+                    @if (reference.type === 'Image' && reference.fileUrl) {
+                      <img [src]="reference.fileUrl" [alt]="reference.title">
                     } @else {
                       <span class="resource-thumb">{{ resourceInitial(reference) }}</span>
                     }
@@ -149,8 +149,8 @@
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowfullscreen
             ></iframe>
-          } @else if (reference.type === 'Image' && reference.fileDataUrl) {
-            <img [src]="reference.fileDataUrl" [alt]="reference.title">
+          } @else if (reference.type === 'Image' && reference.fileUrl) {
+            <img [src]="reference.fileUrl" [alt]="reference.title">
           } @else {
             <div class="file-preview">
               <span>{{ resourceInitial(reference) }}</span>
@@ -233,9 +233,9 @@
 
           <label>
             <span>Category</span>
-            <select [(ngModel)]="form.category" name="category">
+            <select [(ngModel)]="form.categoryId" name="category">
               @for (category of categories(); track category.id) {
-                <option [value]="category.name">{{ category.name }}</option>
+                <option [ngValue]="category.id">{{ category.name }}</option>
               }
             </select>
           </label>
@@ -282,7 +282,7 @@
 
         <div class="editor-actions">
           <button type="button" class="ghost-action" (click)="isEditorOpen.set(false)">Cancel</button>
-          <button type="submit" class="primary-action">Save Reference</button>
+          <button type="submit" class="primary-action" [disabled]="isSaving()">Save Reference</button>
         </div>
       </form>
     </section>
@@ -317,7 +317,7 @@
 
         <div class="editor-actions">
           <button type="button" class="ghost-action" (click)="isCategoryEditorOpen.set(false)">Cancel</button>
-          <button type="submit" class="primary-action">Save Category</button>
+          <button type="submit" class="primary-action" [disabled]="isSaving()">Save Category</button>
         </div>
       </form>
     </section>

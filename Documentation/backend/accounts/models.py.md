@@ -49,3 +49,16 @@ The first version stores one certification and one upload per media category. Mu
 ## Future improvement notes
 
 Move portfolio media and certifications into separate models when approval, ordering, and multiple uploads are required.
+
+## Update: templates, references, and client portal
+
+- `ReferenceCategory` / `TrainerReference`: trainer resource library (video links are YouTube-only; files use `upload_to='trainer-references/'`).
+- `TrackingTemplate`: trainer-level check-in template (max five per trainer, fields JSON without required flags, `standard_key` marks adopted standards, `references` M2M attaches curated resources).
+- `TemplateAssignment`: which clients follow which template; unassigning deletes only the assignment.
+- `TrackingEntry`: one client entry per template per date; keeps `template_name` snapshot and survives template deletion (SET_NULL).
+- `ChatMessage`: trainer-client chat messages with sender and read flag.
+- `ClientAuthToken`: opaque portal token per client (see `client_auth.py`).
+
+## Update 2: references shared per assignment
+
+`TrackingTemplate` no longer has a `references` field. `TemplateAssignment.references` (M2M to `TrainerReference`) now stores which references a trainer shared with a specific client for that template.

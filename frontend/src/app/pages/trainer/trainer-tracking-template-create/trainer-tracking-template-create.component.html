@@ -1,217 +1,108 @@
 <app-trainer-page-shell
-  title="Create New Template"
-  subtitle="Build reusable Daily, Weekly, and Monthly target forms for this group."
-  activeSection="forms-groups"
+  [title]="isEditMode ? 'Edit Template' : 'Create Template'"
+  eyebrow="Tracking Templates"
+  subtitle="Design the check-in form clients fill in. Every field is optional for the client."
+  activeSection="templates"
   maxWidth="96rem"
-  titleId="tracking-template-title"
+  titleId="template-builder-title"
 >
-  <a page-actions class="secondary-action" [routerLink]="group ? ['/trainer/groups', group.id] : '/trainer/forms-groups'">
-    Cancel
-  </a>
-  <button page-actions type="button" class="primary-action" [disabled]="isSaving || !group" (click)="saveTemplate()">
-    {{ isSaving ? 'Saving...' : 'Save Template' }}
-  </button>
+  <a page-actions routerLink="/trainer/templates" class="secondary-action">Back to Templates</a>
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
 
   @if (isLoading) {
     <section class="panel">
       <p>Loading template builder...</p>
     </section>
-  } @else if (group) {
-    @if (message) {
-      <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
-    }
+  } @else {
+    <section class="builder-layout">
+      <div class="builder-main">
+        <article class="panel">
+          <h2>Template Details</h2>
+          <div class="info-grid">
+            <label>
+              <span>Template name</span>
+              <input type="text" [(ngModel)]="templateInfo.name" name="templateName" placeholder="Nutrition Details">
+            </label>
+            <label>
+              <span>Check-in cadence</span>
+              <select [(ngModel)]="templateInfo.cadence" name="templateCadence">
+                @for (cadence of cadences; track cadence.value) {
+                  <option [ngValue]="cadence.value">{{ cadence.label }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Card color</span>
+              <select [(ngModel)]="templateInfo.accent" name="templateAccent">
+                @for (accent of accents; track accent) {
+                  <option [value]="accent">{{ accent }}</option>
+                }
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>Purpose</span>
+            <textarea rows="3" [(ngModel)]="templateInfo.purpose" name="templatePurpose" placeholder="What should this template track for the client?"></textarea>
+          </label>
+        </article>
 
-    <div class="builder-shell">
-      <aside class="step-rail" aria-label="Template steps">
-        <button type="button" [class.active]="activeStep === 'info'" (click)="activeStep = 'info'">
-          <span>1</span>
-          <strong>Template Info</strong>
-          <small>Basic details</small>
-        </button>
-        <button type="button" [class.active]="activeStep === 'sections'" (click)="activeStep = 'sections'">
-          <span>2</span>
-          <strong>Sections</strong>
-          <small>Daily, weekly, monthly</small>
-        </button>
-        <button type="button" [class.active]="activeStep === 'review'" (click)="activeStep = 'review'">
-          <span>3</span>
-          <strong>Review</strong>
-          <small>{{ totalFields }} client fields</small>
-        </button>
+        <article class="panel">
+          <div class="section-heading">
+            <div>
+              <h2>Fields</h2>
+              <p>Clients fill these in on each check-in. Fields are never mandatory - missing a day never blocks a client.</p>
+            </div>
+            <button type="button" class="secondary-action" (click)="addField()">+ Add Field</button>
+          </div>
 
-        <article class="tip-card">
-          <h2>Tips</h2>
-          <p>Use required fields for targets every client must submit. Keep optional fields for notes, photos, and context.</p>
+          <div class="field-list">
+            @for (field of fields; track field.localId; let index = $index) {
+              <div class="field-row">
+                <label>
+                  <span>Label</span>
+                  <input type="text" [(ngModel)]="field.label" [name]="'fieldLabel' + field.localId">
+                </label>
+                <label>
+                  <span>Type</span>
+                  <select [(ngModel)]="field.field_type" [name]="'fieldType' + field.localId">
+                    @for (type of fieldTypes; track type.value) {
+                      <option [ngValue]="type.value">{{ type.label }}</option>
+                    }
+                  </select>
+                </label>
+                <label>
+                  <span>Placeholder</span>
+                  <input type="text" [(ngModel)]="field.placeholder" [name]="'fieldPlaceholder' + field.localId">
+                </label>
+                <div class="field-controls">
+                  <button type="button" title="Move up" (click)="moveField(index, -1)">&#8593;</button>
+                  <button type="button" title="Move down" (click)="moveField(index, 1)">&#8595;</button>
+                  <button type="button" class="remove" title="Remove field" (click)="removeField(field)">x</button>
+                </div>
+              </div>
+            } @empty {
+              <p class="empty-note">No fields yet. Add the first field clients should update.</p>
+            }
+          </div>
+        </article>
+      </div>
+
+      <aside class="builder-side">
+        <article class="panel summary-panel">
+          <h2>Summary</h2>
+          <ul>
+            <li>{{ fields.length }} fields</li>
+            <li>{{ templateInfo.cadence }} check-in</li>
+          </ul>
+          <p class="side-note">References are shared per client when you assign this template from a client profile.</p>
+          <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveTemplate()">
+            {{ isSaving ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template' }}
+          </button>
         </article>
       </aside>
-
-      <main class="builder-main">
-        <section class="panel">
-          <div class="section-heading">
-            <span class="step-dot">1</span>
-            <div>
-              <h2>Template Information</h2>
-              <p>{{ group.name }} clients will see this as their target check-in.</p>
-            </div>
-          </div>
-
-          <div class="form-grid">
-            <label>
-              <span>Template Name</span>
-              <input type="text" [(ngModel)]="templateInfo.name" name="templateName">
-            </label>
-            <label>
-              <span>Template Type</span>
-              <select [(ngModel)]="templateInfo.type" name="templateType">
-                <option>Daily, Weekly, and Monthly Targets</option>
-                <option>Daily Targets Only</option>
-                <option>Weekly Review</option>
-                <option>Monthly Review</option>
-              </select>
-            </label>
-            <label>
-              <span>Description</span>
-              <textarea rows="4" [(ngModel)]="templateInfo.description" name="templateDescription"></textarea>
-            </label>
-            <label>
-              <span>Who is this template for?</span>
-              <textarea rows="4" [(ngModel)]="templateInfo.audience" name="templateAudience"></textarea>
-            </label>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="section-heading with-action">
-            <div class="section-heading-copy">
-              <span class="step-dot">2</span>
-              <div>
-                <h2>Target Sections</h2>
-                <p>Fields clients will fill inside each target period.</p>
-              </div>
-            </div>
-            <span class="usage-pill">Templates Used: 2 / 5</span>
-          </div>
-
-          <div class="section-list">
-            @for (section of sections; track section.id) {
-              <article class="target-section" [class.green]="section.accent === 'green'" [class.blue]="section.accent === 'blue'" [class.orange]="section.accent === 'orange'">
-                <div class="target-section-head">
-                  <div>
-                    <h3>{{ section.title }}</h3>
-                    <p>{{ section.cadence }} - {{ section.purpose }}</p>
-                  </div>
-                  <button type="button" class="ghost-action" (click)="addField(section)">Add Field</button>
-                </div>
-
-                <div class="field-editor-list">
-                  @for (field of section.fields; track field.id; let fieldIndex = $index) {
-                    <div class="field-editor">
-                      <div class="drag-handle" aria-hidden="true">::</div>
-                      <label>
-                        <span>Field Label</span>
-                        <input type="text" [(ngModel)]="field.label" [name]="field.id + '-label'">
-                      </label>
-                      <label>
-                        <span>Type</span>
-                        <select [(ngModel)]="field.fieldType" [name]="field.id + '-type'">
-                          @for (fieldType of fieldTypes; track fieldType.value) {
-                            <option [value]="fieldType.value">{{ fieldType.label }}</option>
-                          }
-                        </select>
-                      </label>
-                      <label>
-                        <span>Placeholder</span>
-                        <input type="text" [(ngModel)]="field.placeholder" [name]="field.id + '-placeholder'">
-                      </label>
-                      <label class="checkbox-label">
-                        <input type="checkbox" [(ngModel)]="field.required" [name]="field.id + '-required'">
-                        <span>Required</span>
-                      </label>
-                      <div class="field-actions">
-                        <button type="button" class="icon-action" [disabled]="fieldIndex === 0" (click)="moveField(section, fieldIndex, -1)">Up</button>
-                        <button type="button" class="icon-action" [disabled]="fieldIndex === section.fields.length - 1" (click)="moveField(section, fieldIndex, 1)">Down</button>
-                        <button type="button" class="danger-action" (click)="removeField(section, field)">Remove</button>
-                      </div>
-                    </div>
-                  }
-                </div>
-              </article>
-            }
-          </div>
-        </section>
-
-        <section class="panel settings-panel">
-          <div class="section-heading">
-            <span class="step-dot">3</span>
-            <div>
-              <h2>Template Settings</h2>
-              <p>Control how this template behaves for new clients.</p>
-            </div>
-          </div>
-          <div class="settings-grid">
-            <label>
-              <span>Template Status</span>
-              <select [(ngModel)]="templateInfo.status" name="templateStatus">
-                <option>Active</option>
-                <option>Draft</option>
-              </select>
-            </label>
-            <label class="toggle-row">
-              <input type="checkbox" [(ngModel)]="templateInfo.defaultTemplate" name="defaultTemplate">
-              <span>Set as default template</span>
-            </label>
-            <label>
-              <span>Notes</span>
-              <textarea rows="3" [(ngModel)]="templateInfo.notes" name="templateNotes" placeholder="Optional internal notes"></textarea>
-            </label>
-          </div>
-        </section>
-      </main>
-
-      <aside class="preview-panel">
-        <section class="panel">
-          <div class="preview-header">
-            <div>
-              <h2>Template Preview</h2>
-              <p>This is how clients will fill their target check-ins.</p>
-            </div>
-            <span>{{ totalFields }} fields</span>
-          </div>
-
-          <div class="preview-stack">
-            @for (section of sections; track section.id) {
-              <article class="preview-card" [class.green]="section.accent === 'green'" [class.blue]="section.accent === 'blue'" [class.orange]="section.accent === 'orange'">
-                <div class="preview-card-head">
-                  <div>
-                    <h3>{{ section.title }}</h3>
-                    <p>{{ section.cadence }}</p>
-                  </div>
-                  <small>{{ section.fields.length }} fields</small>
-                </div>
-
-                @for (field of section.fields; track field.id) {
-                  <label class="preview-field">
-                    <span>{{ field.label }} @if (field.required) { <b>*</b> }</span>
-                    @if (field.fieldType === 'long_text') {
-                      <textarea rows="2" [placeholder]="field.placeholder" disabled></textarea>
-                    } @else if (field.fieldType === 'yes_no') {
-                      <select disabled>
-                        <option>Choose yes or no</option>
-                      </select>
-                    } @else if (field.fieldType === 'image') {
-                      <input type="file" disabled>
-                    } @else {
-                      <input [type]="field.fieldType === 'number' ? 'number' : 'text'" [placeholder]="field.placeholder" disabled>
-                    }
-                  </label>
-                }
-              </article>
-            }
-          </div>
-        </section>
-      </aside>
-    </div>
-  } @else {
-    <p class="message error-message">{{ message || 'Group not found.' }}</p>
+    </section>
   }
 </app-trainer-page-shell>

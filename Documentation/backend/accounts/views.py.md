@@ -58,3 +58,17 @@ Login itself still only authenticates. Forms & Groups setup does not check train
 ## Future improvement notes
 
 Add object-level permissions and audit logging before production profile publishing.
+
+## Update: templates, references, chat, and client portal
+
+- References CRUD: `TrainerReferenceCategoryListView`/`DetailView` (delete blocked while references exist), `TrainerReferenceListView`/`DetailView` (multipart uploads, YouTube-only videos).
+- Templates: `StandardTemplateListView`, `StandardTemplateAdoptView`, `TrackingTemplateListView`/`DetailView`; `MAX_TRACKING_TEMPLATES = 5` enforced on create and adopt.
+- Assignments and entries: `ClientTemplateAssignmentListView`/`DetailView`, `ClientTrackingEntryListView` (filters `?template=`, `?month=YYYY-MM`), `TrainerTrackingEntryDetailView` (trainer edits mark `edited_by_trainer`).
+- Chat: `TrainerClientChatView` and `ClientChatView` (REST polling with `?after=<id>`, marks the other side's messages read).
+- Client portal (ClientTokenAuthentication): `ClientLoginView` now returns a token; `ClientPasswordChangeView`, `ClientMeView`, `ClientTemplateListView` (assigned templates with attached references), `ClientTrackingEntryView` (upsert per template and date).
+
+## Update 2: references shared per assignment
+
+- `ClientTemplateAssignmentListView.post` accepts `reference_ids` when assigning.
+- `ClientTemplateAssignmentDetailView.put` updates an assignment's shared references (`set_assignment_references` helper scopes them to the trainer).
+- `ClientTemplateListView` returns each template's references from the client's assignment, not the template.

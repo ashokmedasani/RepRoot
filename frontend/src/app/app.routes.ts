@@ -30,7 +30,15 @@ export const routes: Routes = [
     path: 'client/profile',
     loadComponent: () =>
       import('./pages/clients/client-profile/client-profile.component').then((module) => module.ClientProfileComponent),
-    title: 'Client Profile'
+    title: 'Client Portal'
+  },
+  {
+    path: 'client/change-password',
+    loadComponent: () =>
+      import('./pages/clients/client-change-password/client-change-password.component').then(
+        (module) => module.ClientChangePasswordComponent
+      ),
+    title: 'Change Password'
   },
   {
     path: 'trainer-access',
@@ -139,12 +147,33 @@ export const routes: Routes = [
     title: 'Create Client Form'
   },
   {
-    path: 'trainer/groups/:groupId/tracking-template/create',
+    path: 'trainer/templates',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-templates/trainer-templates.component').then(
+        (module) => module.TrainerTemplatesComponent
+      ),
+    title: 'Tracking Templates'
+  },
+  {
+    path: 'trainer/templates/create',
     loadComponent: () =>
       import('./pages/trainer/trainer-tracking-template-create/trainer-tracking-template-create.component').then(
         (module) => module.TrainerTrackingTemplateCreateComponent
       ),
     title: 'Create Tracking Template'
+  },
+  {
+    path: 'trainer/templates/:templateId/edit',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-tracking-template-create/trainer-tracking-template-create.component').then(
+        (module) => module.TrainerTrackingTemplateCreateComponent
+      ),
+    title: 'Edit Tracking Template'
+  },
+  {
+    path: 'trainer/groups/:groupId/tracking-template/create',
+    redirectTo: 'trainer/templates',
+    pathMatch: 'full'
   },
   {
     path: 'trainer/groups/:groupId/users',

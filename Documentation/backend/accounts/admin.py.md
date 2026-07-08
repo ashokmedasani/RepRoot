@@ -40,3 +40,7 @@ Admin access is for local and internal management only.
 ## Future improvement notes
 
 Add read-only media previews and grouped fieldsets when admin maintenance becomes part of the production workflow.
+
+## Update
+
+Registered admin entries for `ReferenceCategory`, `TrainerReference`, `TrackingTemplate`, `TemplateAssignment`, `TrackingEntry`, `ChatMessage`, and `ClientAuthToken` (token key read-only).
