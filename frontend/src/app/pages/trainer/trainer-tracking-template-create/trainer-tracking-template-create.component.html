@@ -63,16 +63,7 @@
               <div class="field-row">
                 <label>
                   <span>Label</span>
-                  <input
-                    type="text"
-                    [(ngModel)]="field.label"
-                    [name]="'fieldLabel' + field.localId"
-                    [class.invalid-input]="fieldErrors[field.localId]"
-                    (ngModelChange)="fieldErrors[field.localId] = ''"
-                  >
-                  @if (fieldErrors[field.localId]) {
-                    <small class="field-error">{{ fieldErrors[field.localId] }}</small>
-                  }
+                  <input type="text" [(ngModel)]="field.label" [name]="'fieldLabel' + field.localId">
                 </label>
                 <label>
                   <span>Type</span>

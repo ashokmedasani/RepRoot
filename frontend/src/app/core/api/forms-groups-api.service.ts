@@ -22,8 +22,7 @@ export type DynamicFieldType =
   | 'yes_no'
   | 'date'
   | 'location'
-  | 'address'
-  | 'image';
+  | 'address';
 
 export interface DynamicField {
   key?: string;
@@ -124,7 +123,6 @@ export interface ClientAccessRecord {
   email: string;
   username: string;
   registration_answers: Record<string, string>;
-  trainer_notes?: string;
   must_change_password: boolean;
   is_active: boolean;
   created_at: string;

@@ -32,7 +32,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
   isSaving = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
-  fieldErrors: Record<string, string> = {};
 
   templateInfo: { name: string; purpose: string; cadence: TemplateCadence; accent: string } = {
     name: '',
@@ -79,7 +78,6 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
 
   removeField(field: BuilderField): void {
     this.fields = this.fields.filter((currentField) => currentField.localId !== field.localId);
-    delete this.fieldErrors[field.localId];
   }
 
   moveField(fieldIndex: number, direction: -1 | 1): void {
@@ -101,12 +99,10 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
 
   saveTemplate(): void {
     const name = this.templateInfo.name.trim();
-    this.fieldErrors = {};
 
     if (!name) {
       this.messageType = 'error';
       this.message = 'Add a template name.';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -117,28 +113,16 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
       return;
     }
 
-    const invalidField = this.fields.find((field) => !field.label.trim());
-
-    if (invalidField) {
-      this.fieldErrors = {
-        [invalidField.localId]: 'Add a label for this field.'
-      };
-      this.messageType = 'error';
-      this.message = 'Every field needs a label before saving.';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
     const payload = {
       name,
       purpose: this.templateInfo.purpose.trim(),
       cadence: this.templateInfo.cadence,
       accent: this.templateInfo.accent,
       custom_fields: this.fields.map((field, index) => ({
-        key: field.key || this.createFieldKey(field.label, index),
-        label: field.label.trim(),
+        key: field.key || `field_${index + 1}`,
+        label: field.label,
         field_type: field.field_type,
-        placeholder: field.placeholder.trim()
+        placeholder: field.placeholder
       }))
     };
     const request = this.isEditMode
@@ -192,15 +176,5 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
 
   private createLocalId(): string {
     return `field-${Date.now()}-${Math.round(Math.random() * 100000)}`;
-  }
-
-  private createFieldKey(label: string, index: number): string {
-    const normalizedLabel = label
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-
-    return normalizedLabel || `field_${index + 1}`;
   }
 }

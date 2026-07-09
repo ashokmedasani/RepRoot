@@ -46,10 +46,23 @@
                 <span class="field-label">Confirm Password</span>
                 <app-password-input name="confirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" />
               </label>
-              <button type="submit" class="primary-action" [disabled]="isChangingPassword">
+              <button type="submit" class="primary-action" [disabled]="isChangingPassword || isDeleting">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}
               </button>
             </form>
+          </section>
+
+          <section class="account-section danger-section" aria-labelledby="delete-account-title">
+            <div>
+              <h2 id="delete-account-title">Delete Account</h2>
+              <p>
+                Delete this trainer account from the active database. A copy of the account data is stored in recycle
+                space for the next recovery step.
+              </p>
+            </div>
+            <button type="button" class="danger-action" [disabled]="isChangingPassword || isDeleting" (click)="deleteAccount()">
+              {{ isDeleting ? 'Deleting...' : 'Delete account' }}
+            </button>
           </section>
         </div>
       </section>

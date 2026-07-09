@@ -205,9 +205,6 @@
               @case ('address') {
                 <textarea rows="3" disabled [placeholder]="field.placeholder || 'Street, city, postal code'"></textarea>
               }
-              @case ('image') {
-                <input type="file" accept="image/*" disabled>
-              }
               @case ('email') {
                 <input type="email" disabled [placeholder]="field.placeholder || 'name@example.com'">
               }

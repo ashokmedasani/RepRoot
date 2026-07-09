@@ -262,11 +262,6 @@
                   <span class="field-label">{{ field.label }} @if (field.required) { <span class="required">*</span> }</span>
                   @if (field.field_type === 'long_text' || field.field_type === 'address') {
                     <textarea rows="3" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label"></textarea>
-                  } @else if (field.field_type === 'image') {
-                    <input type="file" accept="image/*" (change)="handleRegistrationImage($event, field)" [name]="'access' + field.label">
-                    @if (isImageValue(clientAccess.registrationAnswers[field.key || field.label])) {
-                      <img [src]="clientAccess.registrationAnswers[field.key || field.label]" alt="Selected upload" class="image-preview">
-                    }
                   } @else {
                     <input [type]="fieldInputType(field)" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label" [readonly]="field.is_core">
                   }

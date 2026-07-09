@@ -118,14 +118,27 @@ input:focus {
   outline: 2px solid color-mix(in srgb, var(--app-primary) 22%, transparent);
 }
 
-.primary-action {
+.danger-section {
+  border-color: color-mix(in srgb, #d92d20 28%, var(--app-border));
+}
+
+.primary-action,
+.danger-action {
   min-height: 2.55rem;
   border: 0;
   border-radius: var(--app-radius-lg);
   padding: 0 0.9rem;
-  background: var(--app-primary);
+  background: #d92d20;
   color: #ffffff;
   font-weight: 700;
+}
+
+.primary-action {
+  background: var(--app-primary);
+}
+
+.danger-action {
+  width: fit-content;
 }
 
 button:disabled {
@@ -166,7 +179,8 @@ button:disabled {
   }
 
   .secondary-action,
-  .primary-action {
+  .primary-action,
+  .danger-action {
     width: 100%;
   }
 }

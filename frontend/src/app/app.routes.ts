@@ -139,14 +139,6 @@ export const routes: Routes = [
     title: 'Clients'
   },
   {
-    path: 'trainer/clients/:clientId/templates/:assignmentId',
-    loadComponent: () =>
-      import('./pages/trainer/trainer-client-template-detail/trainer-client-template-detail.component').then(
-        (module) => module.TrainerClientTemplateDetailComponent
-      ),
-    title: 'Assigned Template'
-  },
-  {
     path: 'trainer/clients/:clientId',
     loadComponent: () =>
       import('./pages/trainer/trainer-client-profile/trainer-client-profile.component').then(

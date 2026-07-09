@@ -100,17 +100,6 @@
                 [(ngModel)]="answers[field.key || field.label]"
                 [name]="field.key || field.label"
               ></textarea>
-            } @else if (field.field_type === 'image') {
-              <input
-                type="file"
-                accept="image/*"
-                [required]="field.required && !answers[field.key || field.label]"
-                (change)="handleImageUpload($event, field)"
-                [name]="field.key || field.label"
-              >
-              @if (isImageValue(answers[field.key || field.label])) {
-                <img [src]="answers[field.key || field.label]" alt="Selected upload" class="image-preview">
-              }
             } @else {
               <input
                 [type]="fieldInputType(field)"

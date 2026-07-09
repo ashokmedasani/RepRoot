@@ -56,7 +56,6 @@ export class TrainerProfileComponent implements OnInit {
   private isPatchingProfile = false;
 
   readonly profileForm = this.formBuilder.nonNullable.group({
-    trainer_id: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[a-zA-Z0-9._-]+$/)]],
     first_name: ['', Validators.required],
     last_name: ['', Validators.required],
     birth_month: ['', Validators.required],
@@ -106,7 +105,6 @@ export class TrainerProfileComponent implements OnInit {
         this.loadedProfile = profile;
         this.isPatchingProfile = true;
         this.profileForm.patchValue({
-          trainer_id: profile.trainer_id || '',
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',

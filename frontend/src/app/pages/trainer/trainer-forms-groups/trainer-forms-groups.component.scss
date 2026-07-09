@@ -465,14 +465,6 @@ textarea {
   color: var(--app-text);
 }
 
-.image-preview {
-  width: min(100%, 12rem);
-  aspect-ratio: 4 / 3;
-  border: 1px solid var(--app-border);
-  border-radius: 0.65rem;
-  object-fit: cover;
-}
-
 .required {
   color: #d92d20;
 }
