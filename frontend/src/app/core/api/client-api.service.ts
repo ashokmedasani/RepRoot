@@ -41,7 +41,7 @@ export class ClientApiService {
 
   login(trainerCode: string, username: string, password: string): Observable<ClientLoginResponse> {
     return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, {
-      trainer_code: trainerCode,
+      trainer_id: trainerCode,
       username,
       password
     });
