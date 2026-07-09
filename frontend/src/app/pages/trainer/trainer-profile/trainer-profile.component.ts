@@ -1,11 +1,11 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Country, State } from 'country-state-city';
 
 import { TrainerAuthApiService, TrainerProfile } from '../../../core/api/trainer-auth-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-trainer-profile',
@@ -53,6 +53,7 @@ export class TrainerProfileComponent implements OnInit {
   };
   selectedFileNames: Record<string, string> = {};
   selectedProfilePhotoPreview = '';
+  private isPatchingProfile = false;
 
   readonly profileForm = this.formBuilder.nonNullable.group({
     first_name: ['', Validators.required],
@@ -102,6 +103,7 @@ export class TrainerProfileComponent implements OnInit {
         }
 
         this.loadedProfile = profile;
+        this.isPatchingProfile = true;
         this.profileForm.patchValue({
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
@@ -125,16 +127,19 @@ export class TrainerProfileComponent implements OnInit {
           youtube_url: profile.youtube_url || '',
           website_url: profile.website_url || ''
         });
+        this.isPatchingProfile = false;
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.profileMessage = this.formatApiError(error, 'Could not load trainer profile.');
+        this.profileMessage = formatApiError(error, 'Could not load trainer profile.');
         this.isLoading = false;
       }
     });
 
     this.profileForm.controls.country.valueChanges.subscribe(() => {
-      this.profileForm.controls.state.setValue('');
+      if (!this.isPatchingProfile) {
+        this.profileForm.controls.state.setValue('');
+      }
     });
   }
 
@@ -167,7 +172,7 @@ export class TrainerProfileComponent implements OnInit {
         this.isSaving = false;
       },
       error: (error: unknown) => {
-        this.profileMessage = this.formatApiError(error, 'Profile could not be saved.');
+        this.profileMessage = formatApiError(error, 'Profile could not be saved.');
         this.isSaving = false;
       }
     });
@@ -181,6 +186,11 @@ export class TrainerProfileComponent implements OnInit {
   private buildProfileFormData(): FormData {
     const formData = new FormData();
     const optionalNumberFields = new Set(['years_experience', 'certification_year']);
+    const trainerId = this.loadedProfile?.trainer_id || this.loadedProfile?.trainer_code || '';
+
+    if (trainerId) {
+      formData.append('trainer_id', trainerId);
+    }
 
     Object.entries(this.profileForm.getRawValue()).forEach(([key, value]) => {
       if (optionalNumberFields.has(key) && value === '') {
@@ -197,21 +207,5 @@ export class TrainerProfileComponent implements OnInit {
     });
 
     return formData;
-  }
-
-  private formatApiError(error: unknown, fallbackMessage: string): string {
-    const responseError = error instanceof HttpErrorResponse ? error.error : error;
-    const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
-
-    if (apiError.message) {
-      return apiError.message;
-    }
-
-    if (!apiError.error || typeof apiError.error === 'string') {
-      return apiError.error || fallbackMessage;
-    }
-
-    const firstError = Object.values(apiError.error)[0];
-    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
   }
 }

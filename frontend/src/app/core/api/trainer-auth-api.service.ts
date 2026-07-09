@@ -83,6 +83,7 @@ export interface TrainerProfile {
   username: string;
   first_name: string;
   last_name: string;
+  trainer_id: string | null;
   trainer_code: string | null;
   profile_setup_completed: boolean;
   profile_photo_url: string;

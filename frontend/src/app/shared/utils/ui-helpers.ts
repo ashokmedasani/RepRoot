@@ -6,26 +6,70 @@ export function initialsFor(firstName: string, lastName: string): string {
 
 export function formatApiError(error: unknown, fallbackMessage: string): string {
   const responseError = error instanceof HttpErrorResponse ? error.error : error;
-  const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string } | null;
 
-  if (!apiError) {
+  if (error instanceof HttpErrorResponse && error.status === 0) {
     return fallbackMessage;
   }
 
-  if (apiError.message) {
+  if (typeof responseError === 'string') {
+    const trimmedError = responseError.trim();
+
+    if (!trimmedError || trimmedError.startsWith('<')) {
+      return fallbackMessage;
+    }
+
+    return trimmedError;
+  }
+
+  if (!responseError || typeof responseError !== 'object') {
+    return fallbackMessage;
+  }
+
+  const apiError = responseError as { error?: unknown; message?: unknown; detail?: unknown };
+
+  if (typeof apiError.message === 'string' && apiError.message.trim()) {
     return apiError.message;
+  }
+
+  if (typeof apiError.detail === 'string' && apiError.detail.trim()) {
+    return apiError.detail;
   }
 
   if (apiError.error && typeof apiError.error === 'string') {
     return apiError.error;
   }
 
-  const errorFields = typeof apiError.error === 'object' && apiError.error ? apiError.error : (apiError as Record<string, string[] | string>);
-  const firstError = Object.values(errorFields || {}).find((value) => typeof value === 'string' || Array.isArray(value));
+  const errorMessage = firstErrorMessage(apiError.error || apiError);
+  return errorMessage || fallbackMessage;
+}
 
-  if (Array.isArray(firstError)) {
-    return String(firstError[0] || fallbackMessage);
+function firstErrorMessage(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmedValue = value.trim();
+    return trimmedValue.startsWith('<') ? '' : trimmedValue;
   }
 
-  return typeof firstError === 'string' ? firstError : fallbackMessage;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = firstErrorMessage(item);
+
+      if (message) {
+        return message;
+      }
+    }
+
+    return '';
+  }
+
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      const message = firstErrorMessage(item);
+
+      if (message) {
+        return message;
+      }
+    }
+  }
+
+  return '';
 }
