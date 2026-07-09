@@ -50,6 +50,7 @@ export class TrainerProfileSetupComponent implements OnInit {
   readonly setupForm = this.formBuilder.nonNullable.group({
     first_name: ['', Validators.required],
     last_name: ['', Validators.required],
+    trainer_code: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
     birth_month: ['', Validators.required],
     birth_year: ['', Validators.required],
     gender: ['', Validators.required],
@@ -58,6 +59,8 @@ export class TrainerProfileSetupComponent implements OnInit {
     professional_headline: [''],
     about_me: ['']
   });
+
+  codeStatus: 'idle' | 'available' | 'taken' = 'idle';
 
   get stateOptions(): string[] {
     const selectedCountry = this.countries.find((country) => country.name === this.setupForm.controls.country.value);
@@ -76,6 +79,7 @@ export class TrainerProfileSetupComponent implements OnInit {
         this.setupForm.patchValue({
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
+          trainer_code: profile.trainer_code || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',
           birth_year: profile.birth_year ? String(profile.birth_year) : '',
           gender: profile.gender || '',
@@ -94,6 +98,24 @@ export class TrainerProfileSetupComponent implements OnInit {
 
     this.setupForm.controls.country.valueChanges.subscribe(() => {
       this.setupForm.controls.state.setValue('');
+    });
+  }
+
+  checkTrainerCode(): void {
+    const code = this.setupForm.controls.trainer_code.value.trim();
+
+    if (code.length < 4) {
+      this.codeStatus = 'idle';
+      return;
+    }
+
+    this.trainerAuthApi.checkTrainerCode(code).subscribe({
+      next: (response) => {
+        this.codeStatus = response.available ? 'available' : 'taken';
+      },
+      error: () => {
+        this.codeStatus = 'idle';
+      }
     });
   }
 

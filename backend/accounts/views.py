@@ -176,6 +176,45 @@ class UsernameAvailabilityView(APIView):
     )
 
 
+class TrainerCodeAvailabilityView(APIView):
+  permission_classes = [permissions.AllowAny]
+
+  def post(self, request):
+    from .serializers import normalize_trainer_code
+    from rest_framework import serializers as drf_serializers
+
+    try:
+      code = normalize_trainer_code(request.data.get('trainer_code', ''))
+    except drf_serializers.ValidationError as error:
+      return Response({'available': False, 'message': error.detail[0]}, status=status.HTTP_200_OK)
+
+    is_available = not TrainerProfile.objects.filter(trainer_code__iexact=code).exists()
+
+    return Response(
+      {
+        'trainer_code': code,
+        'available': is_available,
+        'message': 'Trainer code is available.' if is_available else 'Trainer code is already taken.',
+      }
+    )
+
+
+class TrainerCodeUpdateView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    return Response({'trainer_code': request.user.trainer_profile.trainer_code})
+
+  def put(self, request):
+    from .serializers import TrainerCodeSerializer
+
+    serializer = TrainerCodeSerializer(data=request.data, context={'trainer': request.user})
+    serializer.is_valid(raise_exception=True)
+    profile = serializer.save()
+
+    return Response({'trainer_code': profile.trainer_code, 'message': 'Trainer code saved.'})
+
+
 class EmailAvailabilityView(APIView):
   permission_classes = [permissions.AllowAny]
 

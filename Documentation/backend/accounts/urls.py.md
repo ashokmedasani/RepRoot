@@ -61,3 +61,7 @@ Move profile URLs to a dedicated trainer app if trainer features become large en
 ## Update 3
 
 Added `trainer/forms-groups/clients/<id>/notes/`.
+
+## Update 4
+
+Added `trainer/check-trainer-code/` and `trainer/account/trainer-code/`.

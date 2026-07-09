@@ -13,6 +13,11 @@
 
     <form class="auth-form" (ngSubmit)="verifyClientLogin()">
       <label>
+        <span class="field-label">Trainer code <span class="required">*</span></span>
+        <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Ask your trainer for this" required>
+      </label>
+
+      <label>
         <span class="field-label">Username <span class="required">*</span></span>
         <input name="clientUsername" type="text" [(ngModel)]="loginForm.username" autocomplete="username" required>
       </label>

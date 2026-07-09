@@ -99,6 +99,18 @@ def validate_password_strength(password: str) -> None:
     raise serializers.ValidationError('Password must be at least 8 characters and include 1 special character.')
 
 
+def normalize_trainer_code(value: str) -> str:
+  code = str(value or '').strip().upper()
+
+  if len(code) < 4 or len(code) > 20:
+    raise serializers.ValidationError('Trainer code must be 4 to 20 characters.')
+
+  if not all(character.isalnum() or character in '-_' for character in code):
+    raise serializers.ValidationError('Trainer code can only use letters, numbers, hyphens, and underscores.')
+
+  return code
+
+
 class UsernameAvailabilitySerializer(serializers.Serializer):
   username = serializers.CharField(max_length=150)
 
@@ -290,6 +302,7 @@ class TrainerPasswordChangeSerializer(serializers.Serializer):
 
 class TrainerAccountSerializer(serializers.ModelSerializer):
   middle_name = serializers.CharField(source='trainer_profile.middle_name')
+  trainer_code = serializers.CharField(source='trainer_profile.trainer_code', allow_null=True)
   birth_month = serializers.IntegerField(source='trainer_profile.birth_month', allow_null=True)
   birth_year = serializers.IntegerField(source='trainer_profile.birth_year', allow_null=True)
   profile_setup_completed = serializers.BooleanField(source='trainer_profile.profile_setup_completed')
@@ -303,6 +316,7 @@ class TrainerAccountSerializer(serializers.ModelSerializer):
       'first_name',
       'middle_name',
       'last_name',
+      'trainer_code',
       'birth_month',
       'birth_year',
       'profile_setup_completed',
@@ -332,6 +346,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
       'username',
       'first_name',
       'last_name',
+      'trainer_code',
       'profile_setup_completed',
       'profile_photo',
       'profile_photo_url',
@@ -388,6 +403,19 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     request = self.context.get('request')
     return request.build_absolute_uri(file_field.url) if request else file_field.url
 
+  def validate_trainer_code(self, value):
+    code = normalize_trainer_code(value)
+    trainer = self.instance.user if self.instance else None
+    conflict = TrainerProfile.objects.filter(trainer_code__iexact=code)
+
+    if trainer is not None:
+      conflict = conflict.exclude(user=trainer)
+
+    if conflict.exists():
+      raise serializers.ValidationError('Trainer code is already taken.')
+
+    return code
+
   def validate(self, attrs):
     required_fields = ['first_name', 'last_name', 'gender', 'birth_month', 'birth_year', 'country', 'state']
     user_attrs = attrs.get('user', {})
@@ -397,6 +425,11 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
 
       if value in (None, ''):
         raise serializers.ValidationError({field: 'This field is required for profile setup.'})
+
+    existing_code = self.instance.trainer_code if self.instance else None
+
+    if not attrs.get('trainer_code') and not existing_code:
+      raise serializers.ValidationError({'trainer_code': 'Choose a trainer code your clients will use to log in.'})
 
     return attrs
 
@@ -583,13 +616,22 @@ class ClientAccessCreateSerializer(serializers.Serializer):
 
 
 class ClientLoginSerializer(serializers.Serializer):
+  trainer_code = serializers.CharField(max_length=20)
   username = serializers.CharField(max_length=150)
   password = serializers.CharField(write_only=True)
 
   def validate(self, attrs):
+    trainer_code = str(attrs['trainer_code']).strip().upper()
     username = attrs['username'].strip().lower()
     password = attrs['password']
+
+    trainer_profile = TrainerProfile.objects.filter(trainer_code__iexact=trainer_code).select_related('user').first()
+
+    if trainer_profile is None:
+      raise serializers.ValidationError('Invalid trainer code.')
+
     access_records = ClientAccess.objects.filter(
+      trainer=trainer_profile.user,
       username__iexact=username,
       is_active=True,
       lead_submission__status=LeadSubmission.STATUS_APPROVED,
@@ -616,6 +658,25 @@ class ClientLoginSerializer(serializers.Serializer):
 
     attrs['client_access'] = client_access
     return attrs
+
+
+class TrainerCodeSerializer(serializers.Serializer):
+  trainer_code = serializers.CharField(max_length=20)
+
+  def validate_trainer_code(self, value: str) -> str:
+    code = normalize_trainer_code(value)
+    trainer = self.context['trainer']
+
+    if TrainerProfile.objects.filter(trainer_code__iexact=code).exclude(user=trainer).exists():
+      raise serializers.ValidationError('Trainer code is already taken.')
+
+    return code
+
+  def save(self):
+    profile = self.context['trainer'].trainer_profile
+    profile.trainer_code = self.validated_data['trainer_code']
+    profile.save(update_fields=['trainer_code', 'updated_at'])
+    return profile
 
 
 TEMPLATE_FIELD_TYPES = {

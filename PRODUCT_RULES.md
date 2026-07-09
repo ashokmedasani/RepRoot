@@ -164,6 +164,13 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - Trainer-client chat is stored in the backend (`ChatMessage`) and polled over REST every 5 seconds while a chat panel is open. No websockets in Version 1.
 - The trainer client profile consolidates identity and password reset into a single Account & Access dialog and includes an Insights section computed from entries: 30-day check-in consistency, numeric field trends, and recent client notes by date.
 
+## Trainer Code (client login)
+
+- Each trainer chooses a unique Trainer Code during profile setup (first-login, required field, with a `?` tooltip explaining its purpose). It is editable later in Account Settings and shown there to share with clients.
+- Codes are 4-20 characters (letters, numbers, hyphens, underscores), stored uppercased, unique across trainers.
+- Client login requires Trainer Code + Username + Password. The code identifies the trainer, then the client's username/password are matched within that trainer's clients (client usernames are only unique per trainer, so the code disambiguates).
+- Trainer signup does NOT ask for the code; it is set at profile setup.
+
 ## Redesign Decisions (FitCoach-style)
 
 - The trainer workspace uses a fixed left sidebar (brand, icon navigation, Sign Out at bottom); it collapses to a horizontal bar on small screens.

@@ -12,6 +12,26 @@
         </div>
 
         <div class="account-content">
+          <section class="account-section" aria-labelledby="trainer-code-title">
+            <div>
+              <h2 id="trainer-code-title">Trainer Code</h2>
+              <p class="section-note">Clients log in with this code plus their username and password. Share it with your clients.</p>
+            </div>
+
+            <form class="code-form" (ngSubmit)="saveTrainerCode()">
+              <label>
+                <span class="field-label">Your trainer code</span>
+                <input type="text" name="trainerCode" [(ngModel)]="codeDraft" placeholder="e.g. FITJOHN" autocomplete="off">
+              </label>
+              <button type="submit" class="primary-action" [disabled]="isSavingCode">
+                {{ isSavingCode ? 'Saving...' : 'Save Code' }}
+              </button>
+            </form>
+            @if (codeMessage) {
+              <p class="account-message" [class.error-message]="codeMessageType === 'error'">{{ codeMessage }}</p>
+            }
+          </section>
+
           <section class="account-section" aria-labelledby="change-password-title">
             <div>
               <h2 id="change-password-title">Change Password</h2>

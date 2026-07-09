@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -14,7 +14,7 @@ import { PasswordInputComponent } from '../../../shared/password-input/password-
   templateUrl: './trainer-account-settings.component.html',
   styleUrl: './trainer-account-settings.component.scss'
 })
-export class TrainerAccountSettingsComponent {
+export class TrainerAccountSettingsComponent implements OnInit {
   private readonly trainerAuthApi = inject(TrainerAuthApiService);
   private readonly router = inject(Router);
 
@@ -23,10 +23,52 @@ export class TrainerAccountSettingsComponent {
   accountMessage = '';
   accountMessageType: 'success' | 'error' = 'success';
 
+  trainerCode = '';
+  codeDraft = '';
+  isSavingCode = false;
+  codeMessage = '';
+  codeMessageType: 'success' | 'error' = 'success';
+
   readonly passwordForm = {
     password: '',
     confirmPassword: ''
   };
+
+  ngOnInit(): void {
+    this.trainerAuthApi.getProfile().subscribe({
+      next: (profile) => {
+        this.trainerCode = profile.trainer_code || '';
+        this.codeDraft = this.trainerCode;
+      }
+    });
+  }
+
+  saveTrainerCode(): void {
+    const code = this.codeDraft.trim();
+
+    if (!code) {
+      this.codeMessageType = 'error';
+      this.codeMessage = 'Trainer code is required.';
+      return;
+    }
+
+    this.isSavingCode = true;
+    this.codeMessage = '';
+    this.trainerAuthApi.updateTrainerCode(code).subscribe({
+      next: (response) => {
+        this.trainerCode = response.trainer_code;
+        this.codeDraft = response.trainer_code;
+        this.codeMessageType = 'success';
+        this.codeMessage = response.message;
+        this.isSavingCode = false;
+      },
+      error: (error: unknown) => {
+        this.codeMessageType = 'error';
+        this.codeMessage = this.formatApiError(error, 'Trainer code could not be saved.');
+        this.isSavingCode = false;
+      }
+    });
+  }
 
   changePassword(): void {
     this.accountMessage = '';

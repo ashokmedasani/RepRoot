@@ -35,6 +35,7 @@ UNIVERSAL_CORE_FIELDS = [
 
 class TrainerProfile(models.Model):
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_profile')
+  trainer_code = models.CharField(max_length=20, unique=True, null=True, blank=True, db_index=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='trainer-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)

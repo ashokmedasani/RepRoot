@@ -39,8 +39,12 @@ export class ClientApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  login(username: string, password: string): Observable<ClientLoginResponse> {
-    return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, { username, password });
+  login(trainerCode: string, username: string, password: string): Observable<ClientLoginResponse> {
+    return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, {
+      trainer_code: trainerCode,
+      username,
+      password
+    });
   }
 
   changePassword(

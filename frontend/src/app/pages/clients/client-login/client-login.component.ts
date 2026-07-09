@@ -22,15 +22,17 @@ export class ClientLoginComponent {
   clientName = '';
 
   readonly loginForm = {
+    trainerCode: '',
     username: '',
     password: ''
   };
 
   verifyClientLogin(): void {
+    const trainerCode = this.loginForm.trainerCode.trim();
     const username = this.loginForm.username.trim().toLowerCase();
 
-    if (!username || !this.loginForm.password) {
-      this.loginMessage = 'Username and password are required.';
+    if (!trainerCode || !username || !this.loginForm.password) {
+      this.loginMessage = 'Trainer code, username, and password are all required.';
       return;
     }
 
@@ -38,7 +40,7 @@ export class ClientLoginComponent {
     this.clientName = '';
     this.loginMessage = 'Verifying client login...';
 
-    this.clientApi.login(username, this.loginForm.password).subscribe({
+    this.clientApi.login(trainerCode, username, this.loginForm.password).subscribe({
       next: (response) => {
         const client = response.client;
         this.clientName = `${client.first_name} ${client.last_name}`.trim();
