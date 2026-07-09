@@ -37,3 +37,7 @@ Each assignment row shows how many references are shared and a Share References 
 ## Update: FitCoach-style two-panel layout
 
 Left column: identity card (avatar, group link, contact info from intake answers, Edit User dialog), private Trainer Notes card (edit in place, last-updated stamp), clickable Assigned Templates rows, Client Activity stats (total entries this month, last entry, streak, completion %) with recent entries, and chat. Right column: template detail panel with Overview (shared reference cards, template notes, structure, today + 7-day trend table), Data Entries (per-template table with edit), and Progress (consistency strip, numeric trends, client notes) tabs, plus Share References and Add Entry (trainer-recorded, upserts per date) actions.
+
+## Update 2: split into two pages
+
+The template detail panel moved to its own page (`trainer-client-template`). The client profile is now a single centered column: identity card, private Trainer Notes, Assigned Templates rows that NAVIGATE to `/trainer/clients/:clientId/templates/:assignmentId` (assigning navigates there with `?share=1` to auto-open the reference picker), Client Activity (recent entries deep-link to the detail page's Data Entries tab), and chat. Only the Account & Access dialog remains here.

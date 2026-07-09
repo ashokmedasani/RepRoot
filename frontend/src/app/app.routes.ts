@@ -147,6 +147,14 @@ export const routes: Routes = [
     title: 'Client Profile'
   },
   {
+    path: 'trainer/clients/:clientId/templates/:assignmentId',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-client-template/trainer-client-template.component').then(
+        (module) => module.TrainerClientTemplateComponent
+      ),
+    title: 'Client Template'
+  },
+  {
     path: 'trainer/groups/:groupId/client-form/create',
     loadComponent: () =>
       import('./pages/trainer/trainer-client-form-create/trainer-client-form-create.component').then(

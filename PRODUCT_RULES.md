@@ -169,7 +169,7 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - The trainer workspace uses a fixed left sidebar (brand, icon navigation, Sign Out at bottom); it collapses to a horizontal bar on small screens.
 - A real Dashboard page exists at `/trainer/dashboard` with stat tiles and quick lists.
 - Compact design tokens: panel radius 0.75rem, panel padding 1rem, subtle shadows (`--app-shadow-sm`), page h1 1.45rem. Heavy blur shadows are retired.
-- The client profile is a two-panel layout: identity card, private Trainer Notes (stored on `ClientAccess.trainer_notes`, never sent to the client portal), clickable Assigned Templates, Client Activity stats (entries this month, last entry, streak, completion %), and chat on the left; a template detail panel with Overview / Data Entries / Progress tabs on the right.
+- The client profile and the template detail are two separate pages. The client profile (`/trainer/clients/:id`) is a single column: identity card, private Trainer Notes (stored on `ClientAccess.trainer_notes`, never sent to the client portal), clickable Assigned Templates, Client Activity stats (entries this month, last entry, streak, completion %), and chat. Clicking an assigned template opens the Template Detail page (`/trainer/clients/:id/templates/:assignmentId`) with a Back button, Share References, Start New Entry, and Overview / Data Entries / Progress tabs.
 - Trainers can record an entry on behalf of a client (marked as trainer-recorded, upserts by date).
 - Every password field uses the shared `app-password-input` component with a show/hide eye toggle.
 - Duplicate route `trainer/groups/:groupId/users` redirects to the group detail route.

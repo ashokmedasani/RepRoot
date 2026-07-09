@@ -56,3 +56,7 @@ Add route guards once dashboard and other protected pages are implemented.
 ## Update: dashboard and route cleanup
 
 Added `trainer/dashboard`; the duplicate `trainer/groups/:groupId/users` route now redirects to `trainer/groups/:groupId`.
+
+## Update
+
+Added `trainer/clients/:clientId/templates/:assignmentId` (Template Detail page).
