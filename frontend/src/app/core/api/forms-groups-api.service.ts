@@ -141,6 +141,8 @@ export interface ClientAccessDetailResponse {
   group: TrainerGroup;
   registration_fields: DynamicField[];
   lead_submission: LeadSubmission;
+  trainer_notes: string;
+  trainer_notes_updated_at: string | null;
 }
 
 export interface MessageResponse {
@@ -223,10 +225,13 @@ export class FormsGroupsApiService {
     });
   }
 
-  updateClientTrainerNotes(clientId: number, trainerNotes: string): Observable<{ client: ClientAccessRecord; message: string }> {
-    return this.http.put<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`,
-      { trainer_notes: trainerNotes },
+  saveTrainerNotes(
+    clientId: number,
+    notes: string
+  ): Observable<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }> {
+    return this.http.put<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/notes/`,
+      { notes },
       { headers: this.getAuthHeaders() }
     );
   }

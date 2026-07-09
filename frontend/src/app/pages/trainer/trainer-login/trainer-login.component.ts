@@ -3,12 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
 import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-trainer-login',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './trainer-login.component.html',
   styleUrl: './trainer-login.component.scss'
 })
@@ -51,7 +51,7 @@ export class TrainerLoginComponent {
         this.routeAfterLogin();
       },
       error: (error: unknown) => {
-        this.loginMessage = formatApiError(error, 'Login failed. Check username/email and password.');
+        this.loginMessage = this.formatApiError(error, 'Login failed. Check username/email and password.');
         this.isSubmitting = false;
       }
     });
@@ -64,9 +64,20 @@ export class TrainerLoginComponent {
         void this.router.navigate([response.profile_setup_completed ? '/trainer/profile' : '/trainer/profile-setup']);
       },
       error: (error: unknown) => {
-        this.loginMessage = formatApiError(error, 'Login succeeded, but profile status could not be checked.');
+        this.loginMessage = this.formatApiError(error, 'Login succeeded, but profile status could not be checked.');
         this.isSubmitting = false;
       }
     });
+  }
+
+  private formatApiError(error: unknown, fallbackMessage: string): string {
+    const responseError = error as { error?: Record<string, string[] | string> | string };
+
+    if (!responseError.error || typeof responseError.error === 'string') {
+      return responseError.error || 'Could not reach the backend. Start Django on port 8000 and try again.';
+    }
+
+    const firstError = Object.values(responseError.error)[0];
+    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
   }
 }

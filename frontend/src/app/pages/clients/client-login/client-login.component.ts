@@ -4,11 +4,12 @@ import { Router, RouterLink } from '@angular/router';
 
 import { ClientApiService } from '../../../core/api/client-api.service';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-client-login',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './client-login.component.html',
   styleUrl: './client-login.component.scss'
 })
@@ -19,45 +20,19 @@ export class ClientLoginComponent {
   isSubmitting = false;
   loginMessage = '';
   clientName = '';
-  trainerName = '';
 
   readonly loginForm = {
-    trainerId: '',
+    trainerCode: '',
     username: '',
     password: ''
   };
 
-  searchTrainer(): void {
-    const trainerId = this.loginForm.trainerId.trim().toLowerCase();
-
-    if (!trainerId) {
-      this.loginMessage = 'Enter Trainer ID before searching.';
-      return;
-    }
-
-    this.isSubmitting = true;
-    this.trainerName = '';
-    this.loginMessage = 'Searching trainer ID...';
-
-    this.clientApi.lookupTrainer(trainerId).subscribe({
-      next: (response) => {
-        this.trainerName = response.trainer_name;
-        this.loginMessage = `Trainer found: ${response.trainer_name}.`;
-        this.isSubmitting = false;
-      },
-      error: (error: unknown) => {
-        this.loginMessage = formatApiError(error, 'Trainer ID was not found.');
-        this.isSubmitting = false;
-      }
-    });
-  }
-
   verifyClientLogin(): void {
-    const trainerId = this.loginForm.trainerId.trim().toLowerCase();
+    const trainerCode = this.loginForm.trainerCode.trim();
     const username = this.loginForm.username.trim().toLowerCase();
 
-    if (!trainerId || !username || !this.loginForm.password) {
-      this.loginMessage = 'Trainer ID, username, and password are required.';
+    if (!trainerCode || !username || !this.loginForm.password) {
+      this.loginMessage = 'Trainer code, username, and password are all required.';
       return;
     }
 
@@ -65,7 +40,7 @@ export class ClientLoginComponent {
     this.clientName = '';
     this.loginMessage = 'Verifying client login...';
 
-    this.clientApi.login(trainerId, username, this.loginForm.password).subscribe({
+    this.clientApi.login(trainerCode, username, this.loginForm.password).subscribe({
       next: (response) => {
         const client = response.client;
         this.clientName = `${client.first_name} ${client.last_name}`.trim();
@@ -81,7 +56,7 @@ export class ClientLoginComponent {
         }
       },
       error: (error: unknown) => {
-        this.loginMessage = formatApiError(error, 'Client login failed. Check Trainer ID, username, and password.');
+        this.loginMessage = formatApiError(error, 'Client login failed. Check username and password.');
         this.isSubmitting = false;
       }
     });

@@ -27,9 +27,9 @@ dl {
 
 .panel {
   border: 1px solid var(--app-border);
-  border-radius: 0.8rem;
+  border-radius: var(--app-panel-radius);
   background: var(--app-surface);
-  box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 6%, transparent);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .category-panel,
@@ -394,7 +394,7 @@ dd {
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   border: 1px solid var(--app-border);
-  border-radius: 0.9rem;
+  border-radius: var(--app-panel-radius);
   padding: 1.1rem;
   background: var(--app-surface);
   box-shadow: var(--app-shadow);

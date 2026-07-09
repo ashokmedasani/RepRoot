@@ -188,6 +188,11 @@ export class TrainerProfileComponent implements OnInit {
   private buildProfileFormData(): FormData {
     const formData = new FormData();
     const optionalNumberFields = new Set(['years_experience', 'certification_year']);
+    const trainerId = this.loadedProfile?.trainer_id || this.loadedProfile?.trainer_code || '';
+
+    if (trainerId) {
+      formData.append('trainer_id', trainerId);
+    }
 
     Object.entries(this.profileForm.getRawValue()).forEach(([key, value]) => {
       if (optionalNumberFields.has(key) && value === '') {

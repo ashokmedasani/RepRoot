@@ -46,7 +46,7 @@
   border-radius: 1rem;
   padding: 2rem;
   background: var(--app-surface);
-  box-shadow: 0 18px 65px color-mix(in srgb, var(--app-text) 8%, transparent);
+  box-shadow: var(--app-shadow);
 }
 
 .eyebrow {

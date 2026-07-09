@@ -4,13 +4,14 @@ import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 type ResetOtpStatus = 'idle' | 'sent' | 'verified' | 'failed';
 
 @Component({
   selector: 'app-trainer-forgot-password',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './trainer-forgot-password.component.html',
   styleUrl: './trainer-forgot-password.component.scss'
 })

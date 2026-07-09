@@ -59,3 +59,10 @@ Split portfolio media and certifications into nested serializers when they becom
 ## Update 2: references shared per assignment
 
 `TrackingTemplateSerializer` dropped `references`/`reference_ids`. `TemplateAssignmentSerializer` now nests the shared `references` (compact form with absolute file URLs).
+
+## Update 4: trainer code
+
+- `normalize_trainer_code` validates format (4-20 chars, alphanumeric/-/_, uppercased).
+- `TrainerProfileSerializer` requires `trainer_code` at profile setup (unique per trainer).
+- `ClientLoginSerializer` now requires `trainer_code`, resolves the trainer by code, then matches the client username/password within that trainer.
+- `TrainerCodeSerializer` backs the Settings update; `TrainerAccountSerializer`/`TrainerProfileSerializer` expose the code.

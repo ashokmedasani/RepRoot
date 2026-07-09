@@ -49,9 +49,9 @@ export class TrainerProfileSetupComponent implements OnInit {
   private selectedPhoto: File | null = null;
 
   readonly setupForm = this.formBuilder.nonNullable.group({
-    trainer_id: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[a-zA-Z0-9._-]+$/)]],
     first_name: ['', Validators.required],
     last_name: ['', Validators.required],
+    trainer_code: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
     birth_month: ['', Validators.required],
     birth_year: ['', Validators.required],
     gender: ['', Validators.required],
@@ -60,6 +60,8 @@ export class TrainerProfileSetupComponent implements OnInit {
     professional_headline: [''],
     about_me: ['']
   });
+
+  codeStatus: 'idle' | 'available' | 'taken' = 'idle';
 
   get stateOptions(): string[] {
     const selectedCountry = this.countries.find((country) => country.name === this.setupForm.controls.country.value);
@@ -77,9 +79,9 @@ export class TrainerProfileSetupComponent implements OnInit {
         this.profilePhotoUrl = profile.profile_photo_url || '';
         this.isPatchingProfile = true;
         this.setupForm.patchValue({
-          trainer_id: profile.trainer_id || '',
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
+          trainer_code: profile.trainer_id || profile.trainer_code || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',
           birth_year: profile.birth_year ? String(profile.birth_year) : '',
           gender: profile.gender || '',
@@ -102,6 +104,10 @@ export class TrainerProfileSetupComponent implements OnInit {
         this.setupForm.controls.state.setValue('');
       }
     });
+  }
+
+  checkTrainerCode(): void {
+    this.codeStatus = 'idle';
   }
 
   handlePhotoSelected(event: Event): void {
@@ -144,6 +150,11 @@ export class TrainerProfileSetupComponent implements OnInit {
     const value = this.setupForm.getRawValue();
 
     Object.entries(value).forEach(([key, fieldValue]) => {
+      if (key === 'trainer_code') {
+        formData.append('trainer_id', String(fieldValue ?? '').trim().toLowerCase());
+        return;
+      }
+
       formData.append(key, String(fieldValue ?? ''));
     });
 

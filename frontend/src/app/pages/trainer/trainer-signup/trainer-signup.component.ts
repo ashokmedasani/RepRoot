@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { TrainerAuthApiService, TrainerSignupPayload } from '../../../core/api/trainer-auth-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
 type EmailOtpStatus = 'idle' | 'sending' | 'sent' | 'verified' | 'failed';
 type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
@@ -12,7 +12,7 @@ type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
 @Component({
   selector: 'app-trainer-signup',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PasswordInputComponent],
   templateUrl: './trainer-signup.component.html',
   styleUrl: './trainer-signup.component.scss'
 })
@@ -211,7 +211,7 @@ export class TrainerSignupComponent implements OnDestroy {
       error: (error: unknown) => {
         this.emailOtpStatus = 'failed';
         this.localDebugOtp = '';
-        this.emailCheckMessage = formatApiError(
+        this.emailCheckMessage = this.formatApiError(
           error,
           'Could not check email. Start Django on port 8000 and try again.'
         );
@@ -336,6 +336,22 @@ export class TrainerSignupComponent implements OnDestroy {
     });
   }
 
+  private formatApiError(error: unknown, fallbackMessage: string): string {
+    const responseError = error instanceof HttpErrorResponse ? error.error : error;
+    const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
+
+    if (apiError.message) {
+      return apiError.message;
+    }
+
+    if (!apiError.error || typeof apiError.error === 'string') {
+      return apiError.error || fallbackMessage;
+    }
+
+    const firstError = Object.values(apiError.error)[0];
+    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
+  }
+
   private startResendCountdown(): void {
     this.clearResendTimer();
     this.resendCountdown = 30;
@@ -372,7 +388,7 @@ export class TrainerSignupComponent implements OnDestroy {
       error: (error: unknown) => {
         this.emailOtpStatus = 'failed';
         this.localDebugOtp = '';
-        const message = formatApiError(
+        const message = this.formatApiError(
           error,
           'Could not send OTP. Start Django on port 8000 and try again.'
         );
@@ -454,12 +470,6 @@ export class TrainerSignupComponent implements OnDestroy {
   private applySignupApiErrors(error: unknown): void {
     const responseError = error instanceof HttpErrorResponse ? error.error : error;
     const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
-
-    if (typeof responseError === 'string' && responseError.trim().startsWith('<')) {
-      this.fieldErrors.general = 'Signup failed. The app received an invalid HTML response from the backend route.';
-      this.signupMessage = '';
-      return;
-    }
 
     if (!apiError.error || typeof apiError.error === 'string') {
       this.fieldErrors.general = apiError.message || apiError.error || 'Please refresh and try again.';

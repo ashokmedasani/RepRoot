@@ -77,6 +77,14 @@ export const routes: Routes = [
     title: 'Forgot Password'
   },
   {
+    path: 'trainer/dashboard',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-dashboard/trainer-dashboard.component').then(
+        (module) => module.TrainerDashboardComponent
+      ),
+    title: 'Dashboard'
+  },
+  {
     path: 'trainer/profile-setup',
     loadComponent: () =>
       import('./pages/trainer/trainer-profile-setup/trainer-profile-setup.component').then(
@@ -147,6 +155,14 @@ export const routes: Routes = [
     title: 'Client Profile'
   },
   {
+    path: 'trainer/clients/:clientId/templates/:assignmentId',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-client-template/trainer-client-template.component').then(
+        (module) => module.TrainerClientTemplateComponent
+      ),
+    title: 'Client Template'
+  },
+  {
     path: 'trainer/groups/:groupId/client-form/create',
     loadComponent: () =>
       import('./pages/trainer/trainer-client-form-create/trainer-client-form-create.component').then(
@@ -185,11 +201,8 @@ export const routes: Routes = [
   },
   {
     path: 'trainer/groups/:groupId/users',
-    loadComponent: () =>
-      import('./pages/trainer/trainer-group-users/trainer-group-users.component').then(
-        (module) => module.TrainerGroupUsersComponent
-      ),
-    title: 'Group Users'
+    redirectTo: 'trainer/groups/:groupId',
+    pathMatch: 'full'
   },
   {
     path: 'trainer/account-settings',

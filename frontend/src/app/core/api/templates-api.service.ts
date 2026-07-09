@@ -193,6 +193,17 @@ export class TemplatesApiService {
     );
   }
 
+  createClientEntry(
+    clientId: number,
+    payload: { template_id: number; entry_date: string; answers: Record<string, string>; note: string }
+  ): Observable<{ entry: TrackingEntryRecord; message: string }> {
+    return this.http.post<{ entry: TrackingEntryRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/entries/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
   updateEntry(
     entryId: number,
     payload: { answers: Record<string, string>; note: string }

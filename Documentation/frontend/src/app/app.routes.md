@@ -52,3 +52,11 @@ Add route guards once dashboard and other protected pages are implemented.
 
 - `trainer/templates`, `trainer/templates/create`, `trainer/templates/:templateId/edit` (dedicated Templates section); the old `trainer/groups/:groupId/tracking-template/create` route redirects to `trainer/templates`.
 - `client/change-password` for the forced password change after a temporary password.
+
+## Update: dashboard and route cleanup
+
+Added `trainer/dashboard`; the duplicate `trainer/groups/:groupId/users` route now redirects to `trainer/groups/:groupId`.
+
+## Update
+
+Added `trainer/clients/:clientId/templates/:assignmentId` (Template Detail page).

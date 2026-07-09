@@ -21,3 +21,7 @@ Shared frontend components.
 ## Connected files
 
 - All `pages/trainer/*` components.
+
+## Update: sidebar layout
+
+The shell is now a fixed left sidebar (brand, icon nav with Dashboard/Forms & Groups/Templates/Clients/References/Profile/Settings, Sign Out pinned at the bottom) matching the FitCoach reference design; it collapses to a horizontal bar under 900px. The footer was removed.

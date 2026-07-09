@@ -81,9 +81,10 @@ export interface TrainerProfileStatusResponse {
 export interface TrainerProfile {
   email: string;
   username: string;
-  trainer_id: string;
   first_name: string;
   last_name: string;
+  trainer_id: string | null;
+  trainer_code: string | null;
   profile_setup_completed: boolean;
   profile_photo_url: string;
   gender: string;
@@ -127,6 +128,20 @@ export class TrainerAuthApiService {
 
   checkEmail(email: string): Observable<EmailAvailabilityResponse> {
     return this.http.post<EmailAvailabilityResponse>(`${this.apiBaseUrl}/trainer/check-email/`, { email });
+  }
+
+  checkTrainerCode(trainerCode: string): Observable<{ available: boolean; message: string }> {
+    return this.http.post<{ available: boolean; message: string }>(`${this.apiBaseUrl}/trainer/check-trainer-code/`, {
+      trainer_code: trainerCode
+    });
+  }
+
+  updateTrainerCode(trainerCode: string): Observable<{ trainer_code: string; message: string }> {
+    return this.http.put<{ trainer_code: string; message: string }>(
+      `${this.apiBaseUrl}/trainer/account/trainer-code/`,
+      { trainer_code: trainerCode },
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   requestEmailOtp(email: string): Observable<EmailOtpRequestResponse> {

@@ -62,3 +62,11 @@ Move portfolio media and certifications into separate models when approval, orde
 ## Update 2: references shared per assignment
 
 `TrackingTemplate` no longer has a `references` field. `TemplateAssignment.references` (M2M to `TrainerReference`) now stores which references a trainer shared with a specific client for that template.
+
+## Update 3: private trainer notes
+
+`ClientAccess.trainer_notes` + `trainer_notes_updated_at`: private per-client notes visible only to the trainer (never serialized to the client portal).
+
+## Update 4: trainer code
+
+`TrainerProfile.trainer_code` (unique, chosen at profile setup, editable in Settings). Clients must supply this code plus username + password to log in, which scopes the client-username lookup to one trainer.

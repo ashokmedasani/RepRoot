@@ -72,3 +72,13 @@ Add object-level permissions and audit logging before production profile publish
 - `ClientTemplateAssignmentListView.post` accepts `reference_ids` when assigning.
 - `ClientTemplateAssignmentDetailView.put` updates an assignment's shared references (`set_assignment_references` helper scopes them to the trainer).
 - `ClientTemplateListView` returns each template's references from the client's assignment, not the template.
+
+## Update 3: trainer notes and trainer-recorded entries
+
+- `ClientTrainerNotesView` (`PUT trainer/forms-groups/clients/<id>/notes/`) saves private notes with a timestamp; notes are returned by `ClientAccessDetailView` but never exposed to client endpoints.
+- `ClientTrackingEntryListView.post` lets the trainer record an entry on behalf of a client (upsert per date, marked `edited_by_trainer`).
+
+## Update 4: trainer code endpoints
+
+- `TrainerCodeAvailabilityView` (`POST trainer/check-trainer-code/`) - live availability check.
+- `TrainerCodeUpdateView` (`GET/PUT trainer/account/trainer-code/`) - view/change the code in Settings.

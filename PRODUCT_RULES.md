@@ -164,6 +164,23 @@ Trainer signup is a global trainer signup page. Login will work based on the tra
 - Trainer-client chat is stored in the backend (`ChatMessage`) and polled over REST every 5 seconds while a chat panel is open. No websockets in Version 1.
 - The trainer client profile consolidates identity and password reset into a single Account & Access dialog and includes an Insights section computed from entries: 30-day check-in consistency, numeric field trends, and recent client notes by date.
 
+## Trainer Code (client login)
+
+- Each trainer chooses a unique Trainer Code during profile setup (first-login, required field, with a `?` tooltip explaining its purpose). It is editable later in Account Settings and shown there to share with clients.
+- Codes are 4-20 characters (letters, numbers, hyphens, underscores), stored uppercased, unique across trainers.
+- Client login requires Trainer Code + Username + Password. The code identifies the trainer, then the client's username/password are matched within that trainer's clients (client usernames are only unique per trainer, so the code disambiguates).
+- Trainer signup does NOT ask for the code; it is set at profile setup.
+
+## Redesign Decisions (FitCoach-style)
+
+- The trainer workspace uses a fixed left sidebar (brand, icon navigation, Sign Out at bottom); it collapses to a horizontal bar on small screens.
+- A real Dashboard page exists at `/trainer/dashboard` with stat tiles and quick lists.
+- Compact design tokens: panel radius 0.75rem, panel padding 1rem, subtle shadows (`--app-shadow-sm`), page h1 1.45rem. Heavy blur shadows are retired.
+- The client profile and the template detail are two separate pages. The client profile (`/trainer/clients/:id`) is a single column: identity card, private Trainer Notes (stored on `ClientAccess.trainer_notes`, never sent to the client portal), clickable Assigned Templates, Client Activity stats (entries this month, last entry, streak, completion %), and chat. Clicking an assigned template opens the Template Detail page (`/trainer/clients/:id/templates/:assignmentId`) with a Back button, Share References, Start New Entry, and Overview / Data Entries / Progress tabs.
+- Trainers can record an entry on behalf of a client (marked as trainer-recorded, upserts by date).
+- Every password field uses the shared `app-password-input` component with a show/hide eye toggle.
+- Duplicate route `trainer/groups/:groupId/users` redirects to the group detail route.
+
 ## UI Design Philosophy
 
 The application must feel like a premium SaaS application:

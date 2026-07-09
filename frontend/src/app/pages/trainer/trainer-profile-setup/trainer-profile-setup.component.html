@@ -41,14 +41,6 @@
 
         <div class="form-grid">
           <label>
-            <span class="field-label">Trainer ID <span class="required">*</span></span>
-            <input type="text" formControlName="trainer_id" autocomplete="off">
-            @if (hasError('trainer_id')) {
-              <span class="field-help error-text">Use at least 4 letters, numbers, periods, underscores, or hyphens.</span>
-            }
-          </label>
-
-          <label>
             <span class="field-label">First name <span class="required">*</span></span>
             <input type="text" formControlName="first_name" autocomplete="given-name">
             @if (hasError('first_name')) {
@@ -61,6 +53,34 @@
             <input type="text" formControlName="last_name" autocomplete="family-name">
             @if (hasError('last_name')) {
               <span class="field-help error-text">Last name is required.</span>
+            }
+          </label>
+
+          <label class="code-field">
+            <span class="field-label">
+              Trainer code <span class="required">*</span>
+              <span class="help-tip" tabindex="0" aria-label="Why a trainer code is needed">
+                ?
+                <span class="help-bubble" role="tooltip">
+                  Your clients log in with this code plus their username and password. It links each client's login to your account, so choose something short and easy to share (for example FITJOHN or COACH-99). You can change it later in Settings.
+                </span>
+              </span>
+            </span>
+            <input
+              type="text"
+              formControlName="trainer_code"
+              autocomplete="off"
+              placeholder="e.g. FITJOHN"
+              (input)="checkTrainerCode()"
+            >
+            @if (hasError('trainer_code')) {
+              <span class="field-help error-text">Enter a code of at least 4 letters, numbers, hyphens, or underscores.</span>
+            } @else if (codeStatus === 'available') {
+              <span class="field-help success-text">This code is available.</span>
+            } @else if (codeStatus === 'taken') {
+              <span class="field-help error-text">This code is already taken. Try another.</span>
+            } @else {
+              <span class="field-help">Clients type this to log in. Keep it short and memorable.</span>
             }
           </label>
 

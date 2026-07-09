@@ -20,10 +20,10 @@ h2 {
   gap: 1rem;
   border: 1px solid var(--app-border);
   border-radius: 0.75rem;
-  padding: 1.15rem;
+  padding: var(--app-panel-padding);
   margin-bottom: 1rem;
   background: var(--app-surface);
-  box-shadow: 0 18px 45px color-mix(in srgb, var(--app-text) 6%, transparent);
+  box-shadow: var(--app-shadow-sm);
 }
 
 .group-context {

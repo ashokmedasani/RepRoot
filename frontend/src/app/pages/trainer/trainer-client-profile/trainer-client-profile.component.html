@@ -1,15 +1,10 @@
 <app-trainer-page-shell
-  [title]="client ? client.first_name + ' ' + client.last_name : 'Client Profile'"
-  eyebrow="Approved User"
-  [subtitle]="client ? 'Reference ID: ' + (profile?.lead_submission?.reference_id || '') : 'Loading client profile.'"
-  activeSection="forms-groups"
-  maxWidth="92rem"
+  title="Client Profile"
+  activeSection="clients"
+  maxWidth="52rem"
   titleId="client-profile-title"
 >
-  <a page-actions routerLink="/trainer/clients" class="secondary-action">Back to Clients</a>
-  @if (profile?.group) {
-    <a page-actions [routerLink]="['/trainer/groups', profile?.group?.id]" class="secondary-action">Back to Group</a>
-  }
+  <a page-actions routerLink="/trainer/clients" class="secondary-action">&#8592; Back to Clients</a>
 
   @if (isLoading) {
     <section class="panel">
@@ -20,226 +15,153 @@
       <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
     }
 
-    <section class="client-dashboard">
-      <div class="dashboard-left">
-        <article class="profile-hero-card">
-          <div class="identity-row">
-            <span class="avatar">{{ initials(client) }}</span>
-            <div>
-              <span class="hero-label">Client Profile</span>
+    <div class="profile-stack">
+      <section class="panel identity-card">
+        <div class="identity-top">
+          <span class="avatar">{{ initials(client) }}</span>
+          <div class="identity-copy">
+            <div class="name-row">
               <h2>{{ client.first_name }} {{ client.last_name }}</h2>
-              <p>{{ profile.group.name }} - {{ client.email }}</p>
+              <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
             </div>
+            <a class="group-link" [routerLink]="['/trainer/groups', profile.group.id]">{{ profile.group.name }}</a>
+            <p class="joined">Joined on {{ client.created_at | date: 'dd MMM yyyy' }}</p>
           </div>
-          <div class="hero-details">
-            <article>
-              <span>Templates</span>
-              <strong>{{ assignments.length }} assigned</strong>
-            </article>
-            <article>
-              <span>Entries</span>
-              <strong>{{ entries.length }} submitted</strong>
-            </article>
-            <article>
-              <span>Status</span>
-              <strong>{{ client.is_active ? 'Active' : 'Inactive' }}</strong>
-            </article>
-          </div>
-          <button type="button" class="secondary-action" (click)="openAccountDialog()">Account &amp; Access</button>
-        </article>
+          <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Edit User</button>
+        </div>
+        <div class="contact-rows">
+          <span>{{ client.email }}</span>
+          @if (contactValue(['phone', 'mobile'])) {
+            <span>{{ contactValue(['phone', 'mobile']) }}</span>
+          }
+          @if (contactValue(['birth', 'dob', 'age'])) {
+            <span>{{ contactValue(['birth', 'dob', 'age']) }}</span>
+          }
+          @if (contactValue(['gender'])) {
+            <span>{{ contactValue(['gender']) }}</span>
+          }
+        </div>
+      </section>
 
-        <article class="panel private-notes-panel">
-          <div class="panel-heading">
-            <div>
-              <h3>Trainer Notes <span>Private</span></h3>
-              <p>Only you can see these notes. Clients never receive this text.</p>
-            </div>
-            <button type="button" class="secondary-action compact" [disabled]="isSavingTrainerNotes" (click)="saveTrainerNotes()">
-              {{ isSavingTrainerNotes ? 'Saving...' : 'Save Notes' }}
+      <section class="panel notes-card">
+        <div class="panel-heading">
+          <h3>Trainer Notes <small>(Private)</small></h3>
+          @if (!isEditingNotes) {
+            <button type="button" class="ghost-action compact" (click)="startEditNotes()">Edit Note</button>
+          }
+        </div>
+        @if (isEditingNotes) {
+          <textarea rows="4" [(ngModel)]="notesDraft" name="trainerNotes" placeholder="Private notes about this client - goals, injuries, focus areas..."></textarea>
+          <div class="notes-actions">
+            <button type="button" class="ghost-action compact" (click)="cancelEditNotes()">Cancel</button>
+            <button type="button" class="primary-action compact" [disabled]="isSavingNotes" (click)="saveNotes()">
+              {{ isSavingNotes ? 'Saving...' : 'Save Note' }}
             </button>
           </div>
-          <textarea rows="5" [(ngModel)]="trainerNotesDraft" name="trainerNotes" placeholder="Coaching context, injuries, preferences, reminders..."></textarea>
-        </article>
-
-        <article class="panel templates-panel">
-          <div class="panel-heading">
-            <div>
-              <h3>Assigned Templates</h3>
-              <p>Open a template to review references, structure, and recent entries.</p>
-            </div>
+        } @else {
+          <div class="notes-body">
+            @if (trainerNotes) {
+              <p class="notes-text">{{ trainerNotes }}</p>
+            } @else {
+              <p class="empty-note">No notes yet. Only you can see what you write here.</p>
+            }
           </div>
+          @if (notesUpdatedAt) {
+            <small class="notes-stamp">Last updated: {{ notesUpdatedAt | date: 'dd MMM yyyy, h:mm a' }}</small>
+          }
+        }
+      </section>
 
-          <div class="assignment-list">
-            @for (assignment of assignments; track assignment.id) {
-              <a class="assignment-row" [routerLink]="['/trainer/clients', client.id, 'templates', assignment.id]" [class.green]="assignment.template_accent === 'green'" [class.blue]="assignment.template_accent === 'blue'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'">
-                <span class="template-icon">T</span>
+      <section class="panel">
+        <div class="panel-heading">
+          <h3>Assigned Templates</h3>
+        </div>
+        <div class="assignment-list">
+          @for (assignment of assignments; track assignment.id) {
+            <div class="assignment-row" role="button" tabindex="0" (click)="openTemplatePage(assignment)" (keydown.enter)="openTemplatePage(assignment)">
+              <span class="assignment-icon" [class.green]="assignment.template_accent === 'green'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2.5M16 4V2.5"/></svg>
+              </span>
+              <span class="assignment-copy">
+                <strong>{{ assignment.template_name }}</strong>
+                <small>Assigned on {{ assignment.assigned_at | date: 'dd MMM yyyy' }}</small>
+              </span>
+              <span class="assignment-side">
+                <span class="status-pill">Active</span>
+                <button type="button" class="ghost-action compact" (click)="unassignTemplate(assignment, $event)">Unassign</button>
+                <span class="chevron" aria-hidden="true">&rsaquo;</span>
+              </span>
+            </div>
+          } @empty {
+            <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start tracking.</p>
+          }
+        </div>
+        <p class="hint-note">Click a template to open its details, references, and entries.</p>
+        <div class="assign-row">
+          <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
+            <option [ngValue]="null">Select a template to assign</option>
+            @for (template of availableTemplates; track template.id) {
+              <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
+            }
+          </select>
+          <button type="button" class="primary-action compact" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
+            Assign
+          </button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h3>Client Activity</h3>
+        </div>
+        <div class="activity-grid">
+          <article>
+            <span>Total Entries</span>
+            <strong>{{ entriesThisMonth }}</strong>
+            <small>This month</small>
+          </article>
+          <article>
+            <span>Last Entry</span>
+            <strong>{{ lastEntry ? (lastEntry.entry_date | date: 'dd MMM') : '-' }}</strong>
+            <small>{{ lastEntry?.template_name || 'No entries yet' }}</small>
+          </article>
+          <article>
+            <span>Streak</span>
+            <strong>{{ streak }} {{ streak === 1 ? 'Day' : 'Days' }}</strong>
+            <small>{{ streak > 0 ? 'Keep it up!' : 'No current streak' }}</small>
+          </article>
+          <article>
+            <span>Completion</span>
+            <strong>{{ completionPercent }}%</strong>
+            <small>This month</small>
+          </article>
+        </div>
+
+        @if (recentEntries.length) {
+          <div class="recent-heading">
+            <h4>Recent Entries</h4>
+          </div>
+          <div class="recent-list">
+            @for (entry of recentEntries; track entry.id) {
+              <button type="button" (click)="openEntryFromActivity(entry)">
                 <span>
-                  <strong>{{ assignment.template_name }}</strong>
-                  <small>Assigned {{ assignment.assigned_at | date: 'mediumDate' }} - {{ assignment.references.length }} references</small>
+                  <strong>{{ entry.template_name }}</strong>
+                  <small>{{ entry.entry_date | date: 'dd MMM yyyy' }}</small>
                 </span>
-                <span class="chevron">›</span>
-              </a>
-            } @empty {
-              <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start recording progress.</p>
+                <span class="chevron" aria-hidden="true">&rsaquo;</span>
+              </button>
             }
-          </div>
-
-          <div class="assign-row">
-            <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
-              <option [ngValue]="null">Select a template to assign</option>
-              @for (template of availableTemplates; track template.id) {
-                <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
-              }
-            </select>
-            <button type="button" class="primary-action" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
-              Assign Template
-            </button>
-          </div>
-        </article>
-      </div>
-
-      <div class="dashboard-right">
-        <article class="panel image-folder-panel">
-          <div class="panel-heading">
-            <div>
-              <h3>Optional Image Folder</h3>
-              <p>Images from intake forms and template check-ins collect here automatically.</p>
-            </div>
-            <span class="count-pill">{{ clientImages.length }} images</span>
-          </div>
-          <div class="image-folder-grid">
-            @for (image of clientImages; track image.value) {
-              <figure>
-                <img [src]="image.value" [alt]="image.label">
-                <figcaption>
-                  <strong>{{ image.label }}</strong>
-                  <span>{{ image.source }} @if (image.date) { - {{ image.date | date: 'mediumDate' }} }</span>
-                </figcaption>
-              </figure>
-            } @empty {
-              <p class="empty-note">No images yet. Add an optional image field to a client form or template.</p>
-            }
-          </div>
-        </article>
-
-        <article class="panel">
-          <h3>Intake Details</h3>
-          <p>Everything from the lead form and registration form in one place.</p>
-          <dl class="answer-grid">
-            @for (detail of intakeDetails; track detail.label) {
-              <div>
-                <dt>{{ detail.label }} <em>{{ detail.source === 'lead-form' ? 'lead form' : 'registration' }}</em></dt>
-                <dd>{{ detail.value }}</dd>
-              </div>
-            } @empty {
-              <p class="empty-note">No intake answers recorded.</p>
-            }
-          </dl>
-        </article>
-      </div>
-    </section>
-
-    <section class="panel entries-panel">
-      <div class="panel-heading">
-        <div>
-          <h3>Tracking Entries</h3>
-          <p>Everything {{ client.first_name }} submitted. You can correct any entry - edits are marked.</p>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Template</th>
-              <th>Values</th>
-              <th>Note</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (entry of entries; track entry.id) {
-              <tr>
-                <td>{{ entry.entry_date | date: 'mediumDate' }}</td>
-                <td>{{ entry.template_name }}</td>
-                <td class="values-cell">{{ answerPreview(entry) }}</td>
-                <td class="values-cell">{{ entry.note || '-' }}</td>
-                <td>
-                  @if (entry.edited_by_trainer) {
-                    <span class="edited-pill">Edited by you</span>
-                  } @else {
-                    <span class="client-pill">Client entry</span>
-                  }
-                </td>
-                <td>
-                  <button type="button" class="ghost-action compact" (click)="startEntryEdit(entry)">Edit</button>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="6">No entries yet. Entries appear here as soon as {{ client.first_name }} submits a check-in.</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel insights-panel">
-      <div class="panel-heading">
-        <div>
-          <h3>Insights</h3>
-          <p>How {{ client.first_name }} is doing, computed from their submitted entries.</p>
-        </div>
-      </div>
-
-      <div class="insights-grid">
-        <div class="insight-block">
-          <h4>Check-in consistency (last 30 days)</h4>
-          <div class="consistency-strip">
-            @for (day of consistencyDays; track day.date) {
-              <span class="day-dot" [class.filled]="day.hasEntry" [title]="day.date"></span>
-            }
-          </div>
-        </div>
-
-        @for (trend of numericTrends; track trend.key) {
-          <div class="insight-block">
-            <h4>{{ trend.label }}</h4>
-            <div class="trend-row">
-              <svg viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden="true">
-                <polyline [attr.points]="trend.points" />
-              </svg>
-              <div>
-                <strong>{{ trend.latest }}</strong>
-                <small [class.negative]="trend.change < 0">{{ trend.change > 0 ? '+' : '' }}{{ trend.change }} since first entry</small>
-              </div>
-            </div>
           </div>
         }
-      </div>
+      </section>
 
-      <div class="notes-timeline">
-        <h4>How {{ client.first_name }} is feeling</h4>
-        @for (entry of recentNotes; track entry.id) {
-          <div class="note-row">
-            <span>{{ entry.entry_date | date: 'mediumDate' }}</span>
-            <p>{{ entry.note }}</p>
-          </div>
-        } @empty {
-          <p class="empty-note">No notes yet. Client notes from check-ins show up here.</p>
-        }
-      </div>
-    </section>
-
-    <app-chat-panel
-      mode="trainer"
-      [clientId]="client.id"
-      [counterpartName]="client.first_name"
-      [description]="'Communicate with ' + client.first_name + ' about check-ins, forms, and next steps.'"
-    />
+      <app-chat-panel
+        mode="trainer"
+        [clientId]="client.id"
+        [counterpartName]="client.first_name"
+        [description]="'Communicate with ' + client.first_name + ' about check-ins and next steps.'"
+      />
+    </div>
 
     @if (isAccountDialogOpen) {
       <section class="dialog-backdrop" aria-labelledby="account-dialog-title">
@@ -290,99 +212,6 @@
           @if (resetPasswordResult) {
             <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
           }
-        </div>
-      </section>
-    }
-
-    @if (sharingAssignment; as sharing) {
-      <section class="dialog-backdrop" aria-labelledby="share-dialog-title">
-        <div class="dialog-panel">
-          <div class="dialog-header">
-            <div>
-              <h3 id="share-dialog-title">Share References - {{ sharing.template_name }}</h3>
-              <p>Pick only what {{ client.first_name }} needs for this template. You can change this anytime.</p>
-            </div>
-            <button type="button" class="icon-button" title="Close" (click)="closeShareDialog()">x</button>
-          </div>
-
-          <input
-            type="search"
-            class="reference-search"
-            placeholder="Search references..."
-            [(ngModel)]="referenceSearch"
-            name="shareReferenceSearch"
-          >
-
-          <div class="reference-picker">
-            @for (category of referenceCategories; track category.id) {
-              @if (referencesForCategory(category).length) {
-                <div class="picker-category">
-                  <h4>{{ category.name }}</h4>
-                  @for (reference of referencesForCategory(category); track reference.id) {
-                    <label class="picker-item">
-                      <input
-                        type="checkbox"
-                        [checked]="isSharedReference(reference)"
-                        (change)="toggleSharedReference(reference)"
-                      >
-                      <span>
-                        <strong>{{ reference.title }}</strong>
-                        <small>{{ reference.subcategory || reference.reference_type }}</small>
-                      </span>
-                    </label>
-                  }
-                </div>
-              }
-            } @empty {
-              <p class="empty-note">No references yet. Add resources in the References Library first.</p>
-            }
-          </div>
-
-          <div class="dialog-actions">
-            <span class="share-count">{{ shareSelectedIds.size }} selected</span>
-            <button type="button" class="ghost-action" (click)="closeShareDialog()">Cancel</button>
-            <button type="button" class="primary-action" [disabled]="isSavingShare" (click)="saveSharedReferences()">
-              {{ isSavingShare ? 'Saving...' : 'Share Selected' }}
-            </button>
-          </div>
-        </div>
-      </section>
-    }
-
-    @if (editingEntry) {
-      <section class="dialog-backdrop" aria-labelledby="entry-dialog-title">
-        <div class="dialog-panel">
-          <div class="dialog-header">
-            <div>
-              <h3 id="entry-dialog-title">Edit Entry - {{ editingEntry.template_name }}</h3>
-              <p>{{ editingEntry.entry_date | date: 'fullDate' }}</p>
-            </div>
-            <button type="button" class="icon-button" title="Close" (click)="cancelEntryEdit()">x</button>
-          </div>
-
-          <div class="entry-edit-grid">
-            @for (draft of entryDraftAnswers; track draft.key) {
-              <label>
-                <span>{{ draft.label }}</span>
-                @if (isImageValue(draft.value)) {
-                  <img [src]="draft.value" [alt]="draft.label" class="entry-image-preview">
-                } @else {
-                  <input type="text" [(ngModel)]="draft.value" [name]="'entryAnswer' + draft.key">
-                }
-              </label>
-            }
-            <label>
-              <span>Note</span>
-              <textarea rows="3" [(ngModel)]="entryDraftNote" name="entryNote"></textarea>
-            </label>
-          </div>
-
-          <div class="dialog-actions">
-            <button type="button" class="ghost-action" (click)="cancelEntryEdit()">Cancel</button>
-            <button type="button" class="primary-action" [disabled]="isSavingEntry" (click)="saveEntryEdit()">
-              {{ isSavingEntry ? 'Saving...' : 'Save Entry' }}
-            </button>
-          </div>
         </div>
       </section>
     }

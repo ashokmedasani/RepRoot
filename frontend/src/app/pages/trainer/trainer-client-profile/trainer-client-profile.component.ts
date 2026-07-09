@@ -1,18 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
   ClientAccessDetailResponse,
   ClientAccessRecord,
   FormsGroupsApiService
 } from '../../../core/api/forms-groups-api.service';
-import {
-  ReferenceCategoryRecord,
-  ReferencesApiService,
-  TrainerReferenceRecord
-} from '../../../core/api/references-api.service';
 import {
   TemplateAssignmentRecord,
   TemplatesApiService,
@@ -23,40 +18,6 @@ import { ChatPanelComponent } from '../../../shared/chat-panel/chat-panel.compon
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
 
-interface IntakeDetail {
-  label: string;
-  value: string;
-  source: 'registration' | 'lead-form';
-}
-
-interface EntryAnswerDraft {
-  key: string;
-  label: string;
-  value: string;
-}
-
-interface NumericTrend {
-  key: string;
-  label: string;
-  values: number[];
-  dates: string[];
-  latest: number;
-  change: number;
-  points: string;
-}
-
-interface ConsistencyDay {
-  date: string;
-  hasEntry: boolean;
-}
-
-interface ClientImageItem {
-  label: string;
-  source: string;
-  date?: string;
-  value: string;
-}
-
 @Component({
   selector: 'app-trainer-client-profile',
   standalone: true,
@@ -66,45 +27,33 @@ interface ClientImageItem {
 })
 export class TrainerClientProfileComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
-  private readonly referencesApi = inject(ReferencesApiService);
 
+  clientId = 0;
   profile: ClientAccessDetailResponse | null = null;
   isLoading = true;
   message = '';
   messageType: 'success' | 'error' = 'success';
   resetPasswordResult = '';
   isAccountDialogOpen = false;
-  trainerNotesDraft = '';
-  isSavingTrainerNotes = false;
+
+  trainerNotes = '';
+  notesUpdatedAt: string | null = null;
+  isEditingNotes = false;
+  notesDraft = '';
+  isSavingNotes = false;
 
   assignments: TemplateAssignmentRecord[] = [];
   templates: TrackingTemplateRecord[] = [];
   selectedTemplateId: number | null = null;
-  selectedAssignmentId: number | null = null;
   isAssigning = false;
 
-  referenceCategories: ReferenceCategoryRecord[] = [];
-  referenceLibrary: TrainerReferenceRecord[] = [];
-  sharingAssignment: TemplateAssignmentRecord | null = null;
-  shareSelectedIds = new Set<number>();
-  referenceSearch = '';
-  isSavingShare = false;
-
   entries: TrackingEntryRecord[] = [];
-  editingEntry: TrackingEntryRecord | null = null;
-  entryDraftAnswers: EntryAnswerDraft[] = [];
-  entryDraftNote = '';
-  isSavingEntry = false;
-
-  intakeDetails: IntakeDetail[] = [];
-  numericTrends: NumericTrend[] = [];
-  consistencyDays: ConsistencyDay[] = [];
-  recentNotes: TrackingEntryRecord[] = [];
-  clientImages: ClientImageItem[] = [];
 
   ngOnInit(): void {
+    this.clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.loadProfile();
   }
 
@@ -117,23 +66,27 @@ export class TrainerClientProfileComponent implements OnInit {
     return this.templates.filter((template) => !assignedIds.has(template.id));
   }
 
-  get selectedAssignment(): TemplateAssignmentRecord | null {
-    return this.assignments.find((assignment) => assignment.id === this.selectedAssignmentId) || this.assignments[0] || null;
-  }
-
-  get selectedTemplate(): TrackingTemplateRecord | null {
-    const assignment = this.selectedAssignment;
-    return assignment ? this.templates.find((template) => template.id === assignment.template_id) || null : null;
-  }
-
-  get selectedAssignmentEntries(): TrackingEntryRecord[] {
-    const assignment = this.selectedAssignment;
-    return assignment ? this.entries.filter((entry) => entry.template === assignment.template_id).slice(0, 5) : [];
-  }
-
   initials(client: ClientAccessRecord): string {
     return initialsFor(client.first_name, client.last_name);
   }
+
+  contactValue(keywords: string[]): string {
+    const sources = [this.client?.registration_answers || {}, this.profile?.lead_submission?.answers || {}];
+
+    for (const source of sources) {
+      for (const [key, value] of Object.entries(source)) {
+        const normalizedKey = key.toLowerCase();
+
+        if (keywords.some((keyword) => normalizedKey.includes(keyword)) && String(value ?? '').trim()) {
+          return String(value).trim();
+        }
+      }
+    }
+
+    return '';
+  }
+
+  // ----- account dialog -----
 
   openAccountDialog(): void {
     this.isAccountDialogOpen = true;
@@ -170,23 +123,57 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  assignTemplate(): void {
-    const client = this.client;
+  // ----- trainer notes -----
 
-    if (!client || !this.selectedTemplateId || this.isAssigning) {
+  startEditNotes(): void {
+    this.notesDraft = this.trainerNotes;
+    this.isEditingNotes = true;
+  }
+
+  cancelEditNotes(): void {
+    this.isEditingNotes = false;
+  }
+
+  saveNotes(): void {
+    if (!this.client || this.isSavingNotes) {
+      return;
+    }
+
+    this.isSavingNotes = true;
+    this.formsGroupsApi.saveTrainerNotes(this.clientId, this.notesDraft.trim()).subscribe({
+      next: (response) => {
+        this.trainerNotes = response.trainer_notes;
+        this.notesUpdatedAt = response.trainer_notes_updated_at;
+        this.isEditingNotes = false;
+        this.isSavingNotes = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Notes could not be saved.');
+        this.isSavingNotes = false;
+      }
+    });
+  }
+
+  // ----- assignments -----
+
+  openTemplatePage(assignment: TemplateAssignmentRecord, extras: Record<string, string> = {}): void {
+    void this.router.navigate(['/trainer/clients', this.clientId, 'templates', assignment.id], {
+      queryParams: extras
+    });
+  }
+
+  assignTemplate(): void {
+    if (!this.client || !this.selectedTemplateId || this.isAssigning) {
       return;
     }
 
     this.isAssigning = true;
-    this.templatesApi.assignTemplate(client.id, this.selectedTemplateId).subscribe({
+    this.templatesApi.assignTemplate(this.clientId, this.selectedTemplateId).subscribe({
       next: (response) => {
-        this.messageType = 'success';
-        this.message = response.message;
-        this.selectedTemplateId = null;
-        this.selectedAssignmentId = response.assignment.id;
         this.isAssigning = false;
-        this.loadAssignments(client.id);
-        this.openShareDialog(response.assignment);
+        this.selectedTemplateId = null;
+        this.openTemplatePage(response.assignment, { share: '1' });
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -196,79 +183,8 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  openShareDialog(assignment: TemplateAssignmentRecord): void {
-    this.sharingAssignment = assignment;
-    this.shareSelectedIds = new Set((assignment.references || []).map((reference) => reference.id));
-    this.referenceSearch = '';
-  }
-
-  closeShareDialog(): void {
-    this.sharingAssignment = null;
-    this.shareSelectedIds = new Set<number>();
-  }
-
-  toggleSharedReference(reference: TrainerReferenceRecord): void {
-    if (this.shareSelectedIds.has(reference.id)) {
-      this.shareSelectedIds.delete(reference.id);
-    } else {
-      this.shareSelectedIds.add(reference.id);
-    }
-  }
-
-  isSharedReference(reference: TrainerReferenceRecord): boolean {
-    return this.shareSelectedIds.has(reference.id);
-  }
-
-  get filteredReferenceLibrary(): TrainerReferenceRecord[] {
-    const search = this.referenceSearch.trim().toLowerCase();
-
-    if (!search) {
-      return this.referenceLibrary;
-    }
-
-    return this.referenceLibrary.filter((reference) =>
-      [reference.title, reference.category_name, reference.subcategory, reference.tags.join(' ')]
-        .join(' ')
-        .toLowerCase()
-        .includes(search)
-    );
-  }
-
-  referencesForCategory(category: ReferenceCategoryRecord): TrainerReferenceRecord[] {
-    return this.filteredReferenceLibrary.filter((reference) => reference.category === category.id);
-  }
-
-  saveSharedReferences(): void {
-    const client = this.client;
-    const assignment = this.sharingAssignment;
-
-    if (!client || !assignment || this.isSavingShare) {
-      return;
-    }
-
-    this.isSavingShare = true;
-    this.templatesApi.updateAssignmentReferences(client.id, assignment.id, Array.from(this.shareSelectedIds)).subscribe({
-      next: (response) => {
-        this.messageType = 'success';
-        this.message = response.message;
-        this.isSavingShare = false;
-        this.closeShareDialog();
-        this.loadAssignments(client.id);
-      },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Shared references could not be updated.');
-        this.isSavingShare = false;
-      }
-    });
-  }
-
-  unassignTemplate(assignment: TemplateAssignmentRecord): void {
-    const client = this.client;
-
-    if (!client) {
-      return;
-    }
+  unassignTemplate(assignment: TemplateAssignmentRecord, event: Event): void {
+    event.stopPropagation();
 
     const confirmed = window.confirm(
       `Remove ${assignment.template_name} from this client? Past entries are kept, so nothing is lost.`
@@ -278,14 +194,11 @@ export class TrainerClientProfileComponent implements OnInit {
       return;
     }
 
-    this.templatesApi.unassignTemplate(client.id, assignment.id).subscribe({
+    this.templatesApi.unassignTemplate(this.clientId, assignment.id).subscribe({
       next: (response) => {
         this.messageType = 'success';
         this.message = response.message;
-        if (this.selectedAssignmentId === assignment.id) {
-          this.selectedAssignmentId = null;
-        }
-        this.loadAssignments(client.id);
+        this.loadAssignments();
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -294,110 +207,65 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  startEntryEdit(entry: TrackingEntryRecord): void {
-    this.editingEntry = entry;
-    this.entryDraftNote = entry.note;
-    this.entryDraftAnswers = Object.entries(entry.answers || {}).map(([key, value]) => ({
-      key,
-      label: this.fieldLabelFor(entry, key),
-      value: String(value ?? '')
-    }));
+  // ----- activity -----
+
+  get entriesThisMonth(): number {
+    const monthPrefix = this.todayIso().slice(0, 7);
+    return this.entries.filter((entry) => entry.entry_date.startsWith(monthPrefix)).length;
   }
 
-  cancelEntryEdit(): void {
-    this.editingEntry = null;
-    this.entryDraftAnswers = [];
-    this.entryDraftNote = '';
+  get lastEntry(): TrackingEntryRecord | null {
+    return this.entries.length ? this.entries[0] : null;
   }
 
-  saveEntryEdit(): void {
-    const entry = this.editingEntry;
-    const client = this.client;
+  get streak(): number {
+    const entryDates = new Set(this.entries.map((entry) => entry.entry_date));
+    let streak = 0;
+    const cursor = new Date();
 
-    if (!entry || !client || this.isSavingEntry) {
-      return;
+    if (!entryDates.has(this.todayIso())) {
+      cursor.setDate(cursor.getDate() - 1);
     }
 
-    const answers: Record<string, string> = {};
-
-    for (const draft of this.entryDraftAnswers) {
-      answers[draft.key] = draft.value;
+    while (entryDates.has(cursor.toISOString().slice(0, 10))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
     }
 
-    this.isSavingEntry = true;
-    this.templatesApi.updateEntry(entry.id, { answers, note: this.entryDraftNote }).subscribe({
-      next: (response) => {
-        this.messageType = 'success';
-        this.message = response.message;
-        this.isSavingEntry = false;
-        this.cancelEntryEdit();
-        this.loadEntries(client.id);
-      },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Entry could not be updated.');
-        this.isSavingEntry = false;
-      }
-    });
+    return streak;
   }
 
-  fieldLabelFor(entry: TrackingEntryRecord, key: string): string {
-    const template = this.templates.find((item) => item.id === entry.template);
-    const field = template?.fields.find((item) => item.key === key);
+  get completionPercent(): number {
+    const dayOfMonth = new Date().getDate();
+    const monthPrefix = this.todayIso().slice(0, 7);
+    const daysWithEntries = new Set(
+      this.entries.filter((entry) => entry.entry_date.startsWith(monthPrefix)).map((entry) => entry.entry_date)
+    ).size;
 
-    return field?.label || key.replace(/_/g, ' ');
+    return Math.min(100, Math.round((daysWithEntries / dayOfMonth) * 100));
   }
 
-  answerPreview(entry: TrackingEntryRecord): string {
-    const values = Object.values(entry.answers || {})
-      .map((value) => String(value ?? '').trim())
-      .filter((value) => value && !value.startsWith('data:image'));
-
-    return values.slice(0, 3).join(' | ') || 'No values recorded';
+  get recentEntries(): TrackingEntryRecord[] {
+    return this.entries.slice(0, 3);
   }
 
-  isImageValue(value: string): boolean {
-    return value.startsWith('data:image');
-  }
+  openEntryFromActivity(entry: TrackingEntryRecord): void {
+    const assignment = this.assignments.find((item) => item.template_id === entry.template);
 
-  selectAssignment(assignment: TemplateAssignmentRecord): void {
-    this.selectedAssignmentId = assignment.id;
-  }
-
-  saveTrainerNotes(): void {
-    const client = this.client;
-
-    if (!client || this.isSavingTrainerNotes) {
-      return;
+    if (assignment) {
+      this.openTemplatePage(assignment, { tab: 'entries' });
     }
-
-    this.isSavingTrainerNotes = true;
-    this.formsGroupsApi.updateClientTrainerNotes(client.id, this.trainerNotesDraft).subscribe({
-      next: (response) => {
-        client.trainer_notes = response.client.trainer_notes;
-        this.trainerNotesDraft = response.client.trainer_notes || '';
-        this.messageType = 'success';
-        this.message = response.message;
-        this.isSavingTrainerNotes = false;
-      },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Private trainer notes could not be saved.');
-        this.isSavingTrainerNotes = false;
-      }
-    });
   }
+
+  // ----- loading -----
 
   private loadProfile(): void {
-    const clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.isLoading = true;
-
-    this.formsGroupsApi.getClientProfile(clientId).subscribe({
+    this.formsGroupsApi.getClientProfile(this.clientId).subscribe({
       next: (profile) => {
         this.profile = profile;
-        this.trainerNotesDraft = profile.client.trainer_notes || '';
-        this.buildIntakeDetails(profile);
-        this.buildClientImages();
+        this.trainerNotes = profile.trainer_notes || '';
+        this.notesUpdatedAt = profile.trainer_notes_updated_at;
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -409,49 +277,15 @@ export class TrainerClientProfileComponent implements OnInit {
     this.templatesApi.getTemplates().subscribe({
       next: (response) => {
         this.templates = response.templates;
-        this.buildInsights();
-        this.buildClientImages();
       },
       error: () => {
         this.templates = [];
       }
     });
-    this.loadAssignments(clientId);
-    this.loadEntries(clientId);
-    this.loadReferenceLibrary();
-  }
-
-  private loadReferenceLibrary(): void {
-    this.referencesApi.getCategories().subscribe({
-      next: (response) => (this.referenceCategories = response.categories),
-      error: () => (this.referenceCategories = [])
-    });
-    this.referencesApi.getReferences().subscribe({
-      next: (response) => (this.referenceLibrary = response.references),
-      error: () => (this.referenceLibrary = [])
-    });
-  }
-
-  private loadAssignments(clientId: number): void {
-    this.templatesApi.getAssignments(clientId).subscribe({
-      next: (response) => {
-        this.assignments = response.assignments;
-        if (!this.selectedAssignmentId && this.assignments.length) {
-          this.selectedAssignmentId = this.assignments[0].id;
-        }
-      },
-      error: () => {
-        this.assignments = [];
-      }
-    });
-  }
-
-  private loadEntries(clientId: number): void {
-    this.templatesApi.getClientEntries(clientId).subscribe({
+    this.loadAssignments();
+    this.templatesApi.getClientEntries(this.clientId).subscribe({
       next: (response) => {
         this.entries = response.entries;
-        this.buildInsights();
-        this.buildClientImages();
       },
       error: () => {
         this.entries = [];
@@ -459,152 +293,18 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  private buildIntakeDetails(profile: ClientAccessDetailResponse): void {
-    const details: IntakeDetail[] = [];
-    const seenKeys = new Set<string>();
-
-    for (const field of profile.registration_fields) {
-      const key = field.key || field.label;
-      const value = profile.client.registration_answers?.[key];
-      seenKeys.add(key);
-      details.push({
-        label: field.label,
-        value: this.formatIntakeValue(value),
-        source: 'registration'
-      });
-    }
-
-    for (const [key, value] of Object.entries(profile.lead_submission.answers || {})) {
-      if (seenKeys.has(key)) {
-        continue;
+  private loadAssignments(): void {
+    this.templatesApi.getAssignments(this.clientId).subscribe({
+      next: (response) => {
+        this.assignments = response.assignments;
+      },
+      error: () => {
+        this.assignments = [];
       }
-
-      details.push({
-        label: key.replace(/_/g, ' '),
-        value: this.formatIntakeValue(value),
-        source: 'lead-form'
-      });
-    }
-
-    this.intakeDetails = details;
+    });
   }
 
-  private formatIntakeValue(value: unknown): string {
-    const text = value ? String(value) : '';
-    return text.startsWith('data:image') ? 'Saved in Image Folder' : text || 'Not added';
-  }
-
-  private buildClientImages(): void {
-    const images: ClientImageItem[] = [];
-
-    if (this.profile) {
-      for (const field of this.profile.registration_fields) {
-        const key = field.key || field.label;
-        const value = String(this.profile.client.registration_answers?.[key] || '');
-
-        if (this.isImageValue(value)) {
-          images.push({ label: field.label, source: 'Registration form', value });
-        }
-      }
-
-      for (const [key, rawValue] of Object.entries(this.profile.lead_submission.answers || {})) {
-        const value = String(rawValue || '');
-
-        if (this.isImageValue(value)) {
-          images.push({ label: key.replace(/_/g, ' '), source: 'Lead form', value });
-        }
-      }
-    }
-
-    for (const entry of this.entries) {
-      for (const [key, rawValue] of Object.entries(entry.answers || {})) {
-        const value = String(rawValue || '');
-
-        if (this.isImageValue(value)) {
-          images.push({
-            label: this.fieldLabelFor(entry, key),
-            source: entry.template_name,
-            date: entry.entry_date,
-            value
-          });
-        }
-      }
-    }
-
-    this.clientImages = images;
-  }
-
-  private buildInsights(): void {
-    this.buildNumericTrends();
-    this.buildConsistency();
-    this.recentNotes = this.entries.filter((entry) => entry.note.trim()).slice(0, 6);
-  }
-
-  private buildNumericTrends(): void {
-    const series = new Map<string, { label: string; points: { date: string; value: number }[] }>();
-    const sortedEntries = [...this.entries].sort((first, second) => first.entry_date.localeCompare(second.entry_date));
-
-    for (const entry of sortedEntries) {
-      for (const [key, rawValue] of Object.entries(entry.answers || {})) {
-        const value = Number(String(rawValue).trim());
-
-        if (!String(rawValue).trim() || Number.isNaN(value)) {
-          continue;
-        }
-
-        const existing = series.get(key) || { label: this.fieldLabelFor(entry, key), points: [] };
-        existing.points.push({ date: entry.entry_date, value });
-        series.set(key, existing);
-      }
-    }
-
-    this.numericTrends = Array.from(series.entries())
-      .filter(([, data]) => data.points.length >= 2)
-      .map(([key, data]) => {
-        const values = data.points.map((point) => point.value);
-
-        return {
-          key,
-          label: data.label,
-          values,
-          dates: data.points.map((point) => point.date),
-          latest: values[values.length - 1],
-          change: Number((values[values.length - 1] - values[0]).toFixed(2)),
-          points: this.sparklinePoints(values)
-        };
-      })
-      .slice(0, 6);
-  }
-
-  private buildConsistency(): void {
-    const entryDates = new Set(this.entries.map((entry) => entry.entry_date));
-    const days: ConsistencyDay[] = [];
-    const today = new Date();
-
-    for (let offset = 29; offset >= 0; offset -= 1) {
-      const day = new Date(today);
-      day.setDate(today.getDate() - offset);
-      const isoDate = day.toISOString().slice(0, 10);
-      days.push({ date: isoDate, hasEntry: entryDates.has(isoDate) });
-    }
-
-    this.consistencyDays = days;
-  }
-
-  private sparklinePoints(values: number[]): string {
-    const width = 120;
-    const height = 34;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-
-    return values
-      .map((value, index) => {
-        const x = values.length > 1 ? (index / (values.length - 1)) * width : width / 2;
-        const y = height - 3 - ((value - min) / range) * (height - 6);
-
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
+  private todayIso(): string {
+    return new Date().toISOString().slice(0, 10);
   }
 }

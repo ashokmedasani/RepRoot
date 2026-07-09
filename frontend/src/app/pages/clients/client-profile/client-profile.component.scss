@@ -38,7 +38,7 @@
 .profile-card,
 .portal-card {
   border: 1px solid var(--app-border);
-  border-radius: 0.85rem;
+  border-radius: var(--app-panel-radius);
   padding: 1.25rem;
   background: var(--app-surface);
   box-shadow: var(--app-shadow);

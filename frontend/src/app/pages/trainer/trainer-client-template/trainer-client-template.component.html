@@ -1,0 +1,340 @@
+<app-trainer-page-shell
+  [title]="assignment?.template_name || 'Template'"
+  [subtitle]="assignment ? 'Assigned on ' + (assignment.assigned_at | date: 'dd MMM yyyy') : 'Loading template.'"
+  activeSection="clients"
+  maxWidth="80rem"
+  titleId="client-template-title"
+>
+  <button page-actions type="button" class="ghost-action" (click)="goBack()" aria-label="Back">&#8592; Back</button>
+  <button page-actions type="button" class="secondary-action" (click)="openShareDialog()">Share References</button>
+  <button page-actions type="button" class="primary-action" (click)="openAddEntry()">Start New Entry</button>
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (isLoading) {
+    <section class="panel">
+      <p>Loading template details...</p>
+    </section>
+  } @else if (assignment && client) {
+    <section class="panel detail-panel">
+      <nav class="detail-tabs" aria-label="Template sections">
+        <button type="button" [class.active]="detailTab === 'overview'" (click)="setDetailTab('overview')">Overview</button>
+        <button type="button" [class.active]="detailTab === 'entries'" (click)="setDetailTab('entries')">Data Entries</button>
+        <button type="button" [class.active]="detailTab === 'progress'" (click)="setDetailTab('progress')">Progress</button>
+      </nav>
+
+      @if (detailTab === 'overview') {
+        <div class="detail-section">
+          <h3>Assigned References</h3>
+          <div class="reference-cards">
+            @for (reference of assignment.references; track reference.id) {
+              <article class="reference-card">
+                <span class="ref-icon" [attr.data-kind]="reference.reference_type" aria-hidden="true">
+                  @if (reference.reference_type === 'video_link') {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.5 9.2v5.6l4.8-2.8Z"/></svg>
+                  } @else if (reference.reference_type === 'image') {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5 10 13l3.5 3 3-2.5 3 3"/></svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h8l4 4V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M14 2.5V7h4.5M8.5 12h7M8.5 16h7"/></svg>
+                  }
+                </span>
+                <div>
+                  <strong>{{ reference.title }}</strong>
+                  <small>{{ referenceTypeLabel(reference.reference_type) }}</small>
+                </div>
+              </article>
+            } @empty {
+              <p class="empty-note">No references shared yet. Use "Share References" to pick what {{ client.first_name }} needs.</p>
+            }
+          </div>
+        </div>
+
+        @if (template?.purpose) {
+          <div class="detail-section">
+            <h3>Template Notes</h3>
+            <p class="template-notes">{{ template?.purpose }}</p>
+          </div>
+        }
+
+        <div class="detail-section">
+          <h3>Template Structure <small>({{ template?.fields?.length || 0 }} fields)</small></h3>
+          <div class="structure-list">
+            @for (field of template?.fields || []; track field.key || field.label) {
+              <div class="structure-row">
+                <span>{{ field.label }}</span>
+                <small>{{ field.field_type === 'number' ? 'Number' : field.field_type === 'yes_no' ? 'Yes / No' : field.field_type === 'image' ? 'Image' : 'Text' }}</small>
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (trendRows.length) {
+          <div class="detail-section">
+            <h3>Daily Values <small>Today, {{ today | date: 'dd MMM yyyy' }}</small></h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Today's Entry</th>
+                    <th>Last 7 Days Trend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of trendRows; track row.label) {
+                    <tr>
+                      <td>{{ row.label }}</td>
+                      <td class="today-value">{{ row.today }}</td>
+                      <td>
+                        @if (row.hasTrend) {
+                          <svg class="sparkline" viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden="true">
+                            <polyline [attr.points]="row.points" />
+                          </svg>
+                        } @else {
+                          <small class="empty-note">Not enough data</small>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      }
+
+      @if (detailTab === 'entries') {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Values</th>
+                <th>Note</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of templateEntries; track entry.id) {
+                <tr>
+                  <td>{{ entry.entry_date | date: 'dd MMM yyyy' }}</td>
+                  <td class="values-cell">{{ answerPreview(entry) }}</td>
+                  <td class="values-cell">{{ entry.note || '-' }}</td>
+                  <td>
+                    @if (entry.edited_by_trainer) {
+                      <span class="edited-pill">By trainer</span>
+                    } @else {
+                      <span class="client-pill">Client</span>
+                    }
+                  </td>
+                  <td>
+                    <button type="button" class="ghost-action compact" (click)="startEntryEdit(entry)">Edit</button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5">No entries for this template yet.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      @if (detailTab === 'progress') {
+        <div class="detail-section">
+          <h3>Check-in consistency <small>(last 30 days)</small></h3>
+          <div class="consistency-strip">
+            @for (day of consistencyDays; track day.date) {
+              <span class="day-dot" [class.filled]="day.hasEntry" [title]="day.date"></span>
+            }
+          </div>
+        </div>
+
+        <div class="insights-grid">
+          @for (trend of numericTrends; track trend.key) {
+            <div class="insight-block">
+              <h4>{{ trend.label }}</h4>
+              <div class="trend-row">
+                <svg viewBox="0 0 120 34" preserveAspectRatio="none" aria-hidden="true">
+                  <polyline [attr.points]="trend.points" />
+                </svg>
+                <div>
+                  <strong>{{ trend.latest }}</strong>
+                  <small [class.negative]="trend.change < 0">{{ trend.change > 0 ? '+' : '' }}{{ trend.change }}</small>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <p class="empty-note">Number fields will chart here once {{ client.first_name }} submits a few entries.</p>
+          }
+        </div>
+
+        <div class="detail-section">
+          <h3>How {{ client.first_name }} is feeling</h3>
+          <div class="notes-timeline">
+            @for (entry of recentNotes; track entry.id) {
+              <div class="note-row">
+                <span>{{ entry.entry_date | date: 'dd MMM' }}</span>
+                <p>{{ entry.note }}</p>
+              </div>
+            } @empty {
+              <p class="empty-note">Client notes from check-ins show up here.</p>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    @if (isShareDialogOpen) {
+      <section class="dialog-backdrop" aria-labelledby="share-dialog-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <div>
+              <h3 id="share-dialog-title">Share References - {{ assignment.template_name }}</h3>
+              <p>Pick only what {{ client.first_name }} needs. You can change this anytime.</p>
+            </div>
+            <button type="button" class="icon-button" title="Close" (click)="closeShareDialog()">x</button>
+          </div>
+
+          <input
+            type="search"
+            class="reference-search"
+            placeholder="Search references..."
+            [(ngModel)]="referenceSearch"
+            name="shareReferenceSearch"
+          >
+
+          <div class="reference-picker">
+            @for (category of referenceCategories; track category.id) {
+              @if (referencesForCategory(category).length) {
+                <div class="picker-category">
+                  <h4>{{ category.name }}</h4>
+                  @for (reference of referencesForCategory(category); track reference.id) {
+                    <label class="picker-item">
+                      <input
+                        type="checkbox"
+                        [checked]="isSharedReference(reference)"
+                        (change)="toggleSharedReference(reference)"
+                      >
+                      <span>
+                        <strong>{{ reference.title }}</strong>
+                        <small>{{ reference.subcategory || reference.reference_type }}</small>
+                      </span>
+                    </label>
+                  }
+                </div>
+              }
+            } @empty {
+              <p class="empty-note">No references yet. Add resources in the References Library first.</p>
+            }
+          </div>
+
+          <div class="dialog-actions">
+            <span class="share-count">{{ shareSelectedIds.size }} selected</span>
+            <button type="button" class="ghost-action" (click)="closeShareDialog()">Cancel</button>
+            <button type="button" class="primary-action" [disabled]="isSavingShare" (click)="saveSharedReferences()">
+              {{ isSavingShare ? 'Saving...' : 'Share Selected' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (isAddEntryOpen) {
+      <section class="dialog-backdrop" aria-labelledby="add-entry-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <div>
+              <h3 id="add-entry-title">New Entry - {{ assignment.template_name }}</h3>
+              <p>Record an entry on behalf of {{ client.first_name }}. It is marked as recorded by you.</p>
+            </div>
+            <button type="button" class="icon-button" title="Close" (click)="closeAddEntry()">x</button>
+          </div>
+
+          <div class="entry-edit-grid">
+            <label>
+              <span>Entry date</span>
+              <input type="date" [(ngModel)]="addEntryDate" name="addEntryDate">
+            </label>
+            @for (field of template?.fields || []; track field.key || field.label) {
+              @if (field.field_type !== 'image') {
+                <label>
+                  <span>{{ field.label }}</span>
+                  @if (field.field_type === 'long_text') {
+                    <textarea rows="2" [(ngModel)]="addEntryAnswers[detailFieldKey(field)]" [name]="'add' + detailFieldKey(field)"></textarea>
+                  } @else if (field.field_type === 'yes_no') {
+                    <select [(ngModel)]="addEntryAnswers[detailFieldKey(field)]" [name]="'add' + detailFieldKey(field)">
+                      <option value="">Choose</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  } @else {
+                    <input [type]="field.field_type === 'number' ? 'number' : 'text'" [(ngModel)]="addEntryAnswers[detailFieldKey(field)]" [name]="'add' + detailFieldKey(field)">
+                  }
+                </label>
+              }
+            }
+            <label>
+              <span>Note</span>
+              <textarea rows="2" [(ngModel)]="addEntryNote" name="addEntryNote"></textarea>
+            </label>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="ghost-action" (click)="closeAddEntry()">Cancel</button>
+            <button type="button" class="primary-action" [disabled]="isSavingEntry" (click)="saveAddEntry()">
+              {{ isSavingEntry ? 'Saving...' : 'Save Entry' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+
+    @if (editingEntry) {
+      <section class="dialog-backdrop" aria-labelledby="entry-dialog-title">
+        <div class="dialog-panel">
+          <div class="dialog-header">
+            <div>
+              <h3 id="entry-dialog-title">Edit Entry - {{ editingEntry.template_name }}</h3>
+              <p>{{ editingEntry.entry_date | date: 'fullDate' }}</p>
+            </div>
+            <button type="button" class="icon-button" title="Close" (click)="cancelEntryEdit()">x</button>
+          </div>
+
+          <div class="entry-edit-grid">
+            @for (draft of entryDraftAnswers; track draft.key) {
+              <label>
+                <span>{{ draft.label }}</span>
+                @if (isImageValue(draft.value)) {
+                  <img [src]="draft.value" [alt]="draft.label" class="entry-image-preview">
+                } @else {
+                  <input type="text" [(ngModel)]="draft.value" [name]="'entryAnswer' + draft.key">
+                }
+              </label>
+            }
+            <label>
+              <span>Note</span>
+              <textarea rows="3" [(ngModel)]="entryDraftNote" name="entryNote"></textarea>
+            </label>
+          </div>
+
+          <div class="dialog-actions">
+            <button type="button" class="ghost-action" (click)="cancelEntryEdit()">Cancel</button>
+            <button type="button" class="primary-action" [disabled]="isSavingEntry" (click)="saveEntryEdit()">
+              {{ isSavingEntry ? 'Saving...' : 'Save Entry' }}
+            </button>
+          </div>
+        </div>
+      </section>
+    }
+  } @else {
+    <section class="panel error-panel">
+      <p>{{ message || 'Template assignment not found.' }}</p>
+      <a [routerLink]="['/trainer/clients', clientId]" class="secondary-action">Back to Client Profile</a>
+    </section>
+  }
+</app-trainer-page-shell>

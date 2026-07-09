@@ -2,96 +2,132 @@
   display: block;
 }
 
-.trainer-shell {
+.app-shell {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--app-primary-soft) 36%, transparent), transparent 32rem),
-    var(--app-bg);
+  background: var(--app-bg);
 }
 
-.trainer-topbar {
+.sidebar {
   position: sticky;
   top: 0;
-  z-index: 10;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  border-bottom: 1px solid var(--app-border);
-  padding: 0.85rem var(--app-page-gutter);
-  background: color-mix(in srgb, var(--app-surface) 94%, transparent);
-  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  height: 100vh;
+  border-right: 1px solid var(--app-border);
+  padding: 1.1rem 0.85rem;
+  background: var(--app-surface);
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.25rem 0.5rem;
   color: var(--app-text);
-  font-size: 1.15rem;
+  font-size: 1.08rem;
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.brand-mark {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
+.brand-mark svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 nav {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
-nav a,
-nav span {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 0.72rem 0.95rem;
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border-radius: var(--app-radius-sm);
+  padding: 0.58rem 0.7rem;
   color: var(--app-muted);
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
 
-nav .active {
+.nav-item svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
+.nav-item:hover {
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+}
+
+.nav-item.active {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
 }
 
-.nav-action {
-  flex: 0 0 auto;
-  min-height: 2.55rem;
+.signout {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   border: 1px solid var(--app-border);
-  border-radius: 999px;
-  padding: 0 0.95rem;
+  border-radius: var(--app-radius-sm);
+  padding: 0.58rem 0.7rem;
   background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.signout svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.signout:hover {
   color: var(--app-text);
-  font-size: 0.88rem;
-  font-weight: 700;
+  background: var(--app-surface-soft);
+}
+
+.shell-main {
+  min-width: 0;
 }
 
 .trainer-workspace {
-  width: min(calc(100% - (var(--app-page-gutter) * 2)), var(--trainer-shell-max-width));
+  width: min(100%, var(--trainer-shell-max-width));
   margin: 0 auto;
-  padding: 1.5rem 0;
-  flex: 1;
+  padding: 1.35rem 1.5rem 2rem;
 }
 
 .trainer-page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem 1.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.trainer-page-header > div:first-child {
-  min-width: 0;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
 }
 
 .eyebrow {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.3rem;
   color: var(--app-primary-strong);
   font-size: var(--app-eyebrow-size);
   font-weight: 700;
@@ -108,14 +144,15 @@ h1 {
   color: var(--app-text);
   font-size: var(--app-h1-page);
   font-weight: 700;
-  line-height: 1.12;
+  line-height: 1.15;
   letter-spacing: var(--app-tracking-tight);
 }
 
 .page-subtitle {
-  margin-top: 0.35rem;
+  margin-top: 0.3rem;
   color: var(--app-muted);
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 500;
   line-height: 1.5;
 }
 
@@ -123,20 +160,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.trainer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  border-top: 1px solid var(--app-border);
-  padding: 1rem var(--app-page-gutter);
-  color: var(--app-muted);
-  font-size: 0.82rem;
-  font-weight: 700;
+  gap: 0.6rem;
 }
 
 button:disabled {
@@ -144,30 +168,46 @@ button:disabled {
   opacity: 0.68;
 }
 
-@media (max-width: 980px) {
-  .trainer-topbar {
-    grid-template-columns: 1fr auto;
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    z-index: 10;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    gap: 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+    padding: 0.6rem 0.85rem;
   }
 
   nav {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-    order: 3;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .nav-item span,
+  .signout span {
+    display: none;
+  }
+
+  .nav-item,
+  .signout {
+    padding: 0.55rem;
   }
 }
 
 @media (max-width: 680px) {
-  .trainer-topbar,
-  .trainer-footer {
+  .trainer-workspace {
     padding-inline: 1rem;
   }
 
-  .trainer-workspace {
-    width: calc(100% - 2rem);
-  }
-
-  .trainer-page-header,
-  .trainer-footer {
+  .trainer-page-header {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -175,9 +215,6 @@ button:disabled {
   .page-actions {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  h1 {
-    font-size: 1.85rem;
+    flex-wrap: wrap;
   }
 }
