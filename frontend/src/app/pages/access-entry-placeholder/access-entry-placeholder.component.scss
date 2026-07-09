@@ -1,8 +1,8 @@
 .access-shell {
   min-height: 100vh;
-  width: min(1040px, calc(100% - 2rem));
+  width: min(1040px, calc(100% - (var(--app-page-gutter) * 2)));
   margin: 0 auto;
-  padding: 5rem 0 3rem;
+  padding: clamp(4.5rem, 8vh, 6rem) 0 3rem;
   position: relative;
 }
 
@@ -23,7 +23,7 @@
 
 .access-header {
   max-width: 740px;
-  padding: 1rem 0 2rem;
+  padding: 1rem 0 clamp(1.25rem, 4vw, 2rem);
 }
 
 .eyebrow {
@@ -38,10 +38,10 @@
 h1 {
   margin: 0 0 1rem;
   color: var(--app-text);
-  font-size: var(--app-h1-hero);
+  font-size: clamp(2.1rem, 4vw, 3.6rem);
   font-weight: 800;
   line-height: 1.05;
-  letter-spacing: var(--app-tracking-tight);
+  letter-spacing: 0;
 }
 
 h2,
@@ -72,7 +72,7 @@ small {
 
 .entry-card {
   display: grid;
-  min-height: 15rem;
+  min-height: 11.5rem;
   gap: 0.8rem;
   align-content: start;
   justify-items: start;
@@ -116,7 +116,22 @@ small {
 }
 
 @media (max-width: 760px) {
+  .access-shell {
+    width: calc(100% - 2rem);
+    padding-top: 5.25rem;
+  }
+
+  .back-link {
+    right: auto;
+    left: 0;
+  }
+
   .entry-grid {
     grid-template-columns: 1fr;
+  }
+
+  .entry-card {
+    min-height: 0;
+    padding: 1.25rem;
   }
 }

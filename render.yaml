@@ -1,7 +1,13 @@
+databases:
+  - name: fitness-app-db
+    plan: free
+    databaseName: fitness_app
+    user: fitness_app
+
 services:
   - type: web
     name: fitness-app-backend
-    env: python
+    runtime: python
     rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -13,13 +19,26 @@ services:
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
-        sync: false
+        fromService:
+          type: web
+          name: fitness-app-backend
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
       - key: CORS_ALLOWED_ORIGINS
         sync: false
       - key: CSRF_TRUSTED_ORIGINS
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: fitness-app-db
+          property: connectionString
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "True"
+      - key: DJANGO_SESSION_COOKIE_SECURE
+        value: "True"
+      - key: DJANGO_CSRF_COOKIE_SECURE
+        value: "True"
+      - key: DJANGO_SECURE_HSTS_SECONDS
+        value: "31536000"
       - key: EMAIL_HOST
         sync: false
       - key: EMAIL_PORT

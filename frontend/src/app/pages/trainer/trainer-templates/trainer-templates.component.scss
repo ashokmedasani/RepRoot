@@ -206,21 +206,6 @@ p {
   color: #d92d20;
 }
 
-.message {
-  border: 1px solid color-mix(in srgb, var(--app-success) 32%, var(--app-border));
-  border-radius: 0.7rem;
-  padding: 0.75rem;
-  background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
-  color: var(--app-text);
-  font-weight: 700;
-  margin-bottom: 1rem;
-}
-
-.error-message {
-  border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
-  background: color-mix(in srgb, #d92d20 7%, var(--app-surface));
-}
-
 @media (max-width: 860px) {
   .slots-panel,
   .section-heading {

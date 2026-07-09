@@ -41,7 +41,8 @@ export class FormFieldBuilderComponent {
     { value: 'yes_no', label: 'Yes / No' },
     { value: 'date', label: 'Date' },
     { value: 'location', label: 'Location' },
-    { value: 'address', label: 'Address' }
+    { value: 'address', label: 'Address' },
+    { value: 'image', label: 'Image Upload' }
   ];
   readonly countries = Country.getAllCountries();
   readonly recommendedFields: FitnessFieldTemplate[] = [
@@ -141,6 +142,13 @@ export class FormFieldBuilderComponent {
       field_type: 'long_text',
       placeholder: 'List medical conditions',
       help_text: 'Multi-line field for important health context.'
+    },
+    {
+      icon: 'IM',
+      label: 'Optional Image Folder',
+      field_type: 'image',
+      placeholder: 'Upload progress, posture, or reference photos',
+      help_text: 'Optional image upload folder for client profile photos and visual context.'
     },
     {
       icon: 'NO',

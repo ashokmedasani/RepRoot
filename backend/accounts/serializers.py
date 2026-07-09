@@ -1,5 +1,8 @@
+import re
+
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password, make_password
+from django.db import transaction
 from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
@@ -34,7 +37,10 @@ FIELD_TYPES = {
   'date',
   'location',
   'address',
+  'image',
 }
+
+TRAINER_ID_PATTERN = re.compile(r'^[a-z0-9._-]+$')
 
 
 def normalize_dynamic_fields(fields):
@@ -186,14 +192,16 @@ class TrainerSignupSerializer(serializers.Serializer):
     validated_data.pop('email_verification_token')
     password = validated_data.pop('password')
 
-    user = User.objects.create_user(
-      username=validated_data['username'],
-      email=validated_data['email'],
-      password=password,
-      first_name=validated_data['first_name'].strip(),
-      last_name=validated_data['last_name'].strip(),
-    )
-    TrainerProfile.objects.create(user=user, **profile_data)
+    with transaction.atomic():
+      user = User.objects.create_user(
+        username=validated_data['username'],
+        email=validated_data['email'],
+        password=password,
+        first_name=validated_data['first_name'].strip(),
+        last_name=validated_data['last_name'].strip(),
+      )
+      TrainerProfile.objects.create(user=user, **profile_data)
+
     return user
 
 
@@ -316,6 +324,7 @@ class TrainerProfileStatusSerializer(serializers.ModelSerializer):
 
 
 class TrainerProfileSerializer(serializers.ModelSerializer):
+  trainer_id = serializers.CharField(max_length=32)
   first_name = serializers.CharField(source='user.first_name', max_length=150)
   last_name = serializers.CharField(source='user.last_name', max_length=150)
   email = serializers.EmailField(source='user.email', read_only=True)
@@ -330,6 +339,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     fields = [
       'email',
       'username',
+      'trainer_id',
       'first_name',
       'last_name',
       'profile_setup_completed',
@@ -389,7 +399,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     return request.build_absolute_uri(file_field.url) if request else file_field.url
 
   def validate(self, attrs):
-    required_fields = ['first_name', 'last_name', 'gender', 'birth_month', 'birth_year', 'country', 'state']
+    required_fields = ['trainer_id', 'first_name', 'last_name', 'gender', 'birth_month', 'birth_year', 'country', 'state']
     user_attrs = attrs.get('user', {})
 
     for field in required_fields:
@@ -399,6 +409,28 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
         raise serializers.ValidationError({field: 'This field is required for profile setup.'})
 
     return attrs
+
+  def validate_trainer_id(self, value: str) -> str:
+    trainer_id = value.strip().lower()
+
+    if not trainer_id:
+      raise serializers.ValidationError('Trainer ID is required.')
+
+    if len(trainer_id) < 4:
+      raise serializers.ValidationError('Trainer ID must be at least 4 characters.')
+
+    if not TRAINER_ID_PATTERN.match(trainer_id):
+      raise serializers.ValidationError('Use only letters, numbers, periods, underscores, or hyphens.')
+
+    query = TrainerProfile.objects.filter(trainer_id__iexact=trainer_id)
+
+    if self.instance:
+      query = query.exclude(pk=self.instance.pk)
+
+    if query.exists():
+      raise serializers.ValidationError('Trainer ID is already taken.')
+
+    return trainer_id
 
   def update(self, instance, validated_data):
     user_data = validated_data.pop('user', {})
@@ -583,13 +615,20 @@ class ClientAccessCreateSerializer(serializers.Serializer):
 
 
 class ClientLoginSerializer(serializers.Serializer):
+  trainer_id = serializers.CharField(max_length=32)
   username = serializers.CharField(max_length=150)
   password = serializers.CharField(write_only=True)
 
   def validate(self, attrs):
+    trainer_id = attrs['trainer_id'].strip().lower()
     username = attrs['username'].strip().lower()
     password = attrs['password']
+
+    if not trainer_id:
+      raise serializers.ValidationError({'trainer_id': 'Trainer ID is required.'})
+
     access_records = ClientAccess.objects.filter(
+      trainer__trainer_profile__trainer_id__iexact=trainer_id,
       username__iexact=username,
       is_active=True,
       lead_submission__status=LeadSubmission.STATUS_APPROVED,
@@ -612,10 +651,22 @@ class ClientLoginSerializer(serializers.Serializer):
         break
 
     if client_access is None:
-      raise serializers.ValidationError('Invalid client username or password.')
+      raise serializers.ValidationError('Invalid trainer ID, client username, or password.')
 
     attrs['client_access'] = client_access
     return attrs
+
+
+class ClientTrainerLookupSerializer(serializers.Serializer):
+  trainer_id = serializers.CharField(max_length=32)
+
+  def validate_trainer_id(self, value: str) -> str:
+    trainer_id = value.strip().lower()
+
+    if not trainer_id:
+      raise serializers.ValidationError('Trainer ID is required.')
+
+    return trainer_id
 
 
 TEMPLATE_FIELD_TYPES = {

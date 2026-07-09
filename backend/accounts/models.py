@@ -35,6 +35,7 @@ UNIVERSAL_CORE_FIELDS = [
 
 class TrainerProfile(models.Model):
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_profile')
+  trainer_id = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='trainer-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
@@ -161,6 +162,7 @@ class ClientAccess(models.Model):
   username = models.CharField(max_length=150)
   temporary_password = models.CharField(max_length=128)
   registration_answers = models.JSONField(default=dict)
+  trainer_notes = models.TextField(blank=True)
   must_change_password = models.BooleanField(default=True)
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)

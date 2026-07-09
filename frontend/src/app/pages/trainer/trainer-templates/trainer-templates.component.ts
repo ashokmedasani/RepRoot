@@ -7,7 +7,6 @@ import {
   TrackingTemplateRecord
 } from '../../../core/api/templates-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-trainer-templates',
@@ -24,8 +23,6 @@ export class TrainerTemplatesComponent implements OnInit {
   maxTemplates = 5;
   isLoading = true;
   isSaving = false;
-  message = '';
-  messageType: 'success' | 'error' = 'success';
 
   ngOnInit(): void {
     this.loadTemplates();
@@ -47,14 +44,10 @@ export class TrainerTemplatesComponent implements OnInit {
     this.isSaving = true;
     this.templatesApi.adoptStandardTemplate(standardTemplate.key).subscribe({
       next: (response) => {
-        this.messageType = 'success';
-        this.message = response.message;
         this.isSaving = false;
         this.loadTemplates();
       },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Standard template could not be added.');
+      error: () => {
         this.isSaving = false;
       }
     });
@@ -71,14 +64,9 @@ export class TrainerTemplatesComponent implements OnInit {
 
     this.templatesApi.deleteTemplate(template.id).subscribe({
       next: (response) => {
-        this.messageType = 'success';
-        this.message = response.message;
         this.loadTemplates();
       },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Template could not be deleted.');
-      }
+      error: () => {}
     });
   }
 
@@ -89,19 +77,18 @@ export class TrainerTemplatesComponent implements OnInit {
   private loadTemplates(): void {
     this.templatesApi.getTemplates().subscribe({
       next: (response) => {
-        this.templates = response.templates;
-        this.maxTemplates = response.max_templates;
+        this.templates = Array.isArray(response.templates) ? response.templates : [];
+        this.maxTemplates = response.max_templates || 5;
         this.isLoading = false;
       },
-      error: (error: unknown) => {
-        this.messageType = 'error';
-        this.message = formatApiError(error, 'Templates could not be loaded.');
+      error: () => {
+        this.templates = [];
         this.isLoading = false;
       }
     });
     this.templatesApi.getStandardTemplates().subscribe({
       next: (response) => {
-        this.standardTemplates = response.standard_templates;
+        this.standardTemplates = Array.isArray(response.standard_templates) ? response.standard_templates : [];
       },
       error: () => {
         this.standardTemplates = [];

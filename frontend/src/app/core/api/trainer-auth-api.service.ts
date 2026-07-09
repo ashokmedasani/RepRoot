@@ -81,6 +81,7 @@ export interface TrainerProfileStatusResponse {
 export interface TrainerProfile {
   email: string;
   username: string;
+  trainer_id: string;
   first_name: string;
   last_name: string;
   profile_setup_completed: boolean;

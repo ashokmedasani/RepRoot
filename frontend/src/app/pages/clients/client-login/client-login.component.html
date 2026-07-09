@@ -13,6 +13,17 @@
 
     <form class="auth-form" (ngSubmit)="verifyClientLogin()">
       <label>
+        <span class="field-label">Trainer ID <span class="required">*</span></span>
+        <span class="trainer-id-row">
+          <input name="trainerId" type="text" [(ngModel)]="loginForm.trainerId" autocomplete="off" required>
+          <button type="button" class="lookup-action" [disabled]="isSubmitting" (click)="searchTrainer()">Search</button>
+        </span>
+        @if (trainerName) {
+          <span class="field-help">Trainer: {{ trainerName }}</span>
+        }
+      </label>
+
+      <label>
         <span class="field-label">Username <span class="required">*</span></span>
         <input name="clientUsername" type="text" [(ngModel)]="loginForm.username" autocomplete="username" required>
       </label>

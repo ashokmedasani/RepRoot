@@ -14,12 +14,14 @@
   --app-success: #1f9d63;
   --app-shadow: 0 24px 70px rgba(26, 62, 103, 0.12);
 
+  --app-page-gutter: clamp(1rem, 3vw, 2.5rem);
+  --app-content-max: 1280px;
   --app-radius-sm: 0.6rem;
   --app-radius-md: 0.85rem;
   --app-radius-lg: 1rem;
   --app-radius-xl: 1.5rem;
   --app-control-height: 3rem;
-  --app-h1-hero: clamp(2.4rem, 4.5vw, 4rem);
+  --app-h1-hero: clamp(2.25rem, 4vw, 4.25rem);
   --app-h1-page: 1.9rem;
   --app-h1-form: 1.6rem;
   --app-tracking-tight: -0.02em;
@@ -96,11 +98,13 @@
 html {
   min-height: 100%;
   background: var(--app-bg);
+  overflow-x: hidden;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
   background: var(--app-bg);
   color: var(--app-text);
   font-family: var(--app-font-family);
@@ -113,8 +117,9 @@ body {
 h1,
 h2,
 h3 {
-  letter-spacing: var(--app-tracking-tight);
+  letter-spacing: 0;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 button,
@@ -126,6 +131,13 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 a {
@@ -212,7 +224,7 @@ a {
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid var(--app-border);
-  padding: 0.85rem 1.5rem;
+  padding: 0.85rem var(--app-page-gutter);
   background: color-mix(in srgb, var(--app-surface) 92%, transparent);
   backdrop-filter: blur(16px);
 }
@@ -222,6 +234,7 @@ a {
   align-items: center;
   gap: 0.35rem;
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .top-shell nav a,
@@ -272,13 +285,29 @@ a {
 }
 
 @media (max-width: 680px) {
+  :root {
+    --app-h1-page: 1.65rem;
+    --app-h1-form: 1.45rem;
+  }
+
   .photo-manager,
   .photo-field {
     grid-template-columns: 1fr;
+    padding: 0.9rem;
+  }
+
+  .photo-frame,
+  .photo-placeholder {
+    width: 5.5rem;
+    height: 5.5rem;
   }
 
   .hero-content {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .secondary-action {
+    width: 100%;
   }
 }

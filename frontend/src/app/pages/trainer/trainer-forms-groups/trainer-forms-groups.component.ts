@@ -247,6 +247,27 @@ export class TrainerFormsGroupsComponent implements OnInit {
     return 'text';
   }
 
+  handleRegistrationImage(event: Event, field: DynamicField): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const key = field.key || field.label;
+
+    if (!file) {
+      this.clientAccess.registrationAnswers[key] = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.clientAccess.registrationAnswers[key] = typeof reader.result === 'string' ? reader.result : '';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  isImageValue(value: string): boolean {
+    return value.startsWith('data:image');
+  }
+
   private setError(message: string): void {
     this.messageType = 'error';
     this.message = message;

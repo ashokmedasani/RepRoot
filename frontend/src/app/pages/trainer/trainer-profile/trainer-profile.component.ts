@@ -1,11 +1,11 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Country, State } from 'country-state-city';
 
 import { TrainerAuthApiService, TrainerProfile } from '../../../core/api/trainer-auth-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-trainer-profile',
@@ -53,8 +53,10 @@ export class TrainerProfileComponent implements OnInit {
   };
   selectedFileNames: Record<string, string> = {};
   selectedProfilePhotoPreview = '';
+  private isPatchingProfile = false;
 
   readonly profileForm = this.formBuilder.nonNullable.group({
+    trainer_id: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[a-zA-Z0-9._-]+$/)]],
     first_name: ['', Validators.required],
     last_name: ['', Validators.required],
     birth_month: ['', Validators.required],
@@ -102,7 +104,9 @@ export class TrainerProfileComponent implements OnInit {
         }
 
         this.loadedProfile = profile;
+        this.isPatchingProfile = true;
         this.profileForm.patchValue({
+          trainer_id: profile.trainer_id || '',
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',
@@ -125,16 +129,19 @@ export class TrainerProfileComponent implements OnInit {
           youtube_url: profile.youtube_url || '',
           website_url: profile.website_url || ''
         });
+        this.isPatchingProfile = false;
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.profileMessage = this.formatApiError(error, 'Could not load trainer profile.');
+        this.profileMessage = formatApiError(error, 'Could not load trainer profile.');
         this.isLoading = false;
       }
     });
 
     this.profileForm.controls.country.valueChanges.subscribe(() => {
-      this.profileForm.controls.state.setValue('');
+      if (!this.isPatchingProfile) {
+        this.profileForm.controls.state.setValue('');
+      }
     });
   }
 
@@ -167,7 +174,7 @@ export class TrainerProfileComponent implements OnInit {
         this.isSaving = false;
       },
       error: (error: unknown) => {
-        this.profileMessage = this.formatApiError(error, 'Profile could not be saved.');
+        this.profileMessage = formatApiError(error, 'Profile could not be saved.');
         this.isSaving = false;
       }
     });
@@ -197,21 +204,5 @@ export class TrainerProfileComponent implements OnInit {
     });
 
     return formData;
-  }
-
-  private formatApiError(error: unknown, fallbackMessage: string): string {
-    const responseError = error instanceof HttpErrorResponse ? error.error : error;
-    const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
-
-    if (apiError.message) {
-      return apiError.message;
-    }
-
-    if (!apiError.error || typeof apiError.error === 'string') {
-      return apiError.error || fallbackMessage;
-    }
-
-    const firstError = Object.values(apiError.error)[0];
-    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
   }
 }

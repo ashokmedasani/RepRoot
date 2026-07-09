@@ -1,5 +1,6 @@
 .auth-page {
   min-height: 100vh;
+  padding-bottom: 2rem;
   background: color-mix(in srgb, var(--app-bg) 92%, var(--app-surface));
 }
 
@@ -10,7 +11,7 @@
   gap: 1rem;
   min-height: 4.75rem;
   border-bottom: 1px solid var(--app-border);
-  padding: 0 1.75rem;
+  padding: 0 var(--app-page-gutter);
   background: var(--app-surface);
 }
 
@@ -42,8 +43,8 @@
 }
 
 .auth-card {
-  width: min(43rem, calc(100% - 2rem));
-  margin: 2rem auto;
+  width: min(52rem, calc(100% - 2rem));
+  margin: clamp(1rem, 5vh, 3.5rem) auto;
   border-radius: var(--app-radius-lg);
   padding: 2rem;
   background: var(--app-surface);
@@ -211,7 +212,7 @@ button:disabled {
 
   .auth-card {
     margin: 1.25rem auto;
-    padding: 2rem 1.25rem;
+    padding: 1.5rem 1rem;
   }
 
   .auth-form {

@@ -19,17 +19,45 @@ export class ClientLoginComponent {
   isSubmitting = false;
   loginMessage = '';
   clientName = '';
+  trainerName = '';
 
   readonly loginForm = {
+    trainerId: '',
     username: '',
     password: ''
   };
 
+  searchTrainer(): void {
+    const trainerId = this.loginForm.trainerId.trim().toLowerCase();
+
+    if (!trainerId) {
+      this.loginMessage = 'Enter Trainer ID before searching.';
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.trainerName = '';
+    this.loginMessage = 'Searching trainer ID...';
+
+    this.clientApi.lookupTrainer(trainerId).subscribe({
+      next: (response) => {
+        this.trainerName = response.trainer_name;
+        this.loginMessage = `Trainer found: ${response.trainer_name}.`;
+        this.isSubmitting = false;
+      },
+      error: (error: unknown) => {
+        this.loginMessage = formatApiError(error, 'Trainer ID was not found.');
+        this.isSubmitting = false;
+      }
+    });
+  }
+
   verifyClientLogin(): void {
+    const trainerId = this.loginForm.trainerId.trim().toLowerCase();
     const username = this.loginForm.username.trim().toLowerCase();
 
-    if (!username || !this.loginForm.password) {
-      this.loginMessage = 'Username and password are required.';
+    if (!trainerId || !username || !this.loginForm.password) {
+      this.loginMessage = 'Trainer ID, username, and password are required.';
       return;
     }
 
@@ -37,7 +65,7 @@ export class ClientLoginComponent {
     this.clientName = '';
     this.loginMessage = 'Verifying client login...';
 
-    this.clientApi.login(username, this.loginForm.password).subscribe({
+    this.clientApi.login(trainerId, username, this.loginForm.password).subscribe({
       next: (response) => {
         const client = response.client;
         this.clientName = `${client.first_name} ${client.last_name}`.trim();
@@ -53,7 +81,7 @@ export class ClientLoginComponent {
         }
       },
       error: (error: unknown) => {
-        this.loginMessage = formatApiError(error, 'Client login failed. Check username and password.');
+        this.loginMessage = formatApiError(error, 'Client login failed. Check Trainer ID, username, and password.');
         this.isSubmitting = false;
       }
     });

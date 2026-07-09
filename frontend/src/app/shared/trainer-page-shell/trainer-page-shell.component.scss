@@ -20,7 +20,7 @@
   align-items: center;
   gap: 1rem;
   border-bottom: 1px solid var(--app-border);
-  padding: 0.85rem 1.5rem;
+  padding: 0.85rem var(--app-page-gutter);
   background: color-mix(in srgb, var(--app-surface) 94%, transparent);
   backdrop-filter: blur(16px);
 }
@@ -39,6 +39,7 @@ nav {
   justify-content: flex-end;
   gap: 0.35rem;
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 nav a,
@@ -71,9 +72,9 @@ nav .active {
 }
 
 .trainer-workspace {
-  width: min(100%, var(--trainer-shell-max-width));
+  width: min(calc(100% - (var(--app-page-gutter) * 2)), var(--trainer-shell-max-width));
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.5rem 0;
   flex: 1;
 }
 
@@ -81,8 +82,12 @@ nav .active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1rem 1.5rem;
   margin-bottom: 1.25rem;
+}
+
+.trainer-page-header > div:first-child {
+  min-width: 0;
 }
 
 .eyebrow {
@@ -118,6 +123,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
@@ -127,7 +133,7 @@ h1 {
   justify-content: space-between;
   gap: 1rem;
   border-top: 1px solid var(--app-border);
-  padding: 1rem 1.5rem;
+  padding: 1rem var(--app-page-gutter);
   color: var(--app-muted);
   font-size: 0.82rem;
   font-weight: 700;
@@ -152,9 +158,12 @@ button:disabled {
 
 @media (max-width: 680px) {
   .trainer-topbar,
-  .trainer-workspace,
   .trainer-footer {
     padding-inline: 1rem;
+  }
+
+  .trainer-workspace {
+    width: calc(100% - 2rem);
   }
 
   .trainer-page-header,

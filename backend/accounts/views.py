@@ -31,6 +31,7 @@ from .serializers import (
   ChatMessageSerializer,
   ClientAccessCreateSerializer,
   ClientLoginSerializer,
+  ClientTrainerLookupSerializer,
   ClientAccessSerializer,
   ClientPasswordChangeSerializer,
   ClientRegistrationFormSerializer,
@@ -124,6 +125,7 @@ def build_trainer_account_snapshot(user):
   if profile:
     snapshot['trainer_profile'] = {
       'id': profile.id,
+      'trainer_id': profile.trainer_id,
       'profile_setup_completed': profile.profile_setup_completed,
       'profile_photo': profile.profile_photo.name,
       'middle_name': profile.middle_name,
@@ -759,12 +761,15 @@ class GroupClientAccessListView(APIView):
 class ClientAccessDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
-  def get(self, request, client_id):
-    client_access = ClientAccess.objects.filter(
+  def get_client(self, request, client_id):
+    return ClientAccess.objects.filter(
       id=client_id,
       trainer=request.user,
       is_active=True,
     ).select_related('group', 'lead_submission', 'trainer').first()
+
+  def get(self, request, client_id):
+    client_access = self.get_client(request, client_id)
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -774,10 +779,53 @@ class ClientAccessDetailView(APIView):
 
     return Response(
       {
-        'client': ClientAccessSerializer(client_access).data,
+        'client': {
+          **ClientAccessSerializer(client_access).data,
+          'trainer_notes': client_access.trainer_notes,
+        },
         'group': TrainerGroupSerializer(group).data,
         'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
         'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
+      }
+    )
+
+  def put(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    client_access.trainer_notes = str(request.data.get('trainer_notes', '')).strip()
+    client_access.save(update_fields=['trainer_notes', 'updated_at'])
+
+    return Response(
+      {
+        'client': {
+          **ClientAccessSerializer(client_access).data,
+          'trainer_notes': client_access.trainer_notes,
+        },
+        'message': 'Private trainer notes saved.',
+      }
+    )
+
+
+class ClientTrainerLookupView(APIView):
+  permission_classes = [permissions.AllowAny]
+
+  def post(self, request):
+    serializer = ClientTrainerLookupSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    trainer_id = serializer.validated_data['trainer_id']
+    profile = TrainerProfile.objects.select_related('user').filter(trainer_id__iexact=trainer_id).first()
+
+    if profile is None:
+      return Response({'message': 'Trainer ID not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response(
+      {
+        'trainer_id': profile.trainer_id,
+        'trainer_name': profile.user.get_full_name() or profile.user.username,
+        'message': 'Trainer ID found.',
       }
     )
 
@@ -1272,7 +1320,7 @@ class ClientPasswordChangeView(APIView):
 
     return Response(
       {
-        'client': ClientAccessSerializer(client_access).data,
+        'client': ClientAccessSerializer(client_access, context={'include_trainer_notes': True}).data,
         'message': 'Password changed successfully.',
       }
     )

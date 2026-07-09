@@ -22,7 +22,8 @@ export type DynamicFieldType =
   | 'yes_no'
   | 'date'
   | 'location'
-  | 'address';
+  | 'address'
+  | 'image';
 
 export interface DynamicField {
   key?: string;
@@ -123,6 +124,7 @@ export interface ClientAccessRecord {
   email: string;
   username: string;
   registration_answers: Record<string, string>;
+  trainer_notes?: string;
   must_change_password: boolean;
   is_active: boolean;
   created_at: string;
@@ -219,6 +221,14 @@ export class FormsGroupsApiService {
     return this.http.get<ClientAccessDetailResponse>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  updateClientTrainerNotes(clientId: number, trainerNotes: string): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.put<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`,
+      { trainer_notes: trainerNotes },
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   resetClientPassword(clientId: number): Observable<{ temporary_password: string; message: string }> {

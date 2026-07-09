@@ -20,88 +20,123 @@
       <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
     }
 
-    <section class="profile-hero-card">
-      <div class="identity-row">
-        <span class="avatar">{{ initials(client) }}</span>
-        <div>
-          <span class="hero-label">Client</span>
-          <h2>{{ client.first_name }} {{ client.last_name }}</h2>
-          <p>{{ client.username }} - {{ client.email }}</p>
-        </div>
-      </div>
-      <div class="hero-details">
-        <article>
-          <span>Group</span>
-          <strong>{{ profile.group.name }}</strong>
-        </article>
-        <article>
-          <span>Templates</span>
-          <strong>{{ assignments.length }} assigned</strong>
-        </article>
-        <article>
-          <span>Entries</span>
-          <strong>{{ entries.length }} submitted</strong>
-        </article>
-      </div>
-      <div class="hero-side">
-        <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
-        <button type="button" class="secondary-action" (click)="openAccountDialog()">Account &amp; Access</button>
-      </div>
-    </section>
-
-    <section class="workspace-grid">
-      <article class="panel templates-panel">
-        <div class="panel-heading">
-          <div>
-            <h3>Assigned Templates</h3>
-            <p>Choose which check-in templates {{ client.first_name }} should follow. Change them anytime - past entries are always kept.</p>
-          </div>
-        </div>
-
-        <div class="assignment-list">
-          @for (assignment of assignments; track assignment.id) {
-            <div class="assignment-row" [class.green]="assignment.template_accent === 'green'" [class.blue]="assignment.template_accent === 'blue'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'">
-              <div>
-                <strong>{{ assignment.template_name }}</strong>
-                <small>{{ assignment.template_cadence }} check-in - assigned {{ assignment.assigned_at | date: 'mediumDate' }} - {{ assignment.references.length }} references shared</small>
-              </div>
-              <div class="assignment-actions">
-                <button type="button" class="secondary-action compact" (click)="openShareDialog(assignment)">Share References</button>
-                <button type="button" class="ghost-action" (click)="unassignTemplate(assignment)">Unassign</button>
-              </div>
-            </div>
-          } @empty {
-            <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start recording progress.</p>
-          }
-        </div>
-
-        <div class="assign-row">
-          <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
-            <option [ngValue]="null">Select a template to assign</option>
-            @for (template of availableTemplates; track template.id) {
-              <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
-            }
-          </select>
-          <button type="button" class="primary-action" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
-            Assign Template
-          </button>
-        </div>
-      </article>
-
-      <article class="panel">
-        <h3>Intake Details</h3>
-        <p>Everything from the lead form and registration form in one place.</p>
-        <dl class="answer-grid">
-          @for (detail of intakeDetails; track detail.label) {
+    <section class="client-dashboard">
+      <div class="dashboard-left">
+        <article class="profile-hero-card">
+          <div class="identity-row">
+            <span class="avatar">{{ initials(client) }}</span>
             <div>
-              <dt>{{ detail.label }} <em>{{ detail.source === 'lead-form' ? 'lead form' : 'registration' }}</em></dt>
-              <dd>{{ detail.value }}</dd>
+              <span class="hero-label">Client Profile</span>
+              <h2>{{ client.first_name }} {{ client.last_name }}</h2>
+              <p>{{ profile.group.name }} - {{ client.email }}</p>
             </div>
-          } @empty {
-            <p class="empty-note">No intake answers recorded.</p>
-          }
-        </dl>
-      </article>
+          </div>
+          <div class="hero-details">
+            <article>
+              <span>Templates</span>
+              <strong>{{ assignments.length }} assigned</strong>
+            </article>
+            <article>
+              <span>Entries</span>
+              <strong>{{ entries.length }} submitted</strong>
+            </article>
+            <article>
+              <span>Status</span>
+              <strong>{{ client.is_active ? 'Active' : 'Inactive' }}</strong>
+            </article>
+          </div>
+          <button type="button" class="secondary-action" (click)="openAccountDialog()">Account &amp; Access</button>
+        </article>
+
+        <article class="panel private-notes-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Trainer Notes <span>Private</span></h3>
+              <p>Only you can see these notes. Clients never receive this text.</p>
+            </div>
+            <button type="button" class="secondary-action compact" [disabled]="isSavingTrainerNotes" (click)="saveTrainerNotes()">
+              {{ isSavingTrainerNotes ? 'Saving...' : 'Save Notes' }}
+            </button>
+          </div>
+          <textarea rows="5" [(ngModel)]="trainerNotesDraft" name="trainerNotes" placeholder="Coaching context, injuries, preferences, reminders..."></textarea>
+        </article>
+
+        <article class="panel templates-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Assigned Templates</h3>
+              <p>Open a template to review references, structure, and recent entries.</p>
+            </div>
+          </div>
+
+          <div class="assignment-list">
+            @for (assignment of assignments; track assignment.id) {
+              <a class="assignment-row" [routerLink]="['/trainer/clients', client.id, 'templates', assignment.id]" [class.green]="assignment.template_accent === 'green'" [class.blue]="assignment.template_accent === 'blue'" [class.orange]="assignment.template_accent === 'orange'" [class.purple]="assignment.template_accent === 'purple'">
+                <span class="template-icon">T</span>
+                <span>
+                  <strong>{{ assignment.template_name }}</strong>
+                  <small>Assigned {{ assignment.assigned_at | date: 'mediumDate' }} - {{ assignment.references.length }} references</small>
+                </span>
+                <span class="chevron">›</span>
+              </a>
+            } @empty {
+              <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start recording progress.</p>
+            }
+          </div>
+
+          <div class="assign-row">
+            <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
+              <option [ngValue]="null">Select a template to assign</option>
+              @for (template of availableTemplates; track template.id) {
+                <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
+              }
+            </select>
+            <button type="button" class="primary-action" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
+              Assign Template
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <div class="dashboard-right">
+        <article class="panel image-folder-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Optional Image Folder</h3>
+              <p>Images from intake forms and template check-ins collect here automatically.</p>
+            </div>
+            <span class="count-pill">{{ clientImages.length }} images</span>
+          </div>
+          <div class="image-folder-grid">
+            @for (image of clientImages; track image.value) {
+              <figure>
+                <img [src]="image.value" [alt]="image.label">
+                <figcaption>
+                  <strong>{{ image.label }}</strong>
+                  <span>{{ image.source }} @if (image.date) { - {{ image.date | date: 'mediumDate' }} }</span>
+                </figcaption>
+              </figure>
+            } @empty {
+              <p class="empty-note">No images yet. Add an optional image field to a client form or template.</p>
+            }
+          </div>
+        </article>
+
+        <article class="panel">
+          <h3>Intake Details</h3>
+          <p>Everything from the lead form and registration form in one place.</p>
+          <dl class="answer-grid">
+            @for (detail of intakeDetails; track detail.label) {
+              <div>
+                <dt>{{ detail.label }} <em>{{ detail.source === 'lead-form' ? 'lead form' : 'registration' }}</em></dt>
+                <dd>{{ detail.value }}</dd>
+              </div>
+            } @empty {
+              <p class="empty-note">No intake answers recorded.</p>
+            }
+          </dl>
+        </article>
+      </div>
     </section>
 
     <section class="panel entries-panel">

@@ -50,6 +50,13 @@ interface ConsistencyDay {
   hasEntry: boolean;
 }
 
+interface ClientImageItem {
+  label: string;
+  source: string;
+  date?: string;
+  value: string;
+}
+
 @Component({
   selector: 'app-trainer-client-profile',
   standalone: true,
@@ -69,10 +76,13 @@ export class TrainerClientProfileComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
   resetPasswordResult = '';
   isAccountDialogOpen = false;
+  trainerNotesDraft = '';
+  isSavingTrainerNotes = false;
 
   assignments: TemplateAssignmentRecord[] = [];
   templates: TrackingTemplateRecord[] = [];
   selectedTemplateId: number | null = null;
+  selectedAssignmentId: number | null = null;
   isAssigning = false;
 
   referenceCategories: ReferenceCategoryRecord[] = [];
@@ -92,6 +102,7 @@ export class TrainerClientProfileComponent implements OnInit {
   numericTrends: NumericTrend[] = [];
   consistencyDays: ConsistencyDay[] = [];
   recentNotes: TrackingEntryRecord[] = [];
+  clientImages: ClientImageItem[] = [];
 
   ngOnInit(): void {
     this.loadProfile();
@@ -104,6 +115,20 @@ export class TrainerClientProfileComponent implements OnInit {
   get availableTemplates(): TrackingTemplateRecord[] {
     const assignedIds = new Set(this.assignments.map((assignment) => assignment.template_id));
     return this.templates.filter((template) => !assignedIds.has(template.id));
+  }
+
+  get selectedAssignment(): TemplateAssignmentRecord | null {
+    return this.assignments.find((assignment) => assignment.id === this.selectedAssignmentId) || this.assignments[0] || null;
+  }
+
+  get selectedTemplate(): TrackingTemplateRecord | null {
+    const assignment = this.selectedAssignment;
+    return assignment ? this.templates.find((template) => template.id === assignment.template_id) || null : null;
+  }
+
+  get selectedAssignmentEntries(): TrackingEntryRecord[] {
+    const assignment = this.selectedAssignment;
+    return assignment ? this.entries.filter((entry) => entry.template === assignment.template_id).slice(0, 5) : [];
   }
 
   initials(client: ClientAccessRecord): string {
@@ -158,6 +183,7 @@ export class TrainerClientProfileComponent implements OnInit {
         this.messageType = 'success';
         this.message = response.message;
         this.selectedTemplateId = null;
+        this.selectedAssignmentId = response.assignment.id;
         this.isAssigning = false;
         this.loadAssignments(client.id);
         this.openShareDialog(response.assignment);
@@ -256,6 +282,9 @@ export class TrainerClientProfileComponent implements OnInit {
       next: (response) => {
         this.messageType = 'success';
         this.message = response.message;
+        if (this.selectedAssignmentId === assignment.id) {
+          this.selectedAssignmentId = null;
+        }
         this.loadAssignments(client.id);
       },
       error: (error: unknown) => {
@@ -331,6 +360,34 @@ export class TrainerClientProfileComponent implements OnInit {
     return value.startsWith('data:image');
   }
 
+  selectAssignment(assignment: TemplateAssignmentRecord): void {
+    this.selectedAssignmentId = assignment.id;
+  }
+
+  saveTrainerNotes(): void {
+    const client = this.client;
+
+    if (!client || this.isSavingTrainerNotes) {
+      return;
+    }
+
+    this.isSavingTrainerNotes = true;
+    this.formsGroupsApi.updateClientTrainerNotes(client.id, this.trainerNotesDraft).subscribe({
+      next: (response) => {
+        client.trainer_notes = response.client.trainer_notes;
+        this.trainerNotesDraft = response.client.trainer_notes || '';
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSavingTrainerNotes = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Private trainer notes could not be saved.');
+        this.isSavingTrainerNotes = false;
+      }
+    });
+  }
+
   private loadProfile(): void {
     const clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.isLoading = true;
@@ -338,7 +395,9 @@ export class TrainerClientProfileComponent implements OnInit {
     this.formsGroupsApi.getClientProfile(clientId).subscribe({
       next: (profile) => {
         this.profile = profile;
+        this.trainerNotesDraft = profile.client.trainer_notes || '';
         this.buildIntakeDetails(profile);
+        this.buildClientImages();
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -351,6 +410,7 @@ export class TrainerClientProfileComponent implements OnInit {
       next: (response) => {
         this.templates = response.templates;
         this.buildInsights();
+        this.buildClientImages();
       },
       error: () => {
         this.templates = [];
@@ -376,6 +436,9 @@ export class TrainerClientProfileComponent implements OnInit {
     this.templatesApi.getAssignments(clientId).subscribe({
       next: (response) => {
         this.assignments = response.assignments;
+        if (!this.selectedAssignmentId && this.assignments.length) {
+          this.selectedAssignmentId = this.assignments[0].id;
+        }
       },
       error: () => {
         this.assignments = [];
@@ -388,6 +451,7 @@ export class TrainerClientProfileComponent implements OnInit {
       next: (response) => {
         this.entries = response.entries;
         this.buildInsights();
+        this.buildClientImages();
       },
       error: () => {
         this.entries = [];
@@ -405,7 +469,7 @@ export class TrainerClientProfileComponent implements OnInit {
       seenKeys.add(key);
       details.push({
         label: field.label,
-        value: value ? String(value) : 'Not added',
+        value: this.formatIntakeValue(value),
         source: 'registration'
       });
     }
@@ -417,12 +481,57 @@ export class TrainerClientProfileComponent implements OnInit {
 
       details.push({
         label: key.replace(/_/g, ' '),
-        value: value ? String(value) : 'Not added',
+        value: this.formatIntakeValue(value),
         source: 'lead-form'
       });
     }
 
     this.intakeDetails = details;
+  }
+
+  private formatIntakeValue(value: unknown): string {
+    const text = value ? String(value) : '';
+    return text.startsWith('data:image') ? 'Saved in Image Folder' : text || 'Not added';
+  }
+
+  private buildClientImages(): void {
+    const images: ClientImageItem[] = [];
+
+    if (this.profile) {
+      for (const field of this.profile.registration_fields) {
+        const key = field.key || field.label;
+        const value = String(this.profile.client.registration_answers?.[key] || '');
+
+        if (this.isImageValue(value)) {
+          images.push({ label: field.label, source: 'Registration form', value });
+        }
+      }
+
+      for (const [key, rawValue] of Object.entries(this.profile.lead_submission.answers || {})) {
+        const value = String(rawValue || '');
+
+        if (this.isImageValue(value)) {
+          images.push({ label: key.replace(/_/g, ' '), source: 'Lead form', value });
+        }
+      }
+    }
+
+    for (const entry of this.entries) {
+      for (const [key, rawValue] of Object.entries(entry.answers || {})) {
+        const value = String(rawValue || '');
+
+        if (this.isImageValue(value)) {
+          images.push({
+            label: this.fieldLabelFor(entry, key),
+            source: entry.template_name,
+            date: entry.entry_date,
+            value
+          });
+        }
+      }
+    }
+
+    this.clientImages = images;
   }
 
   private buildInsights(): void {

@@ -7,7 +7,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'local-development-only-secret-key')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
+
+default_allowed_hosts = ['localhost', '127.0.0.1']
+render_external_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+
+if render_external_hostname:
+  default_allowed_hosts.append(render_external_hostname)
+
+ALLOWED_HOSTS = [
+  host.strip()
+  for host in os.environ.get('DJANGO_ALLOWED_HOSTS', ','.join(default_allowed_hosts)).split(',')
+  if host.strip()
+]
 
 INSTALLED_APPS = [
   'django.contrib.admin',
@@ -129,16 +140,24 @@ CORS_ALLOWED_ORIGINS = [
   origin.strip()
   for origin in os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300,http://127.0.0.1:4300',
+    'http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400',
   ).split(',')
   if origin.strip()
 ]
 
 CSRF_TRUSTED_ORIGINS = [
   origin.strip()
-  for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+  for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', ','.join(CORS_ALLOWED_ORIGINS)).split(',')
   if origin.strip()
 ]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'False' if DEBUG else 'True').lower() == 'true'
+SESSION_COOKIE_SECURE = os.environ.get('DJANGO_SESSION_COOKIE_SECURE', 'False' if DEBUG else 'True').lower() == 'true'
+CSRF_COOKIE_SECURE = os.environ.get('DJANGO_CSRF_COOKIE_SECURE', 'False' if DEBUG else 'True').lower() == 'true'
+SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', '0' if DEBUG else '31536000'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() == 'true'
+SECURE_HSTS_PRELOAD = os.environ.get('DJANGO_SECURE_HSTS_PRELOAD', 'False').lower() == 'true'
 
 REST_FRAMEWORK = {
   'DEFAULT_PERMISSION_CLASSES': [

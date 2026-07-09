@@ -116,6 +116,27 @@ export class PublicLeadFormComponent implements OnInit {
     this.answers[key] = nextOptions.join(', ');
   }
 
+  handleImageUpload(event: Event, field: DynamicField): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const key = field.key || field.label;
+
+    if (!file) {
+      this.answers[key] = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.answers[key] = typeof reader.result === 'string' ? reader.result : '';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  isImageValue(value: string): boolean {
+    return value.startsWith('data:image');
+  }
+
   private buildCountryDialCodes(): CountryDialCode[] {
     return this.countries
       .map((country) => {

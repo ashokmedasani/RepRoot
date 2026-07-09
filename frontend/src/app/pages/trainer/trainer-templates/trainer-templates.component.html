@@ -11,10 +11,6 @@
     <span page-actions class="slots-full-note">All 5 template slots are used</span>
   }
 
-  @if (message) {
-    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
-  }
-
   @if (isLoading) {
     <section class="panel">
       <p>Loading templates...</p>

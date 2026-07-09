@@ -73,6 +73,16 @@ textarea {
   outline: none;
 }
 
+.invalid-input {
+  border-color: #d92d20;
+}
+
+.field-error {
+  color: #d92d20;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 textarea {
   resize: vertical;
 }

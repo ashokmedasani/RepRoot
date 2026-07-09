@@ -19,6 +19,12 @@ export interface ClientLoginResponse {
   message: string;
 }
 
+export interface ClientTrainerLookupResponse {
+  trainer_id: string;
+  trainer_name: string;
+  message: string;
+}
+
 export interface ClientMeResponse {
   client: ClientAccessRecord;
   group: TrainerGroup;
@@ -39,8 +45,18 @@ export class ClientApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  login(username: string, password: string): Observable<ClientLoginResponse> {
-    return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, { username, password });
+  lookupTrainer(trainerId: string): Observable<ClientTrainerLookupResponse> {
+    return this.http.post<ClientTrainerLookupResponse>(`${this.apiBaseUrl}/client/trainer-lookup/`, {
+      trainer_id: trainerId
+    });
+  }
+
+  login(trainerId: string, username: string, password: string): Observable<ClientLoginResponse> {
+    return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, {
+      trainer_id: trainerId,
+      username,
+      password
+    });
   }
 
   changePassword(

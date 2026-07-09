@@ -20,8 +20,8 @@ from .models import (
 
 @admin.register(TrainerProfile)
 class TrainerProfileAdmin(admin.ModelAdmin):
-  list_display = ('user', 'profile_setup_completed', 'country', 'state', 'gender', 'created_at')
-  search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name', 'professional_headline')
+  list_display = ('user', 'trainer_id', 'profile_setup_completed', 'country', 'state', 'gender', 'created_at')
+  search_fields = ('trainer_id', 'user__username', 'user__email', 'user__first_name', 'user__last_name', 'professional_headline')
   list_filter = ('profile_setup_completed', 'country', 'gender')
 
 

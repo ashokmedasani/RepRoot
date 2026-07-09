@@ -1,10 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Country, State } from 'country-state-city';
 
 import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-trainer-profile-setup',
@@ -45,9 +45,11 @@ export class TrainerProfileSetupComponent implements OnInit {
   selectedPhotoName = '';
   profilePhotoUrl = '';
   selectedPhotoPreview = '';
+  private isPatchingProfile = false;
   private selectedPhoto: File | null = null;
 
   readonly setupForm = this.formBuilder.nonNullable.group({
+    trainer_id: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[a-zA-Z0-9._-]+$/)]],
     first_name: ['', Validators.required],
     last_name: ['', Validators.required],
     birth_month: ['', Validators.required],
@@ -73,7 +75,9 @@ export class TrainerProfileSetupComponent implements OnInit {
     this.trainerAuthApi.getProfile().subscribe({
       next: (profile) => {
         this.profilePhotoUrl = profile.profile_photo_url || '';
+        this.isPatchingProfile = true;
         this.setupForm.patchValue({
+          trainer_id: profile.trainer_id || '',
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',
@@ -84,16 +88,19 @@ export class TrainerProfileSetupComponent implements OnInit {
           professional_headline: profile.professional_headline || '',
           about_me: profile.about_me || ''
         });
+        this.isPatchingProfile = false;
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.setupMessage = this.formatApiError(error, 'Could not load trainer profile. Please login again.');
+        this.setupMessage = formatApiError(error, 'Could not load trainer profile. Please login again.');
         this.isLoading = false;
       }
     });
 
     this.setupForm.controls.country.valueChanges.subscribe(() => {
-      this.setupForm.controls.state.setValue('');
+      if (!this.isPatchingProfile) {
+        this.setupForm.controls.state.setValue('');
+      }
     });
   }
 
@@ -121,7 +128,7 @@ export class TrainerProfileSetupComponent implements OnInit {
         void this.router.navigate(['/trainer/profile']);
       },
       error: (error: unknown) => {
-        this.setupMessage = this.formatApiError(error, 'Profile setup could not be saved.');
+        this.setupMessage = formatApiError(error, 'Profile setup could not be saved.');
         this.isSaving = false;
       }
     });
@@ -145,21 +152,5 @@ export class TrainerProfileSetupComponent implements OnInit {
     }
 
     return formData;
-  }
-
-  private formatApiError(error: unknown, fallbackMessage: string): string {
-    const responseError = error instanceof HttpErrorResponse ? error.error : error;
-    const apiError = responseError as { error?: Record<string, string[] | string> | string; message?: string };
-
-    if (apiError.message) {
-      return apiError.message;
-    }
-
-    if (!apiError.error || typeof apiError.error === 'string') {
-      return apiError.error || fallbackMessage;
-    }
-
-    const firstError = Object.values(apiError.error)[0];
-    return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
   }
 }
