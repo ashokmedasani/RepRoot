@@ -23,3 +23,11 @@ Tracking Templates tab renders trainer-level template cards (fields shown as opt
 ## Update 2
 
 Tracking Templates tab and section removed; tabs are Overview, Approved Users, Client Registration Form, and Settings.
+
+## Update 3
+
+Overview renders only summary cards and the five-person Recent Approved Users section. Approved Users and Client Registration Form now render only inside their own tabs.
+
+## Update 4
+
+Settings renders a single expandable card with Group Name, Group Description, and Save Group. Access rules are no longer displayed in this page.

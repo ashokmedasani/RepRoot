@@ -1,0 +1,7 @@
+{
+  "name": "coachflow-mobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

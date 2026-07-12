@@ -144,10 +144,9 @@
                       @if (submission.client_access) {
                         <a [routerLink]="['/trainer/clients', submission.client_access.id]" class="icon-action">View Profile</a>
                       } @else {
-                        <button type="button" class="icon-action" title="View details" (click)="viewDetails(submission)">View</button>
+                        <a [routerLink]="['/trainer/forms-groups/requests', submission.id]" class="icon-action" title="View details">View</a>
                       }
                       @if (selectedSubmissionView === 'pending') {
-                        <button type="button" class="icon-action success-action" title="Create client access" (click)="startClientAccess(submission)">Create</button>
                         <button type="button" class="icon-action danger-action" [disabled]="isSaving" title="Delete request" (click)="deletePending(submission)">Delete</button>
                       }
                     </td>
@@ -197,80 +196,6 @@
               </article>
             }
           </div>
-        </section>
-      }
-
-      @if (detailSubmission) {
-        <section class="panel detail-panel" aria-labelledby="detail-title">
-          <div class="section-heading">
-            <h2 id="detail-title">Request details</h2>
-            <button type="button" class="ghost-action" (click)="detailSubmission = null">Close</button>
-          </div>
-          <dl>
-            @for (answer of detailSubmission.answers | keyvalue; track answer.key) {
-              <div>
-                <dt>{{ answer.key }}</dt>
-                <dd>{{ answer.value }}</dd>
-              </div>
-            }
-          </dl>
-        </section>
-      }
-
-      @if (selectedSubmission) {
-        <section class="panel client-access-panel" aria-labelledby="client-access-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Approved client login</p>
-              <h2 id="client-access-title">Create client access for {{ selectedSubmission.applicant_name }}</h2>
-            </div>
-            <button type="button" class="ghost-action" (click)="selectedSubmission = null">Cancel</button>
-          </div>
-
-          <div class="form-grid">
-            <label>
-              <span class="field-label">Group <span class="required">*</span></span>
-              <select [(ngModel)]="clientAccess.groupId" name="clientAccessGroup">
-                <option value="">Select group</option>
-                @for (group of overview.groups; track group.id) {
-                  <option [value]="group.id" [disabled]="!group.has_registration_form">{{ group.name }}</option>
-                }
-              </select>
-            </label>
-
-            <label>
-              <span class="field-label">Client username <span class="required">*</span></span>
-              <input type="text" [(ngModel)]="clientAccess.username" name="clientUsername" autocomplete="username">
-            </label>
-
-            <label>
-              <span class="field-label">Client password <span class="required">*</span></span>
-              <app-password-input [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password" />
-            </label>
-
-            <label>
-              <span class="field-label">Confirm password <span class="required">*</span></span>
-              <app-password-input [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password" />
-            </label>
-          </div>
-
-          @if (selectedRegistrationFields.length) {
-            <div class="dynamic-fields">
-              <h3>Client registration answers</h3>
-              @for (field of selectedRegistrationFields; track field.key || field.label) {
-                <label>
-                  <span class="field-label">{{ field.label }} @if (field.required) { <span class="required">*</span> }</span>
-                  @if (field.field_type === 'long_text' || field.field_type === 'address') {
-                    <textarea rows="3" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label"></textarea>
-                  } @else {
-                    <input [type]="fieldInputType(field)" [(ngModel)]="clientAccess.registrationAnswers[field.key || field.label]" [name]="'access' + field.label" [readonly]="field.is_core">
-                  }
-                </label>
-              }
-            </div>
-          }
-
-          <button type="button" class="primary-action" [disabled]="isSaving" (click)="createClientAccess()">Create client access</button>
         </section>
       }
     }

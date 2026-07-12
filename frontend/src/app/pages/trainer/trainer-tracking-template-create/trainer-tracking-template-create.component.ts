@@ -41,12 +41,14 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
   };
   fields: BuilderField[] = [];
 
+  readonly maxFields = 8;
   readonly fieldTypes: { value: TemplateFieldType; label: string }[] = [
     { value: 'number', label: 'Number' },
     { value: 'short_text', label: 'Short Text' },
     { value: 'long_text', label: 'Long Text' },
     { value: 'yes_no', label: 'Yes / No' },
-    { value: 'image', label: 'Image Upload' }
+    { value: 'dropdown', label: 'Dropdown' },
+    { value: 'rating', label: 'Rating' }
   ];
 
   readonly cadences: { value: TemplateCadence; label: string }[] = [
@@ -73,7 +75,33 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
   }
 
   addField(): void {
+    if (this.fields.length >= this.maxFields) {
+      this.messageType = 'error';
+      this.message = `You have reached the maximum of ${this.maxFields} tracking fields for this template.`;
+      return;
+    }
+
+    this.message = '';
     this.fields = [...this.fields, this.createField('New Target')];
+  }
+
+  needsOptions(field: BuilderField): boolean {
+    return field.field_type === 'dropdown';
+  }
+
+  isRating(field: BuilderField): boolean {
+    return field.field_type === 'rating';
+  }
+
+  optionsText(field: BuilderField): string {
+    return (field.options || []).join(', ');
+  }
+
+  updateOptions(field: BuilderField, value: string): void {
+    field.options = value
+      .split(',')
+      .map((option) => option.trim())
+      .filter(Boolean);
   }
 
   removeField(field: BuilderField): void {
@@ -122,7 +150,9 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
         key: field.key || `field_${index + 1}`,
         label: field.label,
         field_type: field.field_type,
-        placeholder: field.placeholder
+        placeholder: field.placeholder,
+        options: field.field_type === 'dropdown' ? field.options || [] : [],
+        scale: field.field_type === 'rating' ? field.scale || 5 : null
       }))
     };
     const request = this.isEditMode
@@ -170,7 +200,9 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
       localId: this.createLocalId(),
       label,
       field_type: 'number',
-      placeholder: 'Client enters an update'
+      placeholder: 'Client enters an update',
+      options: [],
+      scale: 5
     };
   }
 

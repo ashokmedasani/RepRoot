@@ -1,11 +1,21 @@
 # frontend/src/app/pages/trainer/trainer-client-profile/trainer-client-profile.component.html
 
-Client profile template: hero card with Account & Access button, assigned-templates panel with assign dropdown, intake details grid, entries table with edit actions, insights section (consistency strip, sparklines, notes timeline), shared chat panel, and the Account & Access and entry-edit dialogs.
+## What changed
 
-## Update
+The top profile area now renders a unified Client Information panel instead of splitting key details into unrelated cards/dialog content.
 
-Added the Share References dialog and per-assignment share actions.
+## Why it changed
 
-## Update
+Trainers need to view and edit client details in one predictable place.
 
-Two-panel layout with detail tabs and four dialogs (Account & Access, Share References, Add Entry, Edit Entry).
+## UI behavior
+
+View mode shows core client identity, group/status, joined date, reference ID, and registration answers. Edit mode shows inline controls plus Save and Cancel actions. Reference ID remains disabled/read-only.
+
+## API impact
+
+Submits editable values through the existing component service layer; no direct API logic lives in the template.
+
+## Testing
+
+Verified with `npm run build`.

@@ -14,31 +14,175 @@
       <p>Loading dashboard...</p>
     </section>
   } @else if (overview) {
-    <section class="stats-grid" aria-label="Key stats">
-      <article class="stat-tile">
-        <span>Groups</span>
-        <strong>{{ overview.groups.length }} / {{ overview.max_groups }}</strong>
-        <p>Client groups by goal</p>
+    <section class="kpi-row" aria-label="Key stats">
+      <article class="kpi-card">
+        <span class="kpi-icon clients" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 19a5 5 0 0 0-3-4.6"/></svg>
+        </span>
+        <div class="kpi-copy">
+          <span>Total Clients</span>
+          <strong>{{ overview.approved_forms.length }}</strong>
+          @if (clientsThisWeek > 0) {
+            <small class="up">&uarr; {{ clientsThisWeek }} this week</small>
+          } @else {
+            <small>With portal access</small>
+          }
+        </div>
       </article>
-      <article class="stat-tile">
-        <span>Approved Clients</span>
-        <strong>{{ overview.approved_forms.length }}</strong>
-        <p>Clients with portal access</p>
+
+      <article class="kpi-card">
+        <span class="kpi-icon groups" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3.5 18a4.5 4.5 0 0 1 9 0M12 18a4.5 4.5 0 0 1 8.5-2"/></svg>
+        </span>
+        <div class="kpi-copy">
+          <span>Total Groups</span>
+          <strong>{{ overview.groups.length }} / {{ overview.max_groups }}</strong>
+          @if (groupsThisWeek > 0) {
+            <small class="up">&uarr; {{ groupsThisWeek }} this week</small>
+          } @else {
+            <small>Client groups</small>
+          }
+        </div>
       </article>
-      <article class="stat-tile">
-        <span>Pending Requests</span>
-        <strong>{{ overview.pending_forms.length }}</strong>
-        <p>Lead form submissions to review</p>
+
+      <article class="kpi-card">
+        <span class="kpi-icon templates" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5V6h6V3.5M8.5 11h7M8.5 15h5"/></svg>
+        </span>
+        <div class="kpi-copy">
+          <span>Total Templates</span>
+          <strong>{{ templates.length }} / {{ maxTemplates }}</strong>
+          @if (templatesThisWeek > 0) {
+            <small class="up">&uarr; {{ templatesThisWeek }} this week</small>
+          } @else {
+            <small>Tracking templates</small>
+          }
+        </div>
       </article>
-      <article class="stat-tile">
-        <span>Templates</span>
-        <strong>{{ templates.length }} / {{ maxTemplates }}</strong>
-        <p>Tracking templates in use</p>
+
+      <article class="kpi-card">
+        <span class="kpi-icon requests" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 3.5h9l3.5 3.5V20.5H6z"/><path d="M15 3.5V7h3.5M9 12h6M9 16h4"/></svg>
+        </span>
+        <div class="kpi-copy">
+          <span>Pending Requests</span>
+          <strong>{{ overview.pending_forms.length }}</strong>
+          <small>Lead submissions to review</small>
+        </div>
+      </article>
+
+      <article class="kpi-card">
+        <span class="kpi-icon programs" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V5M4 19h16M8 15l3.5-4 3 2.5L20 8"/></svg>
+        </span>
+        <div class="kpi-copy">
+          <span>Active Programs</span>
+          <strong>{{ activePrograms }}</strong>
+          <small>Template assignments</small>
+        </div>
       </article>
     </section>
 
-    <section class="dashboard-grid">
-      <article class="panel">
+    <section class="overview-panel">
+      <div class="overview-head">
+        <div class="overview-title">
+          <span class="overview-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3.5v3M16 3.5v3"/></svg>
+          </span>
+          <div>
+            <h2>Schedule Overview</h2>
+            <p>
+              @if (scheduleSummary.nearest_date) {
+                Next follow-up on {{ scheduleSummary.nearest_date | date: 'mediumDate' }}
+              } @else {
+                No pending follow-ups scheduled
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="sched-tiles">
+        <article class="sched-tile total">
+          <strong>{{ scheduleSummary.total_pending }}</strong>
+          <span>Total Pending</span>
+        </article>
+        <article class="sched-tile" [class.alert]="scheduleSummary.due_24_hours > 0">
+          <strong>{{ scheduleSummary.due_24_hours }}</strong>
+          <span>Within 24 Hours</span>
+        </article>
+        <article class="sched-tile">
+          <strong>{{ scheduleSummary.due_5_days }}</strong>
+          <span>Within 5 Days</span>
+        </article>
+        <article class="sched-tile">
+          <strong>{{ scheduleSummary.due_7_days }}</strong>
+          <span>Within 7 Days</span>
+        </article>
+        <article class="sched-tile">
+          <strong>{{ scheduleSummary.due_10_days }}</strong>
+          <span>Within 10 Days</span>
+        </article>
+      </div>
+
+      <button type="button" class="upcoming-trigger" (click)="toggleSchedules()" [attr.aria-expanded]="isSchedulesOpen">
+        <span>Upcoming Schedules (Next 10)</span>
+        <span class="caret" [class.open]="isSchedulesOpen" aria-hidden="true">&#9662;</span>
+      </button>
+
+      @if (isSchedulesOpen) {
+        <div class="sched-table-wrap">
+          @if (visibleUpcomingReminders.length) {
+            <table class="sched-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Schedule Title</th>
+                  <th>Date &amp; Time</th>
+                  <th>When</th>
+                  <th>Status</th>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (reminder of visibleUpcomingReminders; track reminder.id) {
+                  <tr>
+                    <td data-label="Client"><strong>{{ reminder.client_name }}</strong></td>
+                    <td data-label="Schedule Title">{{ reminder.title }}</td>
+                    <td data-label="Date &amp; Time">{{ reminder.date | date: 'dd MMM yyyy' }}{{ reminder.time ? ', ' + reminder.time : '' }}</td>
+                    <td data-label="When">
+                      <span class="when-chip" [class.soon]="isReminderSoon(reminder.date, reminder.time)">{{ relativeTime(reminder.date, reminder.time) }}</span>
+                    </td>
+                    <td data-label="Status"><span class="status-chip">{{ reminder.status }}</span></td>
+                    <td data-label="Actions" class="actions-col">
+                      <a class="ghost-action compact" [routerLink]="['/trainer/clients', reminder.client]">Open</a>
+                      <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Complete</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="empty-note">No pending schedules.</p>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="accordion-panel">
+      <button type="button" class="accordion-trigger" (click)="toggleActivity()" [attr.aria-expanded]="isActivityOpen">
+        <span class="trigger-copy">
+          <strong>Activity</strong>
+          <small>{{ pendingRequests.length }} requests &middot; {{ allRecentClients.length }} clients &middot; {{ templates.length }} templates</small>
+        </span>
+        <span class="trigger-side">
+          <span class="caret" [class.open]="isActivityOpen" aria-hidden="true">&#9662;</span>
+        </span>
+      </button>
+
+      @if (isActivityOpen) {
+        <div class="accordion-body dashboard-grid">
+          <article class="activity-card">
         <div class="panel-heading">
           <div>
             <h2>Pending Requests</h2>
@@ -46,7 +190,7 @@
           </div>
           <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
         </div>
-        <div class="mini-list">
+        <div class="mini-list" [class.scrollable]="pendingRequests.length > 5">
           @for (submission of pendingRequests.slice(0, 5); track submission.id) {
             <a routerLink="/trainer/forms-groups">
               <span class="avatar">{{ initialsForSubmission(submission) }}</span>
@@ -59,9 +203,9 @@
             <p class="empty-note">No pending requests right now.</p>
           }
         </div>
-      </article>
+          </article>
 
-      <article class="panel">
+          <article class="activity-card">
         <div class="panel-heading">
           <div>
             <h2>Recent Clients</h2>
@@ -69,7 +213,7 @@
           </div>
           <a routerLink="/trainer/clients" class="ghost-action compact">View All</a>
         </div>
-        <div class="mini-list">
+        <div class="mini-list" [class.scrollable]="allRecentClients.length > 5">
           @for (submission of recentClients; track submission.id) {
             <a [routerLink]="['/trainer/clients', submission.client_access?.id]">
               <span class="avatar">{{ initialsForSubmission(submission) }}</span>
@@ -82,18 +226,18 @@
             <p class="empty-note">No approved clients yet.</p>
           }
         </div>
-      </article>
+          </article>
 
-      <article class="panel">
+          <article class="activity-card">
         <div class="panel-heading">
           <div>
-            <h2>Templates</h2>
+            <h2>Recent Templates</h2>
             <p>Your shared tracking templates.</p>
           </div>
           <a routerLink="/trainer/templates" class="ghost-action compact">Manage</a>
         </div>
-        <div class="mini-list">
-          @for (template of templates; track template.id) {
+        <div class="mini-list" [class.scrollable]="templates.length > 5">
+          @for (template of recentTemplates; track template.id) {
             <a [routerLink]="['/trainer/templates', template.id, 'edit']">
               <span class="avatar template-avatar" [class.green]="template.accent === 'green'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">{{ template.name.charAt(0) }}</span>
               <span>
@@ -105,7 +249,9 @@
             <p class="empty-note">No templates yet. Adopt a standard template to get started.</p>
           }
         </div>
-      </article>
+          </article>
+        </div>
+      }
     </section>
   }
 </app-trainer-page-shell>

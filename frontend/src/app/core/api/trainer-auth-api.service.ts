@@ -66,9 +66,6 @@ export interface TrainerAuthResponse {
 export interface TrainerSignupPayload {
   email: string;
   username: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
   password: string;
   confirm_password: string;
   email_verification_token: string;
@@ -82,11 +79,13 @@ export interface TrainerProfile {
   email: string;
   username: string;
   first_name: string;
+  middle_name: string;
   last_name: string;
   trainer_id: string | null;
   trainer_code: string | null;
   profile_setup_completed: boolean;
   profile_photo_url: string;
+  phone: string;
   gender: string;
   birth_month: number | null;
   birth_year: number | null;
@@ -109,6 +108,29 @@ export interface TrainerProfile {
   instagram_url: string;
   youtube_url: string;
   website_url: string;
+  profile_images: TrainerProfileImage[];
+  profile_links: TrainerProfileLink[];
+  profile_visibility: TrainerProfileVisibility;
+}
+
+export interface TrainerProfileImage {
+  category: string;
+  title: string;
+  url: string;
+}
+
+export interface TrainerProfileLink {
+  title: string;
+  url: string;
+}
+
+export interface TrainerProfileVisibility {
+  about: boolean;
+  professional_summary: boolean;
+  training_style: boolean;
+  certification: boolean;
+  images: boolean;
+  links: boolean;
 }
 
 export interface TrainerProfileSaveResponse {
@@ -140,6 +162,16 @@ export class TrainerAuthApiService {
     return this.http.put<{ trainer_code: string; message: string }>(
       `${this.apiBaseUrl}/trainer/account/trainer-code/`,
       { trainer_code: trainerCode },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateProfileVisibility(
+    visibility: TrainerProfileVisibility
+  ): Observable<{ profile_visibility: TrainerProfileVisibility; message: string }> {
+    return this.http.put<{ profile_visibility: TrainerProfileVisibility; message: string }>(
+      `${this.apiBaseUrl}/trainer/profile/visibility/`,
+      { visibility },
       { headers: this.getAuthHeaders() }
     );
   }

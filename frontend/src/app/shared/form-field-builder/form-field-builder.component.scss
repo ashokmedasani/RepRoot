@@ -171,6 +171,51 @@ p {
   color: #ffffff;
 }
 
+/* ---- compact suggestion chips ---- */
+.section-heading.compact {
+  align-items: center;
+}
+
+.link-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--app-primary-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.1rem;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 35%, var(--app-border));
+  border-radius: 999px;
+  padding: 0 0.85rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.field-chip:hover {
+  background: color-mix(in srgb, var(--app-primary) 20%, var(--app-surface));
+  transform: translateY(-1px);
+}
+
+.chip-plus {
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .field-card {
   display: grid;
   gap: 1rem;

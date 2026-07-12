@@ -109,7 +109,59 @@ export interface ClientAccessPayload {
   username: string;
   password: string;
   confirm_password: string;
+  photo?: string;
   registration_answers: Record<string, string>;
+}
+
+export type AdditionalInfoType = 'text' | 'link' | 'reference';
+
+export interface AdditionalInfoItem {
+  id: string;
+  title: string;
+  type: AdditionalInfoType;
+  visibility?: 'private' | 'client';
+  text?: string;
+  link?: string;
+  reference_id?: number;
+  reference_title?: string;
+}
+
+export type ReminderStatus = 'pending' | 'done';
+
+export interface ClientReminder {
+  id: number;
+  client: number;
+  client_name: string;
+  title: string;
+  date: string;
+  time: string | null;
+  notes: string;
+  status: ReminderStatus;
+  notify_trainer: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScheduleSummary {
+  total_pending: number;
+  due_24_hours: number;
+  due_5_days: number;
+  due_7_days: number;
+  due_10_days: number;
+  nearest_date: string;
+}
+
+export interface ProgressEntry {
+  id: number;
+  client: number;
+  title: string;
+  date: string;
+  notes: string;
+  status: string;
+  next_step: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ClientAccessRecord {
@@ -122,7 +174,10 @@ export interface ClientAccessRecord {
   last_name: string;
   email: string;
   username: string;
+  photo: string;
   registration_answers: Record<string, string>;
+  additional_info: AdditionalInfoItem[];
+  additional_info_shared: boolean;
   must_change_password: boolean;
   is_active: boolean;
   created_at: string;
@@ -134,6 +189,17 @@ export interface GroupUsersResponse {
   clients: ClientAccessRecord[];
 }
 
+export interface ClientDetailChangeRequest {
+  id: number;
+  client: number;
+  proposed_answers: Record<string, string>;
+  status: 'pending' | 'approved' | 'rejected';
+  client_note: string;
+  trainer_note: string;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export interface ClientAccessDetailResponse {
   client: ClientAccessRecord;
   group: TrainerGroup;
@@ -141,6 +207,7 @@ export interface ClientAccessDetailResponse {
   lead_submission: LeadSubmission;
   trainer_notes: string;
   trainer_notes_updated_at: string | null;
+  pending_change_request: ClientDetailChangeRequest | null;
 }
 
 export interface MessageResponse {
@@ -223,6 +290,24 @@ export class FormsGroupsApiService {
     });
   }
 
+  updateClientProfile(
+    clientId: number,
+    payload: Partial<{
+      first_name: string;
+      last_name: string;
+      email: string;
+      username: string;
+      is_active: boolean;
+      registration_answers: Record<string, string>;
+    }>
+  ): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.put<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
   saveTrainerNotes(
     clientId: number,
     notes: string
@@ -230,6 +315,142 @@ export class FormsGroupsApiService {
     return this.http.put<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }>(
       `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/notes/`,
       { notes },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateClientPhoto(clientId: number, photo: string): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.put<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/photo/`,
+      { photo },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateClientAdditionalInfo(
+    clientId: number,
+    items: AdditionalInfoItem[],
+    shared?: boolean
+  ): Observable<{ client: ClientAccessRecord; message: string }> {
+    const body: { additional_info: AdditionalInfoItem[]; additional_info_shared?: boolean } = { additional_info: items };
+
+    if (shared !== undefined) {
+      body.additional_info_shared = shared;
+    }
+
+    return this.http.put<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/additional-info/`,
+      body,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  // ----- follow-up reminders -----
+
+  getClientReminders(clientId: number): Observable<{ reminders: ClientReminder[] }> {
+    return this.http.get<{ reminders: ClientReminder[] }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  createClientReminder(
+    clientId: number,
+    payload: { title: string; date: string; time: string | null; notes: string; notify_trainer: boolean }
+  ): Observable<{ reminder: ClientReminder; message: string }> {
+    return this.http.post<{ reminder: ClientReminder; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateReminder(
+    reminderId: number,
+    payload: Partial<{ title: string; date: string; time: string | null; notes: string; status: ReminderStatus; notify_trainer: boolean }>
+  ): Observable<{ reminder: ClientReminder; message: string }> {
+    return this.http.put<{ reminder: ClientReminder; message: string }>(
+      `${this.apiBaseUrl}/trainer/reminders/${reminderId}/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  deleteReminder(reminderId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiBaseUrl}/trainer/reminders/${reminderId}/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; summary: ScheduleSummary }> {
+    return this.http.get<{ reminders: ClientReminder[]; summary: ScheduleSummary }>(`${this.apiBaseUrl}/trainer/reminders/upcoming/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  // ----- progress records -----
+
+  getClientProgress(clientId: number): Observable<{ progress: ProgressEntry[] }> {
+    return this.http.get<{ progress: ProgressEntry[] }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  createProgress(
+    clientId: number,
+    payload: { title: string; date: string; notes: string; status: string; next_step: string }
+  ): Observable<{ progress: ProgressEntry; message: string }> {
+    return this.http.post<{ progress: ProgressEntry; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateProgress(
+    entryId: number,
+    payload: Partial<{ title: string; date: string; notes: string; status: string; next_step: string }>
+  ): Observable<{ progress: ProgressEntry; message: string }> {
+    return this.http.put<{ progress: ProgressEntry; message: string }>(
+      `${this.apiBaseUrl}/trainer/progress/${entryId}/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  reviewChangeRequest(
+    clientId: number,
+    requestId: number,
+    action: 'approve' | 'reject',
+    note = ''
+  ): Observable<{ change_request: ClientDetailChangeRequest; client: ClientAccessRecord; message: string }> {
+    return this.http.post<{ change_request: ClientDetailChangeRequest; client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/change-requests/${requestId}/`,
+      { action, note },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateClientStatus(clientId: number, isActive: boolean): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.put<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/status/`,
+      { is_active: isActive },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  resetClient(clientId: number): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.post<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reset/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  deleteClient(clientId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/delete/`,
       { headers: this.getAuthHeaders() }
     );
   }

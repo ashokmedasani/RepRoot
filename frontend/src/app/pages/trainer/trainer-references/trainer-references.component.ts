@@ -14,24 +14,20 @@ import {
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
 
-type ReferenceTypeLabel = 'Video Link' | 'PDF' | 'Image' | 'Document' | 'Text Note' | 'External Link';
+type ReferenceTypeLabel = 'Video Link' | 'PDF Link' | 'Text' | 'Image';
 
 const TYPE_LABELS: Record<ReferenceType, ReferenceTypeLabel> = {
   video_link: 'Video Link',
-  pdf: 'PDF',
+  pdf: 'PDF Link',
   image: 'Image',
-  document: 'Document',
-  text_note: 'Text Note',
-  external_link: 'External Link'
+  text_note: 'Text'
 };
 
 const TYPE_VALUES: Record<ReferenceTypeLabel, ReferenceType> = {
   'Video Link': 'video_link',
-  'PDF': 'pdf',
+  'PDF Link': 'pdf',
   'Image': 'image',
-  'Document': 'document',
-  'Text Note': 'text_note',
-  'External Link': 'external_link'
+  'Text': 'text_note'
 };
 
 interface TrainerReferenceView {
@@ -64,7 +60,9 @@ interface ReferenceForm {
 
 interface CategoryForm {
   name: string;
+  description: string;
   subcategoriesText: string;
+  categoryId: number;
 }
 
 @Component({
@@ -78,11 +76,13 @@ export class TrainerReferencesComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly referencesApi = inject(ReferencesApiService);
 
-  readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF', 'Image', 'Document', 'Text Note', 'External Link'];
+  readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF Link', 'Text', 'Image'];
   readonly references = signal<TrainerReferenceView[]>([]);
   readonly categories = signal<ReferenceCategoryRecord[]>([]);
   readonly selectedCategory = signal('All References');
   readonly selectedReferenceId = signal(0);
+  readonly expandedCategory = signal('');
+  readonly expandedReferenceId = signal(0);
   readonly query = signal('');
   readonly message = signal('');
   readonly isEditorOpen = signal(false);
@@ -90,11 +90,9 @@ export class TrainerReferencesComponent implements OnInit {
   readonly isSaving = signal(false);
 
   readonly categoryNames = computed(() => this.categories().map((category) => category.name));
-  readonly subcategories = computed(() =>
-    Array.from(new Set(this.categories().flatMap((category) => category.subcategories))).sort((first, second) =>
-      first.localeCompare(second)
-    )
-  );
+  subcategoriesFor(categoryId: number | null): string[] {
+    return this.categories().find((category) => category.id === categoryId)?.subcategories || [];
+  }
 
   form: ReferenceForm = this.emptyForm();
   categoryForm: CategoryForm = this.emptyCategoryForm();
@@ -144,14 +142,46 @@ export class TrainerReferencesComponent implements OnInit {
     this.selectedReferenceId.set(reference.id);
   }
 
-  addReference(type: ReferenceTypeLabel = 'Video Link'): void {
+  toggleCategory(name: string): void {
+    this.expandedCategory.set(this.expandedCategory() === name ? '' : name);
+    this.expandedReferenceId.set(0);
+  }
+
+  toggleReference(id: number): void {
+    this.expandedReferenceId.set(this.expandedReferenceId() === id ? 0 : id);
+  }
+
+  isCategoryOpen(name: string): boolean {
+    return this.expandedCategory() === name || Boolean(this.query().trim());
+  }
+
+  referencesForCategory(name: string): TrainerReferenceView[] {
+    const search = this.query().trim().toLowerCase();
+
+    return this.references().filter((reference) => {
+      if (reference.category !== name) {
+        return false;
+      }
+
+      if (!search) {
+        return true;
+      }
+
+      return [reference.title, reference.subcategory, reference.type, reference.description, reference.tags.join(' ')]
+        .join(' ')
+        .toLowerCase()
+        .includes(search);
+    });
+  }
+
+  addReference(type: ReferenceTypeLabel = 'Video Link', category?: ReferenceCategoryRecord, subcategory = ''): void {
     if (!this.categories().length) {
       this.addCategory();
       this.message.set('Create a category first, then add references inside it.');
       return;
     }
 
-    this.form = this.emptyForm(type);
+    this.form = this.emptyForm(type, category, subcategory);
     this.isEditorOpen.set(true);
     this.message.set('');
   }
@@ -159,6 +189,18 @@ export class TrainerReferencesComponent implements OnInit {
   addCategory(): void {
     this.categoryForm = this.emptyCategoryForm();
     this.isCategoryEditorOpen.set(true);
+    this.message.set('');
+  }
+
+  addSubcategory(category: ReferenceCategoryRecord): void {
+    this.categoryForm = {
+      categoryId: category.id,
+      name: category.name,
+      description: category.description || '',
+      subcategoriesText: ''
+    };
+    this.isCategoryEditorOpen.set(true);
+    this.message.set('');
   }
 
   saveCategory(): void {
@@ -170,10 +212,24 @@ export class TrainerReferencesComponent implements OnInit {
     }
 
     this.isSaving.set(true);
-    this.referencesApi.createCategory(name, this.parseSubcategories(this.categoryForm.subcategoriesText)).subscribe({
+    const existingCategory = this.categories().find((category) => category.id === this.categoryForm.categoryId);
+    const subcategories = existingCategory
+      ? [...existingCategory.subcategories, ...this.parseSubcategories(this.categoryForm.subcategoriesText)]
+      : this.parseSubcategories(this.categoryForm.subcategoriesText);
+    const uniqueSubcategories = Array.from(new Set(subcategories.map((item) => item.trim()).filter(Boolean)));
+    const request = existingCategory
+      ? this.referencesApi.updateCategory(existingCategory.id, name, this.categoryForm.description.trim(), uniqueSubcategories)
+      : this.referencesApi.createCategory(name, this.categoryForm.description.trim(), uniqueSubcategories);
+
+    request.subscribe({
       next: (response) => {
-        this.categories.set([...this.categories(), response.category]);
+        this.categories.set(
+          existingCategory
+            ? this.categories().map((category) => (category.id === response.category.id ? response.category : category))
+            : [...this.categories(), response.category]
+        );
         this.selectedCategory.set(response.category.name);
+        this.expandedCategory.set(response.category.name);
         this.isCategoryEditorOpen.set(false);
         this.isSaving.set(false);
         this.message.set(response.message);
@@ -302,22 +358,15 @@ export class TrainerReferencesComponent implements OnInit {
       return;
     }
 
-    if (file.type.startsWith('video/')) {
-      this.message.set('Video upload is not supported. Add a YouTube video link instead.');
+    if (!file.type.startsWith('image/')) {
+      this.message.set('Only image uploads are supported for image references.');
       input.value = '';
       return;
     }
 
     this.form.file = file;
     this.form.fileName = file.name;
-
-    if (file.type === 'application/pdf') {
-      this.form.type = 'PDF';
-    } else if (file.type.startsWith('image/')) {
-      this.form.type = 'Image';
-    } else if (this.form.type === 'Video Link') {
-      this.form.type = 'Document';
-    }
+    this.form.type = 'Image';
   }
 
   openReference(reference: TrainerReferenceView): void {
@@ -399,7 +448,7 @@ export class TrainerReferencesComponent implements OnInit {
 
     if (this.form.type === 'Video Link') {
       if (!this.form.link.trim()) {
-        return 'Paste a YouTube video link.';
+        return 'Paste a video URL.';
       }
 
       if (this.form.file) {
@@ -411,31 +460,34 @@ export class TrainerReferencesComponent implements OnInit {
       }
     }
 
-    if (
-      this.form.type !== 'Text Note' &&
-      this.form.type !== 'Video Link' &&
-      !this.form.link.trim() &&
-      !this.form.file &&
-      !this.form.fileName
-    ) {
-      return 'Add a link or upload a file.';
+    if (this.form.type === 'PDF Link' && !this.form.link.trim()) {
+      return 'Paste a PDF URL.';
+    }
+
+    if (this.form.type === 'Text' && !this.form.description.trim()) {
+      return 'Add text for this reference.';
+    }
+
+    if (this.form.type === 'Image' && !this.form.file && !this.form.fileName) {
+      return 'Upload an image.';
     }
 
     return '';
   }
 
-  private emptyForm(type: ReferenceTypeLabel = 'Video Link'): ReferenceForm {
+  private emptyForm(type: ReferenceTypeLabel = 'Video Link', providedCategory?: ReferenceCategoryRecord, subcategory = ''): ReferenceForm {
     const selectedCategory = this.selectedCategory();
     const category =
-      selectedCategory !== 'All References'
+      providedCategory ||
+      (selectedCategory !== 'All References'
         ? this.categories().find((item) => item.name === selectedCategory)
-        : this.categories()[0];
+        : this.categories()[0]);
 
     return {
       id: 0,
       title: '',
       categoryId: category?.id || null,
-      subcategory: category?.subcategories[0] || '',
+      subcategory: subcategory || category?.subcategories[0] || '',
       type,
       description: '',
       link: '',
@@ -448,7 +500,9 @@ export class TrainerReferencesComponent implements OnInit {
   private emptyCategoryForm(): CategoryForm {
     return {
       name: '',
-      subcategoriesText: ''
+      description: '',
+      subcategoriesText: '',
+      categoryId: 0
     };
   }
 

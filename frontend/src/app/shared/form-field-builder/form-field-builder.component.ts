@@ -62,28 +62,6 @@ export class FormFieldBuilderComponent {
       required: true
     },
     {
-      icon: 'LO',
-      label: 'Location',
-      field_type: 'location',
-      placeholder: 'Country and state',
-      help_text: 'Country selector with state or region selector.'
-    },
-    {
-      icon: 'SD',
-      label: 'Preferred Start Date',
-      field_type: 'date',
-      placeholder: 'Choose start date',
-      help_text: 'Calendar picker for when the client wants to begin.'
-    },
-    {
-      icon: 'WT',
-      label: 'Preferred Workout Time',
-      field_type: 'dropdown',
-      placeholder: 'Select workout time',
-      help_text: 'Morning, afternoon, evening, or night preference.',
-      options: ['Morning', 'Afternoon', 'Evening', 'Night']
-    },
-    {
       icon: 'EX',
       label: 'Training Experience',
       field_type: 'dropdown',
@@ -92,71 +70,56 @@ export class FormFieldBuilderComponent {
       options: ['Beginner', 'Intermediate', 'Advanced']
     },
     {
-      icon: 'KG',
-      label: 'Current Weight',
-      field_type: 'number',
-      placeholder: 'Enter weight',
-      help_text: 'Number field with kg/lbs unit selector.'
-    },
-    {
-      icon: 'HT',
-      label: 'Height',
-      field_type: 'number',
-      placeholder: 'Enter height',
-      help_text: 'Number field with unit selector.'
-    },
-    {
-      icon: 'AG',
-      label: 'Age',
-      field_type: 'number',
-      placeholder: 'Enter age',
-      help_text: 'Simple numeric age field.'
-    },
-    {
-      icon: 'GE',
-      label: 'Gender',
-      field_type: 'dropdown',
-      placeholder: 'Select gender',
-      help_text: 'Dropdown for client profile context.',
-      options: ['Female', 'Male', 'Non-binary', 'Prefer not to say']
-    },
-    {
-      icon: 'DI',
-      label: 'Dietary Preference',
-      field_type: 'dropdown',
-      placeholder: 'Select dietary preference',
-      help_text: 'Useful for nutrition coaching and meal guidance.',
-      options: ['Vegetarian', 'Vegan', 'Non-vegetarian', 'Pescatarian', 'Keto', 'No preference']
-    },
-    {
-      icon: 'IN',
-      label: 'Previous Injuries',
-      field_type: 'long_text',
-      placeholder: 'Describe previous injuries',
-      help_text: 'Multi-line field for injury history.'
-    },
-    {
       icon: 'MC',
-      label: 'Medical Conditions',
+      label: 'Medical Conditions or Injuries',
       field_type: 'long_text',
-      placeholder: 'List medical conditions',
-      help_text: 'Multi-line field for important health context.'
+      placeholder: 'List medical conditions or past injuries',
+      help_text: 'Important health context before training begins.'
     },
     {
-      icon: 'NO',
-      label: 'Additional Notes',
-      field_type: 'long_text',
-      placeholder: 'Anything else the trainer should know?',
-      help_text: 'Large text field for extra client notes.'
+      icon: 'TM',
+      label: 'Preferred Training Mode',
+      field_type: 'dropdown',
+      placeholder: 'Select mode',
+      help_text: 'Online, in person, or hybrid coaching preference.',
+      options: ['Online', 'In Person', 'Hybrid']
     }
   ];
+
+  showAllChips = false;
+
+  private readonly primaryChips = [
+    'Phone Number',
+    'Primary Goal',
+    'Training Experience',
+    'Medical Conditions or Injuries',
+    'Preferred Training Mode'
+  ];
+
+  get visibleRecommended(): FitnessFieldTemplate[] {
+    const primary = this.primaryChips
+      .map((label) => this.recommendedFields.find((field) => field.label === label))
+      .filter((field): field is FitnessFieldTemplate => Boolean(field));
+
+    if (!this.showAllChips) {
+      return primary;
+    }
+
+    const rest = this.recommendedFields.filter((field) => !this.primaryChips.includes(field.label));
+    return [...primary, ...rest];
+  }
+
+  toggleAllChips(): void {
+    this.showAllChips = !this.showAllChips;
+  }
 
   addField(): void {
     this.customFields.push({ ...this.createEmptyField(), isEditing: true });
   }
 
   addRecommendedField(template: FitnessFieldTemplate): void {
-    this.customFields.push(this.createFieldFromTemplate(template));
+    // Insert the suggested field and open its settings panel immediately.
+    this.customFields.push(this.createFieldFromTemplate(template, true));
   }
 
   removeField(index: number): void {
@@ -259,7 +222,7 @@ export class FormFieldBuilderComponent {
     };
   }
 
-  private createFieldFromTemplate(template: FitnessFieldTemplate): DynamicField {
+  private createFieldFromTemplate(template: FitnessFieldTemplate, isEditing = false): DynamicField {
     return {
       label: template.label,
       field_type: template.field_type,
@@ -267,7 +230,7 @@ export class FormFieldBuilderComponent {
       placeholder: template.placeholder,
       help_text: template.help_text,
       options: [...(template.options || [])],
-      isEditing: false
+      isEditing
     };
   }
 }

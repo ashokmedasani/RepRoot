@@ -7,19 +7,22 @@ p {
 .panel {
   border: 1px solid var(--app-border);
   border-radius: var(--app-panel-radius);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-sm);
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
   padding: var(--app-panel-padding);
   margin-bottom: 1rem;
+  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .panel h2 {
   color: var(--app-text);
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .panel p {
   color: var(--app-muted);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .slots-panel {
@@ -33,7 +36,7 @@ p {
   display: grid;
   justify-items: center;
   border: 1px solid var(--app-border);
-  border-radius: 0.75rem;
+  border-radius: var(--app-radius-lg);
   padding: 0.7rem 1.1rem;
   background: var(--app-surface-soft);
 }
@@ -41,14 +44,16 @@ p {
 .slots-indicator strong {
   color: var(--app-primary-strong);
   font-size: 1.3rem;
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .slots-indicator span {
   color: var(--app-muted);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
 }
 
 .slots-full-note {
@@ -76,9 +81,16 @@ p {
   align-content: start;
   border: 1px solid var(--app-border);
   border-left: 4px solid var(--app-primary);
-  border-radius: 0.75rem;
-  padding: 1rem;
+  border-radius: var(--app-radius-lg);
+  padding: 1.1rem;
   background: var(--app-surface-soft);
+  transition: transform var(--app-transition-normal), box-shadow var(--app-transition-normal), border-color var(--app-transition-normal);
+}
+
+.template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-lg);
+  border-color: color-mix(in srgb, var(--app-primary) 25%, var(--app-border));
 }
 
 .template-card.green {
@@ -106,10 +118,12 @@ p {
 
 .template-card-head h3 {
   color: var(--app-text);
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .template-card-head span {
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   padding: 0.25rem 0.6rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
@@ -141,7 +155,7 @@ p {
 
 .template-stats span {
   border: 1px solid var(--app-border);
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   padding: 0.22rem 0.6rem;
   background: var(--app-surface);
   color: var(--app-muted);
@@ -157,7 +171,7 @@ p {
 .adopted-pill {
   justify-self: start;
   border: 1px solid color-mix(in srgb, var(--app-success) 35%, var(--app-border));
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   padding: 0.3rem 0.7rem;
   background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface));
   color: var(--app-success);
@@ -169,46 +183,32 @@ p {
   border-left-color: var(--app-border);
 }
 
-.primary-action,
-.secondary-action,
+/* Primary/secondary buttons come from the global premium button styles. */
 .danger-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.5rem;
-  border-radius: 0.65rem;
+  min-height: var(--app-control-height);
+  border: 1px solid color-mix(in srgb, #d92d20 40%, var(--app-border));
+  border-radius: var(--app-radius-md);
   padding: 0 0.9rem;
+  background: color-mix(in srgb, #d92d20 8%, var(--app-surface));
+  color: #d92d20;
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
+  transition: background var(--app-transition-fast), transform var(--app-transition-fast);
 }
 
-.primary-action {
-  border: 1px solid var(--app-primary);
-  background: var(--app-primary);
+.danger-action:hover:not(:disabled) {
+  background: #d92d20;
   color: #ffffff;
-}
-
-.secondary-action {
-  border: 1px solid var(--app-primary);
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-}
-
-.secondary-action:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.danger-action {
-  border: 1px solid color-mix(in srgb, #d92d20 40%, var(--app-border));
-  background: color-mix(in srgb, #d92d20 8%, var(--app-surface));
-  color: #d92d20;
+  transform: translateY(-1px);
 }
 
 .message {
   border: 1px solid color-mix(in srgb, var(--app-success) 32%, var(--app-border));
-  border-radius: 0.7rem;
+  border-radius: var(--app-radius-md);
   padding: 0.75rem;
   background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
   color: var(--app-text);

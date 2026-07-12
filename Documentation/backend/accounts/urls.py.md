@@ -65,3 +65,7 @@ Added `trainer/forms-groups/clients/<id>/notes/`.
 ## Update 4
 
 Added `trainer/check-trainer-code/` and `trainer/account/trainer-code/`.
+
+## Update 5
+
+Added `client/progress/` for read-only client portal progress notes.

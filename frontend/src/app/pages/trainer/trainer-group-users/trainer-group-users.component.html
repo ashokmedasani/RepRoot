@@ -55,7 +55,7 @@
       </nav>
 
       @if (activeTab === 'overview') {
-        <section class="workspace-grid">
+        <section class="overview-stack">
           <article class="panel">
             <div class="panel-header">
               <div>
@@ -82,16 +82,15 @@
             </div>
           </article>
 
-          <article class="panel">
+          <article class="panel recent-approved-panel">
             <div class="panel-header">
               <div>
                 <h2>Recent Approved Users</h2>
-                <p>Open a profile to check registration answers and access status.</p>
+                <p>Latest active clients in this group.</p>
               </div>
-              <button type="button" class="ghost-action" (click)="setTab('approved-users')">View All</button>
             </div>
-            <div class="mini-list">
-              @for (client of clients.slice(0, 5); track client.id) {
+            <div class="mini-list wide">
+              @for (client of recentApprovedUsers; track client.id) {
                 <a [routerLink]="['/trainer/clients', client.id]">
                   <span class="avatar">{{ initials(client) }}</span>
                   <span>
@@ -108,7 +107,7 @@
       }
 
       @if (activeTab === 'approved-users') {
-        <section>
+        <section class="overview-stack">
           <article class="panel">
             <div class="panel-header">
               <div>
@@ -164,81 +163,72 @@
               </table>
             </div>
           </article>
-
         </section>
       }
 
       @if (activeTab === 'registration-form') {
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <h2>Client Registration Form</h2>
-              <p>Fields collected when a lead becomes a client in this group.</p>
+        <section class="overview-stack">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Client Registration Form</h2>
+                <p>Fields collected when a lead becomes a client in this group.</p>
+              </div>
+              <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
             </div>
-            <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
-          </div>
 
-          <div class="field-groups">
-            <article>
-              <h3>Universal Fields</h3>
-              @for (field of registrationFields.slice(0, 3); track field.key || field.label) {
-                <div class="field-row">
-                  <span>{{ field.label }}</span>
-                  <small>Required</small>
-                </div>
-              }
-            </article>
-            <article>
-              <h3>Custom Fields</h3>
-              @for (field of customRegistrationFields; track field.key || field.label) {
-                <div class="field-row">
-                  <span>{{ field.label }}</span>
-                  <small>{{ field.field_type }} - {{ field.required ? 'Required' : 'Optional' }}</small>
-                </div>
-              } @empty {
-                <p>No custom registration fields yet.</p>
-              }
-            </article>
-          </div>
+            <div class="field-groups">
+              <article>
+                <h3>Universal Fields</h3>
+                @for (field of registrationFields.slice(0, 3); track field.key || field.label) {
+                  <div class="field-row">
+                    <span>{{ field.label }}</span>
+                    <small>Required</small>
+                  </div>
+                }
+              </article>
+              <article>
+                <h3>Custom Fields</h3>
+                @for (field of customRegistrationFields; track field.key || field.label) {
+                  <div class="field-row">
+                    <span>{{ field.label }}</span>
+                    <small>{{ field.field_type }} - {{ field.required ? 'Required' : 'Optional' }}</small>
+                  </div>
+                } @empty {
+                  <p>No custom registration fields yet.</p>
+                }
+              </article>
+            </div>
+          </article>
         </section>
       }
 
       @if (activeTab === 'settings') {
-        <section class="settings-grid">
-          <article class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Group Settings</h2>
-                <p>Edit the group name and description.</p>
+        <section class="settings-grid single">
+          <article class="panel settings-accordion">
+            <button type="button" class="settings-trigger" (click)="toggleSettings()" [attr.aria-expanded]="isSettingsOpen">
+              <span>
+                <strong>Group Settings</strong>
+                <small>Edit basic group details.</small>
+              </span>
+              <span class="status-pill">{{ isSettingsOpen ? 'Open' : 'Closed' }}</span>
+            </button>
+
+            @if (isSettingsOpen) {
+              <div class="settings-body">
+                <label>
+                  <span class="field-label">Group Name</span>
+                  <input type="text" [(ngModel)]="groupDraft.name" name="groupName">
+                </label>
+
+                <label>
+                  <span class="field-label">Group Description</span>
+                  <textarea rows="5" [(ngModel)]="groupDraft.description" name="groupDescription"></textarea>
+                </label>
+
+                <button type="button" class="primary-action" (click)="saveGroup()">Save Group</button>
               </div>
-            </div>
-
-            <label>
-              <span class="field-label">Group Name</span>
-              <input type="text" [(ngModel)]="groupDraft.name" name="groupName">
-            </label>
-
-            <label>
-              <span class="field-label">Description</span>
-              <textarea rows="5" [(ngModel)]="groupDraft.description" name="groupDescription"></textarea>
-            </label>
-
-            <button type="button" class="primary-action" (click)="saveGroup()">Save Group</button>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Access Rules</h2>
-                <p>Trainer controls for this group.</p>
-              </div>
-            </div>
-            <div class="rules-list">
-              <span>Trainer can review every approved user profile.</span>
-              <span>Trainer can reset any client password.</span>
-              <span>Registration form fields apply to all clients in this group.</span>
-              <span>Tracking templates define daily, weekly, and monthly progress checks.</span>
-            </div>
+            }
           </article>
         </section>
       }

@@ -8,6 +8,18 @@ export const routes: Routes = [
     title: 'Trainer Management Platform'
   },
   {
+    path: 'terms',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'terms' },
+    title: 'Terms & Conditions'
+  },
+  {
+    path: 'privacy',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'privacy' },
+    title: 'Privacy Policy'
+  },
+  {
     path: 'portal',
     loadComponent: () =>
       import('./pages/access-entry-placeholder/access-entry-placeholder.component').then(
@@ -105,6 +117,14 @@ export const routes: Routes = [
         (module) => module.TrainerFormsGroupsComponent
       ),
     title: 'Forms & Groups'
+  },
+  {
+    path: 'trainer/forms-groups/requests/:submissionId',
+    loadComponent: () =>
+      import('./pages/trainer/trainer-form-request-detail/trainer-form-request-detail.component').then(
+        (module) => module.TrainerFormRequestDetailComponent
+      ),
+    title: 'Form Request'
   },
   {
     path: 'trainer/forms/create',

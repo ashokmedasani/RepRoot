@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { MessageResponse } from './forms-groups-api.service';
 import { ReferenceType } from './references-api.service';
 
-export type TemplateFieldType = 'number' | 'short_text' | 'long_text' | 'yes_no' | 'image';
+export type TemplateFieldType = 'number' | 'short_text' | 'long_text' | 'yes_no' | 'dropdown' | 'rating';
 export type TemplateCadence = 'daily' | 'weekly' | 'monthly';
 
 export interface TemplateField {
@@ -13,6 +13,8 @@ export interface TemplateField {
   label: string;
   field_type: TemplateFieldType;
   placeholder: string;
+  options?: string[];
+  scale?: number | null;
 }
 
 export interface TemplateReference {
@@ -77,6 +79,7 @@ export interface TrackingEntryRecord {
   template: number | null;
   template_name: string;
   entry_date: string;
+  entry_time: string | null;
   answers: Record<string, string>;
   note: string;
   edited_by_trainer: boolean;
@@ -206,7 +209,7 @@ export class TemplatesApiService {
 
   updateEntry(
     entryId: number,
-    payload: { answers: Record<string, string>; note: string }
+    payload: { answers: Record<string, string>; note: string; entry_date?: string; entry_time?: string | null }
   ): Observable<{ entry: TrackingEntryRecord; message: string }> {
     return this.http.put<{ entry: TrackingEntryRecord; message: string }>(
       `${this.apiBaseUrl}/trainer/entries/${entryId}/`,

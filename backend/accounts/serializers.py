@@ -1,3 +1,4 @@
+import json
 import re
 
 from django.contrib.auth import authenticate, get_user_model
@@ -9,8 +10,11 @@ from .email_verification import consume_verified_email_token
 from .models import (
   ChatMessage,
   ClientAccess,
+  ClientDetailChangeRequest,
   ClientRegistrationForm,
+  ClientReminder,
   LeadSubmission,
+  ProgressEntry,
   ReferenceCategory,
   TemplateAssignment,
   TrackingEntry,
@@ -106,13 +110,16 @@ def validate_password_strength(password: str) -> None:
 
 
 class UsernameAvailabilitySerializer(serializers.Serializer):
-  username = serializers.CharField(max_length=150)
+  username = serializers.CharField(max_length=10)
 
   def validate_username(self, value: str) -> str:
     username = value.strip().lower()
 
     if not username:
       raise serializers.ValidationError('Username is required.')
+
+    if len(username) < 5:
+      raise serializers.ValidationError('Username must be at least 5 characters.')
 
     return username
 
@@ -146,10 +153,7 @@ class EmailOtpVerifySerializer(serializers.Serializer):
 
 class TrainerSignupSerializer(serializers.Serializer):
   email = serializers.EmailField()
-  username = serializers.CharField(max_length=150)
-  first_name = serializers.CharField(max_length=150)
-  middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
-  last_name = serializers.CharField(max_length=150)
+  username = serializers.CharField(min_length=5, max_length=10)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
   email_verification_token = serializers.CharField(write_only=True)
@@ -185,9 +189,6 @@ class TrainerSignupSerializer(serializers.Serializer):
     return attrs
 
   def create(self, validated_data):
-    profile_data = {
-      'middle_name': validated_data.pop('middle_name', '').strip(),
-    }
     validated_data.pop('confirm_password')
     validated_data.pop('email_verification_token')
     password = validated_data.pop('password')
@@ -197,10 +198,10 @@ class TrainerSignupSerializer(serializers.Serializer):
         username=validated_data['username'],
         email=validated_data['email'],
         password=password,
-        first_name=validated_data['first_name'].strip(),
-        last_name=validated_data['last_name'].strip(),
+        first_name='',
+        last_name='',
       )
-      TrainerProfile.objects.create(user=user, **profile_data)
+      TrainerProfile.objects.create(user=user)
 
     return user
 
@@ -326,6 +327,7 @@ class TrainerProfileStatusSerializer(serializers.ModelSerializer):
 class TrainerProfileSerializer(serializers.ModelSerializer):
   trainer_id = serializers.CharField(max_length=32)
   first_name = serializers.CharField(source='user.first_name', max_length=150)
+  middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
   last_name = serializers.CharField(source='user.last_name', max_length=150)
   email = serializers.EmailField(source='user.email', read_only=True)
   username = serializers.CharField(source='user.username', read_only=True)
@@ -341,10 +343,12 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
       'username',
       'trainer_id',
       'first_name',
+      'middle_name',
       'last_name',
       'profile_setup_completed',
       'profile_photo',
       'profile_photo_url',
+      'phone',
       'gender',
       'birth_month',
       'birth_year',
@@ -370,6 +374,9 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
       'instagram_url',
       'youtube_url',
       'website_url',
+      'profile_images',
+      'profile_links',
+      'profile_visibility',
     ]
     read_only_fields = [
       'profile_setup_completed',
@@ -431,6 +438,56 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('Trainer ID is already taken.')
 
     return trainer_id
+
+  def validate_profile_images(self, value):
+    return self.normalize_profile_collection(value, {'category', 'title', 'url'})
+
+  def validate_profile_links(self, value):
+    return self.normalize_profile_collection(value, {'title', 'url'})
+
+  def validate_profile_visibility(self, value):
+    if isinstance(value, str):
+      try:
+        value = json.loads(value or '{}')
+      except json.JSONDecodeError:
+        raise serializers.ValidationError('Invalid JSON format.')
+
+    if not isinstance(value, dict):
+      raise serializers.ValidationError('Expected an object.')
+
+    allowed_keys = {
+      'about',
+      'professional_summary',
+      'training_style',
+      'certification',
+      'images',
+      'links',
+    }
+
+    return {key: bool(value.get(key, False)) for key in allowed_keys}
+
+  def normalize_profile_collection(self, value, allowed_keys):
+    if isinstance(value, str):
+      try:
+        value = json.loads(value or '[]')
+      except json.JSONDecodeError:
+        raise serializers.ValidationError('Invalid JSON format.')
+
+    if not isinstance(value, list):
+      raise serializers.ValidationError('Expected a list.')
+
+    cleaned_items = []
+
+    for item in value:
+      if not isinstance(item, dict):
+        continue
+
+      cleaned = {key: str(item.get(key, '')).strip() for key in allowed_keys}
+
+      if cleaned.get('title') and cleaned.get('url'):
+        cleaned_items.append(cleaned)
+
+    return cleaned_items
 
   def update(self, instance, validated_data):
     user_data = validated_data.pop('user', {})
@@ -589,6 +646,7 @@ class ClientAccessCreateSerializer(serializers.Serializer):
   username = serializers.CharField(max_length=150)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
+  photo = serializers.CharField(required=False, allow_blank=True, default='')
   registration_answers = serializers.DictField(required=False)
 
   def validate_username(self, value):
@@ -674,8 +732,11 @@ TEMPLATE_FIELD_TYPES = {
   'short_text',
   'long_text',
   'yes_no',
-  'image',
+  'dropdown',
+  'rating',
 }
+
+MAX_TEMPLATE_FIELDS = 8
 
 YOUTUBE_HOSTS = ('youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be')
 
@@ -692,9 +753,14 @@ def is_youtube_link(link: str) -> bool:
 
 
 def normalize_template_fields(fields):
+  fields = fields or []
+
+  if len(fields) > MAX_TEMPLATE_FIELDS:
+    raise serializers.ValidationError({'fields': f'A template can have at most {MAX_TEMPLATE_FIELDS} fields.'})
+
   normalized_fields = []
 
-  for index, field in enumerate(fields or []):
+  for index, field in enumerate(fields):
     label = str(field.get('label', '')).strip()
     field_type = str(field.get('field_type', '')).strip()
 
@@ -704,12 +770,34 @@ def normalize_template_fields(fields):
     if field_type not in TEMPLATE_FIELD_TYPES:
       raise serializers.ValidationError({'fields': f'Field {index + 1} type is not supported.'})
 
+    options = field.get('options', [])
+
+    if isinstance(options, str):
+      options = [option.strip() for option in options.split(',') if option.strip()]
+
+    if not isinstance(options, list):
+      options = []
+
+    options = [str(option).strip() for option in options if str(option).strip()]
+
+    if field_type == 'dropdown' and not options:
+      raise serializers.ValidationError({'fields': f'Field {index + 1} (dropdown) needs at least one option.'})
+
+    try:
+      scale = int(field.get('scale') or 5)
+    except (TypeError, ValueError):
+      scale = 5
+
+    scale = min(10, max(2, scale))
+
     normalized_fields.append(
       {
         'key': str(field.get('key') or f'field_{index + 1}').strip(),
         'label': label,
         'field_type': field_type,
         'placeholder': str(field.get('placeholder', '')).strip(),
+        'options': options,
+        'scale': scale if field_type == 'rating' else None,
       }
     )
 
@@ -721,7 +809,7 @@ class ReferenceCategorySerializer(serializers.ModelSerializer):
 
   class Meta:
     model = ReferenceCategory
-    fields = ['id', 'name', 'subcategories', 'reference_count', 'created_at', 'updated_at']
+    fields = ['id', 'name', 'description', 'subcategories', 'reference_count', 'created_at', 'updated_at']
     read_only_fields = ['id', 'reference_count', 'created_at', 'updated_at']
 
   def get_reference_count(self, obj):
@@ -808,7 +896,7 @@ class TrainerReferenceSerializer(serializers.ModelSerializer):
 
     if reference_type == TrainerReference.TYPE_VIDEO_LINK:
       if not link:
-        raise serializers.ValidationError({'link': 'Video references require a YouTube link.'})
+        raise serializers.ValidationError({'link': 'Video URL is required.'})
 
       if not is_youtube_link(link):
         raise serializers.ValidationError({'link': 'Videos must be YouTube links so they can be streamed in-app.'})
@@ -817,12 +905,26 @@ class TrainerReferenceSerializer(serializers.ModelSerializer):
 
     upload = attrs.get('file')
 
-    if upload and getattr(upload, 'content_type', '').startswith('video/'):
-      raise serializers.ValidationError({'file': 'Video uploads are not allowed. Submit a YouTube link instead.'})
+    if reference_type == TrainerReference.TYPE_PDF:
+      if not link:
+        raise serializers.ValidationError({'link': 'PDF URL is required.'})
 
-    if reference_type in (TrainerReference.TYPE_PDF, TrainerReference.TYPE_IMAGE, TrainerReference.TYPE_DOCUMENT):
-      if not file and not link:
-        raise serializers.ValidationError({'file': 'Upload a file or provide a link for this reference type.'})
+      attrs['file'] = None
+
+    if reference_type == TrainerReference.TYPE_TEXT_NOTE:
+      if not attrs.get('description', '').strip():
+        raise serializers.ValidationError({'description': 'Text is required.'})
+
+      attrs['link'] = ''
+      attrs['file'] = None
+
+    if reference_type == TrainerReference.TYPE_IMAGE:
+      if not file:
+        raise serializers.ValidationError({'file': 'Image upload is required.'})
+
+      content_type = getattr(upload or file, 'content_type', '')
+      if upload and not content_type.startswith('image/'):
+        raise serializers.ValidationError({'file': 'Only image uploads are allowed.'})
 
     return attrs
 
@@ -889,6 +991,7 @@ class TrackingTemplateSerializer(serializers.ModelSerializer):
 class ClientTrackingEntrySubmitSerializer(serializers.Serializer):
   template_id = serializers.IntegerField()
   entry_date = serializers.DateField()
+  entry_time = serializers.TimeField(required=False, allow_null=True)
   answers = serializers.DictField(required=False, default=dict)
   note = serializers.CharField(required=False, allow_blank=True, default='')
 
@@ -915,6 +1018,7 @@ class TrackingEntrySerializer(serializers.ModelSerializer):
       'template',
       'template_name',
       'entry_date',
+      'entry_time',
       'answers',
       'note',
       'edited_by_trainer',
@@ -984,7 +1088,10 @@ class ClientAccessSerializer(serializers.ModelSerializer):
       'last_name',
       'email',
       'username',
+      'photo',
       'registration_answers',
+      'additional_info',
+      'additional_info_shared',
       'must_change_password',
       'is_active',
       'created_at',
@@ -994,3 +1101,61 @@ class ClientAccessSerializer(serializers.ModelSerializer):
 
   def get_trainer_name(self, obj):
     return obj.trainer.get_full_name() or obj.trainer.username
+
+
+class ClientDetailChangeRequestSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = ClientDetailChangeRequest
+    fields = [
+      'id',
+      'client',
+      'proposed_answers',
+      'status',
+      'client_note',
+      'trainer_note',
+      'created_at',
+      'reviewed_at',
+    ]
+    read_only_fields = fields
+
+
+class ClientReminderSerializer(serializers.ModelSerializer):
+  client_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ClientReminder
+    fields = [
+      'id',
+      'client',
+      'client_name',
+      'title',
+      'date',
+      'time',
+      'notes',
+      'status',
+      'notify_trainer',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'client', 'client_name', 'created_at', 'updated_at']
+
+  def get_client_name(self, obj):
+    return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+
+class ProgressEntrySerializer(serializers.ModelSerializer):
+  class Meta:
+    model = ProgressEntry
+    fields = [
+      'id',
+      'client',
+      'title',
+      'date',
+      'notes',
+      'status',
+      'next_step',
+      'created_by',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'client', 'created_by', 'created_at', 'updated_at']

@@ -16,9 +16,17 @@
     }
 
     <div class="profile-stack">
-      <section class="panel identity-card">
+      <section class="panel identity-card client-info-panel">
         <div class="identity-top">
-          <span class="avatar">{{ initials(client) }}</span>
+          <label class="avatar avatar-upload" title="Upload client photo">
+            @if (client.photo) {
+              <img [src]="client.photo" alt="Client photo">
+            } @else {
+              <span>{{ initials(client) }}</span>
+            }
+            <span class="avatar-edit">Photo</span>
+            <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="visually-hidden">
+          </label>
           <div class="identity-copy">
             <div class="name-row">
               <h2>{{ client.first_name }} {{ client.last_name }}</h2>
@@ -27,22 +35,76 @@
             <a class="group-link" [routerLink]="['/trainer/groups', profile.group.id]">{{ profile.group.name }}</a>
             <p class="joined">Joined on {{ client.created_at | date: 'dd MMM yyyy' }}</p>
           </div>
-          <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Edit User</button>
-        </div>
-        <div class="contact-rows">
-          <span>{{ client.email }}</span>
-          @if (contactValue(['phone', 'mobile'])) {
-            <span>{{ contactValue(['phone', 'mobile']) }}</span>
-          }
-          @if (contactValue(['birth', 'dob', 'age'])) {
-            <span>{{ contactValue(['birth', 'dob', 'age']) }}</span>
-          }
-          @if (contactValue(['gender'])) {
-            <span>{{ contactValue(['gender']) }}</span>
+          @if (!isEditingClientInfo) {
+            <div class="header-actions">
+              <button type="button" class="secondary-action compact" (click)="startClientInfoEdit()">Edit Profile</button>
+              <button type="button" class="ghost-action compact" (click)="openAccountDialog()">Password</button>
+            </div>
           }
         </div>
+
+        @if (!isEditingClientInfo) {
+          <div class="client-info-grid">
+            @for (row of visibleClientInfoRows(); track row.label) {
+              <article [class.readonly]="row.readonly">
+                <span>{{ row.label }}</span>
+                <strong>{{ row.value || 'Not added' }}</strong>
+              </article>
+            }
+          </div>
+          @if (hiddenClientInfoCount > 0 || showAllClientInfo) {
+            <button type="button" class="show-more-toggle" (click)="toggleAllClientInfo()">
+              {{ showAllClientInfo ? 'Show less' : 'Show all details (' + hiddenClientInfoCount + ' more)' }}
+            </button>
+          }
+        } @else {
+          <form class="client-info-form" (ngSubmit)="saveClientInfo()">
+            <div class="info-form-grid">
+              <label><span>First Name</span><input type="text" [(ngModel)]="clientInfoDraft.first_name" name="ciFirst"></label>
+              <label><span>Last Name</span><input type="text" [(ngModel)]="clientInfoDraft.last_name" name="ciLast"></label>
+              <label><span>Email Address</span><input type="email" [(ngModel)]="clientInfoDraft.email" name="ciEmail"></label>
+              <label><span>Username</span><input type="text" [(ngModel)]="clientInfoDraft.username" name="ciUsername"></label>
+              <label><span>Client Status</span>
+                <select [(ngModel)]="clientInfoDraft.is_active" name="ciStatus">
+                  <option [ngValue]="true">Active</option>
+                  <option [ngValue]="false">Inactive</option>
+                </select>
+              </label>
+              <label><span>Reference ID</span><input type="text" [value]="profile.lead_submission.reference_id" disabled></label>
+              @for (field of editableRegistrationFields(); track field.key || field.label) {
+                <label>
+                  <span>{{ field.label }}</span>
+                  @if (field.field_type === 'long_text' || field.field_type === 'address') {
+                    <textarea rows="3" [(ngModel)]="clientInfoDraft.registration_answers[field.key || field.label]" [name]="'ci' + (field.key || field.label)"></textarea>
+                  } @else if (fieldOptions(field).length) {
+                    <select [(ngModel)]="clientInfoDraft.registration_answers[field.key || field.label]" [name]="'ci' + (field.key || field.label)">
+                      <option value="">Select</option>
+                      @for (option of fieldOptions(field); track option) {
+                        <option [value]="option">{{ option }}</option>
+                      }
+                    </select>
+                  } @else {
+                    <input [type]="inputType(field)" [(ngModel)]="clientInfoDraft.registration_answers[field.key || field.label]" [name]="'ci' + (field.key || field.label)">
+                  }
+                </label>
+              }
+            </div>
+            <div class="client-info-actions">
+              <button type="button" class="ghost-action compact" (click)="cancelClientInfoEdit()">Cancel</button>
+              <button type="submit" class="primary-action compact" [disabled]="isSavingClientInfo">
+                {{ isSavingClientInfo ? 'Saving...' : 'Save Client Information' }}
+              </button>
+            </div>
+          </form>
+        }
       </section>
 
+      <nav class="ws-tabs" aria-label="Client sections">
+        <button type="button" [class.active]="workspaceTab === 'workspace'" (click)="workspaceTab = 'workspace'">Client Workspace</button>
+        <button type="button" [class.active]="workspaceTab === 'chat'" (click)="workspaceTab = 'chat'">Chat</button>
+      </nav>
+
+      @if (workspaceTab === 'workspace') {
       <section class="panel notes-card">
         <div class="panel-heading">
           <h3>Trainer Notes <small>(Private)</small></h3>
@@ -71,6 +133,89 @@
           }
         }
       </section>
+
+      <section class="panel scheduler-card">
+        <div class="panel-heading">
+          <h3>Follow-up Scheduler</h3>
+        </div>
+        <p class="section-sub">Schedule a reminder about this client - reviews, follow-ups, calls, payments.</p>
+
+        <div class="sched-form">
+          <div class="sched-row">
+            <label><span>Reminder title</span><input type="text" [(ngModel)]="reminderDraft.title" name="rTitle" placeholder="e.g. Weekly review"></label>
+            <label><span>Date</span><input type="date" [(ngModel)]="reminderDraft.date" name="rDate"></label>
+            <label><span>Time</span><input type="time" [(ngModel)]="reminderDraft.time" name="rTime"></label>
+          </div>
+          <label><span>Notes (optional)</span><textarea rows="2" [(ngModel)]="reminderDraft.notes" name="rNotes"></textarea></label>
+          <div class="sched-actions">
+            <label class="notify-toggle"><input type="checkbox" [(ngModel)]="reminderDraft.notify_trainer" name="rNotify"> Notify me</label>
+            <button type="button" class="primary-action compact" [disabled]="isSavingReminder" (click)="addReminder()">
+              {{ isSavingReminder ? 'Saving...' : 'Schedule reminder' }}
+            </button>
+          </div>
+        </div>
+
+        @if (reminders.length) {
+          <div class="sched-list">
+            @for (reminder of reminders; track reminder.id) {
+              <div class="sched-item" [class.done]="reminder.status === 'done'">
+                <div class="sched-main">
+                  <strong>{{ reminder.title }}</strong>
+                  <span class="sched-when">{{ reminder.date | date: 'dd MMM yyyy' }}{{ reminder.time ? ' ' + reminder.time : '' }}</span>
+                  @if (reminder.notes) { <p>{{ reminder.notes }}</p> }
+                </div>
+                <div class="sched-side">
+                  <span class="sched-status">{{ reminder.status }}</span>
+                  @if (reminder.status !== 'done') {
+                    <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Complete</button>
+                  }
+                  <button type="button" class="ghost-action compact danger" (click)="deleteReminder(reminder)">Delete</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      @if (pendingChangeRequest) {
+        <section class="panel change-request-card">
+          <div class="panel-heading">
+            <h3>Detail edit request <small>(Pending)</small></h3>
+            <span class="request-stamp">Requested {{ pendingChangeRequest.created_at | date: 'dd MMM yyyy, h:mm a' }}</span>
+          </div>
+
+          @if (pendingChangeRequest.client_note) {
+            <p class="request-note">Client note: {{ pendingChangeRequest.client_note }}</p>
+          }
+
+          @if (changeRequestRows().length) {
+            <div class="change-table">
+              <div class="change-head">
+                <span>Field</span>
+                <span>Current</span>
+                <span>Requested</span>
+              </div>
+              @for (row of changeRequestRows(); track row.label) {
+                <div class="change-row">
+                  <span class="change-field">{{ row.label }}</span>
+                  <span class="change-old">{{ row.oldValue }}</span>
+                  <span class="change-new">{{ row.newValue }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="empty-note">This request does not change any details.</p>
+          }
+
+          <textarea rows="2" [(ngModel)]="changeReviewNote" name="changeReviewNote" placeholder="Optional note to the client"></textarea>
+          <div class="notes-actions">
+            <button type="button" class="ghost-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('reject')">Reject</button>
+            <button type="button" class="primary-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('approve')">
+              {{ isReviewingChange ? 'Saving...' : 'Approve changes' }}
+            </button>
+          </div>
+        </section>
+      }
 
       <section class="panel">
         <div class="panel-heading">
@@ -155,12 +300,140 @@
         }
       </section>
 
-      <app-chat-panel
-        mode="trainer"
-        [clientId]="client.id"
-        [counterpartName]="client.first_name"
-        [description]="'Communicate with ' + client.first_name + ' about check-ins and next steps.'"
-      />
+      <section class="panel additional-card">
+        <div class="panel-heading">
+          <div>
+            <h3>Additional Information</h3>
+            <p class="section-sub">Payments, membership, agreements, documents, or anything else about this client.</p>
+          </div>
+          <span class="visibility-toggle" role="group" aria-label="Additional information visibility">
+            <button type="button" [class.active]="!additionalShared" (click)="setAdditionalShared(false)">Private</button>
+            <button type="button" [class.active]="additionalShared" (click)="setAdditionalShared(true)">Shared with Client</button>
+          </span>
+        </div>
+
+        @if (additionalItems.length) {
+          <div class="info-list">
+            @for (item of additionalItems; track item.id) {
+              <div class="info-item">
+                <div class="info-main">
+                  <span class="info-type" [attr.data-type]="item.type">{{ item.type }}</span>
+                  <strong>{{ item.title }}</strong>
+                  @if (item.type === 'text') {
+                    <p>{{ item.text }}</p>
+                  } @else if (item.type === 'reference') {
+                    <p>{{ item.reference_title }}</p>
+                  }
+                </div>
+                <div class="info-actions">
+                  @if (item.link) {
+                    <button type="button" class="ghost-action compact" (click)="openInfoLink(item)">Open</button>
+                  }
+                  <button type="button" class="ghost-action compact danger" (click)="removeAdditionalItem(item)">Remove</button>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">No additional information yet.</p>
+        }
+
+        <div class="info-add">
+          <div class="info-add-row">
+            <label>
+              <span class="field-label">Title</span>
+              <input type="text" [(ngModel)]="newInfo.title" name="infoTitle" placeholder="e.g. Membership plan">
+            </label>
+            <label>
+              <span class="field-label">Type</span>
+              <select [(ngModel)]="newInfo.type" name="infoType">
+                <option value="text">Text</option>
+                <option value="link">Link</option>
+                <option value="reference">Reference</option>
+              </select>
+            </label>
+          </div>
+
+          @if (newInfo.type === 'text') {
+            <textarea rows="2" [(ngModel)]="newInfo.text" name="infoText" placeholder="Details..."></textarea>
+          } @else if (newInfo.type === 'link') {
+            <input type="url" [(ngModel)]="newInfo.link" name="infoLink" placeholder="https://...">
+          } @else {
+            <select [(ngModel)]="newInfo.reference_id" name="infoReference">
+              <option value="">Select a reference from your library</option>
+              @for (reference of referenceLibrary; track reference.id) {
+                <option [value]="reference.id">{{ reference.title }}</option>
+              }
+            </select>
+          }
+
+          <button type="button" class="secondary-action" [disabled]="isSavingAdditional" (click)="addAdditionalItem()">
+            {{ isSavingAdditional ? 'Saving...' : 'Add item' }}
+          </button>
+        </div>
+      </section>
+
+      }
+
+      @if (workspaceTab === 'chat') {
+        <div class="chat-layout">
+          <app-chat-panel
+            mode="trainer"
+            [clientId]="client.id"
+            [counterpartName]="client.first_name"
+            [description]="'Communicate with ' + client.first_name + ' about check-ins and next steps.'"
+          />
+
+          <aside class="panel actions-card" aria-label="Client actions">
+            <div class="panel-heading">
+              <h3>Actions</h3>
+              <span class="status-pill" [class.suspended]="!isClientActive">{{ isClientActive ? 'Active' : 'Suspended' }}</span>
+            </div>
+
+            <div class="action-group">
+              <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Reset Password</button>
+              <button
+                type="button"
+                class="secondary-action compact"
+                [disabled]="isUpdatingStatus"
+                (click)="toggleClientStatus()"
+              >
+                {{ isClientActive ? 'Suspend Account' : 'Reactivate Account' }}
+              </button>
+            </div>
+
+            <div class="action-block warn">
+              <div>
+                <strong>Reset Client</strong>
+                <p>Clears templates, entries, chat, reminders, progress, and notes. Keeps profile details.</p>
+              </div>
+              <button
+                type="button"
+                class="warn-action"
+                [disabled]="isResettingClient"
+                (click)="resetClient()"
+              >
+                {{ isResettingClient ? 'Resetting...' : 'Reset Client' }}
+              </button>
+            </div>
+
+            <div class="action-block danger">
+              <div>
+                <strong>Delete Account</strong>
+                <p>Permanently erases all of this client's details. This cannot be undone.</p>
+              </div>
+              <button
+                type="button"
+                class="danger-action"
+                [disabled]="isDeletingClient"
+                (click)="deleteClient()"
+              >
+                {{ isDeletingClient ? 'Deleting...' : 'Delete Account' }}
+              </button>
+            </div>
+          </aside>
+        </div>
+      }
     </div>
 
     @if (isAccountDialogOpen) {

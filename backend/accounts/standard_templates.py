@@ -41,7 +41,7 @@ STANDARD_TEMPLATES = [
     'accent': 'orange',
     'fields': [
       {'key': 'weight', 'label': 'Current weight (kg)', 'field_type': 'number', 'placeholder': '78.4'},
-      {'key': 'progress_photo', 'label': 'Progress photo', 'field_type': 'image', 'placeholder': ''},
+      {'key': 'energy_rating', 'label': 'Energy level', 'field_type': 'rating', 'scale': 5, 'placeholder': ''},
       {'key': 'energy_mood', 'label': 'Energy / mood today', 'field_type': 'short_text', 'placeholder': 'Energetic, tired, motivated'},
       {'key': 'progress_notes', 'label': 'How are you feeling?', 'field_type': 'long_text', 'placeholder': 'Anything your trainer should know'},
     ],

@@ -1,3 +1,7 @@
 # frontend/src/app/pages/clients/client-profile/client-profile.component.html
 
-Portal template: welcome card with tab navigation (My Templates, My Details, Resources, Trainer Chat), per-template entry forms with recent entries, detail grids for account/registration/application answers, resource cards with YouTube embeds and file buttons, and the shared chat panel.
+Portal template: welcome card plus a trainer-style left sidebar. Sidebar contains My Details, Trainer with nested Profile/Chat, and Templates with nested assigned template names. The main content area renders the selected section/template and keeps Overview, References, Data Entry, and Progress available inside selected templates.
+
+## Testing
+
+Verified with `npm run build`.

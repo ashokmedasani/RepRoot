@@ -52,11 +52,17 @@
         <article class="panel">
           <div class="section-heading">
             <div>
-              <h2>Fields</h2>
-              <p>Clients fill these in on each check-in. Fields are never mandatory - missing a day never blocks a client.</p>
+              <h2>Fields <span class="field-count">Fields: {{ fields.length }} / {{ maxFields }}</span></h2>
+              <p>Clients fill these in on each check-in. Entry date &amp; time are system fields and don't count toward the limit.</p>
             </div>
-            <button type="button" class="secondary-action" (click)="addField()">+ Add Field</button>
+            <button type="button" class="secondary-action" (click)="addField()" [disabled]="fields.length >= maxFields">
+              + Add Field
+            </button>
           </div>
+
+          @if (fields.length >= maxFields) {
+            <p class="limit-note">You have reached the maximum of {{ maxFields }} tracking fields for this template.</p>
+          }
 
           <div class="field-list">
             @for (field of fields; track field.localId; let index = $index) {
@@ -82,6 +88,24 @@
                   <button type="button" title="Move down" (click)="moveField(index, 1)">&#8595;</button>
                   <button type="button" class="remove" title="Remove field" (click)="removeField(field)">x</button>
                 </div>
+
+                @if (needsOptions(field)) {
+                  <label class="field-extra">
+                    <span>Dropdown options (comma separated)</span>
+                    <input
+                      type="text"
+                      [ngModel]="optionsText(field)"
+                      (ngModelChange)="updateOptions(field, $event)"
+                      [name]="'fieldOptions' + field.localId"
+                      placeholder="e.g. Breakfast, Lunch, Dinner"
+                    >
+                  </label>
+                } @else if (isRating(field)) {
+                  <label class="field-extra rating-extra">
+                    <span>Rating scale (max)</span>
+                    <input type="number" min="2" max="10" [(ngModel)]="field.scale" [name]="'fieldScale' + field.localId">
+                  </label>
+                }
               </div>
             } @empty {
               <p class="empty-note">No fields yet. Add the first field clients should update.</p>

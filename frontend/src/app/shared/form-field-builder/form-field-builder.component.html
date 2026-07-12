@@ -21,24 +21,21 @@
   </section>
 
   <section class="recommended-section" aria-label="Recommended fitness fields">
-    <div class="section-heading">
+    <div class="section-heading compact">
       <div>
-        <p class="eyebrow">Fitness templates</p>
-        <h2>Recommended Fitness Fields</h2>
-        <p>Add common fitness intake fields with one click.</p>
+        <h2>Suggested Fields</h2>
+        <p>Tap a suggestion to add it, then customize.</p>
       </div>
+      <button type="button" class="link-toggle" (click)="toggleAllChips()">
+        {{ showAllChips ? 'Show less' : 'More' }}
+      </button>
     </div>
 
-    <div class="recommendation-grid">
-      @for (template of recommendedFields; track template.label) {
-        <article class="template-card">
-          <span class="template-icon">{{ template.icon }}</span>
-          <div>
-            <h3>{{ template.label }}</h3>
-            <p>{{ template.help_text }}</p>
-          </div>
-          <button type="button" (click)="addRecommendedField(template)">Add</button>
-        </article>
+    <div class="chip-row">
+      @for (template of visibleRecommended; track template.label) {
+        <button type="button" class="field-chip" (click)="addRecommendedField(template)" [title]="template.help_text">
+          <span class="chip-plus">+</span>{{ template.label }}
+        </button>
       }
     </div>
   </section>

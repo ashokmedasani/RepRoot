@@ -4,11 +4,12 @@ import { Observable } from 'rxjs';
 
 import { MessageResponse } from './forms-groups-api.service';
 
-export type ReferenceType = 'video_link' | 'pdf' | 'image' | 'document' | 'text_note' | 'external_link';
+export type ReferenceType = 'video_link' | 'pdf' | 'image' | 'text_note';
 
 export interface ReferenceCategoryRecord {
   id: number;
   name: string;
+  description: string;
   subcategories: string[];
   reference_count: number;
   created_at: string;
@@ -54,10 +55,14 @@ export class ReferencesApiService {
     });
   }
 
-  createCategory(name: string, subcategories: string[]): Observable<{ category: ReferenceCategoryRecord; message: string }> {
+  createCategory(
+    name: string,
+    description: string,
+    subcategories: string[]
+  ): Observable<{ category: ReferenceCategoryRecord; message: string }> {
     return this.http.post<{ category: ReferenceCategoryRecord; message: string }>(
       `${this.apiBaseUrl}/trainer/references/categories/`,
-      { name, subcategories },
+      { name, description, subcategories },
       { headers: this.getAuthHeaders() }
     );
   }
@@ -65,11 +70,12 @@ export class ReferencesApiService {
   updateCategory(
     categoryId: number,
     name: string,
+    description: string,
     subcategories: string[]
   ): Observable<{ category: ReferenceCategoryRecord; message: string }> {
     return this.http.put<{ category: ReferenceCategoryRecord; message: string }>(
       `${this.apiBaseUrl}/trainer/references/categories/${categoryId}/`,
-      { name, subcategories },
+      { name, description, subcategories },
       { headers: this.getAuthHeaders() }
     );
   }

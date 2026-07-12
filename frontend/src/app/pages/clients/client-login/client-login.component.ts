@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { ClientApiService } from '../../../core/api/client-api.service';
+import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/client-api.service';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
 import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 
@@ -21,11 +21,58 @@ export class ClientLoginComponent {
   loginMessage = '';
   clientName = '';
 
+  showDirectory = false;
+  directory: TrainerDirectoryEntry[] = [];
+  directorySearch = '';
+  isLoadingDirectory = false;
+  private directoryLoaded = false;
+
   readonly loginForm = {
     trainerCode: '',
     username: '',
     password: ''
   };
+
+  toggleDirectory(): void {
+    this.showDirectory = !this.showDirectory;
+
+    if (this.showDirectory && !this.directoryLoaded) {
+      this.loadDirectory();
+    }
+  }
+
+  get filteredTrainers(): TrainerDirectoryEntry[] {
+    const term = this.directorySearch.trim().toLowerCase();
+
+    if (!term) {
+      return this.directory;
+    }
+
+    return this.directory.filter(
+      (trainer) =>
+        trainer.trainer_name.toLowerCase().includes(term) || trainer.trainer_id.toLowerCase().includes(term)
+    );
+  }
+
+  selectTrainer(trainer: TrainerDirectoryEntry): void {
+    this.loginForm.trainerCode = trainer.trainer_id;
+    this.showDirectory = false;
+  }
+
+  loadDirectory(): void {
+    this.isLoadingDirectory = true;
+    this.clientApi.getTrainerDirectory().subscribe({
+      next: (response) => {
+        this.directory = response.trainers;
+        this.directoryLoaded = true;
+        this.isLoadingDirectory = false;
+      },
+      error: () => {
+        this.directory = [];
+        this.isLoadingDirectory = false;
+      }
+    });
+  }
 
   verifyClientLogin(): void {
     const trainerCode = this.loginForm.trainerCode.trim();

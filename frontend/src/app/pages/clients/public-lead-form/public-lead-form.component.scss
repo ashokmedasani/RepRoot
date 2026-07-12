@@ -27,10 +27,11 @@
   display: grid;
   gap: 1rem;
   border: 1px solid var(--app-border);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-sm);
+  border-radius: var(--app-radius-xl);
+  padding: 1.5rem;
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
+  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .public-form header,

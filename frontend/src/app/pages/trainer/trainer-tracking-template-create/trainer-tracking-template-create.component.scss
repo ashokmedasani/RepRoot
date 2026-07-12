@@ -7,13 +7,16 @@ p {
 .panel {
   border: 1px solid var(--app-border);
   border-radius: var(--app-panel-radius);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-sm);
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
   padding: var(--app-panel-padding);
+  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .panel h2 {
   color: var(--app-text);
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .panel p {
@@ -59,18 +62,14 @@ label > span {
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
 }
 
+/* Inputs inherit the global premium form-control styles. */
 input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--app-border);
-  border-radius: 0.65rem;
-  padding: 0.6rem 0.75rem;
-  background: var(--app-surface);
-  color: var(--app-text);
-  outline: none;
 }
 
 textarea {
@@ -88,9 +87,22 @@ textarea {
   gap: 0.7rem;
   align-items: end;
   border: 1px solid var(--app-border);
-  border-radius: 0.75rem;
+  border-radius: var(--app-radius-lg);
   padding: 0.8rem;
   background: var(--app-surface-soft);
+  transition: border-color var(--app-transition-fast);
+}
+
+.field-row:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 20%, var(--app-border));
+}
+
+.field-extra {
+  grid-column: 1 / -1;
+}
+
+.field-extra.rating-extra {
+  max-width: 12rem;
 }
 
 .field-controls {
@@ -104,11 +116,17 @@ textarea {
   height: 2.2rem;
   place-items: center;
   border: 1px solid var(--app-border);
-  border-radius: 0.55rem;
+  border-radius: var(--app-radius-sm);
   background: var(--app-surface);
   color: var(--app-text);
   font-weight: 700;
   cursor: pointer;
+  transition: background var(--app-transition-fast), border-color var(--app-transition-fast);
+}
+
+.field-controls button:hover:not(:disabled) {
+  background: var(--app-surface-soft);
+  border-color: color-mix(in srgb, var(--app-primary) 25%, var(--app-border));
 }
 
 .field-controls .remove {
@@ -134,39 +152,14 @@ textarea {
   margin-bottom: 0.9rem;
 }
 
-.primary-action,
-.secondary-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.5rem;
-  border-radius: 0.65rem;
-  padding: 0 0.9rem;
-  font-weight: 700;
-  text-decoration: none;
-  cursor: pointer;
-}
-
+/* Action buttons come from the global premium button styles. */
 .primary-action {
   width: 100%;
-  border: 1px solid var(--app-primary);
-  background: var(--app-primary);
-  color: #ffffff;
-}
-
-.primary-action:disabled {
-  opacity: 0.6;
-}
-
-.secondary-action {
-  border: 1px solid var(--app-primary);
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
 }
 
 .message {
   border: 1px solid color-mix(in srgb, var(--app-success) 32%, var(--app-border));
-  border-radius: 0.7rem;
+  border-radius: var(--app-radius-md);
   padding: 0.75rem;
   background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
   color: var(--app-text);
@@ -189,4 +182,20 @@ textarea {
   .field-controls {
     justify-content: flex-end;
   }
+}
+
+.field-count {
+  margin-left: 0.5rem;
+  color: var(--app-primary-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.limit-note {
+  margin: 0.5rem 0 0;
+  border-radius: var(--app-radius-sm);
+  padding: 0.6rem 0.8rem;
+  background: color-mix(in srgb, #b54708 12%, var(--app-surface));
+  color: #b54708;
+  font-weight: 600;
 }

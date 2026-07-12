@@ -1,0 +1,124 @@
+.legal-page {
+  min-height: 100vh;
+  background: color-mix(in srgb, var(--app-bg) 92%, var(--app-surface));
+}
+
+.legal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.5rem;
+  border-bottom: 1px solid var(--app-border);
+  padding: 0 1.5rem;
+  background: var(--app-surface);
+}
+
+.brand {
+  color: var(--app-text);
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.legal-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.legal-nav a {
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  color: var(--app-muted);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.legal-nav a.active {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.legal-body {
+  width: min(52rem, calc(100% - 2rem));
+  margin: 1.75rem auto 4rem;
+}
+
+.disclaimer {
+  border: 1px solid var(--app-warning-border, #f3dfa8);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--app-warning-soft, #fff8e6);
+  color: color-mix(in srgb, #b54708 88%, var(--app-text));
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+h1 {
+  margin: 1.5rem 0 0.25rem;
+  color: var(--app-text);
+  font-size: 1.9rem;
+  font-weight: 800;
+}
+
+.updated {
+  margin: 0 0 1rem;
+  color: var(--app-muted);
+  font-weight: 600;
+}
+
+section {
+  margin-top: 1.4rem;
+}
+
+h2 {
+  margin: 0 0 0.4rem;
+  color: var(--app-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+h3 {
+  margin: 1rem 0 0.3rem;
+  color: var(--app-primary-strong);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+p,
+li {
+  color: var(--app-text);
+  line-height: 1.65;
+}
+
+.legal-body p {
+  margin: 0 0 0.5rem;
+}
+
+ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+a {
+  color: var(--app-primary-strong);
+  font-weight: 600;
+}
+
+.regional {
+  border: 1px solid var(--app-border);
+  border-radius: 0.85rem;
+  padding: 1rem 1.1rem;
+  background: var(--app-surface);
+}
+
+.back-row {
+  margin-top: 2rem;
+}
+
+.back-row a {
+  font-weight: 700;
+  text-decoration: none;
+}

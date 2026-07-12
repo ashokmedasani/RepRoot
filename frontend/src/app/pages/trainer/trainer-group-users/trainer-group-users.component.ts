@@ -38,6 +38,7 @@ export class TrainerGroupUsersComponent implements OnInit {
     description: ''
   };
   resetPasswordResult = '';
+  isSettingsOpen = true;
   readonly tabs: { id: GroupTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'approved-users', label: 'Approved Users' },
@@ -80,6 +81,10 @@ export class TrainerGroupUsersComponent implements OnInit {
 
       return matchesSearch && matchesStatus;
     });
+  }
+
+  get recentApprovedUsers(): ClientAccessRecord[] {
+    return this.activeClients.slice(0, 5);
   }
 
   get registrationFields(): DynamicField[] {
@@ -137,6 +142,10 @@ export class TrainerGroupUsersComponent implements OnInit {
         this.message = formatApiError(error, 'Group could not be updated.');
       }
     });
+  }
+
+  toggleSettings(): void {
+    this.isSettingsOpen = !this.isSettingsOpen;
   }
 
   resetClientPassword(client: ClientAccessRecord): void {

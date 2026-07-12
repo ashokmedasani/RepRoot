@@ -19,11 +19,12 @@ h2 {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--app-border);
-  border-radius: 0.75rem;
+  border-radius: var(--app-panel-radius);
   padding: var(--app-panel-padding);
   margin-bottom: 1rem;
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow-sm);
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
+  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .core-card {

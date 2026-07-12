@@ -1,0 +1,247 @@
+<main class="legal-page">
+  <header class="legal-topbar">
+    <a routerLink="/" class="brand">CoachFlow</a>
+    <nav class="legal-nav">
+      <a routerLink="/terms" [class.active]="doc === 'terms'">Terms</a>
+      <a routerLink="/privacy" [class.active]="doc === 'privacy'">Privacy</a>
+    </nav>
+  </header>
+
+  <article class="legal-body">
+    <p class="disclaimer" role="note">
+      This is a general template provided for convenience. It is not legal advice. Have it reviewed by a qualified
+      lawyer for your jurisdictions before you launch, and replace every [bracketed] placeholder.
+    </p>
+
+    @if (doc === 'terms') {
+      <h1>Terms &amp; Conditions</h1>
+      <p class="updated">Last updated: {{ lastUpdated }}</p>
+
+      <section>
+        <h2>1. Who we are &amp; acceptance</h2>
+        <p>
+          CoachFlow ("CoachFlow", "we", "us", "our") is operated by [Company Legal Name], [registered address].
+          These Terms govern your access to and use of the CoachFlow web application and mobile applications
+          (together, the "Service"). By creating an account, signing in, or otherwise using the Service you agree to
+          these Terms and to our <a routerLink="/privacy">Privacy Policy</a>. If you do not agree, do not use the Service.
+        </p>
+      </section>
+
+      <section>
+        <h2>2. Eligibility</h2>
+        <p>
+          You must be at least 18 years old (or the age of majority in your jurisdiction) to create a trainer account.
+          Clients must be at least 16, and where required by local law a parent or guardian must consent. You confirm
+          the information you provide is accurate and that you are legally able to enter into this agreement.
+        </p>
+      </section>
+
+      <section>
+        <h2>3. Accounts &amp; security</h2>
+        <p>
+          You are responsible for safeguarding your credentials and for all activity under your account. Notify us
+          promptly of any unauthorized use. Trainers who create client login access are responsible for the accounts
+          they issue and for informing those clients how their data is handled.
+        </p>
+      </section>
+
+      <section>
+        <h2>4. The trainer–client relationship</h2>
+        <p>
+          CoachFlow is a tool that helps independent trainers manage clients, forms, tracking templates, and
+          communication. We are not a party to the coaching relationship between a trainer and a client, do not employ
+          trainers, and do not supervise or endorse any training program, plan, or advice delivered through the Service.
+          Trainers are solely responsible for the lawfulness, accuracy, and appropriateness of the content and guidance
+          they provide.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. Health &amp; medical disclaimer</h2>
+        <p>
+          The Service is for general fitness and wellness organization only. It does <strong>not</strong> provide medical
+          advice, diagnosis, or treatment, and is not a substitute for professional healthcare. Always consult a
+          qualified healthcare provider before starting any exercise or nutrition program. You use fitness guidance and
+          tracking features at your own risk.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Acceptable use</h2>
+        <p>You agree not to: use the Service unlawfully or for others' data without a lawful basis; upload malicious code;
+          attempt to breach security or access accounts that are not yours; scrape, resell, or reverse-engineer the
+          Service; or upload content that is illegal, infringing, harassing, or harmful. We may suspend accounts that
+          violate these Terms.</p>
+      </section>
+
+      <section>
+        <h2>7. User content &amp; intellectual property</h2>
+        <p>
+          You retain ownership of the content you upload (forms, templates, notes, references, entries). You grant us a
+          limited license to host and process that content solely to operate the Service. All CoachFlow software,
+          branding, and design remain our property or that of our licensors.
+        </p>
+      </section>
+
+      <section>
+        <h2>8. Third-party services</h2>
+        <p>
+          The Service may link to or embed third-party content (for example, YouTube videos or documents a trainer
+          shares). We are not responsible for third-party content or services and their own terms apply.
+        </p>
+      </section>
+
+      <section>
+        <h2>9. Disclaimers &amp; limitation of liability</h2>
+        <p>
+          The Service is provided "as is" and "as available" without warranties of any kind to the extent permitted by
+          law. To the maximum extent permitted by applicable law, CoachFlow will not be liable for indirect, incidental,
+          special, or consequential damages, or for loss of data, profits, or goodwill. Nothing in these Terms limits
+          liability that cannot be limited by law (including, where applicable, statutory consumer rights in the EEA, UK,
+          India, USA, and Japan).
+        </p>
+      </section>
+
+      <section>
+        <h2>10. Termination</h2>
+        <p>
+          You may stop using the Service and delete your account at any time. We may suspend or terminate access if you
+          breach these Terms or where required by law. On deletion, we handle your data as described in the
+          <a routerLink="/privacy">Privacy Policy</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>11. Governing law &amp; changes</h2>
+        <p>
+          These Terms are governed by the laws of [Governing Jurisdiction], without prejudice to mandatory consumer
+          protections in your country of residence. We may update these Terms; material changes will be notified in-app or
+          by email, and continued use after the effective date means you accept the updated Terms.
+        </p>
+      </section>
+
+      <section>
+        <h2>12. Contact</h2>
+        <p>Questions about these Terms: <a href="mailto:support@coachflow.app">support&#64;coachflow.app</a>.</p>
+      </section>
+    } @else {
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: {{ lastUpdated }}</p>
+
+      <section>
+        <h2>1. Controller &amp; scope</h2>
+        <p>
+          [Company Legal Name] ("CoachFlow", "we") is the controller of personal data processed through the Service,
+          except that when a trainer records information about their clients, the trainer is the controller and CoachFlow
+          acts as a processor on their behalf. This Policy explains what we collect, why, and the rights you have. It is
+          written to meet the EU/UK GDPR, India's Digital Personal Data Protection Act 2023, the California Consumer
+          Privacy Act (CCPA/CPRA), and Japan's Act on the Protection of Personal Information (APPI).
+        </p>
+      </section>
+
+      <section>
+        <h2>2. Data we collect</h2>
+        <ul>
+          <li><strong>Account data</strong> — name, email, username, trainer code, password (hashed), profile details.</li>
+          <li><strong>Client data</strong> — registration answers, contact details, and any information a trainer adds
+            about a client (notes, additional information, documents).</li>
+          <li><strong>Health &amp; fitness data</strong> — tracking entries such as weight, nutrition, activity, and
+            wellbeing ratings. This may be considered <em>sensitive/special-category data</em> and is handled with
+            additional care and on the basis of your explicit consent where required.</li>
+          <li><strong>Usage &amp; device data</strong> — log data, IP address, and app diagnostics needed to run and
+            secure the Service.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>3. Why we process it (legal bases)</h2>
+        <p>
+          To provide and secure the Service (performance of a contract); to comply with law (legal obligation); with your
+          consent (for sensitive fitness data and optional communications); and for our legitimate interests in operating,
+          improving, and protecting the Service, balanced against your rights. You may withdraw consent at any time.
+        </p>
+      </section>
+
+      <section>
+        <h2>4. Sharing</h2>
+        <p>
+          We do not sell your personal data. We share it only with: your trainer (for client data), service providers who
+          host and support the Service under contract, and authorities where legally required. Trainers only see the
+          client data relevant to their own clients.
+        </p>
+      </section>
+
+      <section>
+        <h2>5. International transfers</h2>
+        <p>
+          We may process data in countries other than yours. Where we transfer personal data out of the EEA, UK, or other
+          regulated regions, we use appropriate safeguards such as Standard Contractual Clauses (and the UK Addendum), or
+          equivalent legally recognized mechanisms.
+        </p>
+      </section>
+
+      <section>
+        <h2>6. Retention &amp; security</h2>
+        <p>
+          We keep personal data only as long as needed to provide the Service or as required by law, then delete or
+          anonymize it. Deleted trainer accounts are moved to recycle space before permanent removal. We use encryption in
+          transit, hashed passwords, access controls, and other measures appropriate to the risk.
+        </p>
+      </section>
+
+      <section>
+        <h2>7. Your rights</h2>
+        <p>
+          Depending on where you live, you may have the right to access, correct, delete, restrict, or object to
+          processing, to data portability, and to withdraw consent. In the Service, clients can request changes to their
+          details for trainer approval, and can request deletion. To exercise rights, contact us using the details below;
+          we respond within the timeframe required by applicable law.
+        </p>
+      </section>
+
+      <section class="regional">
+        <h2>8. Regional information</h2>
+        <h3>EEA &amp; United Kingdom (GDPR)</h3>
+        <p>You have the rights in Section 7 and the right to lodge a complaint with your supervisory authority (e.g. your
+          national Data Protection Authority, or the UK ICO). Our EU/UK representative is [Representative, if applicable].</p>
+
+        <h3>India (DPDP Act 2023)</h3>
+        <p>You may access and correct your data, nominate another person to exercise rights, and raise grievances with our
+          Grievance Officer at [grievance&#64;coachflow.app]. We process personal data based on your consent or legitimate
+          uses permitted by the Act.</p>
+
+        <h3>United States (California — CCPA/CPRA)</h3>
+        <p>California residents may request to know, delete, and correct personal information, and to opt out of "sale" or
+          "sharing." <strong>We do not sell or share personal information</strong> as those terms are defined. We do not
+          discriminate against you for exercising your rights.</p>
+
+        <h3>Japan (APPI)</h3>
+        <p>You may request disclosure, correction, or cessation of use of your retained personal data. We identify the
+          purpose of use, and obtain consent before providing personal data to third parties or transferring it overseas
+          except as permitted by the APPI.</p>
+      </section>
+
+      <section>
+        <h2>9. Children</h2>
+        <p>The Service is not directed to children under 16. Where a client under the age of consent uses the Service, a
+          parent or guardian must provide consent as required by local law.</p>
+      </section>
+
+      <section>
+        <h2>10. Cookies</h2>
+        <p>We use only the storage strictly necessary to keep you signed in and run the app. We do not use advertising or
+          cross-site tracking cookies.</p>
+      </section>
+
+      <section>
+        <h2>11. Contact</h2>
+        <p>
+          Privacy questions or requests: <a href="mailto:privacy@coachflow.app">privacy&#64;coachflow.app</a>.
+          [Company Legal Name], [registered address].
+        </p>
+      </section>
+    }
+
+    <p class="back-row"><a routerLink="/">&larr; Back to home</a></p>
+  </article>
+</main>

@@ -43,18 +43,18 @@ export class TrainerLeadFormCreateComponent implements OnInit {
       options: ['Weight Loss', 'Muscle Gain', 'Strength Training', 'Mobility', 'General Fitness']
     },
     {
-      label: 'How did you hear about us?',
+      label: 'Training Experience',
       field_type: 'dropdown',
       required: false,
-      placeholder: 'Select source',
+      placeholder: 'Select experience level',
       help_text: '',
-      options: ['Instagram', 'YouTube', 'Google', 'Friend / Referral', 'Other']
+      options: ['Beginner', 'Intermediate', 'Advanced']
     },
     {
-      label: 'Message',
+      label: 'Medical Conditions or Injuries',
       field_type: 'long_text',
       required: false,
-      placeholder: 'Tell us more about your goals',
+      placeholder: 'List medical conditions or past injuries',
       help_text: '',
       options: []
     },
@@ -65,22 +65,6 @@ export class TrainerLeadFormCreateComponent implements OnInit {
       placeholder: 'Select mode',
       help_text: '',
       options: ['Online', 'In Person', 'Hybrid']
-    },
-    {
-      label: 'Preferred Time',
-      field_type: 'dropdown',
-      required: false,
-      placeholder: 'Select time',
-      help_text: '',
-      options: ['Morning', 'Afternoon', 'Evening', 'Flexible']
-    },
-    {
-      label: 'Are you working with a trainer currently?',
-      field_type: 'yes_no',
-      required: false,
-      placeholder: '',
-      help_text: '',
-      options: ['Yes', 'No']
     }
   ];
 

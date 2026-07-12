@@ -35,15 +35,13 @@ export class TrainerSignupComponent implements OnDestroy {
   verifiedUsername = '';
   isEmailAlreadyRegistered = false;
   resendCountdown = 0;
+  agreedToTerms = false;
 
   readonly signupForm = {
     email: '',
     emailOtp: '',
     password: '',
     confirmPassword: '',
-    firstName: '',
-    middleName: '',
-    lastName: '',
     username: ''
   };
 
@@ -53,8 +51,6 @@ export class TrainerSignupComponent implements OnDestroy {
     otp: '',
     password: '',
     confirmPassword: '',
-    firstName: '',
-    lastName: '',
     general: ''
   };
 
@@ -256,8 +252,10 @@ export class TrainerSignupComponent implements OnDestroy {
   verifyUsername(): void {
     const username = this.signupForm.username.trim().toLowerCase();
 
-    if (!username) {
-      this.fieldErrors.username = 'Username is required.';
+    const usernameLengthError = this.getUsernameLengthError(username);
+
+    if (usernameLengthError) {
+      this.fieldErrors.username = usernameLengthError;
       return;
     }
 
@@ -295,6 +293,12 @@ export class TrainerSignupComponent implements OnDestroy {
       return;
     }
 
+    if (!this.agreedToTerms) {
+      this.fieldErrors.general = 'Please accept the Terms & Conditions and Privacy Policy to continue.';
+      this.signupMessage = '';
+      return;
+    }
+
     if (!this.emailVerificationToken || this.emailOtpStatus !== 'verified') {
       this.fieldErrors.otp = 'Please verify your email with OTP before creating the account.';
       this.signupMessage = '';
@@ -310,9 +314,6 @@ export class TrainerSignupComponent implements OnDestroy {
     const payload: TrainerSignupPayload = {
       email: form.email.trim().toLowerCase(),
       username,
-      first_name: form.firstName.trim(),
-      middle_name: form.middleName.trim(),
-      last_name: form.lastName.trim(),
       password: form.password,
       confirm_password: form.confirmPassword,
       email_verification_token: this.emailVerificationToken
@@ -405,9 +406,6 @@ export class TrainerSignupComponent implements OnDestroy {
     this.signupForm.emailOtp = '';
     this.signupForm.password = '';
     this.signupForm.confirmPassword = '';
-    this.signupForm.firstName = '';
-    this.signupForm.middleName = '';
-    this.signupForm.lastName = '';
     this.signupForm.username = '';
     this.signupMessage = '';
     this.emailCheckMessage = '';
@@ -427,23 +425,15 @@ export class TrainerSignupComponent implements OnDestroy {
     let isValid = true;
     const form = this.signupForm;
 
-    if (!username) {
-      this.fieldErrors.username = 'Username is required.';
+    const usernameLengthError = this.getUsernameLengthError(username);
+
+    if (usernameLengthError) {
+      this.fieldErrors.username = usernameLengthError;
       isValid = false;
     }
 
     if (!form.email.trim()) {
       this.fieldErrors.email = 'Email is required.';
-      isValid = false;
-    }
-
-    if (!form.firstName.trim()) {
-      this.fieldErrors.firstName = 'First name is required.';
-      isValid = false;
-    }
-
-    if (!form.lastName.trim()) {
-      this.fieldErrors.lastName = 'Last name is required.';
       isValid = false;
     }
 
@@ -483,8 +473,6 @@ export class TrainerSignupComponent implements OnDestroy {
       email_verification_token: 'otp',
       password: 'password',
       confirm_password: 'confirmPassword',
-      first_name: 'firstName',
-      last_name: 'lastName',
       non_field_errors: 'general'
     };
 
@@ -503,9 +491,23 @@ export class TrainerSignupComponent implements OnDestroy {
     this.fieldErrors.otp = '';
     this.fieldErrors.password = '';
     this.fieldErrors.confirmPassword = '';
-    this.fieldErrors.firstName = '';
-    this.fieldErrors.lastName = '';
     this.fieldErrors.general = '';
+  }
+
+  private getUsernameLengthError(username: string): string {
+    if (!username) {
+      return 'Username is required.';
+    }
+
+    if (username.length < 5) {
+      return 'Username must be at least 5 characters.';
+    }
+
+    if (username.length > 10) {
+      return 'Username must be no more than 10 characters.';
+    }
+
+    return '';
   }
 
   private clearResendTimer(): void {

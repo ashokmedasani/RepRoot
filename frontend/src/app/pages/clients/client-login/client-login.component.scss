@@ -1,6 +1,9 @@
 .auth-page {
   min-height: 100vh;
-  background: color-mix(in srgb, var(--app-bg) 92%, var(--app-surface));
+  background: color-mix(in srgb, var(--app-bg) 95%, var(--app-surface));
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 300ms ease-out;
 }
 
 .auth-topbar {
@@ -10,15 +13,18 @@
   gap: 1rem;
   min-height: 4.75rem;
   border-bottom: 1px solid var(--app-border);
-  padding: 0 1.75rem;
-  background: var(--app-surface);
+  padding: 0 2rem;
+  background: var(--app-glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .brand {
   color: var(--app-text);
   font-size: 1.35rem;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .top-action {
@@ -26,30 +32,138 @@
   align-items: center;
   gap: 0.75rem;
   color: var(--app-muted);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .top-action a {
-  border-radius: 0.55rem;
-  padding: 0.7rem 1rem;
+  border-radius: var(--app-radius-md);
+  padding: 0.55rem 0.95rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: all var(--app-transition-fast);
+  border: 1px solid color-mix(in srgb, var(--app-primary) 20%, transparent);
+}
+
+.top-action a:hover {
   background: var(--app-primary);
   color: #ffffff;
-  font-weight: 700;
-  text-decoration: none;
-  text-transform: uppercase;
+  transform: translateY(-1px);
 }
 
 .auth-card {
-  width: min(43rem, calc(100% - 2rem));
-  margin: 2rem auto;
-  border-radius: 1rem;
-  padding: 2rem;
+  width: min(32rem, calc(100% - 2.5rem));
+  margin: auto;
+  border-radius: var(--app-radius-xl);
+  padding: 2.25rem;
+  background: var(--app-card-bg-gradient);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-lg);
+  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.picker-toggle {
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--app-radius-xs);
+  padding: 0.2rem 0.6rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--app-transition-fast);
+}
+
+.picker-toggle:hover {
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
+.field-label {
+  width: 100%;
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+}
+
+.trainer-picker {
+  margin-top: 0.5rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.75rem;
   background: var(--app-surface);
-  box-shadow: var(--app-shadow);
+  box-shadow: var(--app-shadow-sm);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.trainer-picker input {
+  min-height: 2.5rem;
+  width: 100%;
+  border-radius: var(--app-radius-md);
+  font-size: 0.88rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.picker-list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.picker-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.6rem 0.85rem;
+  background: var(--app-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--app-transition-fast);
+}
+
+.picker-item:hover,
+.picker-item.selected {
+  border-color: var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+.picker-name {
+  color: var(--app-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.picker-code {
+  color: var(--app-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.picker-empty {
+  margin: 0.5rem 0;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 .eyebrow {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.5rem;
   color: var(--app-primary-strong);
   font-size: var(--app-eyebrow-size);
   font-weight: 700;
@@ -58,59 +172,31 @@
 }
 
 h1 {
-  margin: 0 0 1.45rem;
+  margin: 0 0 1.5rem;
   color: var(--app-text);
-  font-size: 1.6rem;
-  font-weight: 600;
+  font-size: 1.45rem;
+  font-weight: 800;
   line-height: 1.25;
-}
-
-.auth-form,
-label {
-  display: grid;
+  letter-spacing: var(--app-tracking-tight);
 }
 
 .auth-form {
-  gap: 0.9rem;
+  display: grid;
+  gap: 1.1rem;
 }
 
 label {
-  gap: 0.45rem;
-  color: var(--app-text);
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.field-label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.2rem;
+  display: grid;
+  gap: 0.4rem;
 }
 
 input {
-  min-height: 3.05rem;
-  border: 1px solid var(--app-border);
-  border-radius: 1rem;
-  padding: 0.8rem 1rem;
-  background: var(--app-surface);
-  color: var(--app-text);
-  font-size: 1rem;
-}
-
-input:focus {
-  border-color: var(--app-primary);
-  outline: 2px solid color-mix(in srgb, var(--app-primary) 22%, transparent);
+  width: 100%;
 }
 
 .primary-action {
-  min-height: 3.2rem;
-  border: 0;
-  border-radius: 1rem;
-  background: var(--app-primary);
-  color: #ffffff;
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 .required {
@@ -118,29 +204,51 @@ input:focus {
   font-weight: 700;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.68;
-}
-
 .form-message {
   margin: 0;
-  border-radius: 0.55rem;
-  padding: 0.85rem 1rem;
+  border-radius: var(--app-radius-md);
+  padding: 0.85rem 1.1rem;
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 15%, transparent);
+  animation: slide-up var(--app-transition-fast) ease-out;
+}
+
+.legal-note {
+  margin: 0.5rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.legal-note a {
+  color: var(--app-primary-strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.legal-note a:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 620px) {
   .auth-topbar {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 1rem;
+    align-items: center;
+    padding: 0 1.25rem;
+    min-height: 4.25rem;
   }
 
   .auth-card {
-    margin: 1.25rem auto;
-    padding: 2rem 1.25rem;
+    width: calc(100% - 1.5rem);
+    margin: 2rem auto;
+    padding: 1.75rem 1.25rem;
+  }
+
+  h1 {
+    font-size: 1.3rem;
   }
 }

@@ -18,11 +18,12 @@ Angular core API services.
 - `changePassword`: verifies the current password and clears `must_change_password`.
 - `getMe`: profile, group, registration fields, and original lead submission.
 - `getTemplates`: assigned templates including attached references.
-- `getEntries` / `submitEntry`: entry history and per-date upsert submission.
+- `getEntries` / `submitEntry`: entry history and template submission.
+- `getProgress`: read-only progress notes shared by the trainer.
 
 ## Data flow
 
-All authenticated methods send `Authorization: ClientToken <key>`. `submitEntry` upserts by template and date, so re-submitting the same day updates the earlier entry.
+All authenticated methods send `Authorization: ClientToken <key>`. Entries and trainer-shared progress records feed the client template tabs.
 
 ## Connected files
 

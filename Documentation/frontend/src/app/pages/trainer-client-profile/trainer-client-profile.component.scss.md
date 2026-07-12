@@ -1,7 +1,21 @@
 # frontend/src/app/pages/trainer/trainer-client-profile/trainer-client-profile.component.scss
 
-Styles for the restructured client profile: hero grid, assignment rows with accent borders, entries table pills, insights blocks (day dots, sparkline strokes), dialog backdrop/panel, and responsive stacking.
+## What changed
 
-## Update
+Added styles for the unified Client Information view/edit panel, including detail tiles, edit-grid controls, and compact action rows.
 
-Compact two-panel styles: identity card, warning-toned notes card, selectable assignment rows, activity tiles, detail tabs, reference cards with type-colored icons, sparkline tables, and shared dialog styles.
+## Why it changed
+
+The trainer needs a large but organized section for editing client information without spreading fields across multiple cards.
+
+## UI behavior
+
+Desktop shows three-column detail/edit grids. Mobile stacks the client information fields with no horizontal overflow.
+
+## API or database impact
+
+Style-only file; no API or database impact.
+
+## Testing
+
+Verified with `npm run build`.

@@ -1,23 +1,36 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 
 import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
-import { ClientAccessRecord } from '../../../core/api/forms-groups-api.service';
 import {
-  TemplateReference,
+  AdditionalInfoItem,
+  ClientAccessRecord,
+  ClientDetailChangeRequest,
+  DynamicField,
+  ProgressEntry
+} from '../../../core/api/forms-groups-api.service';
+import {
+  TemplateField,
   TrackingEntryRecord,
   TrackingTemplateRecord
 } from '../../../core/api/templates-api.service';
 import { ChatPanelComponent } from '../../../shared/chat-panel/chat-panel.component';
+import { ChartSpec } from '../../../shared/analytics/analytics.types';
+import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
+import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../shared/analytics/graph-engine';
+import { ReferencesAccordionComponent } from '../../../shared/references-accordion/references-accordion.component';
+import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
 
-type PortalTab = 'templates' | 'details' | 'resources' | 'chat';
+type PortalTab = 'details' | 'trainer' | 'templates';
+type TrainerTab = 'profile' | 'chat';
+type TemplateTab = 'overview' | 'references' | 'data-entry' | 'progress';
 
 interface EntryDraft {
   entryDate: string;
+  entryTime: string;
   answers: Record<string, string>;
   note: string;
 }
@@ -25,30 +38,57 @@ interface EntryDraft {
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [ChatPanelComponent, DatePipe, FormsModule, RouterLink],
+  imports: [ChartRendererComponent, ChatPanelComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink],
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
 export class ClientProfileComponent implements OnInit {
   private readonly clientApi = inject(ClientApiService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   client: ClientAccessRecord | null = null;
   me: ClientMeResponse | null = null;
   templates: TrackingTemplateRecord[] = [];
   entries: TrackingEntryRecord[] = [];
+  progressEntries: ProgressEntry[] = [];
   drafts: Record<number, EntryDraft> = {};
-  activeTab: PortalTab = 'templates';
+  activeTab: PortalTab = 'details';
+  trainerTab: TrainerTab = 'profile';
+  templateTab: TemplateTab = 'overview';
+  selectedTemplateId: number | null = null;
+  areTemplatesExpanded = true;
   message = '';
   messageType: 'success' | 'error' = 'success';
   savingTemplateId = 0;
 
+  changeRequest: ClientDetailChangeRequest | null = null;
+  isEditingDetails = false;
+  savingDetailEdit = false;
+  editAnswers: Record<string, string> = {};
+  editNote = '';
+
   readonly tabs: { id: PortalTab; label: string }[] = [
-    { id: 'templates', label: 'My Templates' },
     { id: 'details', label: 'My Details' },
-    { id: 'resources', label: 'Resources' },
-    { id: 'chat', label: 'Trainer Chat' }
+    { id: 'trainer', label: 'Trainer' },
+    { id: 'templates', label: 'Templates' }
   ];
+  readonly trainerTabs: { id: TrainerTab; label: string }[] = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'chat', label: 'Chat' }
+  ];
+  readonly templateTabs: { id: TemplateTab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'references', label: 'References' },
+    { id: 'data-entry', label: 'Data Entry' },
+    { id: 'progress', label: 'Progress' }
+  ];
+
+  get trainerProfile() {
+    return this.me?.trainer_profile || null;
+  }
+
+  get sharedAdditionalInfo() {
+    return this.me?.shared_additional_info || [];
+  }
 
   ngOnInit(): void {
     const storedClient = window.sessionStorage.getItem('client-access');
@@ -57,22 +97,6 @@ export class ClientProfileComponent implements OnInit {
     if (this.client && window.sessionStorage.getItem('client-auth-token')) {
       this.loadPortal();
     }
-  }
-
-  get resources(): TemplateReference[] {
-    const seen = new Set<number>();
-    const references: TemplateReference[] = [];
-
-    for (const template of this.templates) {
-      for (const reference of template.references || []) {
-        if (!seen.has(reference.id)) {
-          seen.add(reference.id);
-          references.push(reference);
-        }
-      }
-    }
-
-    return references;
   }
 
   signOut(): void {
@@ -87,12 +111,66 @@ export class ClientProfileComponent implements OnInit {
 
   setTab(tab: PortalTab): void {
     this.activeTab = tab;
+
+    if (tab === 'templates') {
+      this.areTemplatesExpanded = !this.areTemplatesExpanded || !this.selectedTemplateId;
+      this.selectedTemplateId = this.selectedTemplate?.id || null;
+    }
+  }
+
+  setTrainerTab(tab: TrainerTab): void {
+    this.trainerTab = tab;
+  }
+
+  setTemplateTab(tab: TemplateTab): void {
+    this.templateTab = tab;
+  }
+
+  selectTemplate(template: TrackingTemplateRecord): void {
+    this.activeTab = 'templates';
+    this.areTemplatesExpanded = true;
+    this.selectedTemplateId = template.id;
+    this.templateTab = 'overview';
+  }
+
+  get selectedTemplate(): TrackingTemplateRecord | null {
+    return this.templates.find((template) => template.id === this.selectedTemplateId) || this.templates[0] || null;
+  }
+
+  onPhotoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    readImageAsDataUrl(file)
+      .then((dataUrl) => {
+        this.clientApi.updatePhoto(dataUrl).subscribe({
+          next: (response) => {
+            this.client = response.client;
+            window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
+            this.messageType = 'success';
+            this.message = response.message;
+          },
+          error: (error: unknown) => {
+            this.messageType = 'error';
+            this.message = formatApiError(error, 'Photo could not be updated.');
+          }
+        });
+      })
+      .catch(() => {
+        this.messageType = 'error';
+        this.message = 'That image could not be used. Try a different photo.';
+      });
   }
 
   draftFor(template: TrackingTemplateRecord): EntryDraft {
     if (!this.drafts[template.id]) {
       this.drafts[template.id] = {
         entryDate: this.todayIso(),
+        entryTime: this.nowTime(),
         answers: {},
         note: ''
       };
@@ -102,7 +180,42 @@ export class ClientProfileComponent implements OnInit {
   }
 
   entriesFor(template: TrackingTemplateRecord): TrackingEntryRecord[] {
-    return this.entries.filter((entry) => entry.template === template.id).slice(0, 5);
+    return this.entries.filter((entry) => entry.template === template.id);
+  }
+
+  recentEntriesFor(template: TrackingTemplateRecord): TrackingEntryRecord[] {
+    return this.entriesFor(template).slice(0, 20);
+  }
+
+  entryCountFor(template: TrackingTemplateRecord): number {
+    return this.entriesFor(template).length;
+  }
+
+  // Auto-generated charts for this template, using the shared graph engine.
+  templateCharts(template: TrackingTemplateRecord): ChartSpec[] {
+    const entries = this.entriesFor(template);
+    return entries.length ? buildFieldCharts(template.fields, entries, 0) : [];
+  }
+
+  hasChartData(template: TrackingTemplateRecord): boolean {
+    return this.templateCharts(template).length > 0;
+  }
+
+  numericStatsFor(template: TrackingTemplateRecord): NumericFieldStat[] {
+    return numericFieldStats(template.fields, this.entriesFor(template)).filter((stat) => stat.hasData);
+  }
+
+  hasOverviewData(template: TrackingTemplateRecord): boolean {
+    return this.numericStatsFor(template).length > 0 || this.hasChartData(template);
+  }
+
+  progressFor(_template: TrackingTemplateRecord): ProgressEntry[] {
+    return this.progressEntries;
+  }
+
+  ratingSteps(field: TemplateField): number[] {
+    const scale = Math.min(10, Math.max(2, field.scale || 5));
+    return Array.from({ length: scale }, (_value, index) => index + 1);
   }
 
   submitEntry(template: TrackingTemplateRecord): void {
@@ -113,56 +226,80 @@ export class ClientProfileComponent implements OnInit {
     }
 
     this.savingTemplateId = template.id;
+
+    const onSuccess = (message: string): void => {
+      this.messageType = 'success';
+      this.message = message;
+      this.savingTemplateId = 0;
+      this.editingEntryId = null;
+      this.drafts[template.id] = { entryDate: this.todayIso(), entryTime: this.nowTime(), answers: {}, note: '' };
+      this.loadEntries();
+    };
+
+    const onError = (error: unknown): void => {
+      this.messageType = 'error';
+      this.message = formatApiError(error, 'Entry could not be saved.');
+      this.savingTemplateId = 0;
+    };
+
+    if (this.editingEntryId) {
+      this.clientApi
+        .updateEntry(this.editingEntryId, {
+          answers: draft.answers,
+          note: draft.note.trim(),
+          entry_date: draft.entryDate,
+          entry_time: draft.entryTime || this.nowTime()
+        })
+        .subscribe({ next: (response) => onSuccess(response.message), error: onError });
+      return;
+    }
+
     this.clientApi
       .submitEntry({
         template_id: template.id,
         entry_date: draft.entryDate,
+        entry_time: draft.entryTime || this.nowTime(),
         answers: draft.answers,
         note: draft.note.trim()
       })
-      .subscribe({
-        next: (response) => {
-          this.messageType = 'success';
-          this.message = response.message;
-          this.savingTemplateId = 0;
-          this.drafts[template.id] = { entryDate: this.todayIso(), answers: {}, note: '' };
-          this.loadEntries();
-        },
-        error: (error: unknown) => {
-          this.messageType = 'error';
-          this.message = formatApiError(error, 'Entry could not be submitted.');
-          this.savingTemplateId = 0;
-        }
-      });
+      .subscribe({ next: (response) => onSuccess(response.message), error: onError });
   }
 
-  handleEntryImage(event: Event, template: TrackingTemplateRecord, fieldKey: string): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+  clearEntryForm(template: TrackingTemplateRecord): void {
+    this.cancelEntryEdit(template);
+  }
 
-    if (!file || !file.type.startsWith('image/')) {
+  editingEntryId: number | null = null;
+
+  isEntryEditable(entry: TrackingEntryRecord): boolean {
+    if (!entry.created_at) {
+      return true;
+    }
+
+    return Date.now() - new Date(entry.created_at).getTime() <= 72 * 60 * 60 * 1000;
+  }
+
+  startEntryEdit(template: TrackingTemplateRecord, entry: TrackingEntryRecord): void {
+    if (!this.isEntryEditable(entry)) {
+      this.messageType = 'error';
+      this.message = 'This entry is older than 72 hours and can no longer be edited.';
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = new Image();
-      image.onload = () => {
-        const maxSize = 800;
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
-        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
-        this.draftFor(template).answers[fieldKey] = canvas.toDataURL('image/jpeg', 0.7);
-      };
-      image.src = String(reader.result || '');
+    this.editingEntryId = entry.id;
+    this.drafts[template.id] = {
+      entryDate: entry.entry_date,
+      entryTime: entry.entry_time || this.nowTime(),
+      answers: { ...(entry.answers || {}) },
+      note: entry.note || ''
     };
-    reader.readAsDataURL(file);
+    this.messageType = 'success';
+    this.message = 'Editing an existing entry. Update the values and submit to save.';
   }
 
-  isImageValue(value: string | undefined): boolean {
-    return Boolean(value && value.startsWith('data:image'));
+  cancelEntryEdit(template: TrackingTemplateRecord): void {
+    this.editingEntryId = null;
+    this.drafts[template.id] = { entryDate: this.todayIso(), entryTime: this.nowTime(), answers: {}, note: '' };
   }
 
   answerSummary(entry: TrackingEntryRecord): string {
@@ -173,28 +310,10 @@ export class ClientProfileComponent implements OnInit {
     return values.slice(0, 3).join(' | ') || 'Submitted';
   }
 
-  youtubeEmbedResourceUrl(link: string): SafeResourceUrl | null {
-    const patterns = [/youtu\.be\/([^?&/]+)/, /youtube\.com\/watch\?v=([^?&]+)/, /youtube\.com\/embed\/([^?&/]+)/];
-    const videoId = patterns.map((pattern) => link.match(pattern)?.[1]).find(Boolean);
-
-    return videoId ? this.sanitizer.bypassSecurityTrustResourceUrl(`https://www.youtube.com/embed/${videoId}`) : null;
-  }
-
-  openResource(reference: TemplateReference): void {
-    const url = reference.file_url || reference.link;
-
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+  openInfoLink(item: AdditionalInfoItem): void {
+    if (item.link) {
+      window.open(item.link, '_blank', 'noopener,noreferrer');
     }
-  }
-
-  leadAnswers(): { key: string; value: string }[] {
-    const answers = this.me?.lead_submission?.answers || {};
-
-    return Object.entries(answers).map(([key, value]) => ({
-      key: key.replace(/_/g, ' '),
-      value: String(value ?? '') || 'Not added'
-    }));
   }
 
   registrationAnswers(): { label: string; value: string }[] {
@@ -208,6 +327,88 @@ export class ClientProfileComponent implements OnInit {
 
       return { label: field.label, value: value ? String(value) : 'Not added' };
     });
+  }
+
+  // Fields the client may propose edits to (core identity stays fixed).
+  editableFields(): DynamicField[] {
+    return (this.me?.registration_fields || []).filter((field) => !field.is_core);
+  }
+
+  get hasPendingChangeRequest(): boolean {
+    return this.changeRequest?.status === 'pending';
+  }
+
+  startDetailEdit(): void {
+    const current = this.me?.client.registration_answers || {};
+    this.editAnswers = {};
+
+    for (const field of this.editableFields()) {
+      const key = field.key || field.label;
+      this.editAnswers[key] = String(current[key] ?? '');
+    }
+
+    this.editNote = '';
+    this.isEditingDetails = true;
+  }
+
+  cancelDetailEdit(): void {
+    this.isEditingDetails = false;
+    this.editAnswers = {};
+    this.editNote = '';
+  }
+
+  submitDetailEdit(): void {
+    if (this.savingDetailEdit) {
+      return;
+    }
+
+    this.savingDetailEdit = true;
+    this.clientApi.submitDetailChangeRequest(this.editAnswers, this.editNote.trim()).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.changeRequest = response.change_request;
+        this.isEditingDetails = false;
+        this.savingDetailEdit = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Edit request could not be submitted.');
+        this.savingDetailEdit = false;
+      }
+    });
+  }
+
+  detailFieldOptions(field: DynamicField): string[] {
+    if (field.field_type === 'yes_no') {
+      return ['Yes', 'No'];
+    }
+
+    if (['dropdown', 'radio', 'checkbox'].includes(field.field_type)) {
+      return field.options || [];
+    }
+
+    return [];
+  }
+
+  detailInputType(field: DynamicField): string {
+    if (field.field_type === 'number') {
+      return 'number';
+    }
+
+    if (field.field_type === 'date') {
+      return 'date';
+    }
+
+    if (field.field_type === 'phone') {
+      return 'tel';
+    }
+
+    if (field.field_type === 'email') {
+      return 'email';
+    }
+
+    return 'text';
   }
 
   private loadPortal(): void {
@@ -225,12 +426,23 @@ export class ClientProfileComponent implements OnInit {
     this.clientApi.getTemplates().subscribe({
       next: (response) => {
         this.templates = response.templates;
+        this.selectedTemplateId = response.templates[0]?.id || null;
       },
       error: () => {
         this.templates = [];
+        this.selectedTemplateId = null;
+      }
+    });
+    this.clientApi.getDetailChangeRequest().subscribe({
+      next: (response) => {
+        this.changeRequest = response.change_request;
+      },
+      error: () => {
+        this.changeRequest = null;
       }
     });
     this.loadEntries();
+    this.loadProgress();
   }
 
   private loadEntries(): void {
@@ -244,7 +456,23 @@ export class ClientProfileComponent implements OnInit {
     });
   }
 
+  private loadProgress(): void {
+    this.clientApi.getProgress().subscribe({
+      next: (response) => {
+        this.progressEntries = response.progress;
+      },
+      error: () => {
+        this.progressEntries = [];
+      }
+    });
+  }
+
   private todayIso(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private nowTime(): string {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   }
 }

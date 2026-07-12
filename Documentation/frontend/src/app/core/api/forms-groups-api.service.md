@@ -21,12 +21,22 @@ Angular core API services.
 - `getGroupUsers`: loads active users created under one group.
 - `deletePendingForm`: deletes a pending applicant request.
 - `createClientAccess`: converts a pending applicant into client access.
+- `updateClientProfile`: lets the trainer save editable client profile and registration-answer fields while keeping protected values such as reference ID outside the payload.
+- `getUpcomingReminders`: returns upcoming schedule rows plus summary counts for total pending and due-within ranges.
 - `getPublicForm` and `submitPublicForm`: support unauthenticated applicants.
 - Dynamic field types include location and address in addition to text, phone, choice, number, and date types.
 
 ## Data flow
 
 Protected trainer methods include the stored trainer auth token. Public form methods call unauthenticated backend routes. The dashboard uses one overview payload while guided setup pages reuse the create/update endpoints.
+
+## Update
+
+Schedule summary typing and trainer-side client profile update typing were added for dashboard and client-profile refinements. No database impact from this frontend service change.
+
+## Testing
+
+Verified by `npm run build`.
 
 ## Connected files
 

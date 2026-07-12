@@ -1,9 +1,11 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
@@ -13,10 +15,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import (
+  default_client_registration_fields,
   ChatMessage,
   ClientAccess,
+  ClientDetailChangeRequest,
   ClientRegistrationForm,
+  ClientReminder,
   LeadSubmission,
+  ProgressEntry,
   RecycledTrainerAccount,
   ReferenceCategory,
   TemplateAssignment,
@@ -30,13 +36,16 @@ from .models import (
 from .serializers import (
   ChatMessageSerializer,
   ClientAccessCreateSerializer,
+  ClientDetailChangeRequestSerializer,
   ClientLoginSerializer,
   ClientTrainerLookupSerializer,
   ClientAccessSerializer,
   ClientPasswordChangeSerializer,
   ClientRegistrationFormSerializer,
+  ClientReminderSerializer,
   ClientTrackingEntrySubmitSerializer,
   EmailAvailabilitySerializer,
+  ProgressEntrySerializer,
   EmailOtpRequestSerializer,
   EmailOtpVerifySerializer,
   LeadSubmissionSerializer,
@@ -151,6 +160,8 @@ def build_trainer_account_snapshot(user):
       'instagram_url': profile.instagram_url,
       'youtube_url': profile.youtube_url,
       'website_url': profile.website_url,
+      'profile_images': profile.profile_images,
+      'profile_links': profile.profile_links,
       'terms_accepted': profile.terms_accepted,
       'privacy_policy_accepted': profile.privacy_policy_accepted,
       'created_at': serialize_datetime(profile.created_at),
@@ -158,6 +169,52 @@ def build_trainer_account_snapshot(user):
     }
 
   return snapshot
+
+
+def build_public_trainer_profile(user, request=None):
+  profile = getattr(user, 'trainer_profile', None)
+
+  if profile is None:
+    return None
+
+  visibility = profile.profile_visibility or {}
+
+  def file_url(file_field):
+    if not file_field:
+      return ''
+
+    return request.build_absolute_uri(file_field.url) if request else file_field.url
+
+  payload = {
+    'trainer_name': user.get_full_name() or user.username,
+    'profile_photo_url': file_url(profile.profile_photo),
+    'professional_headline': profile.professional_headline,
+    'location': ', '.join(item for item in [profile.state, profile.country] if item),
+    'about_me': profile.about_me if visibility.get('about') else '',
+    'professional_summary': None,
+    'training_style': profile.training_style if visibility.get('training_style') else '',
+    'certification': None,
+    'images': profile.profile_images if visibility.get('images') else [],
+    'links': profile.profile_links if visibility.get('links') else [],
+  }
+
+  if visibility.get('professional_summary'):
+    payload['professional_summary'] = {
+      'trainer_type': profile.trainer_type,
+      'years_experience': profile.years_experience,
+      'specializations': profile.specializations,
+      'languages_known': profile.languages_known,
+    }
+
+  if visibility.get('certification'):
+    payload['certification'] = {
+      'name': profile.certification_name,
+      'issued_by': profile.certification_issued_by,
+      'year': profile.certification_year,
+      'file_url': file_url(profile.certification_file),
+    }
+
+  return payload
 
 
 class UsernameAvailabilityView(APIView):
@@ -460,6 +517,24 @@ class TrainerProfileView(APIView):
     return self.post(request)
 
 
+class TrainerProfileVisibilityView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request):
+    profile = request.user.trainer_profile
+    visibility = request.data.get('visibility', {})
+
+    if not isinstance(visibility, dict):
+      return Response({'message': 'visibility must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile.profile_visibility = {key: bool(value) for key, value in visibility.items()}
+    profile.save(update_fields=['profile_visibility', 'updated_at'])
+
+    return Response(
+      {'profile_visibility': profile.profile_visibility, 'message': 'Profile visibility updated.'}
+    )
+
+
 class TrainerLogoutView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
@@ -570,6 +645,11 @@ class TrainerGroupListView(APIView):
       group = serializer.save(trainer=request.user)
     except IntegrityError:
       return Response({'message': 'Group Name must be unique for this trainer.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Seed the universal client creation form so every group has one from the
+    # start. A registration form is mandatory before a lead can be converted
+    # into a client; the trainer can still customise these fields afterwards.
+    ClientRegistrationForm.objects.create(group=group, fields=default_client_registration_fields())
 
     return Response(
       {
@@ -739,9 +819,9 @@ class ClientAccessCreateView(APIView):
     registration_answers['last_name'] = submission.last_name
     registration_answers['email'] = submission.email
 
-    from .serializers import validate_required_answers
-
-    validate_required_answers(registration_form.fields, registration_answers)
+    # Required fields are mandatory for the CLIENT to complete (from their
+    # account, via an edit request the trainer approves) - not for the trainer
+    # to fill in at creation time. So no required-answer validation here.
 
     client_password = serializer.validated_data['password']
 
@@ -756,6 +836,7 @@ class ClientAccessCreateView(APIView):
           email=submission.email,
           username=serializer.validated_data['username'],
           temporary_password=make_password(client_password),
+          photo=serializer.validated_data.get('photo', ''),
           registration_answers=registration_answers,
           must_change_password=False,
         )
@@ -799,7 +880,8 @@ class GroupClientAccessListView(APIView):
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    clients = ClientAccess.objects.filter(trainer=request.user, group=group, is_active=True)
+    # Include suspended clients too so the trainer can see status and reactivate.
+    clients = ClientAccess.objects.filter(trainer=request.user, group=group).order_by('-is_active', '-created_at')
 
     return Response(
       {
@@ -813,10 +895,10 @@ class ClientAccessDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_client(self, request, client_id):
+    # No is_active filter: the trainer can open a suspended client to reactivate.
     return ClientAccess.objects.filter(
       id=client_id,
       trainer=request.user,
-      is_active=True,
     ).select_related('group', 'lead_submission', 'trainer').first()
 
   def get(self, request, client_id):
@@ -827,6 +909,9 @@ class ClientAccessDetailView(APIView):
 
     group = client_access.group
     registration_form = getattr(group, 'client_registration_form', None)
+    pending_change_request = client_access.detail_change_requests.filter(
+      status=ClientDetailChangeRequest.STATUS_PENDING
+    ).first()
 
     return Response(
       {
@@ -839,8 +924,54 @@ class ClientAccessDetailView(APIView):
         'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
         'trainer_notes': client_access.trainer_notes,
         'trainer_notes_updated_at': serialize_datetime(client_access.trainer_notes_updated_at),
+        'pending_change_request': (
+          ClientDetailChangeRequestSerializer(pending_change_request).data if pending_change_request else None
+        ),
       }
     )
+
+  def put(self, request, client_id):
+    client_access = self.get_client(request, client_id)
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    registration_answers = dict(client_access.registration_answers or {})
+    submitted_answers = request.data.get('registration_answers')
+
+    if submitted_answers is not None:
+      if not isinstance(submitted_answers, dict):
+        return Response({'message': 'registration_answers must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
+      registration_answers.update(submitted_answers)
+
+    first_name = str(request.data.get('first_name', client_access.first_name)).strip()
+    last_name = str(request.data.get('last_name', client_access.last_name)).strip()
+    email = str(request.data.get('email', client_access.email)).strip().lower()
+    username = str(request.data.get('username', client_access.username)).strip()
+
+    if not first_name or not last_name or not email or not username:
+      return Response({'message': 'First name, last name, email, and username are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if ClientAccess.objects.filter(trainer=request.user, username=username).exclude(id=client_access.id).exists():
+      return Response({'message': 'Username is already used by another client.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if ClientAccess.objects.filter(trainer=request.user, email=email).exclude(id=client_access.id).exists():
+      return Response({'message': 'Email is already used by another client.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    client_access.first_name = first_name
+    client_access.last_name = last_name
+    client_access.email = email
+    client_access.username = username
+    client_access.registration_answers = registration_answers
+
+    if 'is_active' in request.data:
+      client_access.is_active = bool(request.data.get('is_active'))
+
+    client_access.save(
+      update_fields=['first_name', 'last_name', 'email', 'username', 'registration_answers', 'is_active', 'updated_at']
+    )
+
+    return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Client information updated.'})
 
 
 class ClientTrainerNotesView(APIView):
@@ -864,6 +995,240 @@ class ClientTrainerNotesView(APIView):
       }
     )
 
+class ClientAccessPhotoView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    client_access.photo = str(request.data.get('photo', '') or '')
+    client_access.save(update_fields=['photo', 'updated_at'])
+
+    return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Client photo updated.'})
+
+
+class ClientAdditionalInfoView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    items = request.data.get('additional_info', [])
+
+    if not isinstance(items, list):
+      return Response({'message': 'additional_info must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    client_access.additional_info = items
+
+    if 'additional_info_shared' in request.data:
+      client_access.additional_info_shared = bool(request.data.get('additional_info_shared'))
+
+    client_access.save(update_fields=['additional_info', 'additional_info_shared', 'updated_at'])
+
+    return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Additional information saved.'})
+
+
+class ClientReminderListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def _client(self, request, client_id):
+    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, client_id):
+    client = self._client(request, client_id)
+
+    if client is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'reminders': ClientReminderSerializer(client.reminders.all(), many=True).data})
+
+  def post(self, request, client_id):
+    client = self._client(request, client_id)
+
+    if client is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ClientReminderSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    reminder = serializer.save(trainer=request.user, client=client)
+
+    return Response(
+      {'reminder': ClientReminderSerializer(reminder).data, 'message': 'Reminder scheduled.'},
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ClientReminderDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def _reminder(self, request, reminder_id):
+    return ClientReminder.objects.filter(id=reminder_id, trainer=request.user).select_related('client').first()
+
+  def put(self, request, reminder_id):
+    reminder = self._reminder(request, reminder_id)
+
+    if reminder is None:
+      return Response({'message': 'Reminder not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ClientReminderSerializer(reminder, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    return Response({'reminder': ClientReminderSerializer(reminder).data, 'message': 'Reminder updated.'})
+
+  def delete(self, request, reminder_id):
+    reminder = self._reminder(request, reminder_id)
+
+    if reminder is None:
+      return Response({'message': 'Reminder not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    reminder.delete()
+    return Response({'message': 'Reminder deleted.'})
+
+
+class TrainerUpcomingRemindersView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    pending = ClientReminder.objects.filter(trainer=request.user, status=ClientReminder.STATUS_PENDING).select_related('client')
+    now = timezone.localtime()
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+
+    def due_within(days):
+      return pending.filter(date__lte=today + timedelta(days=days)).count()
+
+    reminders = pending[:10]
+
+    return Response(
+      {
+        'reminders': ClientReminderSerializer(reminders, many=True).data,
+        'summary': {
+          'total_pending': pending.count(),
+          'due_24_hours': pending.filter(date__lte=tomorrow).count(),
+          'due_5_days': due_within(5),
+          'due_7_days': due_within(7),
+          'due_10_days': due_within(10),
+          'nearest_date': reminders[0].date.isoformat() if reminders else '',
+        },
+      }
+    )
+
+
+class ClientProgressListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def _client(self, request, client_id):
+    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+
+  def get(self, request, client_id):
+    client = self._client(request, client_id)
+
+    if client is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response({'progress': ProgressEntrySerializer(client.progress_entries.all(), many=True).data})
+
+  def post(self, request, client_id):
+    client = self._client(request, client_id)
+
+    if client is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ProgressEntrySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    entry = serializer.save(
+      trainer=request.user,
+      client=client,
+      created_by=request.user.get_full_name() or request.user.username,
+    )
+
+    return Response(
+      {'progress': ProgressEntrySerializer(entry).data, 'message': 'Progress record saved.'},
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ClientProgressDetailView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, entry_id):
+    entry = ProgressEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+
+    if entry is None:
+      return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ProgressEntrySerializer(entry, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    return Response({'progress': ProgressEntrySerializer(entry).data, 'message': 'Progress record updated.'})
+
+  def delete(self, request, entry_id):
+    entry = ProgressEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+
+    if entry is None:
+      return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    entry.delete()
+    return Response({'message': 'Progress record deleted.'})
+
+
+class TrainerClientChangeRequestActionView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, client_id, request_id):
+    change_request = ClientDetailChangeRequest.objects.filter(
+      id=request_id,
+      client_id=client_id,
+      client__trainer=request.user,
+      status=ClientDetailChangeRequest.STATUS_PENDING,
+    ).select_related('client').first()
+
+    if change_request is None:
+      return Response({'message': 'Pending change request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    action = str(request.data.get('action', '')).strip().lower()
+    note = str(request.data.get('note', '')).strip()
+
+    if action not in ('approve', 'reject'):
+      return Response({'message': 'Action must be approve or reject.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    client_access = change_request.client
+
+    if action == 'approve':
+      # Preserve the immutable core identity fields; apply everything else.
+      answers = dict(client_access.registration_answers or {})
+      for key, value in (change_request.proposed_answers or {}).items():
+        if key in ('first_name', 'last_name', 'email'):
+          continue
+        answers[key] = value
+
+      client_access.registration_answers = answers
+      client_access.save(update_fields=['registration_answers', 'updated_at'])
+      change_request.status = ClientDetailChangeRequest.STATUS_APPROVED
+    else:
+      change_request.status = ClientDetailChangeRequest.STATUS_REJECTED
+
+    change_request.trainer_note = note
+    change_request.reviewed_at = timezone.now()
+    change_request.save(update_fields=['status', 'trainer_note', 'reviewed_at'])
+
+    return Response(
+      {
+        'change_request': ClientDetailChangeRequestSerializer(change_request).data,
+        'client': ClientAccessSerializer(client_access).data,
+        'message': f'Change request {change_request.status}.',
+      }
+    )
+
+
 class ClientTrainerLookupView(APIView):
   permission_classes = [permissions.AllowAny]
 
@@ -885,11 +1250,59 @@ class ClientTrainerLookupView(APIView):
     )
 
 
+class TrainerDirectoryView(APIView):
+  permission_classes = [permissions.AllowAny]
+
+  def get(self, request):
+    search = str(request.query_params.get('search', '')).strip()
+    profiles = (
+      TrainerProfile.objects.select_related('user')
+      .exclude(trainer_id__isnull=True)
+      .exclude(trainer_id__exact='')
+    )
+
+    if search:
+      profiles = profiles.filter(
+        Q(trainer_id__icontains=search)
+        | Q(user__first_name__icontains=search)
+        | Q(user__last_name__icontains=search)
+      )
+
+    profiles = profiles.order_by('user__first_name', 'user__last_name')[:100]
+
+    trainers = [
+      {
+        'trainer_id': profile.trainer_id,
+        'trainer_name': profile.user.get_full_name() or profile.user.username,
+        'professional_headline': profile.professional_headline,
+      }
+      for profile in profiles
+    ]
+
+    return Response({'trainers': trainers})
+
+
+class ClientAccessStatusView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def put(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    client_access.is_active = bool(request.data.get('is_active'))
+    client_access.save(update_fields=['is_active', 'updated_at'])
+    state = 'reactivated' if client_access.is_active else 'suspended'
+
+    return Response({'client': ClientAccessSerializer(client_access).data, 'message': f'Client access {state}.'})
+
+
 class ClientAccessPasswordResetView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -918,6 +1331,72 @@ class ClientAccessPasswordResetView(APIView):
         'message': 'Client password reset email sent.',
       }
     )
+
+
+class ClientAccessResetView(APIView):
+  """Wipe a client's activity (templates, entries, chat, reminders, progress,
+  additional info, notes) while keeping their profile / registration identity."""
+
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    with transaction.atomic():
+      TemplateAssignment.objects.filter(client=client_access).delete()
+      TrackingEntry.objects.filter(client=client_access).delete()
+      ChatMessage.objects.filter(client=client_access).delete()
+      ClientReminder.objects.filter(client=client_access).delete()
+      ProgressEntry.objects.filter(client=client_access).delete()
+      ClientDetailChangeRequest.objects.filter(client=client_access).delete()
+
+      client_access.additional_info = []
+      client_access.additional_info_shared = False
+      client_access.trainer_notes = ''
+      client_access.trainer_notes_updated_at = None
+      client_access.save(
+        update_fields=[
+          'additional_info',
+          'additional_info_shared',
+          'trainer_notes',
+          'trainer_notes_updated_at',
+          'updated_at',
+        ]
+      )
+
+    return Response(
+      {
+        'client': ClientAccessSerializer(client_access).data,
+        'message': "Client reset. Templates, entries, chat, and notes were cleared; profile details were kept.",
+      }
+    )
+
+
+class ClientAccessDeleteView(APIView):
+  """Permanently delete a client account and every record tied to it."""
+
+  permission_classes = [permissions.IsAuthenticated]
+
+  def delete(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    with transaction.atomic():
+      lead_submission = client_access.lead_submission
+      # Free the roster slot: retire the original lead as deleted.
+      lead_submission.status = LeadSubmission.STATUS_DELETED
+      lead_submission.is_active = False
+      lead_submission.deleted_at = timezone.now()
+      lead_submission.save(update_fields=['status', 'is_active', 'deleted_at', 'updated_at'])
+      # Cascades assignments, entries, chat, reminders, progress, change requests, token.
+      client_access.delete()
+
+    return Response({'message': 'Client account permanently deleted.'})
 
 
 class TrainerReferenceCategoryListView(APIView):
@@ -1341,6 +1820,14 @@ class ClientTrackingEntryListView(APIView):
     )
 
 
+ENTRY_EDIT_WINDOW = timedelta(hours=72)
+
+
+def entry_editable(entry):
+  """Entries can only be edited within 72 hours of being submitted."""
+  return timezone.now() - entry.created_at <= ENTRY_EDIT_WINDOW
+
+
 class TrainerTrackingEntryDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
@@ -1349,6 +1836,12 @@ class TrainerTrackingEntryDetailView(APIView):
 
     if entry is None:
       return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if not entry_editable(entry):
+      return Response(
+        {'message': 'This entry is older than 72 hours and can no longer be edited.'},
+        status=status.HTTP_403_FORBIDDEN,
+      )
 
     serializer = TrackingEntrySerializer(entry, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -1433,7 +1926,75 @@ class ClientMeView(APIView):
         'group': TrainerGroupSerializer(client_access.group).data,
         'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
         'lead_submission': LeadSubmissionSerializer(client_access.lead_submission).data,
+        'trainer_profile': build_public_trainer_profile(client_access.trainer, request),
+        'additional_info_shared': client_access.additional_info_shared,
+        'shared_additional_info': client_access.additional_info if client_access.additional_info_shared else [],
       }
+    )
+
+
+class ClientPhotoView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def put(self, request):
+    client_access = request.auth
+    client_access.photo = str(request.data.get('photo', '') or '')
+    client_access.save(update_fields=['photo', 'updated_at'])
+    return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Photo updated.'})
+
+
+class ClientDetailChangeRequestView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    change_request = request.auth.detail_change_requests.first()
+    return Response(
+      {
+        'change_request': (
+          ClientDetailChangeRequestSerializer(change_request).data if change_request else None
+        )
+      }
+    )
+
+  def post(self, request):
+    client_access = request.auth
+
+    if client_access.detail_change_requests.filter(status=ClientDetailChangeRequest.STATUS_PENDING).exists():
+      return Response(
+        {'message': 'You already have an edit request awaiting your trainer\'s approval.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    registration_form = getattr(client_access.group, 'client_registration_form', None)
+    proposed_answers = request.data.get('proposed_answers') or {}
+
+    if not isinstance(proposed_answers, dict) or not proposed_answers:
+      return Response({'message': 'Proposed answers are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Core identity stays fixed - always carry the current values through.
+    proposed_answers['first_name'] = client_access.first_name
+    proposed_answers['last_name'] = client_access.last_name
+    proposed_answers['email'] = client_access.email
+
+    if registration_form and registration_form.is_active:
+      from .serializers import validate_required_answers
+
+      validate_required_answers(registration_form.fields, proposed_answers)
+
+    change_request = ClientDetailChangeRequest.objects.create(
+      client=client_access,
+      proposed_answers=proposed_answers,
+      client_note=str(request.data.get('note', '')).strip(),
+    )
+
+    return Response(
+      {
+        'change_request': ClientDetailChangeRequestSerializer(change_request).data,
+        'message': 'Edit request submitted. Your trainer will review it.',
+      },
+      status=status.HTTP_201_CREATED,
     )
 
 
@@ -1497,24 +2058,62 @@ class ClientTrackingEntryView(APIView):
     if template is None:
       return Response({'message': 'Template is not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
 
-    entry, created = TrackingEntry.objects.update_or_create(
+    # A client may log the same template multiple times per day, so every
+    # submission creates a new entry (rather than overwriting the day's row).
+    entry_time = serializer.validated_data.get('entry_time') or timezone.localtime().time()
+    entry = TrackingEntry.objects.create(
       client=client_access,
       template=template,
+      template_name=template.name,
       entry_date=serializer.validated_data['entry_date'],
-      defaults={
-        'template_name': template.name,
-        'answers': serializer.validated_data['answers'],
-        'note': serializer.validated_data['note'],
-        'edited_by_trainer': False,
-      },
+      entry_time=entry_time,
+      answers=serializer.validated_data['answers'],
+      note=serializer.validated_data['note'],
+      edited_by_trainer=False,
     )
 
     return Response(
       {
         'entry': TrackingEntrySerializer(entry).data,
-        'message': 'Entry submitted successfully.' if created else 'Entry updated successfully.',
+        'message': 'Entry submitted successfully.',
       },
-      status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ClientPortalProgressView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    return Response({'progress': ProgressEntrySerializer(request.auth.progress_entries.all(), many=True).data})
+
+
+class ClientTrackingEntryDetailView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def put(self, request, entry_id):
+    entry = TrackingEntry.objects.filter(id=entry_id, client=request.auth).first()
+
+    if entry is None:
+      return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if not entry_editable(entry):
+      return Response(
+        {'message': 'This entry is older than 72 hours and can no longer be edited.'},
+        status=status.HTTP_403_FORBIDDEN,
+      )
+
+    serializer = TrackingEntrySerializer(entry, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(edited_by_trainer=False)
+
+    return Response(
+      {
+        'entry': TrackingEntrySerializer(entry).data,
+        'message': 'Entry updated successfully.',
+      }
     )
 
 

@@ -13,8 +13,38 @@
 
     <form class="auth-form" (ngSubmit)="verifyClientLogin()">
       <label>
-        <span class="field-label">Trainer code <span class="required">*</span></span>
-        <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Ask your trainer for this" required>
+        <span class="field-label">
+          Trainer code <span class="required">*</span>
+          <button type="button" class="picker-toggle" (click)="toggleDirectory()">
+            {{ showDirectory ? 'Close' : 'Find by name' }}
+          </button>
+        </span>
+        <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Ask your trainer or find by name" required>
+
+        @if (showDirectory) {
+          <div class="trainer-picker">
+            <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Search trainer name or code" autocomplete="off">
+            <div class="picker-list">
+              @if (isLoadingDirectory) {
+                <p class="picker-empty">Loading trainers...</p>
+              } @else {
+                @for (trainer of filteredTrainers; track trainer.trainer_id) {
+                  <button
+                    type="button"
+                    class="picker-item"
+                    [class.selected]="loginForm.trainerCode === trainer.trainer_id"
+                    (click)="selectTrainer(trainer)"
+                  >
+                    <span class="picker-name">{{ trainer.trainer_name }}</span>
+                    <span class="picker-code">{{ trainer.trainer_id }}</span>
+                  </button>
+                } @empty {
+                  <p class="picker-empty">No trainers match your search.</p>
+                }
+              }
+            </div>
+          </div>
+        }
       </label>
 
       <label>
@@ -32,6 +62,13 @@
       @if (loginMessage) {
         <p class="form-message">{{ loginMessage }}</p>
       }
+
+      <p class="legal-note">
+        By continuing, you agree to our
+        <a routerLink="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+        and
+        <a routerLink="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+      </p>
     </form>
   </section>
 </main>

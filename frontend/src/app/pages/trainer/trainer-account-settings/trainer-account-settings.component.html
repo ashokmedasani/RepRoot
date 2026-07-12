@@ -5,19 +5,38 @@
   maxWidth="72rem"
   titleId="account-settings-title"
 >
-    <div class="settings-grid">
-      <section class="settings-panel account-panel">
-        <div class="settings-menu" aria-label="Settings sections">
-          <button type="button" class="settings-tab active">Account</button>
-        </div>
+  <div class="settings-grid">
+    <nav class="settings-menu" aria-label="Settings sections">
+      @for (item of menu; track item.id) {
+        <button
+          type="button"
+          class="settings-tab"
+          [class.active]="activeSection === item.id"
+          [class.danger]="item.id === 'delete'"
+          (click)="activeSection = item.id"
+        >
+          {{ item.label }}
+        </button>
+      }
+    </nav>
 
+    <section class="settings-panel">
+      <!-- 1. My Account -->
+      @if (activeSection === 'my-account') {
         <div class="account-content">
+          <section class="account-section" aria-labelledby="my-account-title">
+            <div>
+              <h2 id="my-account-title">My Account</h2>
+              <p class="section-note">Update your personal and professional details. These power your public Profile page.</p>
+            </div>
+            <app-trainer-profile-form />
+          </section>
+
           <section class="account-section" aria-labelledby="trainer-code-title">
             <div>
               <h2 id="trainer-code-title">Trainer Code</h2>
               <p class="section-note">Clients log in with this code plus their username and password. Share it with your clients.</p>
             </div>
-
             <form class="code-form" (ngSubmit)="saveTrainerCode()">
               <label>
                 <span class="field-label">Your trainer code</span>
@@ -31,44 +50,177 @@
               <p class="account-message" [class.error-message]="codeMessageType === 'error'">{{ codeMessage }}</p>
             }
           </section>
+        </div>
+      }
 
+      <!-- 2. Change Password -->
+      @if (activeSection === 'password') {
+        <div class="account-content">
           <section class="account-section" aria-labelledby="change-password-title">
             <div>
               <h2 id="change-password-title">Change Password</h2>
+              <p class="section-note">For your security, you will be signed out after changing your password.</p>
             </div>
-
             <form class="password-form" (ngSubmit)="changePassword()">
               <label>
-                <span class="field-label">Password</span>
+                <span class="field-label">New Password</span>
                 <app-password-input name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password" />
               </label>
               <label>
                 <span class="field-label">Confirm Password</span>
                 <app-password-input name="confirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" />
               </label>
-              <button type="submit" class="primary-action" [disabled]="isChangingPassword || isDeleting">
+              <button type="submit" class="primary-action" [disabled]="isChangingPassword">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}
               </button>
             </form>
           </section>
+        </div>
+      }
 
-          <section class="account-section danger-section" aria-labelledby="delete-account-title">
+      <!-- 3. Notifications -->
+      @if (activeSection === 'notifications') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="notifications-title">
             <div>
-              <h2 id="delete-account-title">Delete Account</h2>
-              <p>
-                Delete this trainer account from the active database. A copy of the account data is stored in recycle
-                space for the next recovery step.
-              </p>
+              <h2 id="notifications-title">Notifications</h2>
+              <p class="section-note">Choose what you want to be alerted about. Saved on this device.</p>
             </div>
-            <button type="button" class="danger-action" [disabled]="isChangingPassword || isDeleting" (click)="deleteAccount()">
-              {{ isDeleting ? 'Deleting...' : 'Delete account' }}
-            </button>
+            <ul class="toggle-list">
+              <li>
+                <div>
+                  <strong>Form Submission</strong>
+                  <small>A new client submits your lead form.</small>
+                </div>
+                <button type="button" class="switch" role="switch" [class.on]="notifications.formSubmission" [attr.aria-checked]="notifications.formSubmission" (click)="toggleNotification('formSubmission')"><span></span></button>
+              </li>
+              <li>
+                <div>
+                  <strong>Client Message</strong>
+                  <small>A client sends you a chat message.</small>
+                </div>
+                <button type="button" class="switch" role="switch" [class.on]="notifications.clientMessage" [attr.aria-checked]="notifications.clientMessage" (click)="toggleNotification('clientMessage')"><span></span></button>
+              </li>
+              <li>
+                <div>
+                  <strong>Schedule Reminder</strong>
+                  <small>An upcoming follow-up is due.</small>
+                </div>
+                <button type="button" class="switch" role="switch" [class.on]="notifications.scheduleReminder" [attr.aria-checked]="notifications.scheduleReminder" (click)="toggleNotification('scheduleReminder')"><span></span></button>
+              </li>
+              <li>
+                <div>
+                  <strong>Email Notifications</strong>
+                  <small>Also receive the alerts above by email.</small>
+                </div>
+                <button type="button" class="switch" role="switch" [class.on]="notifications.email" [attr.aria-checked]="notifications.email" (click)="toggleNotification('email')"><span></span></button>
+              </li>
+            </ul>
           </section>
         </div>
-      </section>
-
-      @if (accountMessage) {
-        <p class="message" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
       }
-    </div>
+
+      <!-- 4. Appearance -->
+      @if (activeSection === 'appearance') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="appearance-title">
+            <div>
+              <h2 id="appearance-title">Appearance</h2>
+              <p class="section-note">Pick the theme that suits you. Applies across the app.</p>
+            </div>
+            <app-theme-switcher />
+          </section>
+        </div>
+      }
+
+      <!-- 5. Support -->
+      @if (activeSection === 'support') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="support-title">
+            <div>
+              <h2 id="support-title">Support</h2>
+              <p class="section-note">We usually reply within one business day.</p>
+            </div>
+            <ul class="link-list">
+              <li>
+                <a [href]="supportMailto('Support Request')">
+                  <strong>Contact Support</strong>
+                  <small>Questions about your account or the app.</small>
+                </a>
+              </li>
+              <li>
+                <a [href]="supportMailto('Bug Report', 'Describe what happened and the steps to reproduce it:')">
+                  <strong>Report a Bug</strong>
+                  <small>Something isn't working as expected.</small>
+                </a>
+              </li>
+              <li>
+                <a [href]="supportMailto('Feature Request', 'Describe the feature you would like to see:')">
+                  <strong>Feature Request</strong>
+                  <small>Suggest an improvement or new feature.</small>
+                </a>
+              </li>
+              <li>
+                <a [href]="supportMailto('Help / FAQ')">
+                  <strong>FAQ / Help Center</strong>
+                  <small>Get answers to common questions.</small>
+                </a>
+              </li>
+            </ul>
+          </section>
+        </div>
+      }
+
+      <!-- 6. About -->
+      @if (activeSection === 'about') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="about-title">
+            <div>
+              <h2 id="about-title">About</h2>
+              <p class="section-note">CoachFlow — your trainer &amp; client workspace.</p>
+            </div>
+            <ul class="info-list">
+              <li>
+                <span>App Version</span>
+                <strong>{{ appVersion }}</strong>
+              </li>
+              <li>
+                <span>Release Notes</span>
+                <a [href]="supportMailto('Release Notes')">What's new</a>
+              </li>
+              <li>
+                <span>Privacy Policy</span>
+                <a routerLink="/privacy" target="_blank" rel="noopener">View</a>
+              </li>
+              <li>
+                <span>Terms &amp; Conditions</span>
+                <a routerLink="/terms" target="_blank" rel="noopener">View</a>
+              </li>
+            </ul>
+          </section>
+        </div>
+      }
+
+      <!-- 7. Delete Trainer Account -->
+      @if (activeSection === 'delete') {
+        <div class="account-content">
+          <section class="account-section danger-section" aria-labelledby="delete-account-title">
+            <div>
+              <h2 id="delete-account-title">Delete Trainer Account</h2>
+              <p class="danger-note">
+                To permanently delete your trainer account, please contact Support. This helps prevent
+                accidental deletion of client data.
+              </p>
+            </div>
+            <a class="danger-action" [href]="deleteRequestMailto">Request account deletion</a>
+            <p class="section-note">This opens a pre-filled request to our Support team — no account is deleted automatically.</p>
+          </section>
+        </div>
+      }
+    </section>
+
+    @if (accountMessage) {
+      <p class="message" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
+    }
+  </div>
 </app-trainer-page-shell>

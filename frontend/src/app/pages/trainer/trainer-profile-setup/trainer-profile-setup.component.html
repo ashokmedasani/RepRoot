@@ -39,7 +39,8 @@
           </div>
         </div>
 
-        <div class="form-grid">
+        <div class="setup-fields">
+          <div class="field-row two">
           <label>
             <span class="field-label">First name <span class="required">*</span></span>
             <input type="text" formControlName="first_name" autocomplete="given-name">
@@ -49,13 +50,22 @@
           </label>
 
           <label>
+            <span class="field-label">Middle name <small>Optional</small></span>
+            <input type="text" formControlName="middle_name" autocomplete="additional-name">
+          </label>
+          </div>
+
+          <div class="field-row">
+          <label>
             <span class="field-label">Last name <span class="required">*</span></span>
             <input type="text" formControlName="last_name" autocomplete="family-name">
             @if (hasError('last_name')) {
               <span class="field-help error-text">Last name is required.</span>
             }
           </label>
+          </div>
 
+          <div class="field-row">
           <label class="code-field">
             <span class="field-label">
               Trainer code <span class="required">*</span>
@@ -83,7 +93,24 @@
               <span class="field-help">Clients type this to log in. Keep it short and memorable.</span>
             }
           </label>
+          </div>
 
+          <div class="field-row">
+          <label>
+            <span class="field-label">Gender <span class="required">*</span></span>
+            <select formControlName="gender">
+              <option value="">Select gender</option>
+              @for (gender of genders; track gender) {
+                <option [value]="gender">{{ gender }}</option>
+              }
+            </select>
+            @if (hasError('gender')) {
+              <span class="field-help error-text">Gender is required.</span>
+            }
+          </label>
+          </div>
+
+          <div class="field-row two">
           <label>
             <span class="field-label">Birth month <span class="required">*</span></span>
             <select formControlName="birth_month">
@@ -109,20 +136,9 @@
               <span class="field-help error-text">Birth year is required.</span>
             }
           </label>
+          </div>
 
-          <label>
-            <span class="field-label">Gender <span class="required">*</span></span>
-            <select formControlName="gender">
-              <option value="">Select gender</option>
-              @for (gender of genders; track gender) {
-                <option [value]="gender">{{ gender }}</option>
-              }
-            </select>
-            @if (hasError('gender')) {
-              <span class="field-help error-text">Gender is required.</span>
-            }
-          </label>
-
+          <div class="field-row two">
           <label>
             <span class="field-label">Country <span class="required">*</span></span>
             <select formControlName="country">
@@ -148,11 +164,14 @@
               <span class="field-help error-text">State or region is required.</span>
             }
           </label>
+          </div>
 
+          <div class="field-row">
           <label>
             <span class="field-label">Professional headline <small>Optional</small></span>
             <input type="text" formControlName="professional_headline" maxlength="180">
           </label>
+          </div>
         </div>
 
         <label>

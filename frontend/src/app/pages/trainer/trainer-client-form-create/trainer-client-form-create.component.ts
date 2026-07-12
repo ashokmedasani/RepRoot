@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 
 import { DynamicField, FormsGroupsApiService, TrainerGroup } from '../../../core/api/forms-groups-api.service';
+import { buildUniversalClientFormFields } from '../../../core/forms/universal-client-form';
 import { FormFieldBuilderComponent } from '../../../shared/form-field-builder/form-field-builder.component';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 
@@ -41,6 +42,14 @@ export class TrainerClientFormCreateComponent implements OnInit {
         this.customFields = (this.group.registration_form?.fields || [])
           .filter((field) => !field.is_core)
           .map((field) => ({ ...field }));
+
+        // Legacy groups created before the universal template existed have no
+        // custom fields yet - pre-populate the builder so the form is never
+        // empty and always includes the required personal information.
+        if (this.customFields.length === 0) {
+          this.customFields = buildUniversalClientFormFields();
+        }
+
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -53,6 +62,12 @@ export class TrainerClientFormCreateComponent implements OnInit {
 
   saveForm(): void {
     if (!this.group) {
+      return;
+    }
+
+    if (this.customFields.length === 0) {
+      this.messageType = 'error';
+      this.message = 'Add at least one client detail field before saving the form.';
       return;
     }
 

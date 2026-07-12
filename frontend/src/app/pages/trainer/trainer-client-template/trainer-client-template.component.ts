@@ -6,7 +6,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   ClientAccessDetailResponse,
   ClientAccessRecord,
-  FormsGroupsApiService
+  FormsGroupsApiService,
+  ProgressEntry
 } from '../../../core/api/forms-groups-api.service';
 import {
   ReferenceCategoryRecord,
@@ -20,10 +21,15 @@ import {
   TrackingEntryRecord,
   TrackingTemplateRecord
 } from '../../../core/api/templates-api.service';
+import { ChartSpec, DateRange } from '../../../shared/analytics/analytics.types';
+import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
+import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../shared/analytics/graph-engine';
+import { exportCsv, exportExcel, exportPdf, toTable } from '../../../shared/analytics/export.util';
+import { ReferencesAccordionComponent } from '../../../shared/references-accordion/references-accordion.component';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
 
-type DetailTab = 'overview' | 'entries' | 'progress';
+type DetailTab = 'overview' | 'references' | 'entries' | 'progress';
 
 interface EntryAnswerDraft {
   key: string;
@@ -31,30 +37,10 @@ interface EntryAnswerDraft {
   value: string;
 }
 
-interface NumericTrend {
-  key: string;
-  label: string;
-  latest: number;
-  change: number;
-  points: string;
-}
-
-interface TrendRow {
-  label: string;
-  today: string;
-  points: string;
-  hasTrend: boolean;
-}
-
-interface ConsistencyDay {
-  date: string;
-  hasEntry: boolean;
-}
-
 @Component({
   selector: 'app-trainer-client-template',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent],
+  imports: [ChartRendererComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink, TrainerPageShellComponent],
   templateUrl: './trainer-client-template.component.html',
   styleUrl: './trainer-client-template.component.scss'
 })
@@ -64,8 +50,6 @@ export class TrainerClientTemplateComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly referencesApi = inject(ReferencesApiService);
-
-  readonly today = new Date();
 
   clientId = 0;
   assignmentId = 0;
@@ -88,6 +72,8 @@ export class TrainerClientTemplateComponent implements OnInit {
   editingEntry: TrackingEntryRecord | null = null;
   entryDraftAnswers: EntryAnswerDraft[] = [];
   entryDraftNote = '';
+  entryDraftDate = '';
+  entryDraftTime = '';
   isSavingEntry = false;
 
   isAddEntryOpen = false;
@@ -100,11 +86,12 @@ export class TrainerClientTemplateComponent implements OnInit {
     this.assignmentId = Number(this.route.snapshot.paramMap.get('assignmentId'));
     const requestedTab = this.route.snapshot.queryParamMap.get('tab') as DetailTab | null;
 
-    if (requestedTab && ['overview', 'entries', 'progress'].includes(requestedTab)) {
+    if (requestedTab && ['overview', 'references', 'entries', 'progress'].includes(requestedTab)) {
       this.detailTab = requestedTab;
     }
 
     this.loadAll(this.route.snapshot.queryParamMap.get('share') === '1');
+    this.loadProgress();
   }
 
   get client(): ClientAccessRecord | null {
@@ -139,34 +126,178 @@ export class TrainerClientTemplateComponent implements OnInit {
     this.detailTab = tab;
   }
 
-  get trendRows(): TrendRow[] {
+  // ----- analytics dashboard (graph engine) -----
+
+  dateRange: DateRange = 30;
+  isExportOpen = false;
+  viewingEntry: TrackingEntryRecord | null = null;
+
+  readonly rangeOptions: { value: DateRange; label: string }[] = [
+    { value: 7, label: '7 Days' },
+    { value: 30, label: '30 Days' },
+    { value: 90, label: '90 Days' },
+    { value: 0, label: 'All time' }
+  ];
+
+  setRange(range: DateRange): void {
+    this.dateRange = range;
+  }
+
+  get templateStatus(): string {
+    return this.template?.is_active === false ? 'Completed' : 'Active';
+  }
+
+  get fieldCharts(): ChartSpec[] {
+    return this.template ? buildFieldCharts(this.template.fields, this.templateEntries, this.dateRange) : [];
+  }
+
+  get numericStats(): NumericFieldStat[] {
+    return this.template ? numericFieldStats(this.template.fields, this.templateEntries) : [];
+  }
+
+  // ----- data-entries date filter -----
+  entriesFrom = '';
+  entriesTo = '';
+
+  get filteredDataEntries(): TrackingEntryRecord[] {
+    return this.templateEntries.filter((entry) => {
+      if (this.entriesFrom && entry.entry_date < this.entriesFrom) {
+        return false;
+      }
+
+      if (this.entriesTo && entry.entry_date > this.entriesTo) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  clearEntryFilter(): void {
+    this.entriesFrom = '';
+    this.entriesTo = '';
+  }
+
+  entryKeyValues(entry: TrackingEntryRecord): { label: string; value: string }[] {
+    return (this.template?.fields || [])
+      .filter((field) => field.field_type !== 'long_text')
+      .map((field) => ({
+        label: field.label,
+        value: String(entry.answers?.[field.key || field.label] ?? '').trim() || '-'
+      }));
+  }
+
+  isEntryEditable(entry: TrackingEntryRecord): boolean {
+    if (!entry.created_at) {
+      return true;
+    }
+
+    const age = Date.now() - new Date(entry.created_at).getTime();
+    return age <= 72 * 60 * 60 * 1000;
+  }
+
+  viewEntry(entry: TrackingEntryRecord): void {
+    this.viewingEntry = entry;
+  }
+
+  closeViewEntry(): void {
+    this.viewingEntry = null;
+  }
+
+  toggleExport(): void {
+    this.isExportOpen = !this.isExportOpen;
+  }
+
+  exportAs(format: 'csv' | 'excel' | 'pdf'): void {
+    this.isExportOpen = false;
     const template = this.template;
 
     if (!template) {
-      return [];
+      return;
     }
 
-    const todayIso = this.todayIso();
-    const todayEntry = this.templateEntries.find((entry) => entry.entry_date === todayIso);
-    const lastWeek = [...this.templateEntries]
-      .sort((first, second) => first.entry_date.localeCompare(second.entry_date))
-      .slice(-7);
+    const name = `${template.name.replace(/\s+/g, '-').toLowerCase()}-entries`;
+    const table = toTable(template.fields, this.filteredDataEntries);
 
-    return template.fields
-      .filter((field) => field.field_type === 'number')
-      .map((field) => {
-        const key = field.key || field.label;
-        const values = lastWeek
-          .map((entry) => Number(String(entry.answers?.[key] ?? '').trim()))
-          .filter((value) => !Number.isNaN(value));
+    if (format === 'csv') {
+      exportCsv(name, table);
+    } else if (format === 'excel') {
+      exportExcel(name, table);
+    } else {
+      exportPdf(name, `${template.name} - ${this.client?.first_name || ''} ${this.client?.last_name || ''}`.trim(), table);
+    }
+  }
 
-        return {
-          label: field.label,
-          today: String(todayEntry?.answers?.[key] ?? '-') || '-',
-          points: values.length >= 2 ? this.sparklinePoints(values) : '',
-          hasTrend: values.length >= 2
-        };
-      });
+  // ----- progress records (trainer-written) -----
+
+  progressEntries: ProgressEntry[] = [];
+  isProgressFormOpen = false;
+  isSavingProgress = false;
+  editingProgressId: number | null = null;
+  progressDraft = { title: '', date: '', notes: '', status: '', next_step: '' };
+
+  loadProgress(): void {
+    this.formsGroupsApi.getClientProgress(this.clientId).subscribe({
+      next: (response) => (this.progressEntries = response.progress),
+      error: () => (this.progressEntries = [])
+    });
+  }
+
+  openProgressForm(): void {
+    this.editingProgressId = null;
+    this.progressDraft = { title: '', date: this.todayIso(), notes: '', status: '', next_step: '' };
+    this.isProgressFormOpen = true;
+  }
+
+  editProgress(entry: ProgressEntry): void {
+    this.editingProgressId = entry.id;
+    this.progressDraft = {
+      title: entry.title,
+      date: entry.date,
+      notes: entry.notes,
+      status: entry.status,
+      next_step: entry.next_step
+    };
+    this.isProgressFormOpen = true;
+  }
+
+  cancelProgress(): void {
+    this.isProgressFormOpen = false;
+    this.editingProgressId = null;
+  }
+
+  saveProgress(): void {
+    if (!this.progressDraft.title.trim() || !this.progressDraft.date || this.isSavingProgress) {
+      return;
+    }
+
+    this.isSavingProgress = true;
+    const payload = {
+      title: this.progressDraft.title.trim(),
+      date: this.progressDraft.date,
+      notes: this.progressDraft.notes.trim(),
+      status: this.progressDraft.status.trim(),
+      next_step: this.progressDraft.next_step.trim()
+    };
+    const request = this.editingProgressId
+      ? this.formsGroupsApi.updateProgress(this.editingProgressId, payload)
+      : this.formsGroupsApi.createProgress(this.clientId, payload);
+
+    request.subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSavingProgress = false;
+        this.isProgressFormOpen = false;
+        this.editingProgressId = null;
+        this.loadProgress();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Progress record could not be saved.');
+        this.isSavingProgress = false;
+      }
+    });
   }
 
   // ----- add entry -----
@@ -284,24 +415,20 @@ export class TrainerClientTemplateComponent implements OnInit {
     });
   }
 
-  referenceTypeLabel(referenceType: string): string {
-    const labels: Record<string, string> = {
-      video_link: 'YouTube Video',
-      pdf: 'PDF Document',
-      image: 'Image',
-      document: 'Document',
-      text_note: 'Note',
-      external_link: 'Link'
-    };
-
-    return labels[referenceType] || 'Resource';
-  }
-
   // ----- entry editing -----
 
   startEntryEdit(entry: TrackingEntryRecord): void {
+    if (!this.isEntryEditable(entry)) {
+      this.messageType = 'error';
+      this.message = 'This entry is older than 72 hours and can no longer be edited.';
+      return;
+    }
+
+    this.viewingEntry = null;
     this.editingEntry = entry;
     this.entryDraftNote = entry.note;
+    this.entryDraftDate = entry.entry_date;
+    this.entryDraftTime = entry.entry_time || '';
     this.entryDraftAnswers = Object.entries(entry.answers || {}).map(([key, value]) => ({
       key,
       label: this.fieldLabelFor(key),
@@ -313,6 +440,8 @@ export class TrainerClientTemplateComponent implements OnInit {
     this.editingEntry = null;
     this.entryDraftAnswers = [];
     this.entryDraftNote = '';
+    this.entryDraftDate = '';
+    this.entryDraftTime = '';
   }
 
   saveEntryEdit(): void {
@@ -329,7 +458,14 @@ export class TrainerClientTemplateComponent implements OnInit {
     }
 
     this.isSavingEntry = true;
-    this.templatesApi.updateEntry(entry.id, { answers, note: this.entryDraftNote }).subscribe({
+    this.templatesApi
+      .updateEntry(entry.id, {
+        answers,
+        note: this.entryDraftNote,
+        entry_date: this.entryDraftDate,
+        entry_time: this.entryDraftTime || null
+      })
+      .subscribe({
       next: (response) => {
         this.messageType = 'success';
         this.message = response.message;
@@ -350,6 +486,11 @@ export class TrainerClientTemplateComponent implements OnInit {
     return field?.label || key.replace(/_/g, ' ');
   }
 
+  ratingSteps(field: TemplateField): number[] {
+    const scale = Math.min(10, Math.max(2, field.scale || 5));
+    return Array.from({ length: scale }, (_value, index) => index + 1);
+  }
+
   answerPreview(entry: TrackingEntryRecord): string {
     const values = Object.values(entry.answers || {})
       .map((value) => String(value ?? '').trim())
@@ -360,59 +501,6 @@ export class TrainerClientTemplateComponent implements OnInit {
 
   isImageValue(value: string): boolean {
     return value.startsWith('data:image');
-  }
-
-  // ----- progress -----
-
-  get consistencyDays(): ConsistencyDay[] {
-    const entryDates = new Set(this.templateEntries.map((entry) => entry.entry_date));
-    const days: ConsistencyDay[] = [];
-    const today = new Date();
-
-    for (let offset = 29; offset >= 0; offset -= 1) {
-      const day = new Date(today);
-      day.setDate(today.getDate() - offset);
-      const isoDate = day.toISOString().slice(0, 10);
-      days.push({ date: isoDate, hasEntry: entryDates.has(isoDate) });
-    }
-
-    return days;
-  }
-
-  get numericTrends(): NumericTrend[] {
-    const series = new Map<string, { label: string; values: number[] }>();
-    const sortedEntries = [...this.templateEntries].sort((first, second) =>
-      first.entry_date.localeCompare(second.entry_date)
-    );
-
-    for (const entry of sortedEntries) {
-      for (const [key, rawValue] of Object.entries(entry.answers || {})) {
-        const value = Number(String(rawValue).trim());
-
-        if (!String(rawValue).trim() || Number.isNaN(value)) {
-          continue;
-        }
-
-        const existing = series.get(key) || { label: this.fieldLabelFor(key), values: [] };
-        existing.values.push(value);
-        series.set(key, existing);
-      }
-    }
-
-    return Array.from(series.entries())
-      .filter(([, data]) => data.values.length >= 2)
-      .map(([key, data]) => ({
-        key,
-        label: data.label,
-        latest: data.values[data.values.length - 1],
-        change: Number((data.values[data.values.length - 1] - data.values[0]).toFixed(2)),
-        points: this.sparklinePoints(data.values)
-      }))
-      .slice(0, 6);
-  }
-
-  get recentNotes(): TrackingEntryRecord[] {
-    return this.templateEntries.filter((entry) => entry.note.trim()).slice(0, 6);
   }
 
   // ----- loading -----
@@ -474,22 +562,5 @@ export class TrainerClientTemplateComponent implements OnInit {
 
   private todayIso(): string {
     return new Date().toISOString().slice(0, 10);
-  }
-
-  private sparklinePoints(values: number[]): string {
-    const width = 120;
-    const height = 34;
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-
-    return values
-      .map((value, index) => {
-        const x = values.length > 1 ? (index / (values.length - 1)) * width : width / 2;
-        const y = height - 3 - ((value - min) / range) * (height - 6);
-
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
   }
 }

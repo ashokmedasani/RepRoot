@@ -8,116 +8,47 @@
 
   @if (client) {
     <section class="profile-card">
-      <p class="eyebrow">Client Portal</p>
-      <h1>Welcome, {{ client.first_name }} {{ client.last_name }}</h1>
-      <p>Record your progress, watch your trainer's resources, and stay in touch.</p>
-
-      <nav class="portal-tabs" aria-label="Portal sections">
-        @for (tab of tabs; track tab.id) {
-          <button type="button" [class.active]="activeTab === tab.id" (click)="setTab(tab.id)">
-            {{ tab.label }}
-          </button>
-        }
-      </nav>
+      <div class="profile-head">
+        <label class="dp-avatar" title="Upload your photo">
+          @if (client.photo) {
+            <img [src]="client.photo" alt="Your photo">
+          } @else {
+            <span>{{ (client.first_name || '?').charAt(0) }}{{ (client.last_name || '').charAt(0) }}</span>
+          }
+          <span class="dp-edit">Photo</span>
+          <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="visually-hidden">
+        </label>
+        <div>
+          <p class="eyebrow">Client Portal</p>
+          <h1>Welcome, {{ client.first_name }} {{ client.last_name }}</h1>
+          <p>Record progress, review your assigned templates, and stay connected with your trainer.</p>
+        </div>
+      </div>
     </section>
 
     @if (message) {
       <p class="portal-message" [class.error-message]="messageType === 'error'">{{ message }}</p>
     }
 
-    @if (activeTab === 'templates') {
-      @for (template of templates; track template.id) {
-        <section class="portal-card template-card">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">{{ template.cadence }} check-in</p>
-              <h2>{{ template.name }}</h2>
-              @if (template.purpose) {
-                <p>{{ template.purpose }}</p>
-              }
-            </div>
-            <span class="count-pill">{{ template.fields.length }} fields</span>
-          </div>
+    <section class="client-portal-layout">
+      <nav class="portal-top-tabs" aria-label="Client portal navigation">
+        <button type="button" [class.active]="activeTab === 'templates'" (click)="setTab('templates')">
+          My Templates <span class="tab-count">{{ templates.length }}</span>
+        </button>
+        <button type="button" [class.active]="activeTab === 'trainer'" (click)="setTab('trainer')">Trainer</button>
+        <button type="button" [class.active]="activeTab === 'details'" (click)="setTab('details')">My Details</button>
+      </nav>
 
-          <form class="entry-form" (ngSubmit)="submitEntry(template)">
-            <label class="date-field">
-              <span>Entry date</span>
-              <input type="date" [(ngModel)]="draftFor(template).entryDate" [name]="'entryDate' + template.id">
-            </label>
-
-            <div class="field-grid">
-              @for (field of template.fields; track field.key || field.label) {
-                <label>
-                  <span>{{ field.label }}</span>
-                  @if (field.field_type === 'long_text') {
-                    <textarea
-                      rows="3"
-                      [placeholder]="field.placeholder || 'Your update'"
-                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
-                      [name]="'answer' + template.id + (field.key || field.label)"
-                    ></textarea>
-                  } @else if (field.field_type === 'yes_no') {
-                    <select
-                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
-                      [name]="'answer' + template.id + (field.key || field.label)"
-                    >
-                      <option value="">Choose</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  } @else if (field.field_type === 'image') {
-                    <input type="file" accept="image/*" (change)="handleEntryImage($event, template, field.key || field.label)">
-                    @if (isImageValue(draftFor(template).answers[field.key || field.label])) {
-                      <img [src]="draftFor(template).answers[field.key || field.label]" alt="Selected photo" class="entry-image-preview">
-                    }
-                  } @else {
-                    <input
-                      [type]="field.field_type === 'number' ? 'number' : 'text'"
-                      [placeholder]="field.placeholder || 'Your update'"
-                      [(ngModel)]="draftFor(template).answers[field.key || field.label]"
-                      [name]="'answer' + template.id + (field.key || field.label)"
-                    >
-                  }
-                </label>
-              }
-              <label>
-                <span>How are you feeling? (optional)</span>
-                <textarea
-                  rows="2"
-                  placeholder="Anything your trainer should know today"
-                  [(ngModel)]="draftFor(template).note"
-                  [name]="'note' + template.id"
-                ></textarea>
-              </label>
-            </div>
-
-            <button type="submit" class="primary-action" [disabled]="savingTemplateId === template.id">
-              {{ savingTemplateId === template.id ? 'Submitting...' : 'Submit Entry' }}
+      <div class="client-content">
+      @if (activeTab === 'templates' && templates.length > 1) {
+        <div class="template-chips" role="group" aria-label="Choose a template">
+          @for (item of templates; track item.id) {
+            <button type="button" class="template-chip" [class.active]="selectedTemplateId === item.id" (click)="selectTemplate(item)">
+              {{ item.name }}
             </button>
-          </form>
-
-          @if (entriesFor(template).length) {
-            <div class="recent-entries">
-              <h3>Recent entries</h3>
-              @for (entry of entriesFor(template); track entry.id) {
-                <div class="entry-row">
-                  <span>{{ entry.entry_date | date: 'mediumDate' }}</span>
-                  <p>{{ answerSummary(entry) }}</p>
-                  @if (entry.edited_by_trainer) {
-                    <small>Adjusted by trainer</small>
-                  }
-                </div>
-              }
-            </div>
           }
-        </section>
-      } @empty {
-        <section class="portal-card">
-          <h2>No templates assigned yet</h2>
-          <p>Your trainer has not assigned a check-in template yet. Check back soon or send them a message.</p>
-        </section>
+        </div>
       }
-    }
 
     @if (activeTab === 'details') {
       <section class="portal-card">
@@ -143,83 +74,400 @@
       </section>
 
       <section class="portal-card">
-        <h2>Your registration details</h2>
-        <p>What you and your trainer recorded when your account was created.</p>
-        <div class="detail-grid answers">
-          @for (answer of registrationAnswers(); track answer.label) {
-            <article>
-              <span>{{ answer.label }}</span>
-              <strong>{{ answer.value }}</strong>
-            </article>
-          } @empty {
-            <p>No registration details recorded.</p>
+        <div class="card-header">
+          <div>
+            <h2>My Details</h2>
+            <p>What you and your trainer recorded when your account was created.</p>
+          </div>
+          @if (!isEditingDetails && !hasPendingChangeRequest && editableFields().length) {
+            <button type="button" class="secondary-action" (click)="startDetailEdit()">Request an edit</button>
           }
         </div>
-      </section>
 
-      <section class="portal-card">
-        <h2>Your original application</h2>
-        <p>The lead form you submitted to your trainer.</p>
-        <div class="detail-grid answers">
-          @for (answer of leadAnswers(); track answer.key) {
-            <article>
-              <span>{{ answer.key }}</span>
-              <strong>{{ answer.value }}</strong>
-            </article>
-          } @empty {
-            <p>No application answers found.</p>
-          }
-        </div>
+        @if (hasPendingChangeRequest) {
+          <p class="status-banner pending">Your edit request is awaiting your trainer's approval. You can't submit another until it's reviewed.</p>
+        } @else if (changeRequest?.status === 'approved') {
+          <p class="status-banner approved">Your last edit request was approved.</p>
+        } @else if (changeRequest?.status === 'rejected') {
+          <p class="status-banner rejected">
+            Your last edit request was declined.
+            @if (changeRequest?.trainer_note) { <span>Trainer note: {{ changeRequest?.trainer_note }}</span> }
+          </p>
+        }
+
+        @if (!isEditingDetails) {
+          <div class="detail-grid answers">
+            @for (answer of registrationAnswers(); track answer.label) {
+              <article>
+                <span>{{ answer.label }}</span>
+                <strong>{{ answer.value }}</strong>
+              </article>
+            } @empty {
+              <p>No registration details recorded.</p>
+            }
+          </div>
+        } @else {
+          <form class="edit-details-form" (ngSubmit)="submitDetailEdit()">
+            <p class="edit-hint">You can't change your details directly. Submit the changes below and your trainer will review them.</p>
+            @for (field of editableFields(); track field.key || field.label) {
+              <label>
+                <span>{{ field.label }} @if (field.required) { <span class="required">*</span> }</span>
+                @if (field.field_type === 'long_text' || field.field_type === 'address') {
+                  <textarea rows="3" [(ngModel)]="editAnswers[field.key || field.label]" [name]="'edit' + (field.key || field.label)"></textarea>
+                } @else if (detailFieldOptions(field).length) {
+                  <select [(ngModel)]="editAnswers[field.key || field.label]" [name]="'edit' + (field.key || field.label)">
+                    <option value="">{{ field.placeholder || 'Select an option' }}</option>
+                    @for (option of detailFieldOptions(field); track option) {
+                      <option [value]="option">{{ option }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input [type]="detailInputType(field)" [(ngModel)]="editAnswers[field.key || field.label]" [name]="'edit' + (field.key || field.label)">
+                }
+              </label>
+            }
+            <label>
+              <span>Note to your trainer (optional)</span>
+              <textarea rows="2" [(ngModel)]="editNote" name="editNote" placeholder="Explain what changed"></textarea>
+            </label>
+            <div class="edit-actions">
+              <button type="button" class="ghost-action" (click)="cancelDetailEdit()">Cancel</button>
+              <button type="submit" class="primary-action" [disabled]="savingDetailEdit">
+                {{ savingDetailEdit ? 'Submitting...' : 'Submit edit request' }}
+              </button>
+            </div>
+          </form>
+        }
       </section>
     }
 
-    @if (activeTab === 'resources') {
-      @for (reference of resources; track reference.id) {
-        <section class="portal-card resource-card">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">{{ reference.category_name }}{{ reference.subcategory ? ' - ' + reference.subcategory : '' }}</p>
-              <h2>{{ reference.title }}</h2>
-              @if (reference.description) {
-                <p>{{ reference.description }}</p>
-              }
-            </div>
-          </div>
-
-          @if (reference.reference_type === 'video_link' && youtubeEmbedResourceUrl(reference.link); as embedUrl) {
-            <div class="video-frame">
-              <iframe
-                [src]="embedUrl"
-                title="YouTube video player"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen
-              ></iframe>
-            </div>
-          } @else if (reference.reference_type === 'image' && reference.file_url) {
-            <img [src]="reference.file_url" [alt]="reference.title" class="resource-image">
-          } @else if (reference.reference_type === 'text_note') {
-            <p class="note-body">{{ reference.description || 'Note from your trainer.' }}</p>
-          } @else {
-            <button type="button" class="primary-action" (click)="openResource(reference)">Open {{ reference.reference_type === 'pdf' ? 'PDF' : 'Resource' }}</button>
+    @if (activeTab === 'trainer') {
+      <section class="portal-card">
+        <nav class="inner-tabs" aria-label="Trainer sections">
+          @for (tab of trainerTabs; track tab.id) {
+            <button type="button" [class.active]="trainerTab === tab.id" (click)="setTrainerTab(tab.id)">
+              {{ tab.label }}
+            </button>
           }
-        </section>
-      } @empty {
-        <section class="portal-card">
-          <h2>No resources yet</h2>
-          <p>When your trainer attaches videos, PDFs, or notes to your templates, they show up here.</p>
+        </nav>
+      </section>
+
+      @if (trainerTab === 'profile') {
+        @if (trainerProfile; as trainer) {
+          <section class="portal-card trainer-card">
+            <div class="trainer-head">
+              <span class="trainer-avatar">
+                @if (trainer.profile_photo_url) {
+                  <img [src]="trainer.profile_photo_url" alt="Trainer photo">
+                } @else {
+                  {{ trainer.trainer_name.charAt(0) }}
+                }
+              </span>
+              <div>
+                <p class="eyebrow">Trainer Profile</p>
+                <h2>{{ trainer.trainer_name }}</h2>
+                @if (trainer.professional_headline) {
+                  <p>{{ trainer.professional_headline }}</p>
+                }
+                @if (trainer.location) {
+                  <small>{{ trainer.location }}</small>
+                }
+              </div>
+            </div>
+          </section>
+
+          @if (trainer.about_me) {
+            <section class="portal-card single-section">
+              <h2>About</h2>
+              <p>{{ trainer.about_me }}</p>
+            </section>
+          }
+
+          @if (trainer.professional_summary) {
+            <section class="portal-card single-section">
+              <h2>Professional Summary</h2>
+              <div class="detail-grid">
+                <article><span>Trainer type</span><strong>{{ trainer.professional_summary.trainer_type || 'Not added' }}</strong></article>
+                <article><span>Experience</span><strong>{{ trainer.professional_summary.years_experience || 0 }} years</strong></article>
+                <article><span>Specializations</span><strong>{{ trainer.professional_summary.specializations || 'Not added' }}</strong></article>
+                <article><span>Languages</span><strong>{{ trainer.professional_summary.languages_known || 'Not added' }}</strong></article>
+              </div>
+            </section>
+          }
+
+          @if (trainer.training_style) {
+            <section class="portal-card single-section">
+              <h2>Training Style</h2>
+              <p>{{ trainer.training_style }}</p>
+            </section>
+          }
+
+          @if (trainer.certification) {
+            <section class="portal-card single-section">
+              <h2>Certification</h2>
+              <div class="detail-grid">
+                <article><span>Name</span><strong>{{ trainer.certification.name || 'Not added' }}</strong></article>
+                <article><span>Issued by</span><strong>{{ trainer.certification.issued_by || 'Not added' }}</strong></article>
+                <article><span>Year</span><strong>{{ trainer.certification.year || 'Not added' }}</strong></article>
+              </div>
+              @if (trainer.certification.file_url) {
+                <a [href]="trainer.certification.file_url" target="_blank" rel="noreferrer" class="primary-action">Open Certificate</a>
+              }
+            </section>
+          }
+
+          @if (trainer.images.length) {
+            <section class="portal-card single-section">
+              <h2>Images</h2>
+              <div class="trainer-media-grid">
+                @for (image of trainer.images; track image.url) {
+                  <figure>
+                    <img [src]="image.url" [alt]="image.title">
+                    <figcaption><strong>{{ image.title }}</strong><span>{{ image.category }}</span></figcaption>
+                  </figure>
+                }
+              </div>
+            </section>
+          }
+
+          @if (trainer.links.length) {
+            <section class="portal-card single-section">
+              <h2>Links</h2>
+              <div class="trainer-link-row">
+                @for (link of trainer.links; track link.url) {
+                  <a [href]="link.url" target="_blank" rel="noreferrer">{{ link.title }}</a>
+                }
+              </div>
+            </section>
+          }
+        } @else {
+          <section class="portal-card">
+            <h2>Trainer details are not available yet.</h2>
+          </section>
+        }
+      }
+
+      @if (trainerTab === 'chat') {
+        <section class="chat-wrap">
+          <app-chat-panel
+            mode="client"
+            [counterpartName]="client.trainer_name || 'Trainer'"
+            description="Send questions, check-in notes, or updates directly to your trainer."
+          />
         </section>
       }
     }
 
-    @if (activeTab === 'chat') {
-      <section class="chat-wrap">
-        <app-chat-panel
-          mode="client"
-          [counterpartName]="client.trainer_name || 'Trainer'"
-          description="Send questions, check-in notes, or updates directly to your trainer."
-        />
-      </section>
+    @if (activeTab === 'templates') {
+      @if (selectedTemplate; as template) {
+        <section class="templates-layout">
+          <section class="template-main">
+            <div class="portal-card selected-template-head">
+              <div>
+                <p class="eyebrow">{{ template.cadence }} check-in</p>
+                <h2>{{ template.name }}</h2>
+                @if (template.purpose) {
+                  <p>{{ template.purpose }}</p>
+                }
+              </div>
+              <span class="count-pill">{{ template.fields.length }} fields</span>
+            </div>
+
+            <section class="portal-card">
+              <nav class="inner-tabs" aria-label="Selected template sections">
+                @for (tab of templateTabs; track tab.id) {
+                  <button type="button" [class.active]="templateTab === tab.id" (click)="setTemplateTab(tab.id)">
+                    {{ tab.label }}
+                  </button>
+                }
+              </nav>
+            </section>
+
+            @if (templateTab === 'overview') {
+              <section class="portal-card">
+                @if (hasOverviewData(template)) {
+                  @if (numericStatsFor(template).length) {
+                    <div class="kpi-grid">
+                      @for (stat of numericStatsFor(template); track stat.key) {
+                        <article>
+                          <span>{{ stat.label }}</span>
+                          <strong>{{ stat.latest }}{{ stat.unit ? ' ' + stat.unit : '' }}</strong>
+                          <small>Avg {{ stat.average }} | Min {{ stat.min }} | Max {{ stat.max }} | {{ stat.count }} entries</small>
+                        </article>
+                      }
+                    </div>
+                  }
+
+                  @if (hasChartData(template)) {
+                    <div class="graphs-grid overview-graphs">
+                      @for (chart of templateCharts(template); track chart.title) {
+                        <app-chart-renderer [spec]="chart" />
+                      }
+                    </div>
+                  }
+                } @else {
+                  <div class="empty-state">
+                    <h2>No submitted data yet</h2>
+                    <p>Once you submit entries with measurable values, KPIs and graphs will appear here.</p>
+                  </div>
+                }
+              </section>
+            }
+
+            @if (templateTab === 'references') {
+              <section class="portal-card">
+                <h2>References</h2>
+                @if (template.references?.length) {
+                  <app-references-accordion [references]="template.references || []" />
+                } @else {
+                  <p>No references assigned to this template yet.</p>
+                }
+              </section>
+            }
+
+            @if (templateTab === 'data-entry') {
+              <section class="portal-card">
+                <form class="entry-form" (ngSubmit)="submitEntry(template)">
+                  <div class="datetime-fields">
+                    <label class="date-field">
+                      <span>Entry date</span>
+                      <input type="date" [(ngModel)]="draftFor(template).entryDate" [name]="'entryDate' + template.id">
+                    </label>
+                    <label class="date-field">
+                      <span>Entry time</span>
+                      <input type="time" [(ngModel)]="draftFor(template).entryTime" [name]="'entryTime' + template.id">
+                    </label>
+                  </div>
+
+                  <div class="field-grid">
+                    @for (field of template.fields; track field.key || field.label) {
+                      <label>
+                        <span>{{ field.label }}</span>
+                        @if (field.field_type === 'long_text') {
+                          <textarea
+                            rows="3"
+                            [placeholder]="field.placeholder || 'Your update'"
+                            [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                            [name]="'answer' + template.id + (field.key || field.label)"
+                          ></textarea>
+                        } @else if (field.field_type === 'yes_no') {
+                          <select
+                            [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                            [name]="'answer' + template.id + (field.key || field.label)"
+                          >
+                            <option value="">Choose</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        } @else if (field.field_type === 'dropdown') {
+                          <select
+                            [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                            [name]="'answer' + template.id + (field.key || field.label)"
+                          >
+                            <option value="">Choose</option>
+                            @for (option of field.options || []; track option) {
+                              <option [value]="option">{{ option }}</option>
+                            }
+                          </select>
+                        } @else if (field.field_type === 'rating') {
+                          <select
+                            [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                            [name]="'answer' + template.id + (field.key || field.label)"
+                          >
+                            <option value="">Choose</option>
+                            @for (step of ratingSteps(field); track step) {
+                              <option [value]="step">{{ step }}</option>
+                            }
+                          </select>
+                        } @else {
+                          <input
+                            [type]="field.field_type === 'number' ? 'number' : 'text'"
+                            [placeholder]="field.placeholder || 'Your update'"
+                            [(ngModel)]="draftFor(template).answers[field.key || field.label]"
+                            [name]="'answer' + template.id + (field.key || field.label)"
+                          >
+                        }
+                      </label>
+                    }
+                    <label>
+                      <span>How are you feeling? (optional)</span>
+                      <textarea
+                        rows="2"
+                        placeholder="Anything your trainer should know today"
+                        [(ngModel)]="draftFor(template).note"
+                        [name]="'note' + template.id"
+                      ></textarea>
+                    </label>
+                  </div>
+
+                  <div class="entry-submit-row">
+                    <button type="submit" class="primary-action" [disabled]="savingTemplateId === template.id">
+                      {{ savingTemplateId === template.id ? 'Saving...' : (editingEntryId ? 'Update Entry' : 'Submit Entry') }}
+                    </button>
+                    <button type="button" class="ghost-action" (click)="clearEntryForm(template)">Clear Form</button>
+                  </div>
+                </form>
+
+                <div class="recent-entries">
+                  <h3>Recent Entries <span class="total-count">{{ entryCountFor(template) }} total</span></h3>
+                  <div class="entries-scroll">
+                    @for (entry of recentEntriesFor(template); track entry.id) {
+                      <div class="entry-row">
+                        <span>{{ entry.entry_date | date: 'mediumDate' }}</span>
+                        <span class="entry-time">{{ entry.entry_time || '--:--' }}</span>
+                        <p>{{ answerSummary(entry) }}</p>
+                        <button type="button" class="entry-edit-btn">View</button>
+                        @if (isEntryEditable(entry)) {
+                          <button type="button" class="entry-edit-btn" (click)="startEntryEdit(template, entry)">Edit</button>
+                        } @else if (entry.edited_by_trainer) {
+                          <small>Adjusted by trainer</small>
+                        }
+                      </div>
+                    } @empty {
+                      <p>No recent entries yet.</p>
+                    }
+                  </div>
+                </div>
+              </section>
+            }
+
+            @if (templateTab === 'progress') {
+              <section class="portal-card">
+                <h2>Progress</h2>
+                <div class="progress-list">
+                  @for (entry of progressFor(template); track entry.id) {
+                    <article>
+                      <div>
+                        <span>{{ entry.date | date: 'mediumDate' }}</span>
+                        @if (entry.status) {
+                          <small>{{ entry.status }}</small>
+                        }
+                      </div>
+                      <h3>{{ entry.title }}</h3>
+                      @if (entry.notes) {
+                        <p>{{ entry.notes }}</p>
+                      }
+                      @if (entry.next_step) {
+                        <p><strong>Next step:</strong> {{ entry.next_step }}</p>
+                      }
+                    </article>
+                  } @empty {
+                    <p>No progress notes shared yet.</p>
+                  }
+                </div>
+              </section>
+            }
+          </section>
+        </section>
+      } @else {
+        <section class="portal-card">
+          <h2>No templates assigned yet</h2>
+          <p>Your trainer has not assigned a check-in template yet. Check back soon or send them a message.</p>
+        </section>
+      }
     }
+      </div>
+    </section>
   } @else {
     <section class="profile-card">
       <p class="eyebrow">Client Portal</p>

@@ -50,6 +50,7 @@ export class TrainerProfileSetupComponent implements OnInit {
 
   readonly setupForm = this.formBuilder.nonNullable.group({
     first_name: ['', Validators.required],
+    middle_name: [''],
     last_name: ['', Validators.required],
     trainer_code: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
     birth_month: ['', Validators.required],
@@ -80,6 +81,7 @@ export class TrainerProfileSetupComponent implements OnInit {
         this.isPatchingProfile = true;
         this.setupForm.patchValue({
           first_name: profile.first_name || '',
+          middle_name: profile.middle_name || '',
           last_name: profile.last_name || '',
           trainer_code: profile.trainer_id || profile.trainer_code || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',

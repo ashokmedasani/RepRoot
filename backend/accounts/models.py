@@ -33,12 +33,79 @@ UNIVERSAL_CORE_FIELDS = [
 ]
 
 
+# Universal client creation form template.
+# Every trainer group is seeded with these personal-information fields so a
+# client creation form always exists (it is mandatory before a lead can be
+# converted into a client). Trainers can customise, reorder, or remove any of
+# these afterwards - they are a starting point, not fixed like the core fields.
+UNIVERSAL_CLIENT_FORM_FIELDS = [
+  {
+    'key': 'phone_number',
+    'label': 'Phone Number',
+    'field_type': 'phone',
+    'required': True,
+    'placeholder': 'Mobile number',
+    'help_text': 'Best contact number for the client.',
+    'options': [],
+    'is_core': False,
+  },
+  {
+    'key': 'primary_goal',
+    'label': 'Primary Goal',
+    'field_type': 'dropdown',
+    'required': True,
+    'placeholder': 'Select primary goal',
+    'help_text': 'Capture the client goal before assigning a program.',
+    'options': ['Weight Loss', 'Muscle Gain', 'Strength', 'General Fitness', 'Mobility', 'Sports Performance'],
+    'is_core': False,
+  },
+  {
+    'key': 'training_experience',
+    'label': 'Training Experience',
+    'field_type': 'dropdown',
+    'required': False,
+    'placeholder': 'Select experience level',
+    'help_text': 'Beginner, intermediate, or advanced training history.',
+    'options': ['Beginner', 'Intermediate', 'Advanced'],
+    'is_core': False,
+  },
+  {
+    'key': 'medical_conditions',
+    'label': 'Medical Conditions or Injuries',
+    'field_type': 'long_text',
+    'required': False,
+    'placeholder': 'List any medical conditions or past injuries',
+    'help_text': 'Important health context before training begins.',
+    'options': [],
+    'is_core': False,
+  },
+  {
+    'key': 'preferred_training_mode',
+    'label': 'Preferred Training Mode',
+    'field_type': 'dropdown',
+    'required': False,
+    'placeholder': 'Select mode',
+    'help_text': 'Online, in person, or hybrid coaching preference.',
+    'options': ['Online', 'In Person', 'Hybrid'],
+    'is_core': False,
+  },
+]
+
+
+def default_client_registration_fields():
+  """Core fields plus the universal personal-information template (fresh copies)."""
+  fields = [field.copy() for field in UNIVERSAL_CORE_FIELDS]
+  fields += [field.copy() for field in UNIVERSAL_CLIENT_FORM_FIELDS]
+  return fields
+
+
 class TrainerProfile(models.Model):
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_profile')
   trainer_id = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='trainer-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
+  phone = models.CharField(max_length=40, blank=True)
   gender = models.CharField(max_length=40, blank=True)
   state = models.CharField(max_length=80, blank=True)
   country = models.CharField(max_length=80, blank=True)
@@ -61,6 +128,9 @@ class TrainerProfile(models.Model):
   instagram_url = models.URLField(blank=True)
   youtube_url = models.URLField(blank=True)
   website_url = models.URLField(blank=True)
+  profile_images = models.JSONField(default=list, blank=True)
+  profile_links = models.JSONField(default=list, blank=True)
+  profile_visibility = models.JSONField(default=dict, blank=True)
   terms_accepted = models.BooleanField(default=False)
   privacy_policy_accepted = models.BooleanField(default=False)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -161,7 +231,10 @@ class ClientAccess(models.Model):
   email = models.EmailField()
   username = models.CharField(max_length=150)
   temporary_password = models.CharField(max_length=128)
+  photo = models.TextField(blank=True)
   registration_answers = models.JSONField(default=dict)
+  additional_info = models.JSONField(default=list)
+  additional_info_shared = models.BooleanField(default=False)
   trainer_notes = models.TextField(blank=True)
   trainer_notes_updated_at = models.DateTimeField(null=True, blank=True)
   must_change_password = models.BooleanField(default=True)
@@ -178,9 +251,85 @@ class ClientAccess(models.Model):
     return f'{self.username} for {self.trainer.username}'
 
 
+class ClientDetailChangeRequest(models.Model):
+  STATUS_PENDING = 'pending'
+  STATUS_APPROVED = 'approved'
+  STATUS_REJECTED = 'rejected'
+
+  STATUS_CHOICES = [
+    (STATUS_PENDING, 'Pending'),
+    (STATUS_APPROVED, 'Approved'),
+    (STATUS_REJECTED, 'Rejected'),
+  ]
+
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='detail_change_requests')
+  proposed_answers = models.JSONField(default=dict)
+  status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+  client_note = models.TextField(blank=True)
+  trainer_note = models.TextField(blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  reviewed_at = models.DateTimeField(null=True, blank=True)
+
+  class Meta:
+    db_table = 'client_detail_change_requests'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.client.username} detail change ({self.status})'
+
+
+class ClientReminder(models.Model):
+  STATUS_PENDING = 'pending'
+  STATUS_DONE = 'done'
+
+  STATUS_CHOICES = [
+    (STATUS_PENDING, 'Pending'),
+    (STATUS_DONE, 'Done'),
+  ]
+
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_reminders')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='reminders')
+  title = models.CharField(max_length=180)
+  date = models.DateField()
+  time = models.TimeField(null=True, blank=True)
+  notes = models.TextField(blank=True)
+  status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+  notify_trainer = models.BooleanField(default=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'client_reminders'
+    ordering = ['date', 'time']
+
+  def __str__(self) -> str:
+    return f'{self.title} for {self.client.username} ({self.date})'
+
+
+class ProgressEntry(models.Model):
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='progress_entries')
+  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='progress_entries')
+  title = models.CharField(max_length=180)
+  date = models.DateField()
+  notes = models.TextField(blank=True)
+  status = models.CharField(max_length=80, blank=True)
+  next_step = models.TextField(blank=True)
+  created_by = models.CharField(max_length=180, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'progress_entries'
+    ordering = ['-date', '-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.title} - {self.client.username} ({self.date})'
+
+
 class ReferenceCategory(models.Model):
   trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reference_categories')
   name = models.CharField(max_length=120)
+  description = models.TextField(blank=True)
   subcategories = models.JSONField(default=list)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
@@ -198,17 +347,13 @@ class TrainerReference(models.Model):
   TYPE_VIDEO_LINK = 'video_link'
   TYPE_PDF = 'pdf'
   TYPE_IMAGE = 'image'
-  TYPE_DOCUMENT = 'document'
   TYPE_TEXT_NOTE = 'text_note'
-  TYPE_EXTERNAL_LINK = 'external_link'
 
   REFERENCE_TYPE_CHOICES = [
     (TYPE_VIDEO_LINK, 'Video Link'),
-    (TYPE_PDF, 'PDF'),
+    (TYPE_PDF, 'PDF Link'),
+    (TYPE_TEXT_NOTE, 'Text'),
     (TYPE_IMAGE, 'Image'),
-    (TYPE_DOCUMENT, 'Document'),
-    (TYPE_TEXT_NOTE, 'Text Note'),
-    (TYPE_EXTERNAL_LINK, 'External Link'),
   ]
 
   trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_references')
@@ -282,6 +427,7 @@ class TrackingEntry(models.Model):
   template = models.ForeignKey(TrackingTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='entries')
   template_name = models.CharField(max_length=120)
   entry_date = models.DateField()
+  entry_time = models.TimeField(null=True, blank=True)
   answers = models.JSONField(default=dict)
   note = models.TextField(blank=True)
   edited_by_trainer = models.BooleanField(default=False)
@@ -290,8 +436,9 @@ class TrackingEntry(models.Model):
 
   class Meta:
     db_table = 'tracking_entries'
-    ordering = ['-entry_date', '-updated_at']
-    unique_together = ('client', 'template', 'entry_date')
+    # A client may log the same template multiple times per day (each with its
+    # own editable date/time), so there is no per-day uniqueness constraint.
+    ordering = ['-entry_date', '-entry_time', '-created_at']
 
   def __str__(self) -> str:
     return f'{self.client.username} {self.template_name} {self.entry_date}'

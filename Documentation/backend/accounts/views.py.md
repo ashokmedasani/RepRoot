@@ -82,3 +82,14 @@ Add object-level permissions and audit logging before production profile publish
 
 - `TrainerCodeAvailabilityView` (`POST trainer/check-trainer-code/`) - live availability check.
 - `TrainerCodeUpdateView` (`GET/PUT trainer/account/trainer-code/`) - view/change the code in Settings.
+
+## Update 5: client progress read endpoint
+
+- `ClientPortalProgressView` (`GET client/progress/`) exposes the authenticated client's trainer-shared progress records as read-only data for the client portal Progress tab.
+
+## Update 6: schedules and trainer client editing
+
+- `TrainerUpcomingRemindersView` now returns the next 10 pending schedules plus summary counts for total pending, due within 24 hours, due within 5 days, 7 days, and 10 days.
+- `ClientAccessDetailView.put` lets the trainer update normal client profile fields and registration answers while keeping system values such as submission reference ID protected.
+- API impact only; no database schema change.
+- Testing performed: `python manage.py check`.

@@ -49,11 +49,8 @@ export class TrainerGroupCreateComponent implements OnInit {
     this.formsGroupsApi.createGroup(this.groupName, this.groupDescription).subscribe({
       next: (response) => {
         this.messageType = 'success';
-        this.message = 'Group created successfully. Now create the client creation form for this group.';
-        window.setTimeout(
-          () => void this.router.navigate(['/trainer/groups', response.group.id, 'client-form/create']),
-          900
-        );
+        this.message = 'Group created successfully. Review and confirm the client creation form for this group.';
+        void this.router.navigate(['/trainer/groups', response.group.id, 'client-form/create']);
       },
       error: (error: unknown) => {
         this.messageType = 'error';

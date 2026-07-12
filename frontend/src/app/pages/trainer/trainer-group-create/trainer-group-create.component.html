@@ -33,6 +33,15 @@
         </label>
       </section>
 
+      <section class="group-card notice-card" role="note">
+        <h3>Next step is required</h3>
+        <p>
+          When you create this group, a simple client creation form is set up automatically with five
+          recommended fitness fields. You will be taken straight to it to review or customize before
+          you assign clients to this group.
+        </p>
+      </section>
+
       @if (message) {
         <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
       }

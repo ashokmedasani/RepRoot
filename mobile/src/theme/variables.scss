@@ -1,0 +1,100 @@
+/*
+ * CoachFlow theme tokens - ported from frontend/src/styles.scss so the mobile
+ * app matches the web brand, mapped onto Ionic's theming variables.
+ */
+
+:root {
+  /* App tokens (same names as the web app) */
+  --app-bg: #f7fbff;
+  --app-surface: #ffffff;
+  --app-surface-soft: #eef7ff;
+  --app-text: #122033;
+  --app-muted: #64748b;
+  --app-border: #d7e5f5;
+  --app-primary: #0b7de3;
+  --app-primary-strong: #075ea8;
+  --app-primary-soft: #dff0ff;
+  --app-accent: #20a3b8;
+  --app-success: #1f9d63;
+  --app-radius-md: 0.75rem;
+  --app-radius-lg: 0.9rem;
+
+  /* Ionic mapping */
+  --ion-color-primary: #0b7de3;
+  --ion-color-primary-rgb: 11, 125, 227;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #075ea8;
+  --ion-color-primary-tint: #2f92e8;
+
+  --ion-color-secondary: #20a3b8;
+  --ion-color-secondary-rgb: 32, 163, 184;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #1c8fa2;
+  --ion-color-secondary-tint: #36acc0;
+
+  --ion-color-success: #1f9d63;
+  --ion-color-success-rgb: 31, 157, 99;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #1b8a57;
+  --ion-color-success-tint: #35a773;
+
+  --ion-color-danger: #d92d20;
+  --ion-color-danger-rgb: 217, 45, 32;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #bf281c;
+  --ion-color-danger-tint: #dd4236;
+
+  --ion-background-color: #f7fbff;
+  --ion-background-color-rgb: 247, 251, 255;
+  --ion-text-color: #122033;
+  --ion-text-color-rgb: 18, 32, 51;
+  --ion-toolbar-background: #ffffff;
+  --ion-toolbar-color: #122033;
+  --ion-tab-bar-background: #ffffff;
+  --ion-tab-bar-color: #64748b;
+  --ion-tab-bar-color-selected: #0b7de3;
+  --ion-item-background: #ffffff;
+  --ion-card-background: #ffffff;
+  --ion-border-color: #d7e5f5;
+}
+
+/* Dark mode mirrors the web [data-theme='dark'] palette. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --app-bg: #101820;
+    --app-surface: #172230;
+    --app-surface-soft: #203144;
+    --app-text: #f6f9fc;
+    --app-muted: #adbac8;
+    --app-border: #2f4358;
+    --app-primary: #58a6ff;
+    --app-primary-strong: #8fc7ff;
+    --app-primary-soft: #193654;
+    --app-accent: #6ee7d8;
+    --app-success: #69db91;
+
+    --ion-color-primary: #58a6ff;
+    --ion-color-primary-rgb: 88, 166, 255;
+    --ion-color-primary-contrast: #101820;
+    --ion-color-primary-contrast-rgb: 16, 24, 32;
+    --ion-color-primary-shade: #4d92e0;
+    --ion-color-primary-tint: #69afff;
+
+    --ion-background-color: #101820;
+    --ion-background-color-rgb: 16, 24, 32;
+    --ion-text-color: #f6f9fc;
+    --ion-text-color-rgb: 246, 249, 252;
+    --ion-toolbar-background: #172230;
+    --ion-toolbar-color: #f6f9fc;
+    --ion-tab-bar-background: #172230;
+    --ion-tab-bar-color: #adbac8;
+    --ion-tab-bar-color-selected: #58a6ff;
+    --ion-item-background: #172230;
+    --ion-card-background: #172230;
+    --ion-border-color: #2f4358;
+  }
+}

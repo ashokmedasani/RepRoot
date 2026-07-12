@@ -13,3 +13,11 @@ Styles the group users page.
 ## Connected files
 
 - `trainer-group-users.component.html`
+
+## Update
+
+Adds a full-width five-column Recent Approved Users strip on desktop, collapsing to two columns and then one column on smaller screens.
+
+## Update 2
+
+Adds compact expandable settings-card styles for the unified Group Settings section. Testing performed: `npm run build`.

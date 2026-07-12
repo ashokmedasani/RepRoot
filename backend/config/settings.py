@@ -8,7 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'local-development-only-secret-key')
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-default_allowed_hosts = ['localhost', '127.0.0.1']
+# 10.0.2.2 is how the Android emulator reaches this PC's localhost.
+default_allowed_hosts = ['localhost', '127.0.0.1', '10.0.2.2']
 render_external_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
 
 if render_external_hostname:
@@ -136,11 +137,13 @@ CACHES = {
   }
 }
 
+# 4300 = web frontend. 4400 = mobile app browser preview (only while you run it).
+# http://localhost + capacitor://localhost = the native Android/iOS app's WebView origin.
 CORS_ALLOWED_ORIGINS = [
   origin.strip()
   for origin in os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:4200,http://127.0.0.1:4200,http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400',
+    'http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400,http://localhost,capacitor://localhost',
   ).split(',')
   if origin.strip()
 ]
