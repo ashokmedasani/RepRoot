@@ -257,8 +257,12 @@ export class TrainerProfileFormComponent implements OnInit {
 
   private defaultVisibility(): TrainerProfileVisibility {
     return {
+      professional_headline: false,
       about: false,
       professional_summary: false,
+      specializations: false,
+      experience: false,
+      languages: false,
       training_style: false,
       certification: false,
       images: false,

@@ -1,0 +1,55 @@
+<section class="support-incidents" aria-labelledby="support-incidents-title">
+  <div class="support-heading">
+    <div>
+      <p class="eyebrow">Support</p>
+      <h2 id="support-incidents-title">Feedback and bug reports</h2>
+      <p>Send a structured request to the support team and keep the full conversation in one place.</p>
+    </div>
+    <div class="support-actions">
+      <span class="active-count">{{ activeCount }} of {{ activeLimit }} active</span>
+      <button type="button" class="primary-action" [disabled]="!canCreate" (click)="openForm()">New request</button>
+    </div>
+  </div>
+
+  @if (!canCreate) {
+    <p class="limit-note">You have reached the maximum of three active support requests. New requests become available after one is resolved or closed.</p>
+  }
+  @if (message) { <p class="support-message" [class.error-message]="messageType === 'error'">{{ message }}</p> }
+
+  @if (showForm) {
+    <form class="incident-form" (ngSubmit)="submit()">
+      <div class="form-grid">
+        <label><span>Request type</span><select [(ngModel)]="form.category" name="category">
+          @for (category of categories; track category.value) { <option [value]="category.value">{{ category.label }}</option> }
+        </select></label>
+        <label><span>Page or feature</span><input [(ngModel)]="form.page_feature" name="pageFeature" placeholder="For example: Dashboard or Templates"></label>
+      </div>
+      <label><span>Subject</span><input [(ngModel)]="form.subject" name="subject" maxlength="180" placeholder="Briefly describe the request"></label>
+      <label><span>Description</span><textarea [(ngModel)]="form.description" name="description" rows="5" maxlength="5000" placeholder="What happened, or what would you like us to know?"></textarea></label>
+      <label><span>Screenshot (optional)</span><input type="file" accept="image/png,image/jpeg,image/webp" (change)="onScreenshotSelected($event)"></label>
+      <div class="form-actions"><button type="button" class="secondary-action" (click)="showForm = false">Cancel</button><button type="submit" class="primary-action" [disabled]="isSubmitting">{{ isSubmitting ? 'Submitting...' : 'Submit request' }}</button></div>
+    </form>
+  }
+
+  @if (isLoading) { <p class="empty-state">Loading support requests...</p> }
+  @else {
+    <div class="incident-list">
+      @for (incident of incidents; track incident.incident_id) {
+        <article class="incident-card">
+          <div class="incident-topline"><span class="incident-id">{{ incident.incident_id }}</span><span class="status-pill" [attr.data-status]="incident.status">{{ statusLabel(incident.status) }}</span></div>
+          <h3>{{ incident.subject }}</h3>
+          <p class="incident-meta">{{ categoryLabel(incident.category) }} · {{ incident.created_at | date:'medium' }}</p>
+          <p>{{ incident.description }}</p>
+          @if (incident.messages.length) {
+            <div class="conversation"><strong>Conversation</strong>@for (item of incident.messages; track item.id) { <p><b>{{ item.author_name }}</b> · {{ item.created_at | date:'short' }}<br>{{ item.body }}</p> }</div>
+          }
+          @if (incident.status === 'waiting_for_user' && followUpIncident?.incident_id !== incident.incident_id) { <button type="button" class="secondary-action" (click)="startFollowUp(incident)">Reply to support</button> }
+          @if ((incident.status === 'resolved' || incident.status === 'closed') && followUpIncident?.incident_id !== incident.incident_id) { <button type="button" class="secondary-action" (click)="reopen(incident)">Reopen request</button> }
+          @if (followUpIncident?.incident_id === incident.incident_id) {
+            <div class="follow-up"><textarea [(ngModel)]="followUpBody" [name]="'followUp' + incident.id" rows="3" placeholder="Add the requested information"></textarea><div class="form-actions"><button type="button" class="secondary-action" (click)="followUpIncident = null">Cancel</button><button type="button" class="primary-action" (click)="sendFollowUp()">Send response</button></div></div>
+          }
+        </article>
+      } @empty { <p class="empty-state">No support requests yet. Use “New request” to report a bug or send feedback.</p> }
+    </div>
+  }
+</section>

@@ -10,18 +10,21 @@ import {
   LeadSubmission
 } from '../../../core/api/forms-groups-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
 
 type SubmissionView = 'pending' | 'approved' | 'deleted';
 
 @Component({
   selector: 'app-trainer-forms-groups',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent],
+  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent, FixedHeightListComponent],
   templateUrl: './trainer-forms-groups.component.html',
   styleUrl: './trainer-forms-groups.component.scss'
 })
 export class TrainerFormsGroupsComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   overview: FormsGroupsOverview | null = null;
   isLoading = true;
@@ -115,8 +118,14 @@ export class TrainerFormsGroupsComponent implements OnInit {
     });
   }
 
-  deletePending(submission: LeadSubmission): void {
-    const confirmed = window.confirm('Delete this pending form request?');
+  async deletePending(submission: LeadSubmission): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete request from',
+      target: submission.applicant_name,
+      impact: 'This pending lead request will be removed from the active review queue. This action may not be reversible.',
+      confirmLabel: 'Delete Request'
+    });
 
     if (!confirmed) {
       return;

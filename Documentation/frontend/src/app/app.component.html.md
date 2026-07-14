@@ -1,5 +1,11 @@
 # src/app/app.component.html
 
+## 2026-07-13 targeted refinement
+
+Hosts the single global confirmation dialog outlet used throughout the application.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Hosts the Angular router outlet where active pages render.

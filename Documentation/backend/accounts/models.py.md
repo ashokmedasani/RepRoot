@@ -1,5 +1,15 @@
 # backend/accounts/models.py
 
+## 2026-07-13 immutable trainer audit reference
+
+`TrainerProfile.internal_reference_code` is an automatically generated, immutable, unique `TRN-…` identifier. The editable trainer lookup/login code remains separate. Internal logs use username plus this stable reference so history survives username or trainer-code changes.
+
+## 2026-07-13 targeted refinement
+
+Adds distinct group-registration submissions, public group form slugs, onboarding source/method support, read-only client reference IDs, and nullable lead-source compatibility.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Defines database models for trainer account profile data and the Forms & Groups setup flow.

@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import writeXlsxFile, { SheetData } from 'write-excel-file/browser';
 
 import { EntryLike, FieldLike } from './analytics.types';
 import { fieldKey } from './graph-engine';
@@ -42,11 +42,12 @@ export function exportCsv(name: string, table: ExportTable): void {
   downloadBlob(lines.join('\n'), 'text/csv;charset=utf-8;', `${name}.csv`);
 }
 
-export function exportExcel(name: string, table: ExportTable): void {
-  const worksheet = XLSX.utils.aoa_to_sheet([table.headers, ...table.rows]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Entries');
-  XLSX.writeFile(workbook, `${name}.xlsx`);
+export function exportExcel(name: string, table: ExportTable): Promise<void> {
+  const sheetData: SheetData = [
+    table.headers.map((value) => ({ value, type: String, fontWeight: 'bold' })),
+    ...table.rows.map((row) => row.map((value) => ({ value: String(value ?? ''), type: String })))
+  ];
+  return writeXlsxFile(sheetData, { sheet: 'Entries' }).toFile(`${name}.xlsx`);
 }
 
 export function exportPdf(name: string, title: string, table: ExportTable): void {

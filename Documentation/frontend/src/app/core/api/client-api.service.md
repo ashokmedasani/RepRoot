@@ -1,5 +1,11 @@
 # frontend/src/app/core/api/client-api.service.ts
 
+## 2026-07-13 targeted refinement
+
+Adds Client Dashboard types/API access and nullable onboarding-source/reference fields used by the redesigned client portal.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Typed Angular HTTP client for the client portal: login, password change, profile, assigned templates, and tracking entries.
@@ -31,3 +37,9 @@ All authenticated methods send `Authorization: ClientToken <key>`. Entries and t
 - `frontend/src/app/pages/clients/client-change-password/client-change-password.component.ts`
 - `frontend/src/app/pages/clients/client-profile/client-profile.component.ts`
 - `backend/accounts/client_auth.py`
+
+## 2026-07-13 production audit
+
+Trainer directory records intentionally contain only trainer name and trainer code. `logout()` calls the server token-revocation endpoint.
+
+The client dashboard summary contract now includes a distinct overdue schedule count while retaining the five required main KPIs.

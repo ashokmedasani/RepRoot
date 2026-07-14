@@ -25,7 +25,8 @@ export class ClientLoginComponent {
   directory: TrainerDirectoryEntry[] = [];
   directorySearch = '';
   isLoadingDirectory = false;
-  private directoryLoaded = false;
+  selectedTrainer: TrainerDirectoryEntry | null = null;
+  pendingTrainer: TrainerDirectoryEntry | null = null;
 
   readonly loginForm = {
     trainerCode: '',
@@ -34,11 +35,9 @@ export class ClientLoginComponent {
   };
 
   toggleDirectory(): void {
-    this.showDirectory = !this.showDirectory;
-
-    if (this.showDirectory && !this.directoryLoaded) {
-      this.loadDirectory();
-    }
+    this.showDirectory = true;
+    this.pendingTrainer = this.selectedTrainer;
+    this.loadDirectory();
   }
 
   get filteredTrainers(): TrainerDirectoryEntry[] {
@@ -55,16 +54,29 @@ export class ClientLoginComponent {
   }
 
   selectTrainer(trainer: TrainerDirectoryEntry): void {
-    this.loginForm.trainerCode = trainer.trainer_id;
+    this.pendingTrainer = trainer;
+  }
+
+  confirmTrainer(): void {
+    if (!this.pendingTrainer) {
+      return;
+    }
+
+    this.selectedTrainer = this.pendingTrainer;
+    this.loginForm.trainerCode = this.pendingTrainer.trainer_id;
+    this.showDirectory = false;
+  }
+
+  cancelDirectory(): void {
+    this.pendingTrainer = null;
     this.showDirectory = false;
   }
 
   loadDirectory(): void {
     this.isLoadingDirectory = true;
-    this.clientApi.getTrainerDirectory().subscribe({
+    this.clientApi.getTrainerDirectory(this.directorySearch).subscribe({
       next: (response) => {
         this.directory = response.trainers;
-        this.directoryLoaded = true;
         this.isLoadingDirectory = false;
       },
       error: () => {
@@ -72,6 +84,10 @@ export class ClientLoginComponent {
         this.isLoadingDirectory = false;
       }
     });
+  }
+
+  searchDirectory(): void {
+    this.loadDirectory();
   }
 
   verifyClientLogin(): void {
@@ -99,7 +115,7 @@ export class ClientLoginComponent {
         if (client.must_change_password) {
           void this.router.navigate(['/client/change-password']);
         } else {
-          void this.router.navigate(['/client/profile']);
+          void this.router.navigate(['/client/dashboard']);
         }
       },
       error: (error: unknown) => {

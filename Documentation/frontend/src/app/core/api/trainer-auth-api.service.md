@@ -1,5 +1,15 @@
 # frontend/src/app/core/api/trainer-auth-api.service.ts
 
+## 2026-07-13 stable data-usage request
+
+Adds `quota_bytes` and `usage_percent` to the typed response. The root service replays the authenticated request during the current SPA session, preventing the sidebar from resetting on every trainer navigation; logout clears it.
+
+## 2026-07-13 targeted refinement
+
+Requires the current password in the Security password-change request.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Provides Angular HTTP methods for trainer authentication, OTP/password reset, profile status, profile setup, and Profile / Portfolio save/read.
@@ -39,3 +49,7 @@ The service does not decide routing. It exposes `profile_setup_completed` so log
 ## Future improvement notes
 
 Move token handling into an HTTP interceptor when more protected APIs are added.
+
+## 2026-07-13 trainer data usage
+
+Exposes the authenticated usage response containing total, database-content, and uploaded-file byte counts.

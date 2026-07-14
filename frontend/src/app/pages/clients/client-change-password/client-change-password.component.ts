@@ -48,7 +48,7 @@ export class ClientChangePasswordComponent {
         next: (response) => {
           window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
           this.isSubmitting = false;
-          void this.router.navigate(['/client/profile']);
+          void this.router.navigate(['/client/dashboard']);
         },
         error: (error: unknown) => {
           this.message = formatApiError(error, 'Password could not be changed.');

@@ -1,5 +1,11 @@
 # src/app/app.component.ts
 
+## 2026-07-13 targeted refinement
+
+Imports the reusable global confirmation component at the application root.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Defines the Angular root component and initializes the active theme when the app starts.

@@ -1,23 +1,13 @@
 <app-trainer-page-shell
   [title]="assignment?.template_name || 'Template'"
+  eyebrow="Client workspace"
   [subtitle]="assignment ? 'Assigned on ' + (assignment.assigned_at | date: 'dd MMM yyyy') : 'Loading template.'"
   activeSection="clients"
-  maxWidth="80rem"
   titleId="client-template-title"
 >
-  <button page-actions type="button" class="ghost-action" (click)="goBack()" aria-label="Back">&#8592; Back</button>
-  <div page-actions class="export-wrap">
-    <button type="button" class="secondary-action" (click)="toggleExport()">Export &#9662;</button>
-    @if (isExportOpen) {
-      <div class="export-menu">
-        <button type="button" (click)="exportAs('csv')">CSV</button>
-        <button type="button" (click)="exportAs('excel')">Excel</button>
-        <button type="button" (click)="exportAs('pdf')">PDF</button>
-      </div>
-    }
-  </div>
   <button page-actions type="button" class="secondary-action" (click)="openShareDialog()">Share References</button>
   <button page-actions type="button" class="primary-action" (click)="openAddEntry()">Start New Entry</button>
+  <button page-actions type="button" class="ghost-action" (click)="goBack()" aria-label="Back">&#8592; Back</button>
 
   @if (message) {
     <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>

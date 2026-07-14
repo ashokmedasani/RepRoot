@@ -1,11 +1,11 @@
 <app-trainer-page-shell
   title="Create your trainer lead form"
   eyebrow="Step 1"
+  subtitle="Build the public enquiry form used by potential clients."
   activeSection="forms-groups"
-  maxWidth="72rem"
   titleId="lead-form-title"
 >
-    <a page-actions class="ghost-link" routerLink="/trainer/forms-groups">Back to dashboard</a>
+    <a page-actions class="secondary-action" routerLink="/trainer/forms-groups">Back to Forms &amp; Groups</a>
 
     @if (isLoading) {
       <p class="message">Loading form builder...</p>

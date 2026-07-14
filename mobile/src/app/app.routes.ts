@@ -1,15 +1,15 @@
 import { Routes } from '@angular/router';
 
 /**
- * Navigation map (see Documentation/MOBILE_APP_DESIGN.md):
+ * Android navigation map:
  * - Role chooser -> trainer or client login -> role tab shell.
- * - Trainer shell: 5 tabs (Dashboard, Clients, Forms & Groups, Templates, More).
- * - Client shell: 4 tabs (My Templates, Trainer, Chat, My Details).
- * Screens marked "stub" are Phase 2/3 placeholders reachable through real navigation.
+ * - Trainer shell: Dashboard, Clients, Forms & Groups, Templates, More.
+ * - Client shell: Dashboard, Templates, Trainer, Chat, Settings.
  */
 export const routes: Routes = [
   {
     path: '',
+    pathMatch: 'full',
     loadComponent: () => import('./pages/role-chooser/role-chooser.page').then((m) => m.RoleChooserPage)
   },
   {
@@ -34,13 +34,15 @@ export const routes: Routes = [
       },
       {
         path: 'forms-groups',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'Forms & Groups', phase: 'Phase 2', note: 'Lead form, requests, and groups management.' }
+        loadComponent: () => import('./pages/trainer/forms-groups/trainer-forms-groups.page').then((m) => m.TrainerFormsGroupsPage)
+      },
+      {
+        path: 'manage',
+        loadComponent: () => import('./pages/trainer/manage/trainer-manage.page').then((m) => m.TrainerManagePage)
       },
       {
         path: 'templates',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'Templates', phase: 'Phase 2', note: 'Template library and builder.' }
+        loadComponent: () => import('./pages/trainer/templates/trainer-templates.page').then((m) => m.TrainerTemplatesPage)
       },
       {
         path: 'more',
@@ -48,18 +50,15 @@ export const routes: Routes = [
       },
       {
         path: 'more/profile',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'Profile', phase: 'Phase 2', note: 'Read-only portfolio with visibility controls and client preview.' }
+        loadComponent: () => import('./pages/trainer/profile/trainer-profile.page').then((m) => m.TrainerProfilePage)
       },
       {
         path: 'more/references',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'References', phase: 'Phase 2', note: 'Category accordion with inline reference details.' }
+        loadComponent: () => import('./pages/trainer/references/trainer-references.page').then((m) => m.TrainerReferencesPage)
       },
       {
         path: 'more/settings',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'Settings', phase: 'Phase 2', note: 'Account, My Account, and Change Password.' }
+        loadComponent: () => import('./pages/trainer/settings/trainer-settings.page').then((m) => m.TrainerSettingsPage)
       },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
@@ -73,25 +72,37 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/client/tabs/client-tabs.page').then((m) => m.ClientTabsPage),
     children: [
       {
+        path: 'dashboard',
+        loadComponent: () => import('./pages/client/dashboard/client-dashboard.page').then((m) => m.ClientDashboardPage)
+      },
+      {
         path: 'templates',
         loadComponent: () => import('./pages/client/templates/client-templates.page').then((m) => m.ClientTemplatesPage)
       },
       {
+        path: 'progress',
+        loadComponent: () => import('./pages/client/progress/client-progress.page').then((m) => m.ClientProgressPage)
+      },
+      {
+        path: 'more',
+        loadComponent: () => import('./pages/client/more/client-more.page').then((m) => m.ClientMorePage)
+      },
+      {
         path: 'trainer',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'My Trainer', phase: 'Phase 3', note: 'Your trainer’s public profile.' }
+        loadComponent: () => import('./pages/client/trainer/client-trainer.page').then((m) => m.ClientTrainerPage),
+        data: { title: 'My Trainer', note: 'Your trainer’s public profile.' }
       },
       {
         path: 'chat',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'Trainer Chat', phase: 'Phase 3', note: 'Direct messages with your trainer.' }
+        loadComponent: () => import('./pages/client/chat/client-chat.page').then((m) => m.ClientChatPage),
+        data: { title: 'Trainer Chat', note: 'Direct messages with your trainer.' }
       },
       {
-        path: 'details',
-        loadComponent: () => import('./pages/shared/stub.page').then((m) => m.StubPage),
-        data: { title: 'My Details', phase: 'Phase 3', note: 'Account, registration details, edit requests, shared info.' }
+        path: 'settings',
+        loadComponent: () => import('./pages/client/settings/client-settings.page').then((m) => m.ClientSettingsPage),
+        data: { title: 'My Details', note: 'Account, registration details, edit requests, shared info.' }
       },
-      { path: '', redirectTo: 'templates', pathMatch: 'full' }
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },
   { path: '**', redirectTo: '' }

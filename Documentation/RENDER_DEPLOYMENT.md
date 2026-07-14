@@ -42,7 +42,20 @@ CORS_ALLOWED_ORIGINS=https://<your-frontend>.onrender.com
 CSRF_TRUSTED_ORIGINS=https://<your-frontend>.onrender.com
 ```
 
-Optional email variables can be added later when you switch away from console email.
+Production startup intentionally fails if SMTP is not configured. Set `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL` before the first deployment so OTP and client-credential messages are delivered securely instead of printed to logs.
+
+Also configure:
+
+```text
+CACHE_URL=redis://...                 # shared OTP, throttle, and verification state
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_STORAGE_BUCKET_NAME=...
+AWS_S3_REGION_NAME=...
+AWS_S3_ENDPOINT_URL=...              # only for non-AWS S3-compatible providers
+```
+
+Durable object storage is required for deployed profile and reference uploads because a web-service filesystem is not durable. Redis is strongly recommended before running more than one API process.
 
 ## 4. Frontend API configuration
 
@@ -100,3 +113,5 @@ The health endpoint should return:
 ```json
 {"status": "ok"}
 ```
+
+Before directing real users to the deployment, also run `python manage.py check --deploy`, `python manage.py migrate --check`, the backend test suite, the Angular production build, and both Python and npm vulnerability audits.

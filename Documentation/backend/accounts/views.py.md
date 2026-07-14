@@ -1,5 +1,15 @@
 # backend/accounts/views.py
 
+## 2026-07-13 Client Action Center follow-up
+
+The existing trainer upcoming-reminders response now also returns trainer-owned pending client profile edits and a `pending_profile_edits` summary count. Each activity includes the client, group, request time, note, and number of actually changed editable fields. No endpoint or model was replaced.
+
+## 2026-07-13 targeted refinement
+
+Implements onboarding conversions and credential email, required schedule KPI windows, reference limits, Client Dashboard aggregation, and granular public trainer profile visibility.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Exposes API views for trainer account access, OTP verification, password reset, profile status, profile save/read, and Forms & Groups workflows.
@@ -93,3 +103,20 @@ Add object-level permissions and audit logging before production profile publish
 - `ClientAccessDetailView.put` lets the trainer update normal client profile fields and registration answers while keeping system values such as submission reference ID protected.
 - API impact only; no database schema change.
 - Testing performed: `python manage.py check`.
+
+## 2026-07-13 production audit
+
+- Public trainer payloads now honor every current visibility key and bridge legacy gallery, certification, and social-link fields into the client-facing contract.
+- Trainer search returns only trainer name and trainer code.
+- Authentication, OTP, trainer-directory, and public-registration endpoints use scoped rate limiting.
+- Client password changes revoke existing client tokens, and the new logout endpoint revokes the active token.
+- Trainer-managed Additional Details and client photos are validated before persistence; all client lookups remain trainer-owned.
+- Current schedule summaries expose the required 24-hour and 7-day windows; the retired 5-day and 10-day values are no longer presented by the dashboard.
+
+## 2026-07-13 overdue schedule organization
+
+Trainer and client dashboard summaries now expose a separate `overdue` count. The 24-hour and 7-day windows count future schedules only, preventing overdue work from being counted twice. The nearest upcoming date also ignores overdue records.
+
+## 2026-07-13 trainer data usage
+
+Adds an authenticated read-only endpoint that returns total, database-content, and uploaded-file bytes for the current trainer only.

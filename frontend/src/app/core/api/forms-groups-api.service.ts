@@ -57,6 +57,7 @@ export interface PublicLeadForm {
 export interface ClientRegistrationForm {
   id: number;
   group: number;
+  public_slug: string;
   fields: DynamicField[];
   created_at: string;
   updated_at: string;
@@ -111,6 +112,29 @@ export interface ClientAccessPayload {
   confirm_password: string;
   photo?: string;
   registration_answers: Record<string, string>;
+  send_credentials?: boolean;
+  registration_submission_id?: number | null;
+}
+
+export interface PublicGroupRegistrationForm {
+  group: { id: number; name: string };
+  trainer_name: string;
+  fields: DynamicField[];
+}
+
+export interface GroupRegistrationSubmission {
+  id: number;
+  group: number;
+  applicant_name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  reference_id: string;
+  answers: Record<string, string>;
+  status: 'pending' | 'converted' | 'deleted';
+  submitted_at: string;
+  converted_at: string | null;
+  client_access_id: number | null;
 }
 
 export type AdditionalInfoType = 'text' | 'link' | 'reference';
@@ -144,11 +168,24 @@ export interface ClientReminder {
 
 export interface ScheduleSummary {
   total_pending: number;
+  overdue: number;
   due_24_hours: number;
-  due_5_days: number;
   due_7_days: number;
-  due_10_days: number;
+  total_completed: number;
+  completed_last_7_days: number;
+  pending_profile_edits: number;
   nearest_date: string;
+}
+
+export interface ClientProfileEditActivity {
+  id: number;
+  client: number;
+  client_name: string;
+  group_name: string;
+  request_type: 'profile_edit' | 'account_deletion';
+  proposed_field_count: number;
+  client_note: string;
+  created_at: string;
 }
 
 export interface ProgressEntry {
@@ -169,7 +206,10 @@ export interface ClientAccessRecord {
   group: number;
   group_name: string;
   trainer_name: string;
-  lead_submission: number;
+  lead_submission: number | null;
+  registration_submission: number | null;
+  reference_id: string;
+  onboarding_method: 'public_lead' | 'manual' | 'group_registration';
   first_name: string;
   last_name: string;
   email: string;
@@ -187,11 +227,13 @@ export interface ClientAccessRecord {
 export interface GroupUsersResponse {
   group: TrainerGroup;
   clients: ClientAccessRecord[];
+  registration_submissions: GroupRegistrationSubmission[];
 }
 
 export interface ClientDetailChangeRequest {
   id: number;
   client: number;
+  request_type: 'profile_edit' | 'account_deletion';
   proposed_answers: Record<string, string>;
   status: 'pending' | 'approved' | 'rejected';
   client_note: string;
@@ -204,7 +246,7 @@ export interface ClientAccessDetailResponse {
   client: ClientAccessRecord;
   group: TrainerGroup;
   registration_fields: DynamicField[];
-  lead_submission: LeadSubmission;
+  lead_submission: LeadSubmission | null;
   trainer_notes: string;
   trainer_notes_updated_at: string | null;
   pending_change_request: ClientDetailChangeRequest | null;
@@ -276,6 +318,22 @@ export class FormsGroupsApiService {
       payload,
       { headers: this.getAuthHeaders() }
     );
+  }
+
+  createManualClient(
+    payload: ClientAccessPayload
+  ): Observable<{
+    client_access: ClientAccessRecord;
+    temporary_password: string;
+    credentials_sent: boolean;
+    message: string;
+  }> {
+    return this.http.post<{
+      client_access: ClientAccessRecord;
+      temporary_password: string;
+      credentials_sent: boolean;
+      message: string;
+    }>(`${this.apiBaseUrl}/trainer/forms-groups/clients/manual/`, payload, { headers: this.getAuthHeaders() });
   }
 
   getGroupUsers(groupId: number): Observable<GroupUsersResponse> {
@@ -382,8 +440,8 @@ export class FormsGroupsApiService {
     });
   }
 
-  getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; summary: ScheduleSummary }> {
-    return this.http.get<{ reminders: ClientReminder[]; summary: ScheduleSummary }>(`${this.apiBaseUrl}/trainer/reminders/upcoming/`, {
+  getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; profile_edits: ClientProfileEditActivity[]; summary: ScheduleSummary }> {
+    return this.http.get<{ reminders: ClientReminder[]; profile_edits: ClientProfileEditActivity[]; summary: ScheduleSummary }>(`${this.apiBaseUrl}/trainer/reminders/upcoming/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -474,6 +532,20 @@ export class FormsGroupsApiService {
     );
   }
 
+  getPublicGroupRegistration(publicSlug: string): Observable<PublicGroupRegistrationForm> {
+    return this.http.get<PublicGroupRegistrationForm>(`${this.apiBaseUrl}/public/group-registration/${publicSlug}/`);
+  }
+
+  submitPublicGroupRegistration(
+    publicSlug: string,
+    answers: Record<string, string>
+  ): Observable<{ reference_id: string; message: string }> {
+    return this.http.post<{ reference_id: string; message: string }>(
+      `${this.apiBaseUrl}/public/group-registration/${publicSlug}/`,
+      { answers }
+    );
+  }
+
   private getAuthHeaders(): HttpHeaders {
     const token = window.localStorage.getItem('trainer-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
@@ -486,6 +558,6 @@ export class FormsGroupsApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return 'http://127.0.0.1:8000/api/accounts';
+    return `http://${window.location.hostname}:8000/api/accounts`;
   }
 }

@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import {
   AdditionalInfoItem,
@@ -22,6 +23,7 @@ import { ChatPanelComponent } from '../../../shared/chat-panel/chat-panel.compon
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
 
 @Component({
   selector: 'app-trainer-client-profile',
@@ -36,6 +38,8 @@ export class TrainerClientProfileComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly referencesApi = inject(ReferencesApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   clientId = 0;
   profile: ClientAccessDetailResponse | null = null;
@@ -89,7 +93,7 @@ export class TrainerClientProfileComponent implements OnInit {
     reference_id: ''
   };
 
-  workspaceTab: 'workspace' | 'chat' = 'workspace';
+  workspaceTab: 'workspace' | 'chat' | 'actions' = 'workspace';
 
   reminders: ClientReminder[] = [];
   isSavingReminder = false;
@@ -142,7 +146,16 @@ export class TrainerClientProfileComponent implements OnInit {
       });
   }
 
-  completeReminder(reminder: ClientReminder): void {
+  async completeReminder(reminder: ClientReminder): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'complete',
+      title: 'Mark schedule complete',
+      target: reminder.title,
+      impact: 'This schedule will move to the completed history for this client.',
+      confirmLabel: 'Mark Complete'
+    });
+    if (!confirmed) return;
+
     this.formsGroupsApi.updateReminder(reminder.id, { status: 'done' }).subscribe({
       next: () => this.loadReminders(),
       error: (error: unknown) => {
@@ -152,7 +165,16 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  deleteReminder(reminder: ClientReminder): void {
+  async deleteReminder(reminder: ClientReminder): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete schedule',
+      target: reminder.title,
+      impact: 'This scheduled item will be permanently removed.',
+      confirmLabel: 'Delete Schedule'
+    });
+    if (!confirmed) return;
+
     this.formsGroupsApi.deleteReminder(reminder.id).subscribe({
       next: () => this.loadReminders(),
       error: () => this.loadReminders()
@@ -166,17 +188,25 @@ export class TrainerClientProfileComponent implements OnInit {
   }
 
   setAdditionalShared(shared: boolean): void {
-    if (this.additionalShared === shared) {
+    if (this.additionalShared === shared || this.isSavingAdditional) {
       return;
     }
 
-    this.formsGroupsApi.updateClientAdditionalInfo(this.clientId, this.additionalItems, shared).subscribe({
+    const previousClient = this.client;
+    if (!previousClient) {
+      return;
+    }
+
+    this.replaceClient({ ...previousClient, additional_info_shared: shared });
+    this.isSavingAdditional = true;
+    this.formsGroupsApi.updateClientAdditionalInfo(this.clientId, this.additionalItems, shared).pipe(
+      finalize(() => (this.isSavingAdditional = false))
+    ).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
+        this.replaceClient(response.client);
       },
       error: (error: unknown) => {
+        this.replaceClient(previousClient);
         this.messageType = 'error';
         this.message = formatApiError(error, 'Visibility could not be updated.');
       }
@@ -216,9 +246,7 @@ export class TrainerClientProfileComponent implements OnInit {
   private saveClientPhoto(photo: string): void {
     this.formsGroupsApi.updateClientPhoto(this.clientId, photo).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
+        this.replaceClient(response.client);
         this.messageType = 'success';
         this.message = response.message;
       },
@@ -263,7 +291,7 @@ export class TrainerClientProfileComponent implements OnInit {
       { label: 'Group', value: client.group_name },
       { label: 'Client Status', value: client.is_active ? 'Active' : 'Inactive' },
       { label: 'Joined Date', value: new Date(client.created_at).toLocaleDateString(), readonly: true },
-      { label: 'Form Submission Reference ID', value: profile.lead_submission.reference_id, readonly: true }
+      { label: 'Reference ID', value: client.reference_id, readonly: true }
     ];
 
     for (const field of profile.registration_fields || []) {
@@ -331,9 +359,7 @@ export class TrainerClientProfileComponent implements OnInit {
     this.isSavingClientInfo = true;
     this.formsGroupsApi.updateClientProfile(this.clientId, this.clientInfoDraft).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
+        this.replaceClient(response.client);
         this.messageType = 'success';
         this.message = response.message;
         this.isEditingClientInfo = false;
@@ -422,12 +448,24 @@ export class TrainerClientProfileComponent implements OnInit {
     return rows;
   }
 
-  reviewChangeRequest(action: 'approve' | 'reject'): void {
+  async reviewChangeRequest(action: 'approve' | 'reject'): Promise<void> {
     const request = this.pendingChangeRequest;
 
     if (!request || this.isReviewingChange) {
       return;
     }
+
+    const clientName = `${this.client?.first_name || ''} ${this.client?.last_name || ''}`.trim();
+    const confirmed = await this.confirmation.confirm({
+      kind: action === 'approve' ? 'approve' : 'warning',
+      title: action === 'approve' ? 'Approve changes for' : 'Reject changes for',
+      target: clientName,
+      impact: action === 'approve'
+        ? 'The submitted profile changes will replace the current registration details.'
+        : 'The submitted changes will be declined and the current details will remain.',
+      confirmLabel: action === 'approve' ? 'Approve Changes' : 'Reject Changes'
+    });
+    if (!confirmed) return;
 
     this.isReviewingChange = true;
     this.formsGroupsApi.reviewChangeRequest(this.clientId, request.id, action, this.changeReviewNote.trim()).subscribe({
@@ -454,7 +492,7 @@ export class TrainerClientProfileComponent implements OnInit {
     return this.client?.is_active ?? true;
   }
 
-  toggleClientStatus(): void {
+  async toggleClientStatus(): Promise<void> {
     const client = this.client;
 
     if (!client || this.isUpdatingStatus) {
@@ -463,11 +501,15 @@ export class TrainerClientProfileComponent implements OnInit {
 
     const next = !client.is_active;
     const verb = next ? 'reactivate' : 'suspend';
-    const confirmed = window.confirm(
-      next
-        ? `Reactivate ${client.first_name} ${client.last_name}? They will be able to log in again.`
-        : `Suspend ${client.first_name} ${client.last_name}? They will lose login access until reactivated. No data is deleted.`
-    );
+    const confirmed = await this.confirmation.confirm({
+      kind: next ? 'approve' : 'warning',
+      title: next ? 'Reactivate' : 'Suspend',
+      target: `${client.first_name} ${client.last_name}`,
+      impact: next
+        ? 'The client will be able to log in again.'
+        : 'The client will lose login access until reactivated. No client data is deleted.',
+      confirmLabel: next ? 'Reactivate Client' : 'Suspend Client'
+    });
 
     if (!confirmed) {
       return;
@@ -476,9 +518,7 @@ export class TrainerClientProfileComponent implements OnInit {
     this.isUpdatingStatus = true;
     this.formsGroupsApi.updateClientStatus(client.id, next).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
+        this.replaceClient(response.client);
         this.messageType = 'success';
         this.message = response.message;
         this.isUpdatingStatus = false;
@@ -494,19 +534,20 @@ export class TrainerClientProfileComponent implements OnInit {
   isResettingClient = false;
   isDeletingClient = false;
 
-  resetClient(): void {
+  async resetClient(): Promise<void> {
     const client = this.client;
 
     if (!client || this.isResettingClient) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Reset ${client.first_name} ${client.last_name}?\n\n` +
-        'This clears their assigned templates, all tracking entries, chat history, ' +
-        'reminders, progress notes, additional info, and trainer notes.\n\n' +
-        'Their profile and registration details are kept. This cannot be undone.'
-    );
+    const confirmed = await this.confirmation.confirm({
+      kind: 'warning',
+      title: 'Reset client data for',
+      target: `${client.first_name} ${client.last_name}`,
+      impact: 'Assignments, entries, chat, schedules, progress, additional information, and trainer notes will be cleared. Identity and registration details remain.',
+      confirmLabel: 'Reset Client Data'
+    });
 
     if (!confirmed) {
       return;
@@ -515,9 +556,7 @@ export class TrainerClientProfileComponent implements OnInit {
     this.isResettingClient = true;
     this.formsGroupsApi.resetClient(client.id).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
+        this.replaceClient(response.client);
         this.trainerNotes = '';
         this.notesUpdatedAt = null;
         this.messageType = 'success';
@@ -534,18 +573,20 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  deleteClient(): void {
+  async deleteClient(): Promise<void> {
     const client = this.client;
 
     if (!client || this.isDeletingClient) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Permanently delete ${client.first_name} ${client.last_name}?\n\n` +
-        'This erases ALL of their details — login, profile, templates, entries, chat, ' +
-        'reminders, and notes. This cannot be undone.'
-    );
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Permanently delete',
+      target: `${client.first_name} ${client.last_name}`,
+      impact: 'Login, profile, templates, entries, chat, schedules, and notes will be erased. This cannot be undone.',
+      confirmLabel: 'Delete Client'
+    });
 
     if (!confirmed) {
       return;
@@ -608,7 +649,16 @@ export class TrainerClientProfileComponent implements OnInit {
     this.newInfo = { title: '', type: 'text', visibility: 'private', text: '', link: '', reference_id: '' };
   }
 
-  removeAdditionalItem(item: AdditionalInfoItem): void {
+  async removeAdditionalItem(item: AdditionalInfoItem): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete additional information',
+      target: item.title,
+      impact: 'This item will be removed from the client profile.',
+      confirmLabel: 'Delete Item'
+    });
+    if (!confirmed) return;
+
     this.persistAdditional(this.additionalItems.filter((current) => current.id !== item.id));
   }
 
@@ -629,22 +679,34 @@ export class TrainerClientProfileComponent implements OnInit {
       return;
     }
 
+    const previousClient = this.client;
+    if (!previousClient) {
+      return;
+    }
+
+    this.replaceClient({ ...previousClient, additional_info: items });
     this.isSavingAdditional = true;
-    this.formsGroupsApi.updateClientAdditionalInfo(this.clientId, items).subscribe({
+    this.formsGroupsApi.updateClientAdditionalInfo(this.clientId, items).pipe(
+      finalize(() => (this.isSavingAdditional = false))
+    ).subscribe({
       next: (response) => {
-        if (this.profile) {
-          this.profile.client = response.client;
-        }
-        this.isSavingAdditional = false;
+        this.replaceClient(response.client);
         this.messageType = 'success';
         this.message = response.message;
       },
       error: (error: unknown) => {
+        this.replaceClient(previousClient);
         this.messageType = 'error';
         this.message = formatApiError(error, 'Additional information could not be saved.');
-        this.isSavingAdditional = false;
       }
     });
+  }
+
+  private replaceClient(client: ClientAccessRecord): void {
+    if (this.profile) {
+      this.profile = { ...this.profile, client };
+      this.changeDetector.detectChanges();
+    }
   }
 
   // ----- account dialog -----
@@ -657,14 +719,20 @@ export class TrainerClientProfileComponent implements OnInit {
     this.isAccountDialogOpen = false;
   }
 
-  resetClientPassword(): void {
+  async resetClientPassword(): Promise<void> {
     const client = this.client;
 
     if (!client) {
       return;
     }
 
-    const confirmed = window.confirm(`Reset password for ${client.first_name} ${client.last_name}?`);
+    const confirmed = await this.confirmation.confirm({
+      kind: 'send',
+      title: 'Reset password and send credentials to',
+      target: client.email,
+      impact: 'The client will receive a new temporary password and must change it at next login.',
+      confirmLabel: 'Reset & Send'
+    });
 
     if (!confirmed) {
       return;
@@ -744,12 +812,16 @@ export class TrainerClientProfileComponent implements OnInit {
     });
   }
 
-  unassignTemplate(assignment: TemplateAssignmentRecord, event: Event): void {
+  async unassignTemplate(assignment: TemplateAssignmentRecord, event: Event): Promise<void> {
     event.stopPropagation();
 
-    const confirmed = window.confirm(
-      `Remove ${assignment.template_name} from this client? Past entries are kept, so nothing is lost.`
-    );
+    const confirmed = await this.confirmation.confirm({
+      kind: 'archive',
+      title: 'Remove assigned template',
+      target: assignment.template_name,
+      impact: 'The client will stop seeing this template. Past entries will be retained.',
+      confirmLabel: 'Remove Template'
+    });
 
     if (!confirmed) {
       return;

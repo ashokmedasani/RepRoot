@@ -1,5 +1,9 @@
 # backend/config/urls.py
 
+## 2026-07-13 Admin Portal API namespace
+
+Mounts protected internal APIs beneath `/api/admin/`. These endpoints do not share trainer/client portal routes.
+
 ## What this file does
 
 Defines root URL routing for the Django project.

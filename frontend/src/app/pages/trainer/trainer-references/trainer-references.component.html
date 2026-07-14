@@ -1,47 +1,59 @@
 <app-trainer-page-shell
   title="References / Resources"
+  eyebrow="Trainer library"
   subtitle="Store trainer-owned reusable exercises, nutrition plans, documents, images, links, and notes."
   activeSection="references"
-  maxWidth="72rem"
   titleId="references-title"
 >
-  <div page-actions class="header-actions">
-    <button type="button" class="ghost-action" (click)="addCategory()">+ Create Category</button>
-  </div>
+  <div page-actions class="usage-counter">References Used: {{ referenceUsage().used }} / {{ referenceUsage().limit === null ? 'Unlimited' : referenceUsage().limit }}</div>
 
   @if (message()) {
     <p class="message">{{ message() }}</p>
   }
 
   <section class="references-single" aria-label="References library">
-    <label class="search-box">
-      <span class="visually-hidden">Search references</span>
-      <input type="search" [ngModel]="query()" (ngModelChange)="setSearch($event)" placeholder="Search references...">
-    </label>
+    @if (referenceLimitReached()) {
+      <p class="limit-message">You have reached the Version 1 reference limit.</p>
+    }
+    <div class="search-actions-row">
+      <label class="search-box">
+        <span class="visually-hidden">Search references</span>
+        <input type="search" [ngModel]="query()" (ngModelChange)="setSearch($event)" placeholder="Search references...">
+      </label>
+      <button type="button" class="primary-action" (click)="addCategory()">+ Create Category</button>
+    </div>
 
     @for (category of categories(); track category.id) {
       <div class="cat-accordion">
-        <button type="button" class="cat-header" (click)="toggleCategory(category.name)">
-          <span class="cat-caret" [class.open]="isCategoryOpen(category.name)">&rsaquo;</span>
-          <span class="cat-name">{{ category.name }}</span>
-          <strong class="cat-count">{{ categoryCount(category.name) }}</strong>
-        </button>
+        <div class="cat-header">
+          <button type="button" class="cat-expand" (click)="toggleCategory(category.name)" [attr.aria-expanded]="isCategoryOpen(category.name)">
+            <span class="cat-caret" [class.open]="isCategoryOpen(category.name)">&rsaquo;</span>
+            <span class="cat-title-copy">
+              <strong class="cat-name">{{ category.name }}</strong>
+              @if (category.description) { <small>{{ category.description }}</small> }
+            </span>
+          </button>
+          <span class="category-metric">{{ category.subcategories.length }} subcategories</span>
+          <span class="category-metric">{{ categoryCount(category.name) }} references</span>
+          <button type="button" class="ghost-action compact" (click)="editCategory(category)">Edit</button>
+          <button type="button" class="ghost-action compact danger" (click)="deleteCategory(category)">Delete</button>
+        </div>
 
         @if (isCategoryOpen(category.name)) {
           <div class="cat-body">
-            @if (category.description) {
-              <p class="cat-description">{{ category.description }}</p>
-            }
-
             <button type="button" class="ghost-action compact add-subcategory" (click)="addSubcategory(category)">+ Add Subcategory</button>
 
             @for (subcategory of category.subcategories; track subcategory) {
               <section class="subcat-block">
                 <div class="subcat-header">
                   <h3>{{ subcategory }}</h3>
-                  <button type="button" class="primary-action compact" (click)="addReference('Video Link', category, subcategory)">+ Add Reference</button>
+                  <div class="subcat-actions">
+                    <button type="button" class="ghost-action compact danger" (click)="deleteSubcategory(category, subcategory)">Delete</button>
+                    <button type="button" class="primary-action compact" [disabled]="referenceLimitReached()" (click)="addReference('Video Link', category, subcategory)">+ Add Reference</button>
+                  </div>
                 </div>
 
+                <div class="subcategory-references">
                 @for (reference of referencesForCategory(category.name); track reference.id) {
                   @if (reference.subcategory === subcategory) {
               <div class="ref-item" [class.open]="expandedReferenceId() === reference.id">
@@ -63,6 +75,8 @@
                         ></iframe>
                       } @else if (reference.type === 'Image' && reference.fileUrl) {
                         <img [src]="reference.fileUrl" [alt]="reference.title">
+                      } @else if (reference.type === 'Text') {
+                        <div class="text-preview">{{ reference.description || 'No text has been added.' }}</div>
                       } @else {
                         <div class="file-preview">
                           <span>{{ resourceInitial(reference) }}</span>
@@ -71,7 +85,7 @@
                       }
                     </div>
 
-                    @if (reference.description) {
+                    @if (reference.description && reference.type !== 'Text') {
                       <p class="ref-desc">{{ reference.description }}</p>
                     }
 
@@ -107,6 +121,7 @@
                 } @empty {
                   <p class="cat-empty">No references in this subcategory yet.</p>
                 }
+                </div>
               </section>
             } @empty {
               <p class="cat-empty">
@@ -225,7 +240,9 @@
       <form class="editor-panel category-editor" (ngSubmit)="saveCategory()">
         <div class="editor-header">
           <div>
-            <h2 id="category-editor-title">{{ categoryForm.categoryId ? 'Add Subcategory' : 'Create Category' }}</h2>
+            <h2 id="category-editor-title">
+              {{ categoryEditorMode() === 'create' ? 'Create Category' : (categoryEditorMode() === 'edit' ? 'Edit Category' : 'Add Subcategory') }}
+            </h2>
             <p>Use categories to organize trainer-owned reusable resources.</p>
           </div>
           <button type="button" class="icon-button" title="Close" (click)="isCategoryEditorOpen.set(false)">x</button>
@@ -233,7 +250,7 @@
 
         <label>
           <span>Category name</span>
-          <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Exercises" [readonly]="categoryForm.categoryId > 0" required>
+          <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Exercises" [readonly]="categoryEditorMode() === 'subcategory'" required>
         </label>
 
         <label>
@@ -243,11 +260,11 @@
             [(ngModel)]="categoryForm.description"
             name="categoryDescription"
             placeholder="Short description for this category"
-            [readonly]="categoryForm.categoryId > 0"
+            [readonly]="categoryEditorMode() === 'subcategory'"
           ></textarea>
         </label>
 
-        @if (categoryForm.categoryId) {
+        @if (categoryEditorMode() !== 'create') {
           <label>
             <span>Subcategory <small>Optional</small></span>
             <textarea
@@ -256,7 +273,7 @@
               name="categorySubcategories"
               placeholder="Back Exercises&#10;Chest Exercises&#10;Leg Exercises"
             ></textarea>
-            <small>Add one per line or separate with commas.</small>
+            <small>{{ categoryEditorMode() === 'edit' ? 'Edit the full subcategory list.' : 'Add one per line or separate with commas.' }}</small>
           </label>
         }
 

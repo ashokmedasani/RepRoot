@@ -1,7 +1,17 @@
-# CoachFlow Mobile (Ionic + Capacitor)
+# CoachFlow Android (Ionic + Capacitor)
 
-One app, two experiences: Trainer workspace and Client portal, role-chosen at launch.
+One Android app with two experiences: Trainer workspace and Client portal, role-chosen at launch.
 Full design blueprint: `../Documentation/MOBILE_APP_DESIGN.md`.
+
+Implemented trainer areas: Dashboard, Clients, Client Detail (notes, schedules,
+progress history, and shared details), Forms & Groups, Templates, Profile,
+References, Settings, percentage-only storage usage, structured support requests,
+and logout.
+
+Implemented client areas: Dashboard KPIs, Programs/templates and entry
+submission, Progress charts from real numeric/rating entries, Trainer Profile,
+Chat, Settings, password change, legal information, structured bug/feedback
+requests, account deletion request/withdrawal, and logout.
 
 ## Quick start
 
@@ -15,12 +25,20 @@ Set your backend URL in `src/environments/environment.ts` first:
 - Android emulator: `http://10.0.2.2:8000`
 - Real device: `http://<your-PC-LAN-IP>:8000`
 
-## Native builds (needs Android Studio / Xcode)
+## Android build (needs Android Studio)
 
 ```bash
 npm run build
-npx cap add android
-npx cap add ios
-npx cap sync
-npx cap open android
+npm run android:sync
+npm run android:open
 ```
+
+The Android project lives in `android/`. No iOS platform is included. For a
+physical device, keep the phone and backend PC on the same Wi-Fi and update
+`src/environments/environment.ts` if the PC IPv4 address changes.
+
+The debug APK is produced at
+`android/app/build/outputs/apk/debug/app-debug.apk`. Android builds require
+Android Studio's bundled JDK 17/21 and an installed Android SDK. The project
+uses `android/local.properties` for the local SDK path; do not commit that
+machine-specific file.

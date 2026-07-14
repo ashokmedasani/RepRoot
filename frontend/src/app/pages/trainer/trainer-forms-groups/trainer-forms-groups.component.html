@@ -1,11 +1,14 @@
 <app-trainer-page-shell
   title="Forms & Groups"
-  subtitle="Home / Forms & Groups"
+  eyebrow="Trainer workspace"
+  subtitle="Manage enquiries, registration forms, groups, and client onboarding."
   activeSection="forms-groups"
-  maxWidth="92rem"
   titleId="forms-title"
 >
   <button page-actions type="button" class="ghost-action" (click)="loadOverview()">Refresh</button>
+  @if (overview?.groups?.length) {
+    <a page-actions routerLink="/trainer/clients/add" class="primary-action">Add Client</a>
+  }
 
     @if (message) {
       <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
@@ -41,7 +44,7 @@
             <div class="form-name-block">
               <span>Form Name</span>
               <h3>{{ overview.lead_form?.title }}</h3>
-              <p>Share this form link with your potential clients.</p>
+              <p>For unknown potential clients and initial enquiries. Approved leads move into client creation.</p>
             </div>
 
             <div class="form-link-box">
@@ -116,7 +119,8 @@
             </button>
           </div>
 
-          <div class="table-wrap">
+          <app-fixed-height-list [visibleRows]="6">
+            <div class="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -158,14 +162,15 @@
                 }
               </tbody>
             </table>
-          </div>
+            </div>
+          </app-fixed-height-list>
         </section>
 
         <section class="panel groups-panel" aria-labelledby="groups-title">
           <div class="section-heading">
             <div>
               <h2 id="groups-title">Groups</h2>
-              <p>Organize your clients into groups based on their goals or programs.</p>
+              <p>Organize clients and share group registration forms with known or already accepted clients.</p>
             </div>
             <a routerLink="/trainer/groups/create" class="primary-action group-create-action">Create Group</a>
           </div>
@@ -182,7 +187,7 @@
                   <span class="status-pill">Active</span>
                 </div>
                 <div class="group-actions">
-                  <span>{{ group.has_registration_form ? 'Client creation form ready' : 'Client creation form needed' }}</span>
+                  <span>{{ group.has_registration_form ? 'Group registration form ready' : 'Group registration form needed' }}</span>
                   <a [routerLink]="['/trainer/groups', group.id]" class="ghost-action">Open group</a>
                   <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
                 </div>

@@ -1,5 +1,9 @@
 # angular.json
 
+## 2026-07-13 production audit
+
+Production component-style budgets now match the current application scale while retaining a 24 kB hard failure threshold. Audited CommonJS transitive dependencies required by PDF/canvas export are explicitly declared so production builds still surface new, unexpected optimization fallbacks.
+
 ## What this file does
 
 Configures the Angular application project, build target, serve target, assets, and global styles.

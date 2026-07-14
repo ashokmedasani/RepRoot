@@ -32,3 +32,7 @@ No business logic lives here. Shared photo and profile-header styles support the
 ## Future improvement notes
 
 Move shared UI primitives into a component library or design-system layer as the app grows.
+
+## 2026-07-13 visual consistency pass
+
+Aligned this file with the shared Dashboard-style page header, portal navigation, action controls, and unclipped profile-image treatment. Verified at port 4400 with no horizontal overflow and covered by the production Angular build.

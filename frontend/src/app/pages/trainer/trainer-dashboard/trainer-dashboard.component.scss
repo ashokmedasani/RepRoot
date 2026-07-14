@@ -36,7 +36,7 @@ p {
 /* ---- KPI cards ---- */
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.85rem;
   margin-bottom: 1.5rem;
 }
@@ -44,12 +44,12 @@ p {
 .kpi-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
   background: var(--app-card-bg-gradient);
   box-shadow: var(--app-shadow-sm);
-  padding: 1.1rem 1.25rem;
+  padding: 1rem;
   transition: all var(--app-transition-normal);
   animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -64,8 +64,8 @@ p {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 3.1rem;
-  height: 3.1rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: var(--app-radius-lg);
   transition: transform var(--app-transition-fast);
 }
@@ -173,60 +173,115 @@ p {
   height: 1.4rem;
 }
 
-.sched-tiles {
+.tracking-visuals {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.8fr);
+  gap: 1rem;
+  align-items: stretch;
+  margin-bottom: 1rem;
+}
+
+.tracking-visuals app-chart-renderer {
+  min-width: 0;
+}
+
+.attention-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.attention-row-heading span {
+  color: var(--app-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
+}
+
+.attention-row-heading strong {
+  border-radius: var(--app-radius-pill);
+  padding: 0.25rem 0.6rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.72rem;
+}
+
+.attention-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
 
-.sched-tile {
+.attention-kpi {
   display: grid;
-  gap: 0.25rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 0.75rem;
+  align-items: center;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
-  padding: 0.9rem;
-  background: var(--app-surface-soft);
-  text-align: center;
-  transition: all var(--app-transition-fast);
+  padding: 0.85rem 0.95rem;
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow-sm);
+  transition: transform var(--app-transition-fast), border-color var(--app-transition-fast), box-shadow var(--app-transition-fast);
 }
 
-.sched-tile:hover {
-  border-color: color-mix(in srgb, var(--app-primary) 20%, var(--app-border));
+.attention-kpi:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--app-primary) 35%, var(--app-border));
+  box-shadow: var(--app-shadow);
 }
 
-.sched-tile strong {
-  color: var(--app-text);
-  font-size: 1.55rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.sched-tile span {
+.attention-kpi span {
   color: var(--app-muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 0.66rem;
+  font-weight: 800;
   letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
 }
 
-.sched-tile.total {
-  border-color: color-mix(in srgb, var(--app-primary) 30%, var(--app-border));
-  background: var(--app-primary-soft);
+.attention-kpi strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--app-text);
+  font-size: 1.8rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.sched-tile.total strong {
+.attention-kpi small {
+  color: var(--app-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.attention-kpi.overdue:not(.clear) {
+  border-color: color-mix(in srgb, #d92d20 38%, var(--app-border));
+  background: color-mix(in srgb, #d92d20 7%, var(--app-surface));
+}
+
+.attention-kpi.overdue:not(.clear) strong {
+  color: #b42318;
+}
+
+.attention-kpi.urgent:not(.clear) {
+  border-color: color-mix(in srgb, #f79009 40%, var(--app-border));
+  background: color-mix(in srgb, #f79009 8%, var(--app-surface));
+}
+
+.attention-kpi.urgent:not(.clear) strong {
+  color: #b54708;
+}
+
+.attention-kpi.review:not(.clear) strong {
   color: var(--app-primary-strong);
 }
 
-.sched-tile.alert {
-  border-color: color-mix(in srgb, #b54708 30%, var(--app-border));
-  background: color-mix(in srgb, #f79009 10%, var(--app-surface-soft));
-}
-
-.sched-tile.alert strong {
-  color: #b54708;
+.attention-kpi.clear strong,
+.attention-kpi.completed strong {
+  color: var(--app-success);
 }
 
 .upcoming-trigger {
@@ -250,6 +305,36 @@ p {
   background: color-mix(in srgb, var(--app-surface-soft) 85%, var(--app-text));
 }
 
+.activity-queue-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  padding: 0.25rem;
+  background: var(--app-surface-soft);
+}
+
+.activity-queue-tabs button {
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  color: var(--app-muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.activity-queue-tabs button.active {
+  background: var(--app-primary);
+  color: #fff;
+}
+
+.activity-queue-tabs span {
+  margin-left: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Upcoming schedules table ---- */
 .sched-table-wrap {
   margin-top: 1rem;
@@ -266,6 +351,9 @@ p {
 }
 
 .sched-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--app-border);
   color: var(--app-muted);
@@ -291,6 +379,37 @@ p {
 
 .sched-table tbody tr:hover td {
   background: var(--app-surface-soft);
+}
+
+.sched-table .schedule-group-row td {
+  padding: 0.48rem 1rem;
+  background: color-mix(in srgb, var(--app-primary) 7%, var(--app-surface));
+  color: var(--app-primary-strong);
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
+}
+
+.sched-table .schedule-group-row td strong {
+  display: inline-grid;
+  min-width: 1.5rem;
+  margin-left: 0.45rem;
+  border-radius: var(--app-radius-pill);
+  padding: 0.1rem 0.4rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  text-align: center;
+}
+
+.sched-table .schedule-group-row.overdue-group td {
+  background: color-mix(in srgb, #d92d20 8%, var(--app-surface));
+  color: #b42318;
+}
+
+.sched-table .schedule-group-row.overdue-group td strong {
+  background: color-mix(in srgb, #d92d20 12%, var(--app-surface));
+  color: #b42318;
 }
 
 .sched-table strong {
@@ -328,6 +447,21 @@ p {
   border: 1px solid color-mix(in srgb, var(--app-primary) 15%, transparent);
 }
 
+.when-chip.overdue {
+  border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
+  background: color-mix(in srgb, #d92d20 9%, var(--app-surface-soft));
+  color: #b42318;
+}
+
+.edit-chip {
+  white-space: nowrap;
+}
+
+.note-cell {
+  max-width: 20rem;
+  overflow-wrap: anywhere;
+}
+
 .actions-col {
   white-space: nowrap;
 }
@@ -341,14 +475,30 @@ p {
 }
 
 @media (max-width: 900px) {
-  .sched-tiles {
+  .kpi-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracking-visuals {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .attention-kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 620px) {
-  .sched-tiles {
-    grid-template-columns: 1fr 1fr;
+  .kpi-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-visuals {
+    grid-template-columns: 1fr;
+  }
+
+  .attention-kpi-row {
+    grid-template-columns: 1fr;
   }
 
   .sched-table thead {
@@ -369,6 +519,22 @@ p {
     padding: 0.5rem 0.75rem;
     margin-bottom: 0.75rem;
     background: var(--app-surface-soft);
+  }
+
+  .sched-table tr.schedule-group-row {
+    border: 0;
+    border-radius: var(--app-radius-md);
+    padding: 0;
+    margin: 0.75rem 0 0.4rem;
+  }
+
+  .sched-table tr.schedule-group-row td {
+    display: block;
+    padding: 0.55rem 0.75rem;
+  }
+
+  .sched-table tr.schedule-group-row td::before {
+    content: none;
   }
 
   .sched-table td {

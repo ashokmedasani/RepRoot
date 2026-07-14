@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
 import {
@@ -23,9 +23,13 @@ import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../
 import { ReferencesAccordionComponent } from '../../../shared/references-accordion/references-accordion.component';
 import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ClientPageShellComponent } from '../../../shared/client-page-shell/client-page-shell.component';
+import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+import { SupportIncidentsComponent } from '../../../shared/support-incidents/support-incidents.component';
 
 type PortalTab = 'details' | 'trainer' | 'templates';
-type TrainerTab = 'profile' | 'chat';
+type TrainerTab = 'profile' | 'chat' | 'additional-details';
 type TemplateTab = 'overview' | 'references' | 'data-entry' | 'progress';
 
 interface EntryDraft {
@@ -38,12 +42,15 @@ interface EntryDraft {
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [ChartRendererComponent, ChatPanelComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink],
+  imports: [ChartRendererComponent, ChatPanelComponent, ClientPageShellComponent, DatePipe, FormsModule, PasswordInputComponent, ReferencesAccordionComponent, RouterLink, SupportIncidentsComponent],
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
 export class ClientProfileComponent implements OnInit {
   private readonly clientApi = inject(ClientApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   client: ClientAccessRecord | null = null;
   me: ClientMeResponse | null = null;
@@ -59,15 +66,21 @@ export class ClientProfileComponent implements OnInit {
   message = '';
   messageType: 'success' | 'error' = 'success';
   savingTemplateId = 0;
+  trainerPhotoFailed = false;
 
   changeRequest: ClientDetailChangeRequest | null = null;
   isEditingDetails = false;
   savingDetailEdit = false;
   editAnswers: Record<string, string> = {};
   editNote = '';
+  deletionRequest: ClientDetailChangeRequest | null = null;
+  deletionNote = '';
+  isRequestingDeletion = false;
+  isChangingPassword = false;
+  readonly passwordForm = { currentPassword: '', password: '', confirmPassword: '' };
 
   readonly tabs: { id: PortalTab; label: string }[] = [
-    { id: 'details', label: 'My Details' },
+    { id: 'details', label: 'Settings' },
     { id: 'trainer', label: 'Trainer' },
     { id: 'templates', label: 'Templates' }
   ];
@@ -97,6 +110,18 @@ export class ClientProfileComponent implements OnInit {
     if (this.client && window.sessionStorage.getItem('client-auth-token')) {
       this.loadPortal();
     }
+
+    this.route.queryParamMap.subscribe((params) => {
+      const tab = params.get('tab') as PortalTab | null;
+      const trainerTab = params.get('trainerTab') as TrainerTab | null;
+
+      if (tab && this.tabs.some((item) => item.id === tab)) {
+        this.setTab(tab);
+      }
+      if (trainerTab && this.trainerTabs.some((item) => item.id === trainerTab)) {
+        this.setTrainerTab(trainerTab);
+      }
+    });
   }
 
   signOut(): void {
@@ -329,6 +354,18 @@ export class ClientProfileComponent implements OnInit {
     });
   }
 
+  onTrainerPhotoError(): void {
+    this.trainerPhotoFailed = true;
+  }
+
+  otherRegistrationAnswers(): { label: string; value: string }[] {
+    return this.registrationAnswers().filter((_answer, index) => !this.me?.registration_fields[index]?.is_core);
+  }
+
+  get middleName(): string {
+    return String(this.client?.registration_answers?.['middle_name'] || 'Not added');
+  }
+
   // Fields the client may propose edits to (core identity stays fixed).
   editableFields(): DynamicField[] {
     return (this.me?.registration_fields || []).filter((field) => !field.is_core);
@@ -379,6 +416,74 @@ export class ClientProfileComponent implements OnInit {
     });
   }
 
+  changePassword(): void {
+    const { currentPassword, password, confirmPassword } = this.passwordForm;
+    if (!currentPassword || !password || !confirmPassword) {
+      this.messageType = 'error';
+      this.message = 'Current password, new password, and confirmation are required.';
+      return;
+    }
+    if (password !== confirmPassword) {
+      this.messageType = 'error';
+      this.message = 'New password and confirmation must match.';
+      return;
+    }
+    this.isChangingPassword = true;
+    this.clientApi.changePassword(currentPassword, password, confirmPassword).subscribe({
+      next: (response) => {
+        window.sessionStorage.removeItem('client-access');
+        window.sessionStorage.removeItem('client-auth-token');
+        window.sessionStorage.setItem('client-login-notice', response.message);
+        void this.router.navigate(['/client/login']);
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Password could not be changed.');
+        this.isChangingPassword = false;
+      }
+    });
+  }
+
+  async requestAccountDeletion(): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Request account deletion for',
+      target: this.client ? `${this.client.first_name} ${this.client.last_name}` : 'this account',
+      impact: 'Your trainer must approve this request. Approval disables login and preserves coaching records for audit and continuity.',
+      confirmLabel: 'Send Request'
+    });
+    if (!confirmed) return;
+
+    this.isRequestingDeletion = true;
+    this.clientApi.requestAccountDeletion(this.deletionNote.trim()).subscribe({
+      next: (response) => {
+        this.deletionRequest = response.deletion_request;
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isRequestingDeletion = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Account deletion request could not be sent.');
+        this.isRequestingDeletion = false;
+      }
+    });
+  }
+
+  withdrawAccountDeletionRequest(): void {
+    this.clientApi.withdrawAccountDeletionRequest().subscribe({
+      next: (response) => {
+        this.deletionRequest = null;
+        this.messageType = 'success';
+        this.message = response.message;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'The request could not be withdrawn.');
+      }
+    });
+  }
+
   detailFieldOptions(field: DynamicField): string[] {
     if (field.field_type === 'yes_no') {
       return ['Yes', 'No'];
@@ -416,6 +521,7 @@ export class ClientProfileComponent implements OnInit {
       next: (response) => {
         this.me = response;
         this.client = response.client;
+        this.trainerPhotoFailed = false;
         window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
       },
       error: (error: unknown) => {
@@ -440,6 +546,10 @@ export class ClientProfileComponent implements OnInit {
       error: () => {
         this.changeRequest = null;
       }
+    });
+    this.clientApi.getAccountDeletionRequest().subscribe({
+      next: (response) => (this.deletionRequest = response.deletion_request),
+      error: () => (this.deletionRequest = null)
     });
     this.loadEntries();
     this.loadProgress();

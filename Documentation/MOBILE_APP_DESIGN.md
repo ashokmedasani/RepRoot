@@ -12,7 +12,7 @@
 - The web frontend is Angular 20; Ionic Angular reuses the exact same language, DI, router, and HttpClient patterns.
 - The six API services in `frontend/src/app/core/api/` are plain HttpClient classes — they were copied into the mobile app nearly verbatim (`mobile/src/app/core/api/`).
 - Capacitor wraps the built web bundle in a native shell; `npx cap add android` / `npx cap add ios` produce real store-ready projects.
-- Chart.js (already used on web) renders in the mobile webview unchanged, so the analytics module ports directly in Phase 2.
+- Mobile progress charts are rendered from the same measurable template entries as the web application; the Android build is the only native target for this release.
 
 ## 2. Project layout
 
@@ -139,7 +139,7 @@ Account rows, registration details (read-only + "Request an edit" → trainer ap
 | Phase | Scope | Status |
 | --- | --- | --- |
 | **1. Scaffold** | Project, theme, API services, role chooser, both logins, trainer Dashboard + Clients (live data), client Templates + Add Entry (live data), stubs for every other screen | ✅ this delivery |
-| **2. Trainer screens** | Forms & Groups flows, client workspace segments, template detail (charts via chart.js), references, profile, settings | you / next sessions |
+| **Trainer screens** | Forms & Groups flows, client workspace details, template detail, references, profile, settings, and support requests | Android release scope |
 | **3. Client screens** | Trainer profile tab, chat, My Details incl. edit requests | you / next sessions |
 | **4. Native polish** | `@capacitor/preferences` token storage, push notifications for reminders/chat, camera plugin for photos, app icons/splash, store builds | later |
 

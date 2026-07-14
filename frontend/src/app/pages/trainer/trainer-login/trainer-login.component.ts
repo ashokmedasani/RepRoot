@@ -61,7 +61,7 @@ export class TrainerLoginComponent {
     this.trainerAuthApi.getProfileStatus().subscribe({
       next: (response) => {
         this.isSubmitting = false;
-        void this.router.navigate([response.profile_setup_completed ? '/trainer/profile' : '/trainer/profile-setup']);
+        void this.router.navigate([response.profile_setup_completed ? '/trainer/dashboard' : '/trainer/profile-setup']);
       },
       error: (error: unknown) => {
         this.loginMessage = this.formatApiError(error, 'Login succeeded, but profile status could not be checked.');

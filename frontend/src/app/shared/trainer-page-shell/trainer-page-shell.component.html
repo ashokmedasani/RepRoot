@@ -54,6 +54,22 @@
       </a>
     </nav>
 
+    <section class="data-usage" aria-label="Total trainer data usage" title="Trainer-owned records, uploaded files, and client content">
+      <div
+        class="usage-gauge"
+        [style.--usage-percent]="dataUsagePercent"
+        role="img"
+        [attr.aria-label]="dataUsagePercent + '% of trainer storage used'"
+      >
+        <span>{{ dataUsagePercent | number: '1.0-1' }}%</span>
+      </div>
+      <span class="usage-copy">
+        <small>Data usage</small>
+        <strong>{{ isUnlimitedStorage ? 'Unlimited Storage' : (dataUsagePercent | number: '1.0-1') + '%' }}</strong>
+        <em>{{ isUnlimitedStorage ? 'plan' : 'used' }}</em>
+      </span>
+    </section>
+
     <button type="button" class="signout" [disabled]="isSigningOut" (click)="signOut()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 7l-5 5 5 5M5 12h11"/>

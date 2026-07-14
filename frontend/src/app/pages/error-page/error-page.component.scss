@@ -1,0 +1,125 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 15%, color-mix(in srgb, var(--app-primary-soft) 78%, transparent), transparent 30rem),
+    var(--app-bg);
+}
+
+.error-page {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--app-text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border-radius: var(--app-radius-md);
+  background: var(--app-primary);
+  color: #fff;
+  box-shadow: var(--app-shadow);
+}
+
+.error-panel {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+  min-height: calc(100vh - 9rem);
+  padding: clamp(2rem, 6vw, 5rem);
+}
+
+.error-visual {
+  position: relative;
+  display: grid;
+  width: min(20rem, 100%);
+  aspect-ratio: 1;
+  place-items: center;
+  justify-self: center;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 24%, var(--app-border));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--app-primary-soft) 65%, var(--app-surface));
+  box-shadow: var(--app-shadow-lg);
+}
+
+.error-code {
+  position: relative;
+  z-index: 1;
+  color: var(--app-primary-strong);
+  font-size: clamp(3.5rem, 9vw, 6.5rem);
+  font-weight: 850;
+  letter-spacing: -0.07em;
+}
+
+.error-pulse {
+  position: absolute;
+  inset: 13%;
+  border: 1px dashed color-mix(in srgb, var(--app-primary) 38%, transparent);
+  border-radius: 50%;
+}
+
+.error-copy {
+  max-width: 37rem;
+}
+
+.error-copy h1 {
+  max-width: 34rem;
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: -0.04em;
+}
+
+.error-message {
+  margin: 1.15rem 0 0;
+  color: var(--app-muted);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.support-copy {
+  margin: 1.5rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 760px) {
+  .error-panel {
+    grid-template-columns: 1fr;
+    align-content: center;
+    min-height: auto;
+    padding: 4rem 0;
+    text-align: center;
+  }
+
+  .error-visual {
+    width: min(14rem, 65vw);
+  }
+
+  .error-copy {
+    margin: 0 auto;
+  }
+
+  .error-actions {
+    justify-content: center;
+  }
+}

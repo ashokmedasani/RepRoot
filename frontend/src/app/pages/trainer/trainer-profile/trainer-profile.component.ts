@@ -25,8 +25,12 @@ export class TrainerProfileComponent implements OnInit {
   profile: TrainerProfile | null = null;
   previewAsClient = false;
   visibility: TrainerProfileVisibility = {
+    professional_headline: false,
     about: false,
     professional_summary: false,
+    specializations: false,
+    experience: false,
+    languages: false,
     training_style: false,
     certification: false,
     images: false,
@@ -61,13 +65,27 @@ export class TrainerProfileComponent implements OnInit {
   }
 
   get links(): { label: string; url: string }[] {
-    return (this.profile?.profile_links || [])
+    const links = (this.profile?.profile_links || [])
       .filter((link) => link.title && link.url)
       .map((link) => ({ label: link.title, url: link.url }));
+    const legacyLinks = [
+      { label: 'Website', url: this.profile?.website_url || '' },
+      { label: 'Instagram', url: this.profile?.instagram_url || '' },
+      { label: 'YouTube', url: this.profile?.youtube_url || '' },
+      { label: 'Introduction video', url: this.profile?.intro_video_url || '' }
+    ];
+    const existingUrls = new Set(links.map((link) => link.url));
+    return [...links, ...legacyLinks.filter((link) => link.url && !existingUrls.has(link.url))];
   }
 
   get images(): { category: string; title: string; url: string }[] {
-    return (this.profile?.profile_images || []).filter((image) => image.title && image.url);
+    const images = (this.profile?.profile_images || []).filter((image) => image.title && image.url);
+    const legacyImages = [
+      { category: 'Transformation Photos', title: 'Transformation photo', url: this.profile?.transformation_photo_url || '' },
+      { category: 'Training', title: 'Training photo', url: this.profile?.training_photo_url || '' }
+    ];
+    const existingUrls = new Set(images.map((image) => image.url));
+    return [...images, ...legacyImages.filter((image) => image.url && !existingUrls.has(image.url))];
   }
 
   togglePreview(): void {

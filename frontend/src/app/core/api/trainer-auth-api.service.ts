@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { finalize, Observable, shareReplay } from 'rxjs';
 
 declare global {
   interface Window {
@@ -75,6 +75,77 @@ export interface TrainerProfileStatusResponse {
   profile_setup_completed: boolean;
 }
 
+export interface TrainerDataUsageResponse {
+  plan_code: 'starter' | 'premium';
+  plan_name: string;
+  plan_limits: Record<string, number | null>;
+  total_bytes: number;
+  database_bytes: number;
+  file_bytes: number;
+  quota_bytes: number;
+  usage_percent: number;
+  record_count: number;
+  sections: Record<string, TrainerDataUsageSection>;
+  featured_client: TrainerClientDataUsage | null;
+}
+
+export interface TrainerDataUsageSection {
+  database_bytes: number;
+  file_bytes: number;
+  total_bytes: number;
+  record_count: number;
+}
+
+export interface SupportIncidentMessage {
+  id: number;
+  author_type: 'user' | 'support';
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface SupportIncident {
+  id: number;
+  incident_id: string;
+  reporter_role: 'trainer' | 'client';
+  reporter_name: string;
+  reporter_email: string;
+  category: string;
+  subject: string;
+  description: string;
+  page_feature: string;
+  platform: 'web' | 'android';
+  app_version: string;
+  device_info: string;
+  screenshot_url: string;
+  priority: string;
+  status: string;
+  assigned_support_name: string;
+  resolution_note: string;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: SupportIncidentMessage[];
+}
+
+export interface SupportIncidentListResponse {
+  incidents: SupportIncident[];
+  active_count: number;
+  active_limit: number;
+}
+
+export interface TrainerClientDataUsage {
+  id: number;
+  reference_id: string;
+  username: string;
+  name: string;
+  total_bytes: number;
+  database_bytes: number;
+  file_bytes: number;
+  record_count: number;
+  sections: Record<string, TrainerDataUsageSection>;
+}
+
 export interface TrainerProfile {
   email: string;
   username: string;
@@ -125,8 +196,12 @@ export interface TrainerProfileLink {
 }
 
 export interface TrainerProfileVisibility {
+  professional_headline: boolean;
   about: boolean;
   professional_summary: boolean;
+  specializations: boolean;
+  experience: boolean;
+  languages: boolean;
   training_style: boolean;
   certification: boolean;
   images: boolean;
@@ -141,6 +216,7 @@ export interface TrainerProfileSaveResponse {
 @Injectable({ providedIn: 'root' })
 export class TrainerAuthApiService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
+  private dataUsageRequest$?: Observable<TrainerDataUsageResponse>;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -199,7 +275,7 @@ export class TrainerAuthApiService {
       {
         headers: this.getAuthHeaders()
       }
-    );
+    ).pipe(finalize(() => (this.dataUsageRequest$ = undefined)));
   }
 
   deleteAccount(): Observable<MessageResponse> {
@@ -208,10 +284,11 @@ export class TrainerAuthApiService {
     });
   }
 
-  changePassword(password: string, confirmPassword: string): Observable<MessageResponse> {
+  changePassword(currentPassword: string, password: string, confirmPassword: string): Observable<MessageResponse> {
     return this.http.post<MessageResponse>(
       `${this.apiBaseUrl}/trainer/account/change-password/`,
       {
+        current_password: currentPassword,
         password,
         confirm_password: confirmPassword
       },
@@ -225,6 +302,50 @@ export class TrainerAuthApiService {
     return this.http.get<TrainerProfileStatusResponse>(`${this.apiBaseUrl}/trainer/profile/status/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  getDataUsage(): Observable<TrainerDataUsageResponse> {
+    if (!this.dataUsageRequest$) {
+      this.dataUsageRequest$ = this.http.get<TrainerDataUsageResponse>(`${this.apiBaseUrl}/trainer/data-usage/`, {
+        headers: this.getAuthHeaders()
+      }).pipe(shareReplay({ bufferSize: 1, refCount: false }));
+    }
+
+    return this.dataUsageRequest$;
+  }
+
+  getSupportIncidents(): Observable<SupportIncidentListResponse> {
+    return this.http.get<SupportIncidentListResponse>(`${this.apiBaseUrl}/trainer/support/incidents/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  createSupportIncident(payload: {
+    category: string;
+    subject: string;
+    description: string;
+    page_feature: string;
+    platform: 'web' | 'android';
+    app_version: string;
+    device_info?: string;
+    screenshot?: File | null;
+  }): Observable<{ incident: SupportIncident; message: string }> {
+    const form = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value instanceof File) form.append(key, value);
+      else if (value !== null && value !== undefined) form.append(key, String(value));
+    });
+    return this.http.post<{ incident: SupportIncident; message: string }>(`${this.apiBaseUrl}/trainer/support/incidents/`, form, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  actOnSupportIncident(incidentId: string, action: 'follow_up' | 'reopen', body = ''): Observable<{ incident: SupportIncident; message: string }> {
+    return this.http.post<{ incident: SupportIncident; message: string }>(
+      `${this.apiBaseUrl}/trainer/support/incidents/${encodeURIComponent(incidentId)}/`,
+      { action, body },
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   getProfile(): Observable<TrainerProfile> {
@@ -276,6 +397,6 @@ export class TrainerAuthApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return 'http://127.0.0.1:8000/api/accounts';
+    return `http://${window.location.hostname}:8000/api/accounts`;
   }
 }

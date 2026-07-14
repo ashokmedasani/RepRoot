@@ -7,9 +7,12 @@ import {
   ClientAccessRecord,
   DynamicField,
   FormsGroupsApiService,
+  GroupRegistrationSubmission,
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
 
 type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'settings';
@@ -17,16 +20,18 @@ type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'settings'
 @Component({
   selector: 'app-trainer-group-users',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent],
+  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent, FixedHeightListComponent],
   templateUrl: './trainer-group-users.component.html',
   styleUrl: './trainer-group-users.component.scss'
 })
 export class TrainerGroupUsersComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   group: TrainerGroup | null = null;
   clients: ClientAccessRecord[] = [];
+  registrationSubmissions: GroupRegistrationSubmission[] = [];
   isLoading = true;
   message = '';
   messageType: 'success' | 'error' = 'success';
@@ -95,12 +100,18 @@ export class TrainerGroupUsersComponent implements OnInit {
     return this.registrationFields.filter((field) => !field.is_core);
   }
 
+  get registrationLink(): string {
+    const slug = this.group?.registration_form?.public_slug;
+    return slug ? `${window.location.origin}/public/group-registration/${slug}` : '';
+  }
+
   loadGroup(groupId: number): void {
     this.isLoading = true;
     this.formsGroupsApi.getGroupUsers(groupId).subscribe({
       next: (response) => {
         this.group = response.group;
         this.clients = response.clients;
+        this.registrationSubmissions = response.registration_submissions || [];
         this.groupDraft = {
           name: response.group.name,
           description: response.group.description || ''
@@ -148,8 +159,14 @@ export class TrainerGroupUsersComponent implements OnInit {
     this.isSettingsOpen = !this.isSettingsOpen;
   }
 
-  resetClientPassword(client: ClientAccessRecord): void {
-    const confirmed = window.confirm(`Reset password for ${client.first_name} ${client.last_name}?`);
+  async resetClientPassword(client: ClientAccessRecord): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'warning',
+      title: 'Reset password for',
+      target: `${client.first_name} ${client.last_name}`,
+      impact: `A new temporary password will be generated and sent to ${client.email}. The client must change it at next login.`,
+      confirmLabel: 'Reset Password'
+    });
 
     if (!confirmed) {
       return;
@@ -167,6 +184,16 @@ export class TrainerGroupUsersComponent implements OnInit {
         this.message = formatApiError(error, 'Client password could not be reset.');
       }
     });
+  }
+
+  copyRegistrationLink(): void {
+    if (!this.registrationLink) {
+      return;
+    }
+
+    void navigator.clipboard.writeText(this.registrationLink);
+    this.messageType = 'success';
+    this.message = 'Group registration form link copied.';
   }
 
   initials(client: ClientAccessRecord): string {

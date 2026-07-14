@@ -1,11 +1,11 @@
 <app-trainer-page-shell
   title="Create the client creation form"
   eyebrow="Step 3"
+  subtitle="Choose the registration information collected for clients joining this group."
   activeSection="forms-groups"
-  maxWidth="72rem"
   titleId="client-form-title"
 >
-    <a page-actions class="ghost-link" routerLink="/trainer/forms-groups">Back to dashboard</a>
+    <a page-actions class="secondary-action" routerLink="/trainer/forms-groups">Back to Forms &amp; Groups</a>
 
     @if (isLoading) {
       <p class="message">Loading client form builder...</p>

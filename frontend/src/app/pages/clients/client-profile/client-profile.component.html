@@ -1,44 +1,15 @@
-<main class="client-page">
-  <header class="client-topbar">
-    <a routerLink="/" class="brand">CoachFlow Studio</a>
-    @if (client) {
-      <button type="button" (click)="signOut()">Sign out</button>
-    }
-  </header>
-
+<app-client-page-shell
+  [title]="activeTab === 'details' ? 'Settings' : activeTab === 'templates' ? 'Templates' : 'Trainer'"
+  [eyebrow]="activeTab === 'details' ? 'Client settings' : activeTab === 'templates' ? 'Client templates' : 'Your trainer'"
+  [subtitle]="activeTab === 'details' ? 'Manage your profile, security, account requests, and legal information.' : activeTab === 'templates' ? 'Complete assigned check-ins and review your progress.' : 'View trainer information, shared details, and conversations.'"
+  [activeSection]="activeTab === 'details' ? 'settings' : activeTab === 'templates' ? 'templates' : trainerTab === 'chat' ? 'trainer-chat' : 'trainer-profile'"
+>
   @if (client) {
-    <section class="profile-card">
-      <div class="profile-head">
-        <label class="dp-avatar" title="Upload your photo">
-          @if (client.photo) {
-            <img [src]="client.photo" alt="Your photo">
-          } @else {
-            <span>{{ (client.first_name || '?').charAt(0) }}{{ (client.last_name || '').charAt(0) }}</span>
-          }
-          <span class="dp-edit">Photo</span>
-          <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="visually-hidden">
-        </label>
-        <div>
-          <p class="eyebrow">Client Portal</p>
-          <h1>Welcome, {{ client.first_name }} {{ client.last_name }}</h1>
-          <p>Record progress, review your assigned templates, and stay connected with your trainer.</p>
-        </div>
-      </div>
-    </section>
-
     @if (message) {
       <p class="portal-message" [class.error-message]="messageType === 'error'">{{ message }}</p>
     }
 
     <section class="client-portal-layout">
-      <nav class="portal-top-tabs" aria-label="Client portal navigation">
-        <button type="button" [class.active]="activeTab === 'templates'" (click)="setTab('templates')">
-          My Templates <span class="tab-count">{{ templates.length }}</span>
-        </button>
-        <button type="button" [class.active]="activeTab === 'trainer'" (click)="setTab('trainer')">Trainer</button>
-        <button type="button" [class.active]="activeTab === 'details'" (click)="setTab('details')">My Details</button>
-      </nav>
-
       <div class="client-content">
       @if (activeTab === 'templates' && templates.length > 1) {
         <div class="template-chips" role="group" aria-label="Choose a template">
@@ -51,34 +22,34 @@
       }
 
     @if (activeTab === 'details') {
-      <section class="portal-card">
-        <h2>Account</h2>
-        <div class="detail-grid">
-          <article>
-            <span>Username</span>
-            <strong>{{ client.username }}</strong>
-          </article>
-          <article>
-            <span>Email</span>
-            <strong>{{ client.email }}</strong>
-          </article>
-          <article>
-            <span>Trainer</span>
-            <strong>{{ client.trainer_name }}</strong>
-          </article>
-          <article>
-            <span>Group</span>
-            <strong>{{ client.group_name }}</strong>
-          </article>
-        </div>
-      </section>
-
-      <section class="portal-card">
+      <section class="portal-card client-information">
         <div class="card-header">
           <div>
-            <h2>My Details</h2>
-            <p>What you and your trainer recorded when your account was created.</p>
+            <h2>Client Information</h2>
+            <p>Your account identity and group registration details.</p>
           </div>
+          <label class="dp-avatar compact-avatar" title="Upload your photo">
+            @if (client.photo) { <img [src]="client.photo" alt="Your profile photo"> }
+            @else { <span>{{ (client.first_name || '?').charAt(0) }}{{ (client.last_name || '').charAt(0) }}</span> }
+            <span class="dp-edit">Photo</span>
+            <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="visually-hidden">
+          </label>
+        </div>
+
+        <div class="detail-grid identity-grid">
+          <article><span>First Name</span><strong>{{ client.first_name }}</strong></article>
+          <article><span>Middle Name</span><strong>{{ middleName }}</strong></article>
+          <article><span>Last Name</span><strong>{{ client.last_name }}</strong></article>
+          <article><span>Username</span><strong>{{ client.username }}</strong></article>
+          <article><span>Email</span><strong>{{ client.email }}</strong></article>
+          <article><span>Group</span><strong>{{ client.group_name }}</strong></article>
+          <article><span>Joined Date</span><strong>{{ client.created_at | date: 'mediumDate' }}</strong></article>
+          <article><span>Status</span><strong>{{ client.is_active ? 'Active' : 'Inactive' }}</strong></article>
+          <article><span>Reference ID</span><strong>{{ client.reference_id }}</strong></article>
+        </div>
+
+        <div class="details-heading">
+          <h2>Registration Details</h2>
           @if (!isEditingDetails && !hasPendingChangeRequest && editableFields().length) {
             <button type="button" class="secondary-action" (click)="startDetailEdit()">Request an edit</button>
           }
@@ -97,7 +68,7 @@
 
         @if (!isEditingDetails) {
           <div class="detail-grid answers">
-            @for (answer of registrationAnswers(); track answer.label) {
+            @for (answer of otherRegistrationAnswers(); track answer.label) {
               <article>
                 <span>{{ answer.label }}</span>
                 <strong>{{ answer.value }}</strong>
@@ -139,6 +110,45 @@
           </form>
         }
       </section>
+
+      <section class="portal-card settings-section">
+        <div class="card-header">
+          <div><h2>Security</h2><p>Change your password. You will be signed out after it is updated.</p></div>
+        </div>
+        <form class="settings-form" (ngSubmit)="changePassword()">
+          <label><span>Current password</span><app-password-input name="clientCurrentPassword" autocomplete="current-password" [(ngModel)]="passwordForm.currentPassword" /></label>
+          <label><span>New password</span><app-password-input name="clientNewPassword" autocomplete="new-password" [(ngModel)]="passwordForm.password" /></label>
+          <label><span>Confirm new password</span><app-password-input name="clientConfirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" /></label>
+          <button type="submit" class="primary-action" [disabled]="isChangingPassword">{{ isChangingPassword ? 'Changing...' : 'Change Password' }}</button>
+        </form>
+      </section>
+
+      <section class="portal-card settings-section">
+        <div class="card-header"><div><h2>Privacy & Legal</h2><p>Review the policies that govern your account and coaching information.</p></div></div>
+        <div class="legal-links">
+          <a routerLink="/terms" target="_blank" rel="noopener"><strong>Terms & Conditions</strong><span>Account responsibilities and acceptable use</span></a>
+          <a routerLink="/privacy" target="_blank" rel="noopener"><strong>Privacy Policy</strong><span>How profile, health-context, and activity data are handled</span></a>
+        </div>
+      </section>
+
+      <section class="portal-card settings-section">
+        <app-support-incidents role="client" pageFeature="Client settings" />
+      </section>
+
+      <section class="portal-card settings-section danger-zone">
+        <div class="card-header"><div><h2>Delete Account</h2><p>Deletion requires trainer approval and appears in their action queue.</p></div></div>
+        @if (deletionRequest?.status === 'pending') {
+          <p class="status-banner pending">Your account deletion request is awaiting trainer review.</p>
+          <button type="button" class="ghost-action" (click)="withdrawAccountDeletionRequest()">Withdraw Request</button>
+        } @else if (deletionRequest?.status === 'approved') {
+          <p class="status-banner approved">Your deletion request was approved. Please sign out.</p>
+        } @else if (deletionRequest?.status === 'rejected') {
+          <p class="status-banner rejected">Your last deletion request was declined. {{ deletionRequest?.trainer_note || '' }}</p>
+        } @else {
+          <label><span>Reason for your trainer (optional)</span><textarea rows="3" [(ngModel)]="deletionNote" name="deletionNote" placeholder="Share any context for this request"></textarea></label>
+          <button type="button" class="danger-action" [disabled]="isRequestingDeletion" (click)="requestAccountDeletion()">{{ isRequestingDeletion ? 'Sending...' : 'Request Account Deletion' }}</button>
+        }
+      </section>
     }
 
     @if (activeTab === 'trainer') {
@@ -149,6 +159,15 @@
               {{ tab.label }}
             </button>
           }
+          @if (sharedAdditionalInfo.length) {
+            <button
+              type="button"
+              [class.active]="trainerTab === 'additional-details'"
+              (click)="setTrainerTab('additional-details')"
+            >
+              Additional Details
+            </button>
+          }
         </nav>
       </section>
 
@@ -157,8 +176,12 @@
           <section class="portal-card trainer-card">
             <div class="trainer-head">
               <span class="trainer-avatar">
-                @if (trainer.profile_photo_url) {
-                  <img [src]="trainer.profile_photo_url" alt="Trainer photo">
+                @if (trainer.profile_photo_url && !trainerPhotoFailed) {
+                  <img
+                    [src]="trainer.profile_photo_url"
+                    [alt]="trainer.trainer_name + ' profile photo'"
+                    (error)="onTrainerPhotoError()"
+                  >
                 } @else {
                   {{ trainer.trainer_name.charAt(0) }}
                 }
@@ -254,6 +277,39 @@
             [counterpartName]="client.trainer_name || 'Trainer'"
             description="Send questions, check-in notes, or updates directly to your trainer."
           />
+        </section>
+      }
+
+      @if (trainerTab === 'additional-details' && sharedAdditionalInfo.length) {
+        <section class="portal-card shared-details-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Shared by Trainer</p>
+              <h2>Additional Details</h2>
+              <p>Information and resources your trainer has shared with you.</p>
+            </div>
+          </div>
+
+          <div class="shared-info-list">
+            @for (item of sharedAdditionalInfo; track item.id) {
+              <article class="shared-info-item">
+                <div class="shared-info-copy">
+                  <span class="shared-info-type">{{ item.type }}</span>
+                  <strong>{{ item.title }}</strong>
+                  @if (item.type === 'text' && item.text) {
+                    <p>{{ item.text }}</p>
+                  } @else if (item.type === 'reference' && item.reference_title) {
+                    <p>{{ item.reference_title }}</p>
+                  } @else if (item.type === 'link' && item.link) {
+                    <p>{{ item.link }}</p>
+                  }
+                </div>
+                @if (item.link) {
+                  <button type="button" class="secondary-action compact" (click)="openInfoLink(item)">Open</button>
+                }
+              </article>
+            }
+          </div>
         </section>
       }
     }
@@ -471,8 +527,8 @@
   } @else {
     <section class="profile-card">
       <p class="eyebrow">Client Portal</p>
-      <h1>Please login to continue.</h1>
+      <h2>Please login to continue.</h2>
       <a routerLink="/client/login" class="primary-action">Client Login</a>
     </section>
   }
-</main>
+</app-client-page-shell>

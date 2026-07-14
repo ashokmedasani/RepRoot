@@ -36,3 +36,9 @@ No business logic lives here, but trainer profile country/state dropdowns depend
 ## Future improvement notes
 
 Audit and update dependencies before production deployment.
+
+## 2026-07-13 production audit
+
+Replaces the vulnerable, unmaintained `xlsx` package with the browser-only `write-excel-file` export path. `npm audit` now reports zero known frontend vulnerabilities.
+
+Angular runtime/compiler packages are pinned to the patched 20.3.26 release and the CLI to 20.3.32, removing the nested Babel build-tool advisory while keeping framework peer versions aligned.

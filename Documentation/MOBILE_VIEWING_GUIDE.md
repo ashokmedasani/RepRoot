@@ -28,7 +28,7 @@ The mobile app is web technology inside a native shell, so Chrome can preview it
 3. Open `http://localhost:4400` in Chrome.
 4. Press **F12** → click the **phone icon** (top-left of DevTools, or Ctrl+Shift+M).
    Chrome now shows the app in a phone-sized frame. Pick "iPhone 12" or "Pixel 7" from the dropdown.
-5. Tap "I'm a Trainer" → log in with your normal trainer account → your real data appears.
+5. Choose **Trainer** or **Client** (the role chooser does not show the temporary app name), then log in with your normal account.
 
 That's your mobile app, pixel-for-pixel, minus the native shell.
 

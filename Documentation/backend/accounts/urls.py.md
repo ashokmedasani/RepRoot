@@ -1,5 +1,11 @@
 # backend/accounts/urls.py
 
+## 2026-07-13 targeted refinement
+
+Registers manual client creation, public group registration, and Client Dashboard API routes without replacing existing endpoints.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Defines account, trainer, Forms & Groups, and public form API routes.
@@ -69,3 +75,11 @@ Added `trainer/check-trainer-code/` and `trainer/account/trainer-code/`.
 ## Update 5
 
 Added `client/progress/` for read-only client portal progress notes.
+
+## 2026-07-13 production audit
+
+Added `client/logout/` so client portal sign-out revokes the server-side token instead of only clearing browser state.
+
+## 2026-07-13 trainer data usage
+
+Adds `trainer/data-usage/` for the shared trainer sidebar indicator.

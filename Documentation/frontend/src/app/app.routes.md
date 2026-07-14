@@ -1,5 +1,11 @@
 # frontend/src/app/app.routes.ts
 
+## 2026-07-13 targeted refinement
+
+Adds Client Dashboard, manual client creation, and public group registration routes while preserving compatibility routes.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Defines Angular routes for the application.
@@ -44,9 +50,9 @@ Old trainer access routes redirect to the current route format for compatibility
 - `frontend/src/app/pages/trainer-forms-groups/trainer-forms-groups.component.ts`
 - `frontend/src/app/pages/public-lead-form/public-lead-form.component.ts`
 
-## Future improvement notes
+## Protected-route behavior
 
-Add route guards once dashboard and other protected pages are implemented.
+Trainer portal routes require a trainer token and redirect to Trainer Login when it is absent. Client portal routes require a client token and redirect to Client Login when it is absent. The reusable guards live in `frontend/src/app/core/guards/portal-auth.guards.ts`.
 
 ## Update: templates and client portal routes
 
@@ -60,3 +66,16 @@ Added `trainer/dashboard`; the duplicate `trainer/groups/:groupId/users` route n
 ## Update
 
 Added `trainer/clients/:clientId/templates/:assignmentId` (Template Detail page).
+
+## 2026-07-13 visual consistency pass
+
+Aligned this file with the shared Dashboard-style page header, portal navigation, action controls, and unclipped profile-image treatment. Verified at port 4400 with no horizontal overflow and covered by the production Angular build.
+
+## 2026-07-13 error routes
+
+- `/error` displays safe network, access, service, and runtime failure information.
+- the final wildcard route displays the shared page with dedicated 404 content for unknown application URLs.
+
+## 2026-07-13 Admin Portal Phase 1
+
+Adds protected, separate routes for internal login, aggregate Dashboard, Finance, and Audit Logs. Admin routes do not reuse trainer/client portal authentication.

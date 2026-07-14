@@ -15,35 +15,15 @@
       <label>
         <span class="field-label">
           Trainer code <span class="required">*</span>
-          <button type="button" class="picker-toggle" (click)="toggleDirectory()">
-            {{ showDirectory ? 'Close' : 'Find by name' }}
-          </button>
+          <button type="button" class="picker-toggle" (click)="toggleDirectory()">{{ selectedTrainer ? 'Change Trainer' : 'Find Trainer' }}</button>
         </span>
-        <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Ask your trainer or find by name" required>
-
-        @if (showDirectory) {
-          <div class="trainer-picker">
-            <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Search trainer name or code" autocomplete="off">
-            <div class="picker-list">
-              @if (isLoadingDirectory) {
-                <p class="picker-empty">Loading trainers...</p>
-              } @else {
-                @for (trainer of filteredTrainers; track trainer.trainer_id) {
-                  <button
-                    type="button"
-                    class="picker-item"
-                    [class.selected]="loginForm.trainerCode === trainer.trainer_id"
-                    (click)="selectTrainer(trainer)"
-                  >
-                    <span class="picker-name">{{ trainer.trainer_name }}</span>
-                    <span class="picker-code">{{ trainer.trainer_id }}</span>
-                  </button>
-                } @empty {
-                  <p class="picker-empty">No trainers match your search.</p>
-                }
-              }
-            </div>
+        @if (selectedTrainer) {
+          <div class="selected-trainer">
+            <strong>{{ selectedTrainer.trainer_name }}</strong>
+            <span>{{ selectedTrainer.trainer_id }}</span>
           </div>
+        } @else {
+          <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Enter trainer code or use Find Trainer" required>
         }
       </label>
 
@@ -71,4 +51,44 @@
       </p>
     </form>
   </section>
+
+  @if (showDirectory) {
+    <div class="trainer-modal-backdrop" (click)="cancelDirectory()">
+      <section class="trainer-modal" role="dialog" aria-modal="true" aria-labelledby="trainer-search-title" (click)="$event.stopPropagation()">
+        <header>
+          <div>
+            <p class="eyebrow">Trainer selection</p>
+            <h2 id="trainer-search-title">Find Trainer</h2>
+            <p>Search by trainer code or trainer name.</p>
+          </div>
+          <button type="button" class="modal-close" (click)="cancelDirectory()" aria-label="Close trainer search">&times;</button>
+        </header>
+        <div class="modal-search-row">
+          <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Trainer code or name" autocomplete="off" (keyup.enter)="searchDirectory()">
+          <button type="button" class="primary-action" (click)="searchDirectory()">Search</button>
+        </div>
+        <div class="picker-list">
+          @if (isLoadingDirectory) {
+            <p class="picker-empty">Loading trainers...</p>
+          } @else {
+            @for (trainer of filteredTrainers; track trainer.trainer_id) {
+              <article class="picker-item" [class.selected]="pendingTrainer?.trainer_id === trainer.trainer_id">
+                <div class="picker-identity">
+                  <strong class="picker-name">{{ trainer.trainer_name }}</strong>
+                  <span class="picker-code"><small>Code</small>{{ trainer.trainer_id }}</span>
+                </div>
+                <button type="button" class="ghost-action" (click)="selectTrainer(trainer)">{{ pendingTrainer?.trainer_id === trainer.trainer_id ? 'Selected' : 'Select' }}</button>
+              </article>
+            } @empty {
+              <p class="picker-empty">No trainers match your search.</p>
+            }
+          }
+        </div>
+        <footer>
+          <button type="button" class="ghost-action" (click)="cancelDirectory()">Cancel</button>
+          <button type="button" class="primary-action" [disabled]="!pendingTrainer" (click)="confirmTrainer()">Confirm Selection</button>
+        </footer>
+      </section>
+    </div>
+  }
 </main>

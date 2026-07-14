@@ -39,3 +39,7 @@ PostgreSQL is the confirmed database for Version 1.
 ## Future improvement notes
 
 Pin exact versions after the first stable development environment is approved.
+
+## 2026-07-13 production audit
+
+Adds `django-storages[s3]` for durable production uploads and `redis` for a shared cache/throttle backend. Dependency auditing reported no known Python package vulnerabilities.

@@ -3,35 +3,44 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import {
+  ClientProfileEditActivity,
   ClientReminder,
   FormsGroupsApiService,
   FormsGroupsOverview,
   LeadSubmission
 } from '../../../core/api/forms-groups-api.service';
 import { TemplatesApiService, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
+import { ChartSpec } from '../../../shared/analytics/analytics.types';
+import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-trainer-dashboard',
   standalone: true,
-  imports: [DatePipe, RouterLink, TrainerPageShellComponent],
+  imports: [ChartRendererComponent, DatePipe, RouterLink, TrainerPageShellComponent, FixedHeightListComponent],
   templateUrl: './trainer-dashboard.component.html',
   styleUrl: './trainer-dashboard.component.scss'
 })
 export class TrainerDashboardComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   overview: FormsGroupsOverview | null = null;
   templates: TrackingTemplateRecord[] = [];
   upcomingReminders: ClientReminder[] = [];
+  pendingProfileEdits: ClientProfileEditActivity[] = [];
   scheduleSummary = {
     total_pending: 0,
+    overdue: 0,
     due_24_hours: 0,
-    due_5_days: 0,
     due_7_days: 0,
-    due_10_days: 0,
+    total_completed: 0,
+    completed_last_7_days: 0,
+    pending_profile_edits: 0,
     nearest_date: ''
   };
   maxTemplates = 5;
@@ -39,15 +48,18 @@ export class TrainerDashboardComponent implements OnInit {
   message = '';
   isActivityOpen = false;
   isSchedulesOpen = false;
+  activityQueueView: 'schedules' | 'profile-edits' = 'schedules';
 
   ngOnInit(): void {
     this.formsGroupsApi.getUpcomingReminders().subscribe({
       next: (response) => {
         this.upcomingReminders = response.reminders;
+        this.pendingProfileEdits = response.profile_edits;
         this.scheduleSummary = response.summary;
       },
       error: () => {
         this.upcomingReminders = [];
+        this.pendingProfileEdits = [];
       }
     });
     this.formsGroupsApi.getOverview().subscribe({
@@ -80,11 +92,11 @@ export class TrainerDashboardComponent implements OnInit {
   }
 
   get recentClients(): LeadSubmission[] {
-    return this.allRecentClients.slice(0, 5);
+    return this.allRecentClients;
   }
 
   get recentTemplates(): TrackingTemplateRecord[] {
-    return this.templates.slice(0, 5);
+    return this.templates;
   }
 
   // ----- KPI helpers (weekly deltas computed from real timestamps) -----
@@ -114,9 +126,35 @@ export class TrainerDashboardComponent implements OnInit {
     return this.templates.reduce((sum, template) => sum + (template.assigned_count || 0), 0);
   }
 
+  get clientAttentionChart(): ChartSpec {
+    return {
+      kind: 'bar',
+      title: 'Attention by timeframe',
+      data: [
+        { label: 'Overdue', value: this.scheduleSummary.overdue },
+        { label: 'Next 24 hours', value: this.scheduleSummary.due_24_hours },
+        { label: 'Next 7 days', value: this.scheduleSummary.due_7_days },
+        { label: 'Profile edits', value: this.scheduleSummary.pending_profile_edits }
+      ],
+      meta: { subtitle: 'Open client tracking activity' }
+    };
+  }
+
+  get scheduleStatusChart(): ChartSpec {
+    return {
+      kind: 'pie',
+      title: 'Schedule status',
+      data: [
+        { label: 'Pending', value: this.scheduleSummary.total_pending },
+        { label: 'Completed', value: this.scheduleSummary.total_completed }
+      ],
+      meta: { subtitle: `${this.scheduleSummary.completed_last_7_days} completed in the last 7 days` }
+    };
+  }
+
   /** "In 2 hours", "In 3 days", "Overdue" from a reminder's date + time. */
   relativeTime(dateStr: string, timeStr: string | null): string {
-    const target = new Date(`${dateStr}T${timeStr || '09:00'}`).getTime();
+    const target = this.reminderTimestamp(dateStr, timeStr);
 
     if (Number.isNaN(target)) {
       return '';
@@ -139,12 +177,40 @@ export class TrainerDashboardComponent implements OnInit {
   }
 
   isReminderSoon(dateStr: string, timeStr: string | null): boolean {
-    const target = new Date(`${dateStr}T${timeStr || '09:00'}`).getTime();
-    return !Number.isNaN(target) && target - Date.now() <= 24 * 60 * 60 * 1000;
+    const target = this.reminderTimestamp(dateStr, timeStr);
+    const difference = target - Date.now();
+    return !Number.isNaN(target) && difference >= 0 && difference <= 24 * 60 * 60 * 1000;
   }
 
-  get visibleUpcomingReminders(): ClientReminder[] {
-    return this.upcomingReminders.slice(0, 10);
+  isReminderOverdue(reminder: ClientReminder): boolean {
+    const target = this.reminderTimestamp(reminder.date, reminder.time);
+    return !Number.isNaN(target) && target < Date.now();
+  }
+
+  get organizedScheduleReminders(): ClientReminder[] {
+    return [...this.upcomingReminders].sort((left, right) =>
+      `${left.date}T${left.time || '23:59'}`.localeCompare(`${right.date}T${right.time || '23:59'}`)
+    );
+  }
+
+  get upcomingScheduleCount(): number {
+    return Math.max(0, this.organizedScheduleReminders.length - this.scheduleSummary.overdue);
+  }
+
+  showScheduleGroupHeader(reminder: ClientReminder, index: number): boolean {
+    if (index === 0) {
+      return true;
+    }
+
+    return this.isReminderOverdue(reminder) !== this.isReminderOverdue(this.organizedScheduleReminders[index - 1]);
+  }
+
+  scheduleGroupTitle(reminder: ClientReminder): string {
+    return this.isReminderOverdue(reminder) ? 'Overdue schedules' : 'Upcoming schedules';
+  }
+
+  scheduleGroupCount(reminder: ClientReminder): number {
+    return this.isReminderOverdue(reminder) ? this.scheduleSummary.overdue : this.upcomingScheduleCount;
   }
 
   toggleActivity(): void {
@@ -155,16 +221,81 @@ export class TrainerDashboardComponent implements OnInit {
     this.isSchedulesOpen = !this.isSchedulesOpen;
   }
 
+  showActivityQueue(view: 'schedules' | 'profile-edits'): void {
+    this.activityQueueView = view;
+  }
+
   initialsForSubmission(submission: LeadSubmission): string {
     return initialsFor(submission.first_name, submission.last_name);
   }
 
-  completeReminder(reminder: ClientReminder): void {
+  async completeReminder(reminder: ClientReminder): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'complete',
+      title: 'Mark schedule complete for',
+      target: `${reminder.client_name} - ${reminder.title}`,
+      impact: 'This schedule will move from pending to completed and update the dashboard totals.',
+      confirmLabel: 'Mark Complete'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
     this.formsGroupsApi.updateReminder(reminder.id, { status: 'done' }).subscribe({
       next: () => {
+        const dueAt = this.reminderTimestamp(reminder.date, reminder.time);
+        const difference = dueAt - Date.now();
         this.upcomingReminders = this.upcomingReminders.filter((item) => item.id !== reminder.id);
         this.scheduleSummary.total_pending = Math.max(0, this.scheduleSummary.total_pending - 1);
+        if (difference < 0) {
+          this.scheduleSummary.overdue = Math.max(0, this.scheduleSummary.overdue - 1);
+        } else {
+          if (difference <= 24 * 60 * 60 * 1000) {
+            this.scheduleSummary.due_24_hours = Math.max(0, this.scheduleSummary.due_24_hours - 1);
+          }
+          if (difference <= 7 * 24 * 60 * 60 * 1000) {
+            this.scheduleSummary.due_7_days = Math.max(0, this.scheduleSummary.due_7_days - 1);
+          }
+        }
+        this.scheduleSummary.total_completed += 1;
+        this.scheduleSummary.completed_last_7_days += 1;
+        this.scheduleSummary.nearest_date = this.organizedScheduleReminders.find(
+          (item) => !this.isReminderOverdue(item)
+        )?.date || '';
       }
     });
+  }
+
+  async reviewClientRequest(request: ClientProfileEditActivity, action: 'approve' | 'reject'): Promise<void> {
+    const isDeletion = request.request_type === 'account_deletion';
+    const confirmed = await this.confirmation.confirm({
+      kind: action === 'approve' ? (isDeletion ? 'delete' : 'complete') : 'warning',
+      title: action === 'approve' ? (isDeletion ? 'Approve account deletion for' : 'Approve request for') : 'Decline request for',
+      target: request.client_name,
+      impact: isDeletion && action === 'approve'
+        ? 'The client account will be deactivated immediately and all active client sessions will be revoked.'
+        : `The ${isDeletion ? 'account deletion' : 'profile edit'} request will be ${action === 'approve' ? 'approved' : 'declined'}.`,
+      confirmLabel: action === 'approve' ? 'Approve' : 'Decline'
+    });
+    if (!confirmed) return;
+
+    this.formsGroupsApi.reviewChangeRequest(request.client, request.id, action).subscribe({
+      next: (response) => {
+        this.pendingProfileEdits = this.pendingProfileEdits.filter((item) => item.id !== request.id);
+        this.scheduleSummary = {
+          ...this.scheduleSummary,
+          pending_profile_edits: Math.max(0, this.scheduleSummary.pending_profile_edits - 1)
+        };
+        this.message = response.message;
+      },
+      error: (error: unknown) => {
+        this.message = formatApiError(error, 'Client request could not be reviewed.');
+      }
+    });
+  }
+
+  private reminderTimestamp(dateStr: string, timeStr: string | null): number {
+    return new Date(`${dateStr}T${timeStr || '23:59'}`).getTime();
   }
 }

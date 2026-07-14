@@ -57,25 +57,36 @@ function shortDate(iso: string): string {
  * Sums a numeric field's values per day (multiple entries on the same day are
  * added together), returned oldest-first. Only numbers are aggregated this way.
  */
-export function dailySums(field: FieldLike, entries: EntryLike[]): { date: string; value: number }[] {
+export function dailySums(field: FieldLike, entries: EntryLike[]): { date: string; value: number; times: string[] }[] {
   const key = fieldKey(field);
   const sums = new Map<string, number>();
+  const times = new Map<string, Set<string>>();
 
   for (const entry of entries) {
     const raw = numericValue(entry.answers?.[key]);
 
     if (!Number.isNaN(raw)) {
       sums.set(entry.entry_date, (sums.get(entry.entry_date) || 0) + raw);
+      const time = String(entry.entry_time || '').slice(0, 5);
+      if (time) {
+        const dateTimes = times.get(entry.entry_date) || new Set<string>();
+        dateTimes.add(time);
+        times.set(entry.entry_date, dateTimes);
+      }
     }
   }
 
   return [...sums.entries()]
-    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100 }))
+    .map(([date, value]) => ({ date, value: Math.round(value * 100) / 100, times: [...(times.get(date) || [])] }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function timeSeries(field: FieldLike, entries: EntryLike[]): DataPoint[] {
-  return dailySums(field, entries).map((point) => ({ label: shortDate(point.date), value: point.value }));
+  return dailySums(field, entries).map((point) => ({
+    label: shortDate(point.date),
+    value: point.value,
+    tooltip: `${point.date}${point.times.length ? ` at ${point.times.join(', ')}` : ''}`
+  }));
 }
 
 export function frequency(field: FieldLike, entries: EntryLike[]): DataPoint[] {

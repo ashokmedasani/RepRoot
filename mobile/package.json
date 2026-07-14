@@ -5,7 +5,10 @@
   "scripts": {
     "start": "ng serve --port 4400",
     "build": "ng build",
-    "sync": "npm run build && npx cap sync"
+    "sync": "npm run build && npx cap sync android",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:build": "npm run android:sync && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
     "@angular/animations": "^20.0.0",
@@ -15,6 +18,7 @@
     "@angular/forms": "^20.0.0",
     "@angular/platform-browser": "^20.0.0",
     "@angular/router": "^20.0.0",
+    "@capacitor/android": "^7.6.7",
     "@capacitor/core": "^7.0.0",
     "@ionic/angular": "^8.4.0",
     "chart.js": "^4.5.1",

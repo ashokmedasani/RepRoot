@@ -86,8 +86,8 @@ export class ReferencesApiService {
     });
   }
 
-  getReferences(): Observable<{ references: TrainerReferenceRecord[] }> {
-    return this.http.get<{ references: TrainerReferenceRecord[] }>(`${this.apiBaseUrl}/trainer/references/`, {
+  getReferences(): Observable<{ references: TrainerReferenceRecord[]; usage: { used: number; limit: number | null } }> {
+    return this.http.get<{ references: TrainerReferenceRecord[]; usage: { used: number; limit: number | null } }>(`${this.apiBaseUrl}/trainer/references/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -146,6 +146,6 @@ export class ReferencesApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return 'http://127.0.0.1:8000/api/accounts';
+    return `http://${window.location.hostname}:8000/api/accounts`;
   }
 }

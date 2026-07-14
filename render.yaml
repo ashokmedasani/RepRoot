@@ -39,6 +39,10 @@ services:
         value: "True"
       - key: DJANGO_SECURE_HSTS_SECONDS
         value: "31536000"
+      - key: DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
+        value: "True"
+      - key: DJANGO_SECURE_HSTS_PRELOAD
+        value: "True"
       - key: EMAIL_HOST
         sync: false
       - key: EMAIL_PORT
@@ -52,6 +56,18 @@ services:
       - key: EMAIL_USE_SSL
         value: "False"
       - key: DEFAULT_FROM_EMAIL
+        sync: false
+      - key: CACHE_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: AWS_S3_REGION_NAME
+        sync: false
+      - key: AWS_S3_ENDPOINT_URL
         sync: false
 
   - type: static

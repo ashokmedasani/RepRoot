@@ -8,6 +8,7 @@ import {
 } from '../../../core/api/templates-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
 
 @Component({
   selector: 'app-trainer-templates',
@@ -18,6 +19,7 @@ import { formatApiError } from '../../../shared/utils/ui-helpers';
 })
 export class TrainerTemplatesComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   templates: TrackingTemplateRecord[] = [];
   standardTemplates: StandardTemplateRecord[] = [];
@@ -60,10 +62,14 @@ export class TrainerTemplatesComponent implements OnInit {
     });
   }
 
-  deleteTemplate(template: TrackingTemplateRecord): void {
-    const confirmed = window.confirm(
-      `Delete ${template.name}? Clients assigned to it will stop seeing it, but their past entries are kept.`
-    );
+  async deleteTemplate(template: TrackingTemplateRecord): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete',
+      target: template.name,
+      impact: 'Assigned clients will stop seeing this template. Past submitted entries will be retained.',
+      confirmLabel: 'Delete Template'
+    });
 
     if (!confirmed) {
       return;

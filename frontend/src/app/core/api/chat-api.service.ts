@@ -72,6 +72,6 @@ export class ChatApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return 'http://127.0.0.1:8000/api/accounts';
+    return `http://${window.location.hostname}:8000/api/accounts`;
   }
 }

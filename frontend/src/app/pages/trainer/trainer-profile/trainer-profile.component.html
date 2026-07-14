@@ -1,20 +1,19 @@
 <app-trainer-page-shell
   title="Profile"
   eyebrow="Trainer profile"
+  subtitle="View the professional information clients can see and manage section visibility."
   activeSection="profile"
-  maxWidth="72rem"
   titleId="trainer-profile-title"
 >
   <button page-actions type="button" class="ghost-action" (click)="togglePreview()">
     {{ previewAsClient ? 'Exit preview' : 'Preview as Client' }}
   </button>
-  <a page-actions routerLink="/trainer/account-settings" class="secondary-action">Edit in My Account</a>
+  <a page-actions routerLink="/trainer/account-settings" class="secondary-action">Manage Profile</a>
 
   @if (isLoading) {
     <p class="message">Loading profile...</p>
   } @else if (profile) {
     <section class="profile-hero" aria-label="Profile summary">
-      <div class="cover-band"></div>
       <div class="hero-content">
         <div class="photo-frame hero-photo">
           @if (profile.profile_photo_url) {
@@ -25,11 +24,19 @@
         </div>
         <div class="hero-copy">
           <h2>{{ fullName }}</h2>
-          <p class="headline">{{ profile.professional_headline || 'Professional trainer' }}</p>
+          @if (showSection('professional_headline')) {
+            <p class="headline">{{ profile.professional_headline || 'Professional trainer' }}</p>
+          }
           @if (location) {
             <p class="muted">{{ location }}</p>
           }
         </div>
+        @if (!previewAsClient) {
+          <span class="visibility-toggle headline-visibility">
+            <button type="button" [class.active]="!visibility.professional_headline" (click)="setSectionVisibility('professional_headline', false)">Private</button>
+            <button type="button" [class.active]="visibility.professional_headline" (click)="setSectionVisibility('professional_headline', true)">Public</button>
+          </span>
+        }
       </div>
     </section>
 
@@ -53,10 +60,10 @@
         </section>
       }
 
-      @if (showSection('professional_summary')) {
+      @if (showSection('professional_summary') && profile.trainer_type) {
         <section class="read-card">
           <div class="card-head">
-            <h3>Professional summary</h3>
+            <h3>Professional focus</h3>
             @if (!previewAsClient) {
               <span class="visibility-toggle">
                 <button type="button" [class.active]="!visibility.professional_summary" (click)="setSectionVisibility('professional_summary', false)">Private</button>
@@ -64,12 +71,52 @@
               </span>
             }
           </div>
-          <dl>
-            <div><dt>Trainer type</dt><dd>{{ profile.trainer_type || 'Not set' }}</dd></div>
-            <div><dt>Experience</dt><dd>{{ profile.years_experience || 0 }} years</dd></div>
-            <div><dt>Specializations</dt><dd>{{ profile.specializations || 'Not set' }}</dd></div>
-            <div><dt>Languages</dt><dd>{{ profile.languages_known || 'Not set' }}</dd></div>
-          </dl>
+          <p>{{ profile.trainer_type }}</p>
+        </section>
+      }
+
+      @if (showSection('experience') && profile.years_experience !== null) {
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Experience</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.experience" (click)="setSectionVisibility('experience', false)">Private</button>
+                <button type="button" [class.active]="visibility.experience" (click)="setSectionVisibility('experience', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.years_experience }} years of training experience</p>
+        </section>
+      }
+
+      @if (showSection('specializations') && profile.specializations) {
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Specializations</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.specializations" (click)="setSectionVisibility('specializations', false)">Private</button>
+                <button type="button" [class.active]="visibility.specializations" (click)="setSectionVisibility('specializations', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.specializations }}</p>
+        </section>
+      }
+
+      @if (showSection('languages') && profile.languages_known) {
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Languages</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.languages" (click)="setSectionVisibility('languages', false)">Private</button>
+                <button type="button" [class.active]="visibility.languages" (click)="setSectionVisibility('languages', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.languages_known }}</p>
         </section>
       }
 
@@ -123,7 +170,7 @@
           </div>
           <div class="portfolio-row">
             @for (image of images; track image.url) {
-              <figure>
+              <figure class="portfolio-card">
                 <img [src]="image.url" [alt]="image.title">
                 <figcaption>
                   <strong>{{ image.title }}</strong>

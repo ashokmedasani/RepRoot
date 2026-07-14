@@ -1,0 +1,98 @@
+<app-trainer-page-shell
+  title="Add Client"
+  eyebrow="Manual client onboarding"
+  subtitle="Create access for a known client without generating a public lead request."
+  activeSection="forms-groups"
+  titleId="manual-client-title"
+>
+  <a page-actions [routerLink]="selectedGroup ? ['/trainer/groups', selectedGroup.id] : ['/trainer/forms-groups']" class="secondary-action">Cancel</a>
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (isLoading) {
+    <section class="manual-panel"><p>Loading registration form...</p></section>
+  } @else if (!groups.length) {
+    <section class="manual-panel empty-state">
+      <h2>A client registration form is required.</h2>
+      <p>Create a group registration form before adding a client manually.</p>
+      <a routerLink="/trainer/forms-groups" class="primary-action">Open Forms &amp; Groups</a>
+    </section>
+  } @else {
+    <form class="manual-panel" (ngSubmit)="createClient()">
+      <div class="section-heading">
+        <div>
+          <h2>Client information</h2>
+          <p>Universal identity fields and the selected group form are saved together.</p>
+        </div>
+        <span class="source-pill">{{ registrationSubmission ? 'Group registration' : 'Manual entry' }}</span>
+      </div>
+
+      <div class="form-grid">
+        <label class="wide">
+          <span>Group</span>
+          <select [(ngModel)]="selectedGroupId" name="group" [disabled]="groupLocked" (ngModelChange)="onGroupChange()" required>
+            <option [ngValue]="null">Select a group</option>
+            @for (group of groups; track group.id) {
+              <option [ngValue]="group.id">{{ group.name }}</option>
+            }
+          </select>
+          @if (groupLocked) { <small>The group was selected from the group workspace.</small> }
+        </label>
+
+        @for (field of fields; track field.key || field.label) {
+          <label [class.wide]="field.field_type === 'long_text' || field.field_type === 'address'">
+            <span>{{ field.label }} @if (field.required) { <strong>*</strong> }</span>
+            @if (field.field_type === 'long_text' || field.field_type === 'address') {
+              <textarea rows="3" [(ngModel)]="answers[field.key || field.label]" [name]="field.key || field.label" [required]="field.required"></textarea>
+            } @else if (fieldOptions(field).length) {
+              <select [(ngModel)]="answers[field.key || field.label]" [name]="field.key || field.label" [required]="field.required">
+                <option value="">{{ field.placeholder || 'Select an option' }}</option>
+                @for (option of fieldOptions(field); track option) { <option [value]="option">{{ option }}</option> }
+              </select>
+            } @else {
+              <input [type]="inputType(field)" [(ngModel)]="answers[field.key || field.label]" [name]="field.key || field.label" [placeholder]="field.placeholder" [required]="field.required">
+            }
+          </label>
+        }
+      </div>
+
+      <div class="access-section">
+        <div class="section-heading">
+          <div><h2>Account access</h2><p>Username uniqueness is scoped to your trainer account.</p></div>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Username *</span>
+            <input type="text" [(ngModel)]="username" name="username" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Temporary password *</span>
+            <div class="password-row">
+              <app-password-input name="temporaryPassword" [(ngModel)]="temporaryPassword" autocomplete="new-password" [required]="true" />
+              <button type="button" class="ghost-action" (click)="generatePassword()">Generate</button>
+            </div>
+          </label>
+          <label>
+            <span>Reference ID</span>
+            <input type="text" [value]="createdReferenceId || 'Generated automatically on creation'" readonly>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" [(ngModel)]="sendCredentials" name="sendCredentials">
+            <span>Send username and temporary password to the client email</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        @if (createdClientId) {
+          <a [routerLink]="['/trainer/clients', createdClientId]" class="secondary-action">Open Client</a>
+        }
+        <button type="submit" class="primary-action" [disabled]="isSaving || createdClientId > 0">
+          {{ isSaving ? 'Creating...' : 'Create Client Account' }}
+        </button>
+      </div>
+    </form>
+  }
+</app-trainer-page-shell>

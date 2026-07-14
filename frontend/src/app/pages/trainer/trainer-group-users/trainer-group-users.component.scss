@@ -579,3 +579,94 @@ dd {
   color: var(--app-muted);
   font-weight: 600;
 }
+.registration-actions,
+.registration-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.flow-note {
+  display: grid;
+  gap: 0.25rem;
+  border-left: 3px solid var(--app-primary);
+  padding: 0.75rem 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.registration-link-box {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.registration-link-box > span {
+  color: var(--app-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.registration-link-box > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.65rem;
+  padding: 0.55rem;
+  background: var(--app-surface);
+}
+
+.registration-link-box a {
+  color: var(--app-primary-strong);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.registration-link-box p {
+  margin: 0;
+  color: var(--app-muted);
+}
+
+.pending-registrations {
+  display: grid;
+  gap: 0.8rem;
+  border-top: 1px solid var(--app-border);
+  padding-top: 1rem;
+}
+
+.registration-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.registration-list article {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.75rem;
+  background: var(--app-surface);
+}
+
+.registration-list article > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.registration-list span,
+.registration-list small {
+  color: var(--app-muted);
+}
+
+@media (max-width: 680px) {
+  .registration-actions,
+  .registration-list article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .registration-link-box > div {
+    grid-template-columns: 1fr;
+  }
+}

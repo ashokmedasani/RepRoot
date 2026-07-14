@@ -1,0 +1,29 @@
+<main class="error-page" aria-labelledby="error-title">
+  <a class="brand" href="/" aria-label="CoachFlow home">
+    <span class="brand-mark" aria-hidden="true">↔</span>
+    <span>CoachFlow</span>
+  </a>
+
+  <section class="error-panel">
+    <div class="error-visual" aria-hidden="true">
+      <span class="error-code">{{ statusLabel }}</span>
+      <span class="error-pulse"></span>
+    </div>
+
+    <div class="error-copy">
+      <p class="eyebrow">{{ error.eyebrow }}</p>
+      <h1 id="error-title">{{ error.title }}</h1>
+      <p class="error-message">{{ error.message }}</p>
+
+      <div class="error-actions">
+        @if (error.canRetry) {
+          <button type="button" class="primary-action" (click)="retry()">Try Again</button>
+        }
+        <button type="button" class="secondary-action" (click)="goToSafeStart()">Go to Home</button>
+        <button type="button" class="ghost-action" (click)="goBack()">Go Back</button>
+      </div>
+
+      <p class="support-copy">If this keeps happening, contact Support and mention error {{ statusLabel }}.</p>
+    </div>
+  </section>
+</main>

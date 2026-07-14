@@ -1,5 +1,19 @@
 # backend/config/settings.py
 
+## 2026-07-13 Admin Portal
+
+Registers the isolated `admin_portal` Django application. Trainer and client authentication applications remain unchanged.
+
+## 2026-07-13 trainer storage configuration
+
+Adds configurable `COACHFLOW_TRAINER_STORAGE_LIMIT_BYTES` with a 100 MB Version 1 default and `COACHFLOW_DATA_USAGE_CACHE_SECONDS` with a 15-minute default. Both can change by environment without UI edits.
+
+## 2026-07-13 targeted refinement
+
+Defines configurable Version 1 limits for references, categories, and subcategories so later plans can raise or remove limits.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Configures the Django backend project for local development.
@@ -43,4 +57,4 @@ Local PostgreSQL defaults are `trainer_platform`, user `postgres`, password `pos
 
 ## Future improvement notes
 
-Move uploaded media to cloud object storage and move secrets into a deployment-safe environment strategy before production.
+Production refuses the development secret and console email backend. Durable S3-compatible media, Redis-backed cache, HTTPS/HSTS/cookie protections, response hardening, and scoped API throttle rates are environment-configurable. Local development retains filesystem media and local-memory cache defaults.

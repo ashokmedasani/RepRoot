@@ -368,9 +368,6 @@ tr:last-child td {
   font-weight: 700;
 }
 
-.primary-action,
-.secondary-action,
-.ghost-action,
 .icon-action {
   display: inline-flex;
   align-items: center;
@@ -382,23 +379,10 @@ tr:last-child td {
   text-decoration: none;
 }
 
-.primary-action {
-  border: 0;
-  background: var(--app-primary);
-  color: #ffffff;
-}
-
 .group-create-action {
   background: var(--app-success);
 }
 
-.secondary-action {
-  border: 1px solid var(--app-primary);
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-}
-
-.ghost-action,
 .icon-action {
   border: 1px solid var(--app-border);
   background: var(--app-surface);

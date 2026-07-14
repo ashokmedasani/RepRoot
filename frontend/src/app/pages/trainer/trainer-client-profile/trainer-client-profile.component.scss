@@ -883,21 +883,22 @@ app-chat-panel {
 
 /* ---- chat + actions layout ---- */
 .chat-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
   animation: fade-in 300ms ease-out;
 }
 
 .chat-layout app-chat-panel {
-  flex: 1 1 auto;
   min-width: 0;
 }
 
 .actions-card {
-  flex: 0 0 19.5rem;
   display: grid;
+  align-self: start;
   gap: 1rem;
+  width: 100%;
 }
 
 .actions-card .status-pill.suspended {
@@ -989,17 +990,6 @@ app-chat-panel {
 .danger-action:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-@media (max-width: 900px) {
-  .chat-layout {
-    flex-direction: column;
-  }
-
-  .actions-card {
-    flex-basis: auto;
-    width: 100%;
-  }
 }
 
 @media (max-width: 760px) {

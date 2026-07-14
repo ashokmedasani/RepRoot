@@ -14,6 +14,7 @@ import { PasswordInputComponent } from '../../../shared/password-input/password-
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
 
 interface SubmittedAnswer {
   label: string;
@@ -31,6 +32,7 @@ export class TrainerFormRequestDetailComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   submission: LeadSubmission | null = null;
   groups: TrainerGroup[] = [];
@@ -158,7 +160,7 @@ export class TrainerFormRequestDetailComponent implements OnInit {
     return 'text';
   }
 
-  createClientAccess(): void {
+  async createClientAccess(): Promise<void> {
     if (!this.submission) {
       return;
     }
@@ -180,6 +182,18 @@ export class TrainerFormRequestDetailComponent implements OnInit {
 
     if (this.clientAccess.password !== this.clientAccess.confirmPassword) {
       this.setError('Client passwords must match.');
+      return;
+    }
+
+    const confirmed = await this.confirmation.confirm({
+      kind: 'approve',
+      title: 'Approve and convert request for',
+      target: this.submission.applicant_name,
+      impact: `This request will become a client account and temporary login credentials will be sent to ${this.submission.email}.`,
+      confirmLabel: 'Approve & Create Client'
+    });
+
+    if (!confirmed) {
       return;
     }
 

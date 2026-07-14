@@ -1,0 +1,29 @@
+import { DecimalPipe } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+
+import { AdminDashboardSummary, AdminPortalApiService } from '../../../core/api/admin-portal-api.service';
+import { AdminPageShellComponent } from '../../../shared/admin-page-shell/admin-page-shell.component';
+import { formatApiError } from '../../../shared/utils/ui-helpers';
+
+@Component({selector:'app-admin-dashboard',standalone:true,imports:[AdminPageShellComponent,FormsModule,DecimalPipe],template:`
+<app-admin-page-shell title="Dashboard" subtitle="Aggregate platform health without exposing private user content." activeSection="dashboard">
+  <label page-actions class="range">Date range<select [(ngModel)]="range" (change)="load()"><option value="today">Today</option><option value="7d">Last 7 Days</option><option value="30d">Last 30 Days</option><option value="90d">Last 90 Days</option></select></label>
+  @if(message){<p class="message">{{message}}</p>}
+  @if(summary){
+    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Accounts</p><h2>Trainer overview</h2></div><span>Aggregate only</span></div><div class="kpis">
+      <article><small>Total trainers</small><strong>{{summary.accounts.total_trainers|number}}</strong></article><article class="positive"><small>Active</small><strong>{{summary.accounts.active_trainers|number}}</strong></article><article class="warning"><small>Suspended</small><strong>{{summary.accounts.suspended_trainers|number}}</strong></article><article><small>Pending deletion</small><strong>{{summary.accounts.pending_deletion|number}}</strong></article><article><small>New in range</small><strong>{{summary.accounts.new_trainers|number}}</strong></article>
+    </div></section>
+    <div class="two-column"><section class="summary-section"><div class="section-head"><div><p class="eyebrow">Clients</p><h2>Client accounts</h2></div></div><div class="compact-grid"><article><small>Total</small><strong>{{summary.clients.total_clients|number}}</strong></article><article><small>Active</small><strong>{{summary.clients.active_clients|number}}</strong></article><article><small>Inactive</small><strong>{{summary.clients.inactive_clients|number}}</strong></article><article><small>New in range</small><strong>{{summary.clients.new_clients|number}}</strong></article></div></section>
+    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Platform</p><h2>Registered accounts</h2></div></div><div class="compact-grid"><article><small>Total</small><strong>{{summary.users.total_accounts|number}}</strong></article><article><small>Trainers</small><strong>{{summary.users.trainer_accounts|number}}</strong></article><article><small>Clients</small><strong>{{summary.users.client_accounts|number}}</strong></article><article><small>Internal staff</small><strong>{{summary.users.internal_accounts|number}}</strong></article></div></section></div>
+    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Usage</p><h2>Platform activity</h2></div></div><div class="usage-grid"><span><strong>{{summary.usage.lead_forms}}</strong> Lead forms</span><span><strong>{{summary.usage.form_submissions}}</strong> Submissions</span><span><strong>{{summary.usage.groups}}</strong> Groups</span><span><strong>{{summary.usage.templates}}</strong> Templates</span><span><strong>{{summary.usage.references}}</strong> References</span><span><strong>{{summary.usage.scheduled_followups}}</strong> Follow-ups</span></div></section>
+  } @else if(!message){<p>Loading dashboard…</p>}
+</app-admin-page-shell>`,styles:[`
+.range{display:flex;align-items:center;gap:.6rem;color:var(--app-muted);font-size:.8rem;font-weight:700}.range select{min-height:2.3rem}.message{border:1px solid #f0b8b3;border-radius:.7rem;padding:.8rem;color:#b42318}.summary-section{margin-bottom:1rem;border:1px solid var(--app-border);border-radius:.9rem;padding:1.15rem;background:var(--app-surface);box-shadow:var(--app-shadow-sm)}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.section-head h2{margin:0;font-size:1.05rem}.section-head .eyebrow{margin:0 0 .2rem}.section-head>span{color:var(--app-muted);font-size:.75rem}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:.7rem}.kpis article,.compact-grid article{display:grid;gap:.25rem;border:1px solid var(--app-border);border-radius:.75rem;padding:.9rem;background:var(--app-surface-soft)}article small{color:var(--app-muted);font-weight:700}article strong{font-size:1.55rem}.positive strong{color:var(--app-success)}.warning strong{color:#b54708}.two-column{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.compact-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}.usage-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem}.usage-grid span{display:grid;gap:.1rem;border-right:1px solid var(--app-border);color:var(--app-muted);font-size:.75rem}.usage-grid strong{color:var(--app-text);font-size:1.15rem}@media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.usage-grid{grid-template-columns:repeat(3,1fr)}.two-column{grid-template-columns:1fr}}@media(max-width:600px){.kpis,.compact-grid,.usage-grid{grid-template-columns:1fr 1fr}}
+`]})
+export class AdminDashboardComponent implements OnInit{
+  range='30d';summary?:AdminDashboardSummary;message='';
+  constructor(private api:AdminPortalApiService){}
+  ngOnInit():void{this.load()}
+  load():void{this.message='';this.api.getDashboard(this.range).subscribe({next:value=>this.summary=value,error:error=>this.message=formatApiError(error,'Dashboard could not be loaded.')})}
+}

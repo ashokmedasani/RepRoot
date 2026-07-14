@@ -12,7 +12,7 @@
  *   - Installed on a real phone:   'http://192.168.4.68:8000' (your PC's IP)
  *   - Production:                  your deployed backend URL
  */
-const NATIVE_API_URL = 'http://10.0.2.2:8000';
+const NATIVE_API_URL = 'http://192.168.4.68:8000';
 
 interface CapacitorGlobal {
   Capacitor?: { isNativePlatform?: () => boolean };

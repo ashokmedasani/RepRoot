@@ -4,7 +4,6 @@
   <form class="profile-grid" [formGroup]="profileForm" (ngSubmit)="saveProfile()">
     <div class="editor-column">
       <section class="profile-hero" aria-label="Profile photo and summary">
-        <div class="cover-band"></div>
         <div class="hero-content">
           <div class="photo-frame hero-photo">
             @if (selectedProfilePhotoPreview || loadedProfile?.profile_photo_url) {
@@ -196,25 +195,31 @@
         <div class="media-list">
           @for (image of profileImages; track $index; let index = $index) {
             <div class="media-row">
-              <label>
-                <span class="field-label">Category</span>
-                <select [(ngModel)]="image.category" [ngModelOptions]="{ standalone: true }">
-                  @for (category of imageCategories; track category) {
-                    <option [value]="category">{{ category }}</option>
-                  }
-                </select>
-              </label>
-              <label>
-                <span class="field-label">Title</span>
-                <input type="text" [(ngModel)]="image.title" [ngModelOptions]="{ standalone: true }">
-              </label>
-              <label class="upload-field">
-                <span class="field-label">Image upload</span>
-                <input type="file" accept="image/*" (change)="handleProfileImageSelected($event, index)">
-              </label>
-              @if (image.url) {
-                <img class="media-preview" [src]="image.url" [alt]="image.title || image.category">
-              }
+              <div class="media-preview-wrap">
+                @if (image.url) {
+                  <img class="media-preview" [src]="image.url" [alt]="image.title || image.category">
+                } @else {
+                  <span>Select an image</span>
+                }
+              </div>
+              <div class="media-fields">
+                <label>
+                  <span class="field-label">Category</span>
+                  <select [(ngModel)]="image.category" [ngModelOptions]="{ standalone: true }">
+                    @for (category of imageCategories; track category) {
+                      <option [value]="category">{{ category }}</option>
+                    }
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Title</span>
+                  <input type="text" [(ngModel)]="image.title" [ngModelOptions]="{ standalone: true }">
+                </label>
+                <label class="upload-field">
+                  <span class="field-label">Image upload</span>
+                  <input type="file" accept="image/*" (change)="handleProfileImageSelected($event, index)">
+                </label>
+              </div>
               <button type="button" class="secondary-action compact danger" (click)="removeProfileImage(index)">Remove</button>
             </div>
           } @empty {

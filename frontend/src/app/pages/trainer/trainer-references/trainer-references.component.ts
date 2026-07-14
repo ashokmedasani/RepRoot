@@ -13,6 +13,7 @@ import {
 } from '../../../core/api/references-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
 
 type ReferenceTypeLabel = 'Video Link' | 'PDF Link' | 'Text' | 'Image';
 
@@ -75,6 +76,7 @@ interface CategoryForm {
 export class TrainerReferencesComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly referencesApi = inject(ReferencesApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF Link', 'Text', 'Image'];
   readonly references = signal<TrainerReferenceView[]>([]);
@@ -88,6 +90,12 @@ export class TrainerReferencesComponent implements OnInit {
   readonly isEditorOpen = signal(false);
   readonly isCategoryEditorOpen = signal(false);
   readonly isSaving = signal(false);
+  readonly categoryEditorMode = signal<'create' | 'edit' | 'subcategory'>('create');
+  readonly referenceUsage = signal({ used: 0, limit: null as number | null });
+  readonly referenceLimitReached = computed(() => {
+    const usage = this.referenceUsage();
+    return usage.limit !== null && usage.used >= usage.limit;
+  });
 
   readonly categoryNames = computed(() => this.categories().map((category) => category.name));
   subcategoriesFor(categoryId: number | null): string[] {
@@ -175,6 +183,11 @@ export class TrainerReferencesComponent implements OnInit {
   }
 
   addReference(type: ReferenceTypeLabel = 'Video Link', category?: ReferenceCategoryRecord, subcategory = ''): void {
+    if (this.referenceLimitReached()) {
+      this.message.set('You have reached the Version 1 reference limit.');
+      return;
+    }
+
     if (!this.categories().length) {
       this.addCategory();
       this.message.set('Create a category first, then add references inside it.');
@@ -187,17 +200,31 @@ export class TrainerReferencesComponent implements OnInit {
   }
 
   addCategory(): void {
+    this.categoryEditorMode.set('create');
     this.categoryForm = this.emptyCategoryForm();
     this.isCategoryEditorOpen.set(true);
     this.message.set('');
   }
 
   addSubcategory(category: ReferenceCategoryRecord): void {
+    this.categoryEditorMode.set('subcategory');
     this.categoryForm = {
       categoryId: category.id,
       name: category.name,
       description: category.description || '',
       subcategoriesText: ''
+    };
+    this.isCategoryEditorOpen.set(true);
+    this.message.set('');
+  }
+
+  editCategory(category: ReferenceCategoryRecord): void {
+    this.categoryEditorMode.set('edit');
+    this.categoryForm = {
+      categoryId: category.id,
+      name: category.name,
+      description: category.description || '',
+      subcategoriesText: category.subcategories.join('\n')
     };
     this.isCategoryEditorOpen.set(true);
     this.message.set('');
@@ -213,7 +240,7 @@ export class TrainerReferencesComponent implements OnInit {
 
     this.isSaving.set(true);
     const existingCategory = this.categories().find((category) => category.id === this.categoryForm.categoryId);
-    const subcategories = existingCategory
+    const subcategories = existingCategory && this.categoryEditorMode() === 'subcategory'
       ? [...existingCategory.subcategories, ...this.parseSubcategories(this.categoryForm.subcategoriesText)]
       : this.parseSubcategories(this.categoryForm.subcategoriesText);
     const uniqueSubcategories = Array.from(new Set(subcategories.map((item) => item.trim()).filter(Boolean)));
@@ -259,6 +286,11 @@ export class TrainerReferencesComponent implements OnInit {
   }
 
   duplicateReference(reference: TrainerReferenceView): void {
+    if (this.referenceLimitReached()) {
+      this.message.set('You have reached the Version 1 reference limit.');
+      return;
+    }
+
     const payload: ReferencePayload = {
       category: reference.categoryId,
       subcategory: reference.subcategory,
@@ -272,6 +304,7 @@ export class TrainerReferencesComponent implements OnInit {
     this.referencesApi.createReference(payload).subscribe({
       next: (response) => {
         this.references.set([this.toView(response.reference), ...this.references()]);
+        this.referenceUsage.update((usage) => ({ ...usage, used: usage.used + 1 }));
         this.selectedReferenceId.set(response.reference.id);
         this.message.set('Reference duplicated.');
       },
@@ -281,8 +314,14 @@ export class TrainerReferencesComponent implements OnInit {
     });
   }
 
-  deleteReference(reference: TrainerReferenceView): void {
-    const confirmed = window.confirm(`Delete ${reference.title}?`);
+  async deleteReference(reference: TrainerReferenceView): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete',
+      target: reference.title,
+      impact: 'This reference will be removed from the library and may no longer be available to connected templates. This action may not be reversible.',
+      confirmLabel: 'Delete Reference'
+    });
 
     if (!confirmed) {
       return;
@@ -292,6 +331,7 @@ export class TrainerReferencesComponent implements OnInit {
       next: () => {
         const remaining = this.references().filter((item) => item.id !== reference.id);
         this.references.set(remaining);
+        this.referenceUsage.update((usage) => ({ ...usage, used: Math.max(0, usage.used - 1) }));
         this.selectedReferenceId.set(remaining[0]?.id || 0);
         this.message.set('Reference deleted.');
         this.loadCategoriesOnly();
@@ -299,6 +339,51 @@ export class TrainerReferencesComponent implements OnInit {
       error: (error: unknown) => {
         this.message.set(formatApiError(error, 'Reference could not be deleted.'));
       }
+    });
+  }
+
+  async deleteCategory(category: ReferenceCategoryRecord): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete',
+      target: category.name,
+      impact: 'This category can only be deleted when it contains no references. Connected content may be affected.',
+      confirmLabel: 'Delete Category'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.referencesApi.deleteCategory(category.id).subscribe({
+      next: (response) => {
+        this.categories.set(this.categories().filter((item) => item.id !== category.id));
+        this.message.set(response.message);
+      },
+      error: (error: unknown) => this.message.set(formatApiError(error, 'Category could not be deleted.'))
+    });
+  }
+
+  async deleteSubcategory(category: ReferenceCategoryRecord, subcategory: string): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete subcategory',
+      target: subcategory,
+      impact: 'The subcategory can only be removed safely when its references have been moved or deleted.',
+      confirmLabel: 'Delete Subcategory'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    const subcategories = category.subcategories.filter((item) => item !== subcategory);
+    this.referencesApi.updateCategory(category.id, category.name, category.description, subcategories).subscribe({
+      next: (response) => {
+        this.categories.set(this.categories().map((item) => item.id === category.id ? response.category : item));
+        this.message.set(response.message);
+      },
+      error: (error: unknown) => this.message.set(formatApiError(error, 'Subcategory could not be deleted.'))
     });
   }
 
@@ -336,6 +421,9 @@ export class TrainerReferencesComponent implements OnInit {
         this.references.set(
           isUpdate ? references.map((reference) => (reference.id === view.id ? view : reference)) : [view, ...references]
         );
+        if (!isUpdate) {
+          this.referenceUsage.update((usage) => ({ ...usage, used: usage.used + 1 }));
+        }
         this.selectedCategory.set('All References');
         this.selectedReferenceId.set(view.id);
         this.isEditorOpen.set(false);
@@ -408,6 +496,7 @@ export class TrainerReferencesComponent implements OnInit {
       next: (response) => {
         const views = response.references.map((reference) => this.toView(reference));
         this.references.set(views);
+        this.referenceUsage.set(response.usage);
         this.selectedReferenceId.set(views[0]?.id || 0);
       },
       error: (error: unknown) => this.message.set(formatApiError(error, 'References could not be loaded.'))

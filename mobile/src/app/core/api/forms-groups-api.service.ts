@@ -89,11 +89,27 @@ export interface ClientReminder {
 
 export interface ReminderSummary {
   total_pending: number;
+  overdue: number;
   due_24_hours: number;
-  due_5_days: number;
   due_7_days: number;
-  due_10_days: number;
+  total_completed: number;
+  completed_last_7_days: number;
+  pending_profile_edits: number;
   nearest_date: string;
+}
+
+export interface ClientProgressEntry {
+  id: number;
+  title: string;
+  date: string;
+  notes: string;
+  status: string;
+  next_step: string;
+}
+
+export interface ClientAccessPayload {
+  group_id: number; username: string; password: string; confirm_password: string;
+  registration_answers: Record<string, string>; send_credentials?: boolean; registration_submission_id?: number | null;
 }
 
 /** Trainer forms/groups/clients/reminders. Mirrors the web forms-groups-api service. */
@@ -127,8 +143,31 @@ export class FormsGroupsApiService {
     }>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`, { headers: this.authHeaders() });
   }
 
-  getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; summary: ReminderSummary }> {
-    return this.http.get<{ reminders: ClientReminder[]; summary: ReminderSummary }>(
+  saveLeadForm(title: string, customFields: DynamicField[]): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/lead-form/`, { title, custom_fields: customFields }, { headers: this.authHeaders() }); }
+  createGroup(name: string, description: string): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/groups/`, { name, description }, { headers: this.authHeaders() }); }
+  updateGroup(groupId: number, name: string, description: string): Observable<unknown> { return this.http.put(`${this.apiBaseUrl}/trainer/forms-groups/groups/${groupId}/`, { name, description }, { headers: this.authHeaders() }); }
+  saveRegistrationForm(groupId: number, customFields: DynamicField[]): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/groups/${groupId}/registration-form/`, { custom_fields: customFields }, { headers: this.authHeaders() }); }
+  deletePendingForm(submissionId: number): Observable<unknown> { return this.http.delete(`${this.apiBaseUrl}/trainer/forms-groups/pending/${submissionId}/`, { headers: this.authHeaders() }); }
+  createClientAccess(submissionId: number, payload: ClientAccessPayload): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/pending/${submissionId}/create-client-access/`, payload, { headers: this.authHeaders() }); }
+  createManualClient(payload: ClientAccessPayload): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/clients/manual/`, payload, { headers: this.authHeaders() }); }
+  updateClientProfile(clientId: number, payload: Partial<ClientAccessRecord>): Observable<unknown> { return this.http.put(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`, payload, { headers: this.authHeaders() }); }
+  saveTrainerNotes(clientId: number, notes: string): Observable<unknown> { return this.http.put(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/notes/`, { notes }, { headers: this.authHeaders() }); }
+  createClientReminder(clientId: number, payload: Partial<ClientReminder>): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`, payload, { headers: this.authHeaders() }); }
+  createProgress(clientId: number, payload: Partial<ClientProgressEntry>): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`, payload, { headers: this.authHeaders() }); }
+  reviewChangeRequest(clientId: number, requestId: number, action: 'approve'|'reject', note = ''): Observable<unknown> { return this.http.post(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/change-requests/${requestId}/`, { action, note }, { headers: this.authHeaders() }); }
+  updateClientStatus(clientId: number, isActive: boolean): Observable<unknown> { return this.http.put(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/status/`, { is_active: isActive }, { headers: this.authHeaders() }); }
+  deleteClient(clientId: number): Observable<unknown> { return this.http.delete(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/delete/`, { headers: this.authHeaders() }); }
+
+  getClientReminders(clientId: number): Observable<{ reminders: ClientReminder[] }> {
+    return this.http.get<{ reminders: ClientReminder[] }>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`, { headers: this.authHeaders() });
+  }
+
+  getClientProgress(clientId: number): Observable<{ progress: ClientProgressEntry[] }> {
+    return this.http.get<{ progress: ClientProgressEntry[] }>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`, { headers: this.authHeaders() });
+  }
+
+  getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; profile_edits: Array<{ id: number; client: number; client_name: string; request_type: string }>; summary: ReminderSummary }> {
+    return this.http.get<{ reminders: ClientReminder[]; profile_edits: Array<{ id: number; client: number; client_name: string; request_type: string }>; summary: ReminderSummary }>(
       `${this.apiBaseUrl}/trainer/reminders/upcoming/`,
       { headers: this.authHeaders() }
     );

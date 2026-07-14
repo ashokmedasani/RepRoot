@@ -9,6 +9,7 @@ export type ChartKind = 'line' | 'bar' | 'hbar' | 'pie' | 'ring' | 'summary';
 export interface DataPoint {
   label: string;
   value: number;
+  tooltip?: string;
 }
 
 export interface ChartMeta {

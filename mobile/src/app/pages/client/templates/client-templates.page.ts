@@ -23,8 +23,7 @@ import { ClientApiService } from '../../../core/api/client-api.service';
 import { TemplateField, TrackingEntryRecord, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
 
 /**
- * My Templates (Phase 1 slice): pick a template, submit an entry, see recent
- * entries. Phase 3 adds Overview charts, References, and Progress screens.
+ * Programs: pick an assigned template, submit an entry, and review recent entries.
  */
 @Component({
   selector: 'app-client-templates',

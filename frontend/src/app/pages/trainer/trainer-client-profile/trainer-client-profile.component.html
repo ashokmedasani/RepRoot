@@ -1,7 +1,8 @@
 <app-trainer-page-shell
   title="Client Profile"
+  eyebrow="Client workspace"
+  subtitle="Review client information, activity, conversations, and account actions."
   activeSection="clients"
-  maxWidth="52rem"
   titleId="client-profile-title"
 >
   <a page-actions routerLink="/trainer/clients" class="secondary-action">&#8592; Back to Clients</a>
@@ -70,7 +71,7 @@
                   <option [ngValue]="false">Inactive</option>
                 </select>
               </label>
-              <label><span>Reference ID</span><input type="text" [value]="profile.lead_submission.reference_id" disabled></label>
+              <label><span>Reference ID</span><input type="text" [value]="client.reference_id" disabled></label>
               @for (field of editableRegistrationFields(); track field.key || field.label) {
                 <label>
                   <span>{{ field.label }}</span>
@@ -99,12 +100,101 @@
         }
       </section>
 
+      @if (pendingChangeRequest) {
+        <section class="panel change-request-card">
+          <div class="panel-heading">
+            <div>
+              <p class="section-sub">Client Profile Update</p>
+              <h3>Profile edit awaiting review <small>(Pending)</small></h3>
+            </div>
+            <span class="request-stamp">Requested {{ pendingChangeRequest.created_at | date: 'dd MMM yyyy, h:mm a' }}</span>
+          </div>
+
+          @if (pendingChangeRequest.client_note) {
+            <p class="request-note">Client note: {{ pendingChangeRequest.client_note }}</p>
+          }
+
+          @if (changeRequestRows().length) {
+            <div class="change-table">
+              <div class="change-head">
+                <span>Field</span>
+                <span>Current</span>
+                <span>Requested</span>
+              </div>
+              @for (row of changeRequestRows(); track row.label) {
+                <div class="change-row">
+                  <span class="change-field">{{ row.label }}</span>
+                  <span class="change-old">{{ row.oldValue }}</span>
+                  <span class="change-new">{{ row.newValue }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="empty-note">This request does not change any details.</p>
+          }
+
+          <textarea rows="2" [(ngModel)]="changeReviewNote" name="changeReviewNote" placeholder="Optional note to the client"></textarea>
+          <div class="notes-actions">
+            <button type="button" class="ghost-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('reject')">Reject</button>
+            <button type="button" class="primary-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('approve')">
+              {{ isReviewingChange ? 'Saving...' : 'Approve changes' }}
+            </button>
+          </div>
+        </section>
+      }
+
       <nav class="ws-tabs" aria-label="Client sections">
         <button type="button" [class.active]="workspaceTab === 'workspace'" (click)="workspaceTab = 'workspace'">Client Workspace</button>
         <button type="button" [class.active]="workspaceTab === 'chat'" (click)="workspaceTab = 'chat'">Chat</button>
+        <button type="button" [class.active]="workspaceTab === 'actions'" (click)="workspaceTab = 'actions'">Actions</button>
       </nav>
 
       @if (workspaceTab === 'workspace') {
+      <section class="panel">
+        <div class="panel-heading">
+          <h3>Client Activity</h3>
+        </div>
+        <div class="activity-grid">
+          <article>
+            <span>Total Entries</span>
+            <strong>{{ entriesThisMonth }}</strong>
+            <small>This month</small>
+          </article>
+          <article>
+            <span>Last Entry</span>
+            <strong>{{ lastEntry ? (lastEntry.entry_date | date: 'dd MMM') : '-' }}</strong>
+            <small>{{ lastEntry?.template_name || 'No entries yet' }}</small>
+          </article>
+          <article>
+            <span>Streak</span>
+            <strong>{{ streak }} {{ streak === 1 ? 'Day' : 'Days' }}</strong>
+            <small>{{ streak > 0 ? 'Keep it up!' : 'No current streak' }}</small>
+          </article>
+          <article>
+            <span>Completion</span>
+            <strong>{{ completionPercent }}%</strong>
+            <small>This month</small>
+          </article>
+        </div>
+
+        @if (recentEntries.length) {
+          <div class="recent-heading">
+            <h4>Recent Entries</h4>
+          </div>
+          <div class="recent-list">
+            @for (entry of recentEntries; track entry.id) {
+              <button type="button" (click)="openEntryFromActivity(entry)">
+                <span>
+                  <strong>{{ entry.template_name }}</strong>
+                  <small>{{ entry.entry_date | date: 'dd MMM yyyy' }}</small>
+                </span>
+                <span class="chevron" aria-hidden="true">&rsaquo;</span>
+              </button>
+            }
+          </div>
+        }
+      </section>
+
       <section class="panel notes-card">
         <div class="panel-heading">
           <h3>Trainer Notes <small>(Private)</small></h3>
@@ -177,46 +267,6 @@
         }
       </section>
 
-      @if (pendingChangeRequest) {
-        <section class="panel change-request-card">
-          <div class="panel-heading">
-            <h3>Detail edit request <small>(Pending)</small></h3>
-            <span class="request-stamp">Requested {{ pendingChangeRequest.created_at | date: 'dd MMM yyyy, h:mm a' }}</span>
-          </div>
-
-          @if (pendingChangeRequest.client_note) {
-            <p class="request-note">Client note: {{ pendingChangeRequest.client_note }}</p>
-          }
-
-          @if (changeRequestRows().length) {
-            <div class="change-table">
-              <div class="change-head">
-                <span>Field</span>
-                <span>Current</span>
-                <span>Requested</span>
-              </div>
-              @for (row of changeRequestRows(); track row.label) {
-                <div class="change-row">
-                  <span class="change-field">{{ row.label }}</span>
-                  <span class="change-old">{{ row.oldValue }}</span>
-                  <span class="change-new">{{ row.newValue }}</span>
-                </div>
-              }
-            </div>
-          } @else {
-            <p class="empty-note">This request does not change any details.</p>
-          }
-
-          <textarea rows="2" [(ngModel)]="changeReviewNote" name="changeReviewNote" placeholder="Optional note to the client"></textarea>
-          <div class="notes-actions">
-            <button type="button" class="ghost-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('reject')">Reject</button>
-            <button type="button" class="primary-action compact" [disabled]="isReviewingChange" (click)="reviewChangeRequest('approve')">
-              {{ isReviewingChange ? 'Saving...' : 'Approve changes' }}
-            </button>
-          </div>
-        </section>
-      }
-
       <section class="panel">
         <div class="panel-heading">
           <h3>Assigned Templates</h3>
@@ -255,51 +305,6 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-heading">
-          <h3>Client Activity</h3>
-        </div>
-        <div class="activity-grid">
-          <article>
-            <span>Total Entries</span>
-            <strong>{{ entriesThisMonth }}</strong>
-            <small>This month</small>
-          </article>
-          <article>
-            <span>Last Entry</span>
-            <strong>{{ lastEntry ? (lastEntry.entry_date | date: 'dd MMM') : '-' }}</strong>
-            <small>{{ lastEntry?.template_name || 'No entries yet' }}</small>
-          </article>
-          <article>
-            <span>Streak</span>
-            <strong>{{ streak }} {{ streak === 1 ? 'Day' : 'Days' }}</strong>
-            <small>{{ streak > 0 ? 'Keep it up!' : 'No current streak' }}</small>
-          </article>
-          <article>
-            <span>Completion</span>
-            <strong>{{ completionPercent }}%</strong>
-            <small>This month</small>
-          </article>
-        </div>
-
-        @if (recentEntries.length) {
-          <div class="recent-heading">
-            <h4>Recent Entries</h4>
-          </div>
-          <div class="recent-list">
-            @for (entry of recentEntries; track entry.id) {
-              <button type="button" (click)="openEntryFromActivity(entry)">
-                <span>
-                  <strong>{{ entry.template_name }}</strong>
-                  <small>{{ entry.entry_date | date: 'dd MMM yyyy' }}</small>
-                </span>
-                <span class="chevron" aria-hidden="true">&rsaquo;</span>
-              </button>
-            }
-          </div>
-        }
-      </section>
-
       <section class="panel additional-card">
         <div class="panel-heading">
           <div>
@@ -307,8 +312,8 @@
             <p class="section-sub">Payments, membership, agreements, documents, or anything else about this client.</p>
           </div>
           <span class="visibility-toggle" role="group" aria-label="Additional information visibility">
-            <button type="button" [class.active]="!additionalShared" (click)="setAdditionalShared(false)">Private</button>
-            <button type="button" [class.active]="additionalShared" (click)="setAdditionalShared(true)">Shared with Client</button>
+            <button type="button" [disabled]="isSavingAdditional" [class.active]="!additionalShared" (click)="setAdditionalShared(false)">Private</button>
+            <button type="button" [disabled]="isSavingAdditional" [class.active]="additionalShared" (click)="setAdditionalShared(true)">Shared with Client</button>
           </span>
         </div>
 
@@ -329,7 +334,9 @@
                   @if (item.link) {
                     <button type="button" class="ghost-action compact" (click)="openInfoLink(item)">Open</button>
                   }
-                  <button type="button" class="ghost-action compact danger" (click)="removeAdditionalItem(item)">Remove</button>
+                  <button type="button" class="ghost-action compact danger" [disabled]="isSavingAdditional" (click)="removeAdditionalItem(item)">
+                    {{ isSavingAdditional ? 'Saving...' : 'Remove' }}
+                  </button>
                 </div>
               </div>
             }
@@ -383,56 +390,61 @@
             [counterpartName]="client.first_name"
             [description]="'Communicate with ' + client.first_name + ' about check-ins and next steps.'"
           />
-
-          <aside class="panel actions-card" aria-label="Client actions">
-            <div class="panel-heading">
-              <h3>Actions</h3>
-              <span class="status-pill" [class.suspended]="!isClientActive">{{ isClientActive ? 'Active' : 'Suspended' }}</span>
-            </div>
-
-            <div class="action-group">
-              <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Reset Password</button>
-              <button
-                type="button"
-                class="secondary-action compact"
-                [disabled]="isUpdatingStatus"
-                (click)="toggleClientStatus()"
-              >
-                {{ isClientActive ? 'Suspend Account' : 'Reactivate Account' }}
-              </button>
-            </div>
-
-            <div class="action-block warn">
-              <div>
-                <strong>Reset Client</strong>
-                <p>Clears templates, entries, chat, reminders, progress, and notes. Keeps profile details.</p>
-              </div>
-              <button
-                type="button"
-                class="warn-action"
-                [disabled]="isResettingClient"
-                (click)="resetClient()"
-              >
-                {{ isResettingClient ? 'Resetting...' : 'Reset Client' }}
-              </button>
-            </div>
-
-            <div class="action-block danger">
-              <div>
-                <strong>Delete Account</strong>
-                <p>Permanently erases all of this client's details. This cannot be undone.</p>
-              </div>
-              <button
-                type="button"
-                class="danger-action"
-                [disabled]="isDeletingClient"
-                (click)="deleteClient()"
-              >
-                {{ isDeletingClient ? 'Deleting...' : 'Delete Account' }}
-              </button>
-            </div>
-          </aside>
         </div>
+      }
+
+      @if (workspaceTab === 'actions') {
+        <section class="panel actions-card" aria-label="Client actions">
+          <div class="panel-heading">
+            <div>
+              <h3>Client Account Actions</h3>
+              <p class="section-sub">Manage access, account status, client data, and permanent deletion.</p>
+            </div>
+            <span class="status-pill" [class.suspended]="!isClientActive">{{ isClientActive ? 'Active' : 'Suspended' }}</span>
+          </div>
+
+          <div class="action-group">
+            <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Reset Password</button>
+            <button
+              type="button"
+              class="secondary-action compact"
+              [disabled]="isUpdatingStatus"
+              (click)="toggleClientStatus()"
+            >
+              {{ isClientActive ? 'Suspend Account' : 'Reactivate Account' }}
+            </button>
+          </div>
+
+          <div class="action-block warn">
+            <div>
+              <strong>Reset Client</strong>
+              <p>Clears templates, entries, chat, reminders, progress, and notes. Keeps profile details.</p>
+            </div>
+            <button
+              type="button"
+              class="warn-action"
+              [disabled]="isResettingClient"
+              (click)="resetClient()"
+            >
+              {{ isResettingClient ? 'Resetting...' : 'Reset Client' }}
+            </button>
+          </div>
+
+          <div class="action-block danger">
+            <div>
+              <strong>Delete Account</strong>
+              <p>Permanently erases all of this client's details. This cannot be undone.</p>
+            </div>
+            <button
+              type="button"
+              class="danger-action"
+              [disabled]="isDeletingClient"
+              (click)="deleteClient()"
+            >
+              {{ isDeletingClient ? 'Deleting...' : 'Delete Account' }}
+            </button>
+          </div>
+        </section>
       }
     </div>
 
@@ -459,11 +471,11 @@
             </div>
             <div>
               <dt>Reference ID</dt>
-              <dd>{{ profile.lead_submission.reference_id }}</dd>
+              <dd>{{ client.reference_id }}</dd>
             </div>
             <div>
               <dt>Submitted On</dt>
-              <dd>{{ profile.lead_submission.submitted_at | date: 'medium' }}</dd>
+              <dd>{{ (profile.lead_submission?.submitted_at || client.created_at) | date: 'medium' }}</dd>
             </div>
             <div>
               <dt>Joined On</dt>

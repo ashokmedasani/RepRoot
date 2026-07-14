@@ -1,8 +1,8 @@
 <app-trainer-page-shell
   title="Settings"
-  eyebrow="Settings"
+  eyebrow="Trainer settings"
+  subtitle="Manage your profile, security, trainer code, and account preferences."
   activeSection="settings"
-  maxWidth="72rem"
   titleId="account-settings-title"
 >
   <div class="settings-grid">
@@ -12,7 +12,6 @@
           type="button"
           class="settings-tab"
           [class.active]="activeSection === item.id"
-          [class.danger]="item.id === 'delete'"
           (click)="activeSection = item.id"
         >
           {{ item.label }}
@@ -32,30 +31,35 @@
             <app-trainer-profile-form />
           </section>
 
+        </div>
+      }
+
+      <!-- 2. Security -->
+      @if (activeSection === 'security') {
+        <div class="account-content">
           <section class="account-section" aria-labelledby="trainer-code-title">
             <div>
               <h2 id="trainer-code-title">Trainer Code</h2>
-              <p class="section-note">Clients log in with this code plus their username and password. Share it with your clients.</p>
+              <p class="section-note">Clients may use this code during login or trainer lookup. Changes must remain unique.</p>
+            </div>
+            <div class="current-code-display">
+              <span>Current trainer code</span>
+              <strong>{{ trainerCode || 'Not set' }}</strong>
             </div>
             <form class="code-form" (ngSubmit)="saveTrainerCode()">
               <label>
-                <span class="field-label">Your trainer code</span>
+                <span class="field-label">Change trainer code</span>
                 <input type="text" name="trainerCode" [(ngModel)]="codeDraft" placeholder="e.g. FITJOHN" autocomplete="off">
               </label>
               <button type="submit" class="primary-action" [disabled]="isSavingCode">
-                {{ isSavingCode ? 'Saving...' : 'Save Code' }}
+                {{ isSavingCode ? 'Saving...' : 'Validate & Save Code' }}
               </button>
             </form>
             @if (codeMessage) {
               <p class="account-message" [class.error-message]="codeMessageType === 'error'">{{ codeMessage }}</p>
             }
           </section>
-        </div>
-      }
 
-      <!-- 2. Change Password -->
-      @if (activeSection === 'password') {
-        <div class="account-content">
           <section class="account-section" aria-labelledby="change-password-title">
             <div>
               <h2 id="change-password-title">Change Password</h2>
@@ -63,17 +67,28 @@
             </div>
             <form class="password-form" (ngSubmit)="changePassword()">
               <label>
+                <span class="field-label">Current Password</span>
+                <app-password-input name="currentPassword" autocomplete="current-password" [(ngModel)]="passwordForm.currentPassword" />
+              </label>
+              <label>
                 <span class="field-label">New Password</span>
                 <app-password-input name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password" />
               </label>
               <label>
-                <span class="field-label">Confirm Password</span>
+                <span class="field-label">Confirm New Password</span>
                 <app-password-input name="confirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" />
               </label>
               <button type="submit" class="primary-action" [disabled]="isChangingPassword">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}
               </button>
             </form>
+          </section>
+
+          <section class="account-section danger-section" aria-labelledby="delete-account-title">
+            <div>
+              <h2 id="delete-account-title">Delete Trainer Account</h2>
+              <p class="danger-note">To delete your trainer account, please contact Support.</p>
+            </div>
           </section>
         </div>
       }
@@ -133,45 +148,123 @@
         </div>
       }
 
-      <!-- 5. Support -->
-      @if (activeSection === 'support') {
+      <!-- 5. Data Usage -->
+      @if (activeSection === 'storage') {
         <div class="account-content">
-          <section class="account-section" aria-labelledby="support-title">
+          <section class="account-section" aria-labelledby="storage-title">
             <div>
-              <h2 id="support-title">Support</h2>
-              <p class="section-note">We usually reply within one business day.</p>
+              <h2 id="storage-title">Data Usage</h2>
+              <p class="section-note">Estimated UTF-8 database content and uploaded files, grouped by the section that owns them.</p>
             </div>
-            <ul class="link-list">
-              <li>
-                <a [href]="supportMailto('Support Request')">
-                  <strong>Contact Support</strong>
-                  <small>Questions about your account or the app.</small>
-                </a>
-              </li>
-              <li>
-                <a [href]="supportMailto('Bug Report', 'Describe what happened and the steps to reproduce it:')">
-                  <strong>Report a Bug</strong>
-                  <small>Something isn't working as expected.</small>
-                </a>
-              </li>
-              <li>
-                <a [href]="supportMailto('Feature Request', 'Describe the feature you would like to see:')">
-                  <strong>Feature Request</strong>
-                  <small>Suggest an improvement or new feature.</small>
-                </a>
-              </li>
-              <li>
-                <a [href]="supportMailto('Help / FAQ')">
-                  <strong>FAQ / Help Center</strong>
-                  <small>Get answers to common questions.</small>
-                </a>
-              </li>
-            </ul>
+
+            @if (dataUsage; as usage) {
+              <div class="storage-summary">
+                <div>
+                  <span>Total stored</span>
+                  <strong>{{ usage.usage_percent }}%</strong>
+                  <small>{{ usage.record_count }} stored records</small>
+                </div>
+                <div>
+                  <span>Database</span>
+                  <strong>{{ usagePercent(usage.database_bytes, usage.total_bytes) }}%</strong>
+                  <small>Structured profiles and activity</small>
+                </div>
+                <div>
+                  <span>Uploaded files</span>
+                  <strong>{{ usagePercent(usage.file_bytes, usage.total_bytes) }}%</strong>
+                  <small>Photos, documents, and references</small>
+                </div>
+                <div>
+                  <span>{{ usage.plan_name }} plan usage</span>
+                  <strong>{{ usage.usage_percent }}%</strong>
+                  <small>{{ usage.plan_code === 'premium' ? 'Unlimited Storage' : 'Percentage of your plan' }}</small>
+                </div>
+              </div>
+
+              <div class="storage-meter" role="meter" aria-label="Trainer storage used" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="usage.usage_percent">
+                <span [style.width.%]="usage.usage_percent"></span>
+              </div>
+
+              <div class="usage-table-wrap">
+                <table class="usage-table">
+                  <thead>
+                    <tr><th>Section</th><th>Records</th><th>Share of usage</th><th>Of plan</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (row of usageRows(usage.sections, trainerUsageLabels); track row.key) {
+                      <tr>
+                        <td><strong>{{ row.label }}</strong></td>
+                        <td>{{ row.usage.record_count }}</td>
+                        <td>{{ usagePercent(row.usage.database_bytes, row.usage.total_bytes) }}% database · {{ usagePercent(row.usage.file_bytes, row.usage.total_bytes) }}% files</td>
+                        <td><strong>{{ usage.plan_code === 'premium' ? usagePercent(row.usage.total_bytes, usage.total_bytes) : usagePercent(row.usage.total_bytes, usage.quota_bytes) }}%</strong></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (usage.featured_client; as client) {
+                <section class="featured-storage" aria-labelledby="featured-client-storage-title">
+                  <div>
+                    <p class="eyebrow">Most active client</p>
+                    <h3 id="featured-client-storage-title">{{ client.name }}</h3>
+                    <p>{{ '@' + client.username }} · {{ client.reference_id }} · {{ client.record_count }} records</p>
+                  </div>
+                  <strong class="featured-total">{{ usage.plan_code === 'premium' ? usagePercent(client.total_bytes, usage.total_bytes) : usagePercent(client.total_bytes, usage.quota_bytes) }}%</strong>
+                  <small>{{ usage.plan_code === 'premium' ? 'of current stored data' : 'of trainer plan storage' }}</small>
+
+                  <div class="client-usage-grid">
+                    @for (row of usageRows(client.sections, clientUsageLabels); track row.key) {
+                      <article>
+                        <span>{{ row.label }}</span>
+                        <strong>{{ usage.plan_code === 'premium' ? usagePercent(row.usage.total_bytes, client.total_bytes) : usagePercent(row.usage.total_bytes, usage.quota_bytes) }}%</strong>
+                        <small>{{ row.usage.record_count }} records · data share</small>
+                      </article>
+                    }
+                  </div>
+                </section>
+              }
+            } @else if (dataUsageError) {
+              <p class="account-message error-message">{{ dataUsageError }}</p>
+            } @else {
+              <p class="section-note">Calculating storage usage…</p>
+            }
           </section>
         </div>
       }
 
-      <!-- 6. About -->
+      <!-- Application Guide -->
+      @if (activeSection === 'guide') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="application-guide-title">
+            <div>
+              <h2 id="application-guide-title">Application Guide</h2>
+              <p class="section-note">A practical map of every trainer workspace and how information moves through CoachFlow.</p>
+            </div>
+            <div class="guide-list">
+              @for (item of guideItems; track item.title) {
+                <article>
+                  <div><h3>{{ item.title }}</h3><p>{{ item.detail }}</p></div>
+                  <a [routerLink]="item.route">Open</a>
+                </article>
+              }
+            </div>
+            <div class="guide-flow">
+              <strong>Recommended workflow</strong>
+              <p>Complete Profile → create Forms & Groups → add or approve Clients → build Templates → assign References → monitor entries and schedules from Dashboard.</p>
+            </div>
+          </section>
+        </div>
+      }
+
+      <!-- 6. Support -->
+      @if (activeSection === 'support') {
+        <div class="account-content">
+          <app-support-incidents role="trainer" pageFeature="Trainer settings" />
+        </div>
+      }
+
+      <!-- 7. About -->
       @if (activeSection === 'about') {
         <div class="account-content">
           <section class="account-section" aria-labelledby="about-title">
@@ -201,22 +294,6 @@
         </div>
       }
 
-      <!-- 7. Delete Trainer Account -->
-      @if (activeSection === 'delete') {
-        <div class="account-content">
-          <section class="account-section danger-section" aria-labelledby="delete-account-title">
-            <div>
-              <h2 id="delete-account-title">Delete Trainer Account</h2>
-              <p class="danger-note">
-                To permanently delete your trainer account, please contact Support. This helps prevent
-                accidental deletion of client data.
-              </p>
-            </div>
-            <a class="danger-action" [href]="deleteRequestMailto">Request account deletion</a>
-            <p class="section-note">This opens a pre-filled request to our Support team — no account is deleted automatically.</p>
-          </section>
-        </div>
-      }
     </section>
 
     @if (accountMessage) {

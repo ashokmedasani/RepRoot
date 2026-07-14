@@ -15,20 +15,14 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
   template: `
     <ion-content class="ion-padding">
       <div class="chooser">
-        <div class="brand">
-          <span class="logo">CF</span>
-          <h1>CoachFlow</h1>
-          <p>Training, tracking, and coaching in one place.</p>
-        </div>
-
         <div class="choices">
           <ion-button expand="block" size="large" (click)="goTrainer()">
             <ion-icon slot="start" name="barbell-outline" />
-            I'm a Trainer
+            Trainer
           </ion-button>
           <ion-button expand="block" size="large" fill="outline" (click)="goClient()">
             <ion-icon slot="start" name="person-outline" />
-            I'm a Client
+            Client
           </ion-button>
         </div>
       </div>
@@ -90,7 +84,7 @@ export class RoleChooserPage implements OnInit {
     if (this.trainerAuth.hasSession()) {
       void this.router.navigateByUrl('/trainer/tabs/dashboard', { replaceUrl: true });
     } else if (this.clientApi.hasSession()) {
-      void this.router.navigateByUrl('/client/tabs/templates', { replaceUrl: true });
+      void this.router.navigateByUrl('/client/tabs/dashboard', { replaceUrl: true });
     }
   }
 

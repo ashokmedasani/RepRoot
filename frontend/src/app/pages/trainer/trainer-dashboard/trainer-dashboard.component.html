@@ -1,8 +1,8 @@
 <app-trainer-page-shell
   title="Dashboard"
+  eyebrow="Trainer dashboard"
   subtitle="A quick look at your groups, clients, requests, and templates."
   activeSection="dashboard"
-  maxWidth="96rem"
   titleId="dashboard-title"
 >
   @if (message) {
@@ -90,82 +90,158 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3.5v3M16 3.5v3"/></svg>
           </span>
           <div>
-            <h2>Schedule Overview</h2>
+            <h2>Client Tracking Center</h2>
             <p>
-              @if (scheduleSummary.nearest_date) {
+              @if (scheduleSummary.overdue) {
+                {{ scheduleSummary.overdue }} overdue {{ scheduleSummary.overdue === 1 ? 'schedule needs' : 'schedules need' }} attention
+              } @else if (scheduleSummary.pending_profile_edits) {
+                {{ scheduleSummary.pending_profile_edits }} client {{ scheduleSummary.pending_profile_edits === 1 ? 'request needs' : 'requests need' }} review
+              } @else if (scheduleSummary.nearest_date) {
                 Next follow-up on {{ scheduleSummary.nearest_date | date: 'mediumDate' }}
               } @else {
-                No pending follow-ups scheduled
+                No client actions need attention
               }
             </p>
           </div>
         </div>
       </div>
 
-      <div class="sched-tiles">
-        <article class="sched-tile total">
-          <strong>{{ scheduleSummary.total_pending }}</strong>
-          <span>Total Pending</span>
+      <div class="tracking-visuals" aria-label="Client tracking overview">
+        <app-chart-renderer [spec]="clientAttentionChart" />
+        <app-chart-renderer [spec]="scheduleStatusChart" />
+      </div>
+
+      <div class="attention-row-heading">
+        <span>Needs attention</span>
+        <strong>{{ scheduleSummary.overdue + scheduleSummary.due_24_hours + scheduleSummary.pending_profile_edits }} open</strong>
+      </div>
+      <div class="attention-kpi-row" aria-label="Immediate client actions">
+        <article class="attention-kpi overdue" [class.clear]="scheduleSummary.overdue === 0">
+          <span>Past due</span>
+          <strong>{{ scheduleSummary.overdue }}</strong>
+          <small>Overdue schedules</small>
         </article>
-        <article class="sched-tile" [class.alert]="scheduleSummary.due_24_hours > 0">
+        <article class="attention-kpi urgent" [class.clear]="scheduleSummary.due_24_hours === 0">
+          <span>Immediate</span>
           <strong>{{ scheduleSummary.due_24_hours }}</strong>
-          <span>Within 24 Hours</span>
+          <small>Due within 24 hours</small>
         </article>
-        <article class="sched-tile">
-          <strong>{{ scheduleSummary.due_5_days }}</strong>
-          <span>Within 5 Days</span>
+        <article class="attention-kpi review" [class.clear]="scheduleSummary.pending_profile_edits === 0">
+          <span>Client updates</span>
+          <strong>{{ scheduleSummary.pending_profile_edits }}</strong>
+          <small>Client requests to review</small>
         </article>
-        <article class="sched-tile">
-          <strong>{{ scheduleSummary.due_7_days }}</strong>
-          <span>Within 7 Days</span>
-        </article>
-        <article class="sched-tile">
-          <strong>{{ scheduleSummary.due_10_days }}</strong>
-          <span>Within 10 Days</span>
+        <article class="attention-kpi completed">
+          <span>Recent progress</span>
+          <strong>{{ scheduleSummary.completed_last_7_days }}</strong>
+          <small>Completed in last 7 days</small>
         </article>
       </div>
 
       <button type="button" class="upcoming-trigger" (click)="toggleSchedules()" [attr.aria-expanded]="isSchedulesOpen">
-        <span>Upcoming Schedules (Next 10)</span>
+        <span>Client Activity Queue ({{ organizedScheduleReminders.length + pendingProfileEdits.length }})</span>
         <span class="caret" [class.open]="isSchedulesOpen" aria-hidden="true">&#9662;</span>
       </button>
 
       @if (isSchedulesOpen) {
-        <div class="sched-table-wrap">
-          @if (visibleUpcomingReminders.length) {
-            <table class="sched-table">
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Schedule Title</th>
-                  <th>Date &amp; Time</th>
-                  <th>When</th>
-                  <th>Status</th>
-                  <th class="actions-col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (reminder of visibleUpcomingReminders; track reminder.id) {
-                  <tr>
-                    <td data-label="Client"><strong>{{ reminder.client_name }}</strong></td>
-                    <td data-label="Schedule Title">{{ reminder.title }}</td>
-                    <td data-label="Date &amp; Time">{{ reminder.date | date: 'dd MMM yyyy' }}{{ reminder.time ? ', ' + reminder.time : '' }}</td>
-                    <td data-label="When">
-                      <span class="when-chip" [class.soon]="isReminderSoon(reminder.date, reminder.time)">{{ relativeTime(reminder.date, reminder.time) }}</span>
-                    </td>
-                    <td data-label="Status"><span class="status-chip">{{ reminder.status }}</span></td>
-                    <td data-label="Actions" class="actions-col">
-                      <a class="ghost-action compact" [routerLink]="['/trainer/clients', reminder.client]">Open</a>
-                      <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Complete</button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          } @else {
-            <p class="empty-note">No pending schedules.</p>
-          }
+        <div class="activity-queue-tabs" role="group" aria-label="Client activity type">
+          <button type="button" [class.active]="activityQueueView === 'schedules'" (click)="showActivityQueue('schedules')">
+            Schedules <span>{{ organizedScheduleReminders.length }}</span>
+          </button>
+          <button type="button" [class.active]="activityQueueView === 'profile-edits'" (click)="showActivityQueue('profile-edits')">
+            Client Requests <span>{{ pendingProfileEdits.length }}</span>
+          </button>
         </div>
+
+        @if (activityQueueView === 'schedules') {
+          <app-fixed-height-list [visibleRows]="6">
+            <div class="sched-table-wrap">
+            @if (organizedScheduleReminders.length) {
+              <table class="sched-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Schedule Title</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>When</th>
+                    <th>Status</th>
+                    <th class="actions-col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (reminder of organizedScheduleReminders; track reminder.id; let rowIndex = $index) {
+                    @if (showScheduleGroupHeader(reminder, rowIndex)) {
+                      <tr class="schedule-group-row" [class.overdue-group]="isReminderOverdue(reminder)">
+                        <td colspan="7">
+                          <span>{{ scheduleGroupTitle(reminder) }}</span>
+                          <strong>{{ scheduleGroupCount(reminder) }}</strong>
+                        </td>
+                      </tr>
+                    }
+                    <tr>
+                      <td data-label="Client"><strong>{{ reminder.client_name }}</strong></td>
+                      <td data-label="Schedule Title">{{ reminder.title }}</td>
+                      <td data-label="Date">{{ reminder.date | date: 'dd MMM yyyy' }}</td>
+                      <td data-label="Time">{{ reminder.time || 'Not set' }}</td>
+                      <td data-label="When">
+                        <span class="when-chip" [class.overdue]="isReminderOverdue(reminder)" [class.soon]="isReminderSoon(reminder.date, reminder.time)">{{ relativeTime(reminder.date, reminder.time) }}</span>
+                      </td>
+                      <td data-label="Status"><span class="status-chip">{{ reminder.status }}</span></td>
+                      <td data-label="Actions" class="actions-col">
+                        <a class="ghost-action compact" [routerLink]="['/trainer/clients', reminder.client]">Open Client</a>
+                        <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Mark Complete</button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="empty-note">No pending schedules.</p>
+            }
+            </div>
+          </app-fixed-height-list>
+        } @else {
+          <app-fixed-height-list [visibleRows]="6">
+            <div class="sched-table-wrap">
+            @if (pendingProfileEdits.length) {
+              <table class="sched-table edit-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Group</th>
+                    <th>Requested</th>
+                    <th>Request</th>
+                    <th>Client Note</th>
+                    <th class="actions-col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (edit of pendingProfileEdits; track edit.id) {
+                    <tr>
+                      <td data-label="Client"><strong>{{ edit.client_name }}</strong></td>
+                      <td data-label="Group">{{ edit.group_name }}</td>
+                      <td data-label="Requested">{{ edit.created_at | date: 'dd MMM yyyy, h:mm a' }}</td>
+                      <td data-label="Request"><span class="status-chip edit-chip">{{ edit.request_type === 'account_deletion' ? 'Delete account' : edit.proposed_field_count + ' profile fields' }}</span></td>
+                      <td data-label="Client Note" class="note-cell">{{ edit.client_note || 'No note added' }}</td>
+                      <td data-label="Action" class="actions-col">
+                        @if (edit.request_type === 'account_deletion') {
+                          <button type="button" class="primary-action compact" (click)="reviewClientRequest(edit, 'approve')">Approve</button>
+                          <button type="button" class="ghost-action compact" (click)="reviewClientRequest(edit, 'reject')">Keep Account</button>
+                        } @else {
+                          <a class="primary-action compact" [routerLink]="['/trainer/clients', edit.client]">Review Edit</a>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="empty-note">No client account requests are waiting for review.</p>
+            }
+            </div>
+          </app-fixed-height-list>
+        }
       }
     </section>
 
@@ -190,8 +266,9 @@
           </div>
           <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
         </div>
-        <div class="mini-list" [class.scrollable]="pendingRequests.length > 5">
-          @for (submission of pendingRequests.slice(0, 5); track submission.id) {
+        <app-fixed-height-list [visibleRows]="5">
+        <div class="mini-list">
+          @for (submission of pendingRequests; track submission.id) {
             <a routerLink="/trainer/forms-groups">
               <span class="avatar">{{ initialsForSubmission(submission) }}</span>
               <span>
@@ -203,6 +280,7 @@
             <p class="empty-note">No pending requests right now.</p>
           }
         </div>
+        </app-fixed-height-list>
           </article>
 
           <article class="activity-card">
@@ -213,7 +291,8 @@
           </div>
           <a routerLink="/trainer/clients" class="ghost-action compact">View All</a>
         </div>
-        <div class="mini-list" [class.scrollable]="allRecentClients.length > 5">
+        <app-fixed-height-list [visibleRows]="5">
+        <div class="mini-list">
           @for (submission of recentClients; track submission.id) {
             <a [routerLink]="['/trainer/clients', submission.client_access?.id]">
               <span class="avatar">{{ initialsForSubmission(submission) }}</span>
@@ -226,6 +305,7 @@
             <p class="empty-note">No approved clients yet.</p>
           }
         </div>
+        </app-fixed-height-list>
           </article>
 
           <article class="activity-card">
@@ -236,7 +316,8 @@
           </div>
           <a routerLink="/trainer/templates" class="ghost-action compact">Manage</a>
         </div>
-        <div class="mini-list" [class.scrollable]="templates.length > 5">
+        <app-fixed-height-list [visibleRows]="5">
+        <div class="mini-list">
           @for (template of recentTemplates; track template.id) {
             <a [routerLink]="['/trainer/templates', template.id, 'edit']">
               <span class="avatar template-avatar" [class.green]="template.accent === 'green'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">{{ template.name.charAt(0) }}</span>
@@ -249,6 +330,7 @@
             <p class="empty-note">No templates yet. Adopt a standard template to get started.</p>
           }
         </div>
+        </app-fixed-height-list>
           </article>
         </div>
       }

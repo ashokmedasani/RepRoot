@@ -5,7 +5,9 @@
 .app-shell {
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
+  width: 100%;
   min-height: 100vh;
+  overflow-x: clip;
   background: var(--app-bg);
 }
 
@@ -100,6 +102,72 @@ nav {
   border-color: color-mix(in srgb, var(--app-primary) 12%, transparent);
 }
 
+.data-usage {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.65rem 0.75rem;
+  background: var(--app-surface);
+  color: var(--app-primary-strong);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.usage-gauge {
+  --usage-angle: calc(var(--usage-percent) * 3.6deg);
+  position: relative;
+  display: grid;
+  width: 3.15rem;
+  height: 3.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--app-primary) var(--usage-angle), var(--app-surface-soft) 0);
+}
+
+.usage-gauge::before {
+  position: absolute;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  background: var(--app-surface);
+  content: '';
+}
+
+.usage-gauge span {
+  position: relative;
+  color: var(--app-text);
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-copy {
+  display: grid;
+  gap: 0.04rem;
+  min-width: 0;
+}
+
+.data-usage small {
+  color: var(--app-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.data-usage strong {
+  color: var(--app-text);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-usage em {
+  color: var(--app-muted);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
 .signout {
   display: flex;
   align-items: center;
@@ -192,7 +260,7 @@ button:disabled {
 
 @media (max-width: 900px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {
@@ -203,6 +271,8 @@ button:disabled {
     align-items: center;
     height: auto;
     gap: 1rem;
+    /* Prevent the icon bar's intrinsic width from stretching the page. */
+    min-width: 0;
     border-right: 0;
     border-bottom: 1px solid var(--app-border);
     padding: 0.75rem 1.25rem;
@@ -213,6 +283,8 @@ button:disabled {
 
   nav {
     flex-direction: row;
+    /* Allow the icon strip to shrink and scroll instead of stretching the page. */
+    min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 0;
@@ -225,7 +297,8 @@ button:disabled {
   }
 
   .nav-item span,
-  .signout span {
+  .signout span,
+  .data-usage small {
     display: none;
   }
 
@@ -233,6 +306,24 @@ button:disabled {
   .signout {
     padding: 0.65rem;
     border-radius: var(--app-radius-md);
+  }
+
+  .data-usage {
+    padding: 0.65rem;
+  }
+
+  .usage-copy {
+    display: none;
+  }
+
+  .usage-gauge {
+    width: 2.7rem;
+    height: 2.7rem;
+  }
+
+  .usage-gauge::before {
+    width: 2rem;
+    height: 2rem;
   }
   
   .nav-item:hover {

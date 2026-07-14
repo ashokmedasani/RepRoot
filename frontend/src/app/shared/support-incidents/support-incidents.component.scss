@@ -1,0 +1,27 @@
+.support-incidents { display: grid; gap: 1rem; }
+.support-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }
+.support-heading h2 { margin: .2rem 0 .35rem; }
+.support-heading p:not(.eyebrow) { margin: 0; color: var(--app-muted); }
+.support-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: end; }
+.active-count { color: var(--app-muted); font-size: .85rem; white-space: nowrap; }
+.incident-form, .incident-card { border: 1px solid var(--app-border); border-radius: 1rem; padding: 1rem; background: var(--app-surface, #fff); }
+.incident-form { display: grid; gap: .85rem; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+label { display: grid; gap: .35rem; color: var(--app-text); font-weight: 700; }
+label span { font-size: .82rem; }
+input, select, textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--app-border); border-radius: .65rem; background: var(--app-surface, #fff); color: var(--app-text); padding: .7rem .75rem; font: inherit; }
+textarea { resize: vertical; }
+.form-actions { display: flex; justify-content: end; gap: .6rem; }
+.incident-list { display: grid; gap: .8rem; }
+.incident-card { display: grid; gap: .55rem; }
+.incident-card h3, .incident-card p { margin: 0; }
+.incident-meta, .incident-id { color: var(--app-muted); font-size: .82rem; }
+.incident-topline { display: flex; justify-content: space-between; gap: .5rem; align-items: center; }
+.status-pill { border-radius: 999px; padding: .25rem .55rem; background: color-mix(in srgb, var(--app-primary) 12%, transparent); color: var(--app-primary); font-size: .75rem; font-weight: 800; }
+.status-pill[data-status='resolved'], .status-pill[data-status='closed'] { background: #e7f6ed; color: #18794e; }
+.status-pill[data-status='waiting_for_user'] { background: #fff5dc; color: #8a5c00; }
+.conversation { display: grid; gap: .35rem; padding: .75rem; border-radius: .7rem; background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface, #fff)); }
+.conversation p { font-size: .88rem; }
+.limit-note, .support-message, .empty-state { margin: 0; padding: .75rem; border-radius: .7rem; background: color-mix(in srgb, var(--app-primary) 7%, transparent); }
+.error-message { background: #fff0f0; color: #a12828; }
+@media (max-width: 700px) { .support-heading { display: grid; } .support-actions { justify-content: start; } .form-grid { grid-template-columns: 1fr; } }

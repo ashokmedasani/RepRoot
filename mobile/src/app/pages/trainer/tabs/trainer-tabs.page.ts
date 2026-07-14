@@ -4,12 +4,12 @@ import { addIcons } from 'ionicons';
 import {
   ellipsisHorizontalOutline,
   gridOutline,
-  layersOutline,
+  gridOutline as manageOutline,
   peopleOutline,
   readerOutline
 } from 'ionicons/icons';
 
-/** Trainer shell: 5 bottom tabs, each holding its own screen stack. */
+/** Trainer shell: Dashboard, Clients, Manage, and More. Shop is intentionally deferred. */
 @Component({
   selector: 'app-trainer-tabs',
   standalone: true,
@@ -25,13 +25,9 @@ import {
           <ion-icon name="people-outline" />
           <ion-label>Clients</ion-label>
         </ion-tab-button>
-        <ion-tab-button tab="forms-groups">
+        <ion-tab-button tab="manage">
           <ion-icon name="reader-outline" />
-          <ion-label>Forms</ion-label>
-        </ion-tab-button>
-        <ion-tab-button tab="templates">
-          <ion-icon name="layers-outline" />
-          <ion-label>Templates</ion-label>
+          <ion-label>Manage</ion-label>
         </ion-tab-button>
         <ion-tab-button tab="more">
           <ion-icon name="ellipsis-horizontal-outline" />
@@ -43,6 +39,6 @@ import {
 })
 export class TrainerTabsPage {
   constructor() {
-    addIcons({ gridOutline, peopleOutline, readerOutline, layersOutline, ellipsisHorizontalOutline });
+    addIcons({ gridOutline, peopleOutline, readerOutline, ellipsisHorizontalOutline, manageOutline });
   }
 }

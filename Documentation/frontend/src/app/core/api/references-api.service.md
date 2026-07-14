@@ -1,5 +1,11 @@
 # frontend/src/app/core/api/references-api.service.ts
 
+## 2026-07-13 targeted refinement
+
+Exposes configured reference usage and limit data returned by the backend.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Typed Angular HTTP client for the trainer references library (categories and references).

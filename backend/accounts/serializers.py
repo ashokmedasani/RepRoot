@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 
@@ -13,9 +14,12 @@ from .models import (
   ClientDetailChangeRequest,
   ClientRegistrationForm,
   ClientReminder,
+  GroupRegistrationSubmission,
   LeadSubmission,
   ProgressEntry,
   ReferenceCategory,
+  SupportIncident,
+  SupportIncidentMessage,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
@@ -27,6 +31,114 @@ from .models import (
 )
 
 User = get_user_model()
+
+PROFILE_VISIBILITY_KEYS = {
+  'professional_headline',
+  'about',
+  'professional_summary',
+  'specializations',
+  'experience',
+  'languages',
+  'training_style',
+  'certification',
+  'images',
+  'links',
+}
+
+LEGACY_PROFILE_VISIBILITY_KEYS = {
+  'certifications': 'certification',
+  'gallery': 'images',
+  'social_links': 'links',
+}
+
+
+def normalize_profile_visibility(value):
+  """Return the complete, current section-visibility contract."""
+  source = value if isinstance(value, dict) else {}
+  normalized = {key: bool(source.get(key, False)) for key in PROFILE_VISIBILITY_KEYS}
+
+  for legacy_key, current_key in LEGACY_PROFILE_VISIBILITY_KEYS.items():
+    if current_key not in source and legacy_key in source:
+      normalized[current_key] = bool(source[legacy_key])
+
+  return normalized
+
+
+def normalize_additional_info(items):
+  """Convert legacy label/value items to the current, stable UI contract."""
+  if not isinstance(items, list):
+    return []
+
+  normalized = []
+  used_ids = set()
+
+  for index, item in enumerate(items[:100]):
+    if not isinstance(item, dict):
+      continue
+
+    title = str(item.get('title') or item.get('label') or '').strip()[:200]
+    if not title:
+      continue
+
+    item_type = str(item.get('type') or '').strip().lower()
+    if item_type not in {'text', 'link', 'reference'}:
+      item_type = 'link' if item.get('link') or item.get('url') else 'text'
+
+    item_id = str(item.get('id') or '').strip()[:120]
+    if not item_id:
+      fingerprint = hashlib.sha256(
+        json.dumps(item, sort_keys=True, default=str).encode('utf-8')
+      ).hexdigest()[:12]
+      item_id = f'legacy-{index}-{fingerprint}'
+
+    base_id = item_id
+    duplicate_index = 2
+    while item_id in used_ids:
+      item_id = f'{base_id}-{duplicate_index}'[:120]
+      duplicate_index += 1
+    used_ids.add(item_id)
+
+    visibility = str(item.get('visibility') or '').strip().lower()
+    if visibility not in {'private', 'client'}:
+      visibility = 'client' if 'label' in item else 'private'
+
+    cleaned = {
+      'id': item_id,
+      'title': title,
+      'type': item_type,
+      'visibility': visibility,
+    }
+
+    if item_type == 'text':
+      cleaned['text'] = str(item.get('text') or item.get('value') or '').strip()[:10000]
+    else:
+      cleaned['link'] = str(item.get('link') or item.get('url') or '').strip()[:2000]
+
+    if item_type == 'reference':
+      reference_id = item.get('reference_id')
+      try:
+        cleaned['reference_id'] = int(reference_id) if reference_id not in (None, '') else None
+      except (TypeError, ValueError):
+        cleaned['reference_id'] = None
+      cleaned['reference_title'] = str(item.get('reference_title') or '').strip()[:200]
+
+    normalized.append(cleaned)
+
+  return normalized
+
+
+def validate_client_photo(value):
+  photo = str(value or '')
+  if not photo:
+    return ''
+
+  if len(photo) > 7_000_000:
+    raise serializers.ValidationError('The profile photo must be smaller than 5 MB.')
+
+  if not re.match(r'^data:image/(jpeg|jpg|png|webp|gif);base64,', photo, re.IGNORECASE):
+    raise serializers.ValidationError('Upload a JPEG, PNG, WebP, or GIF image.')
+
+  return photo
 
 FIELD_TYPES = {
   'short_text',
@@ -277,10 +389,16 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 class TrainerPasswordChangeSerializer(serializers.Serializer):
+  current_password = serializers.CharField(write_only=True)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
 
   def validate(self, attrs):
+    user = self.context['user']
+
+    if not user.check_password(attrs['current_password']):
+      raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
+
     try:
       validate_password_strength(attrs['password'])
     except serializers.ValidationError as error:
@@ -439,6 +557,33 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
 
     return trainer_id
 
+  def validate_profile_photo(self, value):
+    return self.validate_image_upload(value)
+
+  def validate_transformation_photo(self, value):
+    return self.validate_image_upload(value)
+
+  def validate_training_photo(self, value):
+    return self.validate_image_upload(value)
+
+  def validate_certification_file(self, value):
+    if value.size > 10 * 1024 * 1024:
+      raise serializers.ValidationError('Certification files must be smaller than 10 MB.')
+
+    content_type = str(getattr(value, 'content_type', '') or '').lower()
+    if content_type and content_type != 'application/pdf' and not content_type.startswith('image/'):
+      raise serializers.ValidationError('Upload a PDF or image certification file.')
+    return value
+
+  def validate_image_upload(self, value):
+    if value.size > 5 * 1024 * 1024:
+      raise serializers.ValidationError('Images must be smaller than 5 MB.')
+
+    content_type = str(getattr(value, 'content_type', '') or '').lower()
+    if content_type and not content_type.startswith('image/'):
+      raise serializers.ValidationError('Upload a valid image file.')
+    return value
+
   def validate_profile_images(self, value):
     return self.normalize_profile_collection(value, {'category', 'title', 'url'})
 
@@ -455,16 +600,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     if not isinstance(value, dict):
       raise serializers.ValidationError('Expected an object.')
 
-    allowed_keys = {
-      'about',
-      'professional_summary',
-      'training_style',
-      'certification',
-      'images',
-      'links',
-    }
-
-    return {key: bool(value.get(key, False)) for key in allowed_keys}
+    return normalize_profile_visibility(value)
 
   def normalize_profile_collection(self, value, allowed_keys):
     if isinstance(value, str):
@@ -572,8 +708,8 @@ class ClientRegistrationFormSerializer(serializers.ModelSerializer):
 
   class Meta:
     model = ClientRegistrationForm
-    fields = ['id', 'group', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
-    read_only_fields = ['id', 'group', 'fields', 'is_active', 'created_at', 'updated_at']
+    fields = ['id', 'group', 'public_slug', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'group', 'public_slug', 'fields', 'is_active', 'created_at', 'updated_at']
 
   def validate(self, attrs):
     attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields', []))
@@ -641,6 +777,51 @@ class PublicLeadSubmissionSerializer(serializers.Serializer):
     return attrs
 
 
+class GroupRegistrationSubmissionSerializer(serializers.ModelSerializer):
+  applicant_name = serializers.SerializerMethodField()
+  client_access_id = serializers.SerializerMethodField()
+
+  class Meta:
+    model = GroupRegistrationSubmission
+    fields = [
+      'id',
+      'group',
+      'applicant_name',
+      'first_name',
+      'last_name',
+      'email',
+      'reference_id',
+      'answers',
+      'status',
+      'submitted_at',
+      'converted_at',
+      'client_access_id',
+    ]
+    read_only_fields = fields
+
+  def get_applicant_name(self, obj):
+    return f'{obj.first_name} {obj.last_name}'.strip()
+
+  def get_client_access_id(self, obj):
+    try:
+      return obj.client_access.id
+    except ClientAccess.DoesNotExist:
+      return None
+
+
+class PublicGroupRegistrationSerializer(serializers.Serializer):
+  answers = serializers.DictField()
+
+  def validate(self, attrs):
+    registration_form = self.context['registration_form']
+    answers = attrs['answers']
+    validate_required_answers(registration_form.fields, answers)
+    attrs['first_name'] = str(answers.get('first_name', '')).strip()
+    attrs['last_name'] = str(answers.get('last_name', '')).strip()
+    attrs['email'] = str(answers.get('email', '')).strip().lower()
+    return attrs
+
+
 class ClientAccessCreateSerializer(serializers.Serializer):
   group_id = serializers.IntegerField()
   username = serializers.CharField(max_length=150)
@@ -648,6 +829,8 @@ class ClientAccessCreateSerializer(serializers.Serializer):
   confirm_password = serializers.CharField(min_length=8, write_only=True)
   photo = serializers.CharField(required=False, allow_blank=True, default='')
   registration_answers = serializers.DictField(required=False)
+  send_credentials = serializers.BooleanField(required=False, default=True)
+  registration_submission_id = serializers.IntegerField(required=False, allow_null=True)
 
   def validate_username(self, value):
     username = value.strip().lower()
@@ -655,7 +838,9 @@ class ClientAccessCreateSerializer(serializers.Serializer):
     if not username:
       raise serializers.ValidationError('Client username is required.')
 
-    if ClientAccess.objects.filter(username__iexact=username, is_active=True).exists():
+    trainer = self.context.get('trainer')
+
+    if trainer and ClientAccess.objects.filter(trainer=trainer, username__iexact=username).exists():
       raise serializers.ValidationError('Client username is already taken.')
 
     return username
@@ -689,8 +874,7 @@ class ClientLoginSerializer(serializers.Serializer):
       trainer__trainer_profile__trainer_id__iexact=trainer_id,
       username__iexact=username,
       is_active=True,
-      lead_submission__status=LeadSubmission.STATUS_APPROVED,
-    ).select_related('trainer', 'group', 'lead_submission')
+    ).select_related('trainer', 'group', 'lead_submission', 'registration_submission')
 
     client_access = None
 
@@ -1075,6 +1259,7 @@ class ClientPasswordChangeSerializer(serializers.Serializer):
 class ClientAccessSerializer(serializers.ModelSerializer):
   group_name = serializers.CharField(source='group.name', read_only=True)
   trainer_name = serializers.SerializerMethodField()
+  additional_info = serializers.SerializerMethodField()
 
   class Meta:
     model = ClientAccess
@@ -1084,6 +1269,9 @@ class ClientAccessSerializer(serializers.ModelSerializer):
       'group_name',
       'trainer_name',
       'lead_submission',
+      'registration_submission',
+      'reference_id',
+      'onboarding_method',
       'first_name',
       'last_name',
       'email',
@@ -1102,21 +1290,117 @@ class ClientAccessSerializer(serializers.ModelSerializer):
   def get_trainer_name(self, obj):
     return obj.trainer.get_full_name() or obj.trainer.username
 
+  def get_additional_info(self, obj):
+    return normalize_additional_info(obj.additional_info)
+
+
+class ClientAdditionalInfoUpdateSerializer(serializers.Serializer):
+  additional_info = serializers.JSONField()
+  additional_info_shared = serializers.BooleanField(required=False)
+
+  def validate_additional_info(self, value):
+    if not isinstance(value, list):
+      raise serializers.ValidationError('Must be a list.')
+
+    if len(value) > 100:
+      raise serializers.ValidationError('A maximum of 100 additional information items is allowed.')
+
+    return normalize_additional_info(value)
+
+
+class ClientPhotoUpdateSerializer(serializers.Serializer):
+  photo = serializers.CharField(required=False, allow_blank=True, trim_whitespace=False, default='')
+
+  def validate_photo(self, value):
+    return validate_client_photo(value)
+
 
 class ClientDetailChangeRequestSerializer(serializers.ModelSerializer):
+  reviewed_by = serializers.SerializerMethodField()
+
   class Meta:
     model = ClientDetailChangeRequest
     fields = [
       'id',
       'client',
+      'request_type',
       'proposed_answers',
       'status',
       'client_note',
       'trainer_note',
       'created_at',
       'reviewed_at',
+      'reviewed_by',
+      'archived_at',
     ]
     read_only_fields = fields
+
+  def get_reviewed_by(self, obj):
+    if not obj.reviewed_at:
+      return ''
+    trainer = obj.client.trainer
+    return trainer.get_full_name() or trainer.username
+
+
+class SupportIncidentMessageSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = SupportIncidentMessage
+    fields = ['id', 'author_type', 'author_name', 'body', 'created_at']
+    read_only_fields = fields
+
+
+class SupportIncidentSerializer(serializers.ModelSerializer):
+  messages = serializers.SerializerMethodField()
+  screenshot_url = serializers.SerializerMethodField()
+  assigned_support_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = SupportIncident
+    fields = [
+      'id', 'incident_id', 'reporter_role', 'reporter_name', 'reporter_email', 'category',
+      'subject', 'description', 'page_feature', 'platform', 'app_version', 'device_info',
+      'screenshot_url', 'priority', 'status', 'assigned_support_name', 'resolution_note',
+      'closed_at', 'created_at', 'updated_at', 'messages',
+    ]
+    read_only_fields = fields
+
+  def get_messages(self, obj):
+    messages = obj.messages.all()
+    if not self.context.get('include_internal', False):
+      messages = messages.exclude(author_type=SupportIncidentMessage.AUTHOR_INTERNAL)
+    return SupportIncidentMessageSerializer(messages, many=True).data
+
+  def get_screenshot_url(self, obj):
+    if not obj.screenshot:
+      return ''
+    request = self.context.get('request')
+    return request.build_absolute_uri(obj.screenshot.url) if request else obj.screenshot.url
+
+  def get_assigned_support_name(self, obj):
+    if not obj.assigned_support:
+      return ''
+    return obj.assigned_support.get_full_name() or obj.assigned_support.username
+
+
+class SupportIncidentCreateSerializer(serializers.Serializer):
+  category = serializers.ChoiceField(choices=SupportIncident.CATEGORY_CHOICES)
+  subject = serializers.CharField(max_length=180)
+  description = serializers.CharField(max_length=5000)
+  page_feature = serializers.CharField(max_length=180, required=False, allow_blank=True, default='')
+  platform = serializers.ChoiceField(choices=['web', 'android'], default='web')
+  app_version = serializers.CharField(max_length=40, required=False, allow_blank=True, default='')
+  device_info = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+  screenshot = serializers.FileField(required=False, allow_null=True)
+
+  def validate_screenshot(self, value):
+    if not value:
+      return value
+    if value.size > 5 * 1024 * 1024:
+      raise serializers.ValidationError('Screenshots must be 5 MB or smaller.')
+    content_type = str(getattr(value, 'content_type', '')).lower()
+    if content_type not in ('image/jpeg', 'image/png', 'image/webp'):
+      raise serializers.ValidationError('Only PNG, JPEG, and WebP screenshots are supported.')
+    return value
 
 
 class ClientReminderSerializer(serializers.ModelSerializer):

@@ -39,6 +39,50 @@ label {
   margin-top: 0.35rem;
 }
 
+.profile-hero {
+  overflow: visible;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 0;
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
+}
+
+.profile-hero .hero-content {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.profile-hero .hero-photo {
+  overflow: hidden;
+  width: 8.5rem;
+  height: 8.5rem;
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+}
+
+.profile-hero .hero-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.profile-hero .photo-placeholder {
+  width: 100%;
+  height: 100%;
+  font-size: 1.8rem;
+}
+
+.profile-hero .hero-copy {
+  padding: 0;
+}
+
 .section-block {
   gap: 1rem;
   border: 1px solid var(--app-border);
@@ -159,7 +203,6 @@ textarea:focus {
   gap: 0.75rem;
 }
 
-.media-row,
 .link-row-edit {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
@@ -171,14 +214,49 @@ textarea:focus {
   background: var(--app-surface-soft);
 }
 
+.media-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.85rem;
+  background: var(--app-surface-soft);
+}
+
+.media-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.media-fields .upload-field {
+  grid-column: 1 / -1;
+}
+
+.media-preview-wrap {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .link-row-edit {
   grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto;
 }
 
 .media-preview {
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: var(--app-radius-sm);
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
   object-fit: cover;
 }
 
@@ -233,10 +311,8 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
-  .hero-photo {
-    width: 8rem;
-    height: 8rem;
-  }
+  .profile-hero .hero-content { grid-template-columns: 1fr; justify-items: start; text-align: left; }
+  .profile-hero .hero-photo { width: 6.5rem; height: 6.5rem; }
 
   .form-grid {
     grid-template-columns: 1fr;
@@ -246,6 +322,9 @@ button:disabled {
   .link-row-edit {
     grid-template-columns: 1fr;
   }
+
+  .media-fields { grid-template-columns: 1fr; }
+  .media-fields .upload-field { grid-column: auto; }
 }
 
 /* Visibility is controlled on the Profile page, not in My Account. */

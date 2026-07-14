@@ -222,7 +222,7 @@ export class TrainerClientTemplateComponent implements OnInit {
     if (format === 'csv') {
       exportCsv(name, table);
     } else if (format === 'excel') {
-      exportExcel(name, table);
+      void exportExcel(name, table);
     } else {
       exportPdf(name, `${template.name} - ${this.client?.first_name || ''} ${this.client?.last_name || ''}`.trim(), table);
     }

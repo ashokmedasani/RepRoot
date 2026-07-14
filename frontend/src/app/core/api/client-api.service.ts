@@ -8,6 +8,7 @@ import {
   ClientDetailChangeRequest,
   DynamicField,
   LeadSubmission,
+  ClientReminder,
   ProgressEntry,
   TrainerGroup
 } from './forms-groups-api.service';
@@ -30,16 +31,33 @@ export interface ClientLoginResponse {
 export interface TrainerDirectoryEntry {
   trainer_id: string;
   trainer_name: string;
-  professional_headline: string;
 }
 
 export interface ClientMeResponse {
   client: ClientAccessRecord;
   group: TrainerGroup;
   registration_fields: DynamicField[];
-  lead_submission: LeadSubmission;
+  lead_submission: LeadSubmission | null;
   trainer_profile: ClientTrainerProfile | null;
   shared_additional_info: AdditionalInfoItem[];
+}
+
+export interface ClientDashboardResponse {
+  summary: {
+    total_entries: number;
+    entries_this_week: number;
+    entries_last_30_days: number;
+    active_days_last_30: number;
+    consistency_percent: number;
+    current_streak: number;
+    last_entry_date: string;
+    completed_schedules_last_30: number;
+    active_templates: number;
+    overdue: number;
+    due_24_hours: number;
+    due_7_days: number;
+  };
+  schedules: ClientReminder[];
 }
 
 export interface ClientTrainerProfile {
@@ -71,6 +89,44 @@ export interface ClientEntrySubmitPayload {
   entry_time: string;
   answers: Record<string, string>;
   note: string;
+}
+
+export interface ClientSupportIncidentMessage {
+  id: number;
+  author_type: 'user' | 'support';
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface ClientSupportIncident {
+  id: number;
+  incident_id: string;
+  reporter_role: 'trainer' | 'client';
+  reporter_name: string;
+  reporter_email: string;
+  category: string;
+  subject: string;
+  description: string;
+  page_feature: string;
+  platform: 'web' | 'android';
+  app_version: string;
+  device_info: string;
+  screenshot_url: string;
+  priority: string;
+  status: string;
+  assigned_support_name: string;
+  resolution_note: string;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: ClientSupportIncidentMessage[];
+}
+
+export interface ClientSupportIncidentListResponse {
+  incidents: ClientSupportIncident[];
+  active_count: number;
+  active_limit: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -113,6 +169,20 @@ export class ClientApiService {
 
   getMe(): Observable<ClientMeResponse> {
     return this.http.get<ClientMeResponse>(`${this.apiBaseUrl}/client/me/`, { headers: this.getAuthHeaders() });
+  }
+
+  logout(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBaseUrl}/client/logout/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getDashboard(): Observable<ClientDashboardResponse> {
+    return this.http.get<ClientDashboardResponse>(`${this.apiBaseUrl}/client/dashboard/`, {
+      headers: this.getAuthHeaders()
+    });
   }
 
   getTemplates(): Observable<{ templates: TrackingTemplateRecord[] }> {
@@ -187,6 +257,61 @@ export class ClientApiService {
     );
   }
 
+  getAccountDeletionRequest(): Observable<{ deletion_request: ClientDetailChangeRequest | null }> {
+    return this.http.get<{ deletion_request: ClientDetailChangeRequest | null }>(
+      `${this.apiBaseUrl}/client/account-deletion-request/`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  requestAccountDeletion(note = ''): Observable<{ deletion_request: ClientDetailChangeRequest; message: string }> {
+    return this.http.post<{ deletion_request: ClientDetailChangeRequest; message: string }>(
+      `${this.apiBaseUrl}/client/account-deletion-request/`,
+      { note },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  withdrawAccountDeletionRequest(): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiBaseUrl}/client/account-deletion-request/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  getSupportIncidents(): Observable<ClientSupportIncidentListResponse> {
+    return this.http.get<ClientSupportIncidentListResponse>(`${this.apiBaseUrl}/client/support/incidents/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  createSupportIncident(payload: {
+    category: string;
+    subject: string;
+    description: string;
+    page_feature: string;
+    platform: 'web' | 'android';
+    app_version: string;
+    device_info?: string;
+    screenshot?: File | null;
+  }): Observable<{ incident: ClientSupportIncident; message: string }> {
+    const form = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value instanceof File) form.append(key, value);
+      else if (value !== null && value !== undefined) form.append(key, String(value));
+    });
+    return this.http.post<{ incident: ClientSupportIncident; message: string }>(`${this.apiBaseUrl}/client/support/incidents/`, form, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  actOnSupportIncident(incidentId: string, action: 'follow_up' | 'reopen', body = ''): Observable<{ incident: ClientSupportIncident; message: string }> {
+    return this.http.post<{ incident: ClientSupportIncident; message: string }>(
+      `${this.apiBaseUrl}/client/support/incidents/${encodeURIComponent(incidentId)}/`,
+      { action, body },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
   private getAuthHeaders(): HttpHeaders {
     const token = window.sessionStorage.getItem('client-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `ClientToken ${token}` } : {});
@@ -199,6 +324,6 @@ export class ClientApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return 'http://127.0.0.1:8000/api/accounts';
+    return `http://${window.location.hostname}:8000/api/accounts`;
   }
 }

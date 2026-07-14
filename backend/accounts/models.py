@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+import uuid
 
 
 UNIVERSAL_CORE_FIELDS = [
@@ -99,9 +100,31 @@ def default_client_registration_fields():
   return fields
 
 
+def generate_client_reference_id():
+  """Generate a compact internal reference for every client onboarding path."""
+  return f'CL-{uuid.uuid4().hex[:10].upper()}'
+
+
+def generate_trainer_internal_reference():
+  """Generate an immutable, support-safe identifier for trainer audit history."""
+  return f'TRN-{uuid.uuid4().hex[:10].upper()}'
+
+
 class TrainerProfile(models.Model):
+  PLAN_STARTER = 'starter'
+  PLAN_PREMIUM = 'premium'
+  PLAN_CHOICES = [(PLAN_STARTER, 'Starter'), (PLAN_PREMIUM, 'Premium')]
+
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_profile')
+  internal_reference_code = models.CharField(
+    max_length=24,
+    unique=True,
+    default=generate_trainer_internal_reference,
+    editable=False,
+    db_index=True,
+  )
   trainer_id = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
+  plan_tier = models.CharField(max_length=20, choices=PLAN_CHOICES, default=PLAN_STARTER, db_index=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='trainer-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
@@ -178,6 +201,7 @@ class TrainerGroup(models.Model):
 
 class ClientRegistrationForm(models.Model):
   group = models.OneToOneField(TrainerGroup, on_delete=models.CASCADE, related_name='client_registration_form')
+  public_slug = models.SlugField(max_length=64, unique=True, null=True, blank=True, db_index=True)
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -188,6 +212,11 @@ class ClientRegistrationForm(models.Model):
 
   def __str__(self) -> str:
     return f'{self.group.name} client registration form'
+
+  def save(self, *args, **kwargs):
+    if not self.public_slug:
+      self.public_slug = f'group-{self.group_id}-{uuid.uuid4().hex[:12]}'
+    return super().save(*args, **kwargs)
 
 
 class LeadSubmission(models.Model):
@@ -222,10 +251,64 @@ class LeadSubmission(models.Model):
     return f'{self.reference_id} - {self.email}'
 
 
+class GroupRegistrationSubmission(models.Model):
+  STATUS_PENDING = 'pending'
+  STATUS_CONVERTED = 'converted'
+  STATUS_DELETED = 'deleted'
+
+  STATUS_CHOICES = [
+    (STATUS_PENDING, 'Pending'),
+    (STATUS_CONVERTED, 'Converted'),
+    (STATUS_DELETED, 'Deleted'),
+  ]
+
+  group = models.ForeignKey(TrainerGroup, on_delete=models.CASCADE, related_name='registration_submissions')
+  first_name = models.CharField(max_length=150)
+  last_name = models.CharField(max_length=150)
+  email = models.EmailField()
+  reference_id = models.CharField(max_length=32, unique=True, default=generate_client_reference_id)
+  answers = models.JSONField(default=dict)
+  status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+  submitted_at = models.DateTimeField(auto_now_add=True)
+  converted_at = models.DateTimeField(null=True, blank=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'group_registration_submissions'
+    ordering = ['-submitted_at']
+
+  def __str__(self) -> str:
+    return f'{self.reference_id} - {self.group.name}'
+
+
 class ClientAccess(models.Model):
+  ONBOARDING_PUBLIC_LEAD = 'public_lead'
+  ONBOARDING_MANUAL = 'manual'
+  ONBOARDING_GROUP_REGISTRATION = 'group_registration'
+  ONBOARDING_CHOICES = [
+    (ONBOARDING_PUBLIC_LEAD, 'Public lead'),
+    (ONBOARDING_MANUAL, 'Manual'),
+    (ONBOARDING_GROUP_REGISTRATION, 'Group registration'),
+  ]
+
   trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_access_records')
   group = models.ForeignKey(TrainerGroup, on_delete=models.PROTECT, related_name='client_access_records')
-  lead_submission = models.OneToOneField(LeadSubmission, on_delete=models.PROTECT, related_name='client_access')
+  lead_submission = models.OneToOneField(
+    LeadSubmission,
+    on_delete=models.PROTECT,
+    related_name='client_access',
+    null=True,
+    blank=True,
+  )
+  registration_submission = models.OneToOneField(
+    GroupRegistrationSubmission,
+    on_delete=models.PROTECT,
+    related_name='client_access',
+    null=True,
+    blank=True,
+  )
+  reference_id = models.CharField(max_length=32, unique=True, default=generate_client_reference_id)
+  onboarding_method = models.CharField(max_length=24, choices=ONBOARDING_CHOICES, default=ONBOARDING_PUBLIC_LEAD)
   first_name = models.CharField(max_length=150)
   last_name = models.CharField(max_length=150)
   email = models.EmailField()
@@ -252,23 +335,36 @@ class ClientAccess(models.Model):
 
 
 class ClientDetailChangeRequest(models.Model):
+  TYPE_PROFILE_EDIT = 'profile_edit'
+  TYPE_ACCOUNT_DELETION = 'account_deletion'
+  TYPE_CHOICES = [
+    (TYPE_PROFILE_EDIT, 'Profile edit'),
+    (TYPE_ACCOUNT_DELETION, 'Account deletion'),
+  ]
+
   STATUS_PENDING = 'pending'
   STATUS_APPROVED = 'approved'
   STATUS_REJECTED = 'rejected'
+  STATUS_CANCELLED = 'cancelled'
+  STATUS_ARCHIVED = 'archived'
 
   STATUS_CHOICES = [
     (STATUS_PENDING, 'Pending'),
     (STATUS_APPROVED, 'Approved'),
     (STATUS_REJECTED, 'Rejected'),
+    (STATUS_CANCELLED, 'Cancelled'),
+    (STATUS_ARCHIVED, 'Archived'),
   ]
 
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='detail_change_requests')
+  request_type = models.CharField(max_length=24, choices=TYPE_CHOICES, default=TYPE_PROFILE_EDIT, db_index=True)
   proposed_answers = models.JSONField(default=dict)
   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
   client_note = models.TextField(blank=True)
   trainer_note = models.TextField(blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
   reviewed_at = models.DateTimeField(null=True, blank=True)
+  archived_at = models.DateTimeField(null=True, blank=True)
 
   class Meta:
     db_table = 'client_detail_change_requests'
@@ -276,6 +372,125 @@ class ClientDetailChangeRequest(models.Model):
 
   def __str__(self) -> str:
     return f'{self.client.username} detail change ({self.status})'
+
+
+def support_incident_reference():
+  return f'INC-{uuid.uuid4().hex[:10].upper()}'
+
+
+class SupportIncident(models.Model):
+  ROLE_TRAINER = 'trainer'
+  ROLE_CLIENT = 'client'
+  ROLE_CHOICES = [(ROLE_TRAINER, 'Trainer'), (ROLE_CLIENT, 'Client')]
+
+  CATEGORY_FEEDBACK = 'feedback'
+  CATEGORY_BUG = 'bug_report'
+  CATEGORY_ACCOUNT = 'account_issue'
+  CATEGORY_PAYMENT = 'payment_subscription'
+  CATEGORY_FEATURE = 'feature_request'
+  CATEGORY_TECHNICAL = 'technical_problem'
+  CATEGORY_OTHER = 'other'
+  CATEGORY_CHOICES = [
+    (CATEGORY_FEEDBACK, 'Feedback'),
+    (CATEGORY_BUG, 'Bug report'),
+    (CATEGORY_ACCOUNT, 'Account issue'),
+    (CATEGORY_PAYMENT, 'Payment or subscription issue'),
+    (CATEGORY_FEATURE, 'Feature request'),
+    (CATEGORY_TECHNICAL, 'Technical problem'),
+    (CATEGORY_OTHER, 'Other issue'),
+  ]
+
+  STATUS_SUBMITTED = 'submitted'
+  STATUS_OPEN = 'open'
+  STATUS_REVIEW = 'under_review'
+  STATUS_WAITING = 'waiting_for_user'
+  STATUS_RESOLVED = 'resolved'
+  STATUS_CLOSED = 'closed'
+  STATUS_REOPENED = 'reopened'
+  STATUS_CHOICES = [
+    (STATUS_SUBMITTED, 'Submitted'),
+    (STATUS_OPEN, 'Open'),
+    (STATUS_REVIEW, 'Under review'),
+    (STATUS_WAITING, 'Waiting for user'),
+    (STATUS_RESOLVED, 'Resolved'),
+    (STATUS_CLOSED, 'Closed'),
+    (STATUS_REOPENED, 'Reopened'),
+  ]
+  ACTIVE_STATUSES = (STATUS_SUBMITTED, STATUS_OPEN, STATUS_REVIEW, STATUS_WAITING, STATUS_REOPENED)
+
+  PRIORITY_LOW = 'low'
+  PRIORITY_NORMAL = 'normal'
+  PRIORITY_HIGH = 'high'
+  PRIORITY_URGENT = 'urgent'
+  PRIORITY_CHOICES = [
+    (PRIORITY_LOW, 'Low'),
+    (PRIORITY_NORMAL, 'Normal'),
+    (PRIORITY_HIGH, 'High'),
+    (PRIORITY_URGENT, 'Urgent'),
+  ]
+
+  incident_id = models.CharField(max_length=24, unique=True, default=support_incident_reference, editable=False, db_index=True)
+  reporter_role = models.CharField(max_length=12, choices=ROLE_CHOICES, db_index=True)
+  reporter_trainer = models.ForeignKey(
+    settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='support_incidents'
+  )
+  reporter_client = models.ForeignKey(
+    ClientAccess, on_delete=models.CASCADE, null=True, blank=True, related_name='support_incidents'
+  )
+  reporter_name = models.CharField(max_length=180)
+  reporter_email = models.EmailField(blank=True)
+  category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, db_index=True)
+  subject = models.CharField(max_length=180)
+  description = models.TextField()
+  page_feature = models.CharField(max_length=180, blank=True)
+  platform = models.CharField(max_length=24, default='web')
+  app_version = models.CharField(max_length=40, blank=True)
+  device_info = models.CharField(max_length=300, blank=True)
+  screenshot = models.FileField(upload_to='support-incidents/%Y/%m/', null=True, blank=True)
+  priority = models.CharField(max_length=12, choices=PRIORITY_CHOICES, default=PRIORITY_NORMAL, db_index=True)
+  status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_SUBMITTED, db_index=True)
+  assigned_support = models.ForeignKey(
+    settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_support_incidents'
+  )
+  resolution_note = models.TextField(blank=True)
+  closed_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'support_incidents'
+    ordering = ['-updated_at']
+    indexes = [models.Index(fields=['reporter_role', 'status'], name='support_role_status_idx')]
+
+  def __str__(self) -> str:
+    return f'{self.incident_id} · {self.subject}'
+
+
+class SupportIncidentMessage(models.Model):
+  AUTHOR_USER = 'user'
+  AUTHOR_SUPPORT = 'support'
+  AUTHOR_INTERNAL = 'internal'
+  AUTHOR_CHOICES = [
+    (AUTHOR_USER, 'Reporter'),
+    (AUTHOR_SUPPORT, 'Support'),
+    (AUTHOR_INTERNAL, 'Internal note'),
+  ]
+
+  incident = models.ForeignKey(SupportIncident, on_delete=models.CASCADE, related_name='messages')
+  author_type = models.CharField(max_length=12, choices=AUTHOR_CHOICES, db_index=True)
+  author_name = models.CharField(max_length=180)
+  author_staff = models.ForeignKey(
+    settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_incident_messages'
+  )
+  body = models.TextField()
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+  class Meta:
+    db_table = 'support_incident_messages'
+    ordering = ['created_at']
+
+  def __str__(self) -> str:
+    return f'{self.incident.incident_id} · {self.author_type}'
 
 
 class ClientReminder(models.Model):

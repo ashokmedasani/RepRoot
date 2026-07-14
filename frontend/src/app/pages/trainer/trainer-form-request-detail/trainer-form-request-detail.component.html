@@ -1,11 +1,11 @@
 <app-trainer-page-shell
   title="Form request details"
-  subtitle="Home / Forms & Groups / Request"
+  eyebrow="Forms & Groups"
+  subtitle="Review the submitted enquiry and decide the next onboarding action."
   activeSection="forms-groups"
-  maxWidth="72rem"
   titleId="request-detail-title"
 >
-  <a page-actions class="ghost-link" routerLink="/trainer/forms-groups">Back to Forms & Groups</a>
+  <a page-actions class="secondary-action" routerLink="/trainer/forms-groups">Back to Forms &amp; Groups</a>
 
   @if (message) {
     <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>

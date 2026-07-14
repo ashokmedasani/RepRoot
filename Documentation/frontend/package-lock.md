@@ -27,3 +27,9 @@ No direct business logic lives here.
 ## Future improvement notes
 
 Regenerate only through `npm install` when dependencies intentionally change.
+
+## 2026-07-13 production audit
+
+Lock data reflects removal of `xlsx` and installation of `write-excel-file@4.1.1`; the resulting dependency tree audits cleanly.
+
+The final lock refresh aligns Angular framework packages at 20.3.26 and resolves the nested Babel advisory. `npm audit` reports zero known vulnerabilities.

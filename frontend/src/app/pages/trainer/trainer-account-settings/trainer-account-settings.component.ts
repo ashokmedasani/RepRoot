@@ -3,20 +3,26 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
+import {
+  TrainerAuthApiService,
+  TrainerDataUsageResponse,
+  TrainerDataUsageSection
+} from '../../../core/api/trainer-auth-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
 import { TrainerProfileFormComponent } from '../../../shared/trainer-profile-form/trainer-profile-form.component';
 import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
 import { ThemeSwitcherComponent } from '../../../shared/theme-switcher/theme-switcher.component';
+import { SupportIncidentsComponent } from '../../../shared/support-incidents/support-incidents.component';
 
 type SettingsSection =
   | 'my-account'
-  | 'password'
+  | 'security'
   | 'notifications'
   | 'appearance'
+  | 'storage'
+  | 'guide'
   | 'support'
-  | 'about'
-  | 'delete';
+  | 'about';
 
 interface NotificationPrefs {
   formSubmission: boolean;
@@ -34,7 +40,8 @@ interface NotificationPrefs {
     TrainerPageShellComponent,
     TrainerProfileFormComponent,
     PasswordInputComponent,
-    ThemeSwitcherComponent
+    ThemeSwitcherComponent,
+    SupportIncidentsComponent
   ],
   templateUrl: './trainer-account-settings.component.html',
   styleUrl: './trainer-account-settings.component.scss'
@@ -50,12 +57,13 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
   readonly menu: { id: SettingsSection; label: string }[] = [
     { id: 'my-account', label: 'My Account' },
-    { id: 'password', label: 'Change Password' },
+    { id: 'security', label: 'Security' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'appearance', label: 'Appearance' },
+    { id: 'storage', label: 'Data Usage' },
+    { id: 'guide', label: 'Application Guide' },
     { id: 'support', label: 'Support' },
-    { id: 'about', label: 'About' },
-    { id: 'delete', label: 'Delete Trainer Account' }
+    { id: 'about', label: 'About' }
   ];
 
   activeSection: SettingsSection = 'my-account';
@@ -68,8 +76,43 @@ export class TrainerAccountSettingsComponent implements OnInit {
   isSavingCode = false;
   codeMessage = '';
   codeMessageType: 'success' | 'error' = 'success';
+  dataUsage?: TrainerDataUsageResponse;
+  dataUsageError = '';
+
+  readonly trainerUsageLabels: Record<string, string> = {
+    trainer_profile: 'Trainer profile',
+    forms_groups: 'Forms & groups',
+    clients: 'Client profiles',
+    schedules_progress: 'Schedules & progress',
+    references: 'References',
+    templates_tracking: 'Templates & tracking',
+    messages: 'Messages'
+  };
+
+  readonly clientUsageLabels: Record<string, string> = {
+    profile_intake: 'Profile & intake',
+    templates: 'Template assignments',
+    tracking_history: 'Tracking history',
+    progress: 'Progress reviews',
+    schedules: 'Schedules',
+    messages: 'Messages',
+    account_activity: 'Account activity'
+  };
+
+  readonly guideItems = [
+    { title: 'Dashboard', route: '/trainer/dashboard', detail: 'Review business KPIs, client activity, schedules, profile edit requests, account deletion requests, and recent work that needs attention.' },
+    { title: 'Forms & Groups', route: '/trainer/forms-groups', detail: 'Manage the public lead form, review incoming requests, create groups, and see capacity for your current plan.' },
+    { title: 'Client Creation Form', route: '/trainer/forms-groups', detail: 'Each group has its own registration form. Customize intake questions, share its public link, and convert completed registrations into client accounts.' },
+    { title: 'Templates', route: '/trainer/templates', detail: 'Create reusable tracking templates, choose fields and cadence, then assign them to any client without losing historical entries.' },
+    { title: 'Clients', route: '/trainer/clients', detail: 'Search all clients, add clients manually, open a profile, assign templates, schedule follow-ups, review entries, and record progress.' },
+    { title: 'References', route: '/trainer/references', detail: 'Organize PDFs, images, and YouTube resources by category. Share selected references with each client assignment.' },
+    { title: 'Profile', route: '/trainer/profile', detail: 'Maintain the professional information clients can see, upload portfolio media, and control the visibility of each profile section.' },
+    { title: 'Settings', route: '/trainer/account-settings', detail: 'Manage your account, security, trainer code, notifications, theme, plan storage, support links, and legal information.' },
+    { title: 'Client Portal', route: '/client/login', detail: 'Clients use your trainer code and their credentials to complete templates, review progress, message you, maintain settings, and submit approval requests.' }
+  ];
 
   readonly passwordForm = {
+    currentPassword: '',
     password: '',
     confirmPassword: ''
   };
@@ -85,10 +128,30 @@ export class TrainerAccountSettingsComponent implements OnInit {
     this.loadNotificationPrefs();
     this.trainerAuthApi.getProfile().subscribe({
       next: (profile) => {
-        this.trainerCode = profile.trainer_code || '';
+        this.trainerCode = profile.trainer_id || '';
         this.codeDraft = this.trainerCode;
       }
     });
+    this.trainerAuthApi.getDataUsage().subscribe({
+      next: (usage) => (this.dataUsage = usage),
+      error: () => (this.dataUsageError = 'Storage usage is temporarily unavailable.')
+    });
+  }
+
+  usageRows(
+    sections: Record<string, TrainerDataUsageSection> | undefined,
+    labels: Record<string, string>
+  ): { key: string; label: string; usage: TrainerDataUsageSection }[] {
+    return Object.entries(sections || {}).map(([key, usage]) => ({
+      key,
+      label: labels[key] || key.replaceAll('_', ' '),
+      usage
+    }));
+  }
+
+  usagePercent(bytes: number, quotaBytes: number): number {
+    if (!quotaBytes || bytes <= 0) return 0;
+    return Math.min(100, Math.round((bytes / quotaBytes) * 10000) / 100);
   }
 
   /** mailto link for the Support section, pre-filled per intent. */
@@ -98,15 +161,6 @@ export class TrainerAccountSettingsComponent implements OnInit {
       params.set('body', body);
     }
     return `mailto:${this.supportEmail}?${params.toString()}`;
-  }
-
-  /** Delete requests are routed to Support (Feature Request) with an automated message — no self-serve delete. */
-  get deleteRequestMailto(): string {
-    const body =
-      'Automated request: I would like to permanently delete my CoachFlow trainer account.\n\n' +
-      'Please confirm what happens to my client data before proceeding.\n\n' +
-      `Trainer code: ${this.trainerCode || '(add your trainer code)'}`;
-    return this.supportMailto('Account Deletion Request', body);
   }
 
   private loadNotificationPrefs(): void {
@@ -157,12 +211,13 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
   changePassword(): void {
     this.accountMessage = '';
+    const currentPassword = this.passwordForm.currentPassword;
     const password = this.passwordForm.password;
     const confirmPassword = this.passwordForm.confirmPassword;
 
-    if (!password || !confirmPassword) {
+    if (!currentPassword || !password || !confirmPassword) {
       this.accountMessageType = 'error';
-      this.accountMessage = 'New Password and Confirm Password are required.';
+      this.accountMessage = 'Current Password, New Password, and Confirm New Password are required.';
       return;
     }
 
@@ -174,7 +229,7 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
     this.isChangingPassword = true;
 
-    this.trainerAuthApi.changePassword(password, confirmPassword).subscribe({
+    this.trainerAuthApi.changePassword(currentPassword, password, confirmPassword).subscribe({
       next: (response) => {
         this.clearTrainerSession();
         window.sessionStorage.setItem('trainer-login-notice', response.message);

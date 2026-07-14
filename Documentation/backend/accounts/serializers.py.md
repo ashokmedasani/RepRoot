@@ -1,5 +1,11 @@
 # backend/accounts/serializers.py
 
+## 2026-07-13 targeted refinement
+
+Validates manual and known-client group registration, trainer-scoped username uniqueness, credential options, current-password changes, and public registration payloads.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Defines Django REST Framework serializers for trainer authentication, OTP flows, password reset, profile status, profile setup, Profile / Portfolio data, and Forms & Groups data.
@@ -46,6 +52,13 @@ Profile setup requires first name, last name, gender, birth month, birth year, c
 ## Future improvement notes
 
 Split portfolio media and certifications into nested serializers when they become multi-record features.
+
+## 2026-07-13 production audit
+
+- Normalizes legacy and current trainer section-visibility keys without dropping Training Style, Certifications, Images, or Links.
+- Normalizes legacy client additional-information rows into stable, removable items with generated IDs.
+- Validates trainer uploads, certification files, and client data-image photos with explicit type and size limits.
+- Adds validated payload contracts for client photos and trainer-managed Additional Details.
 
 ## Update: templates, references, and client portal
 

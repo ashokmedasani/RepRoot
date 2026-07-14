@@ -156,7 +156,7 @@ export class ClientLoginPage {
       next: (response) => {
         this.clientApi.storeSession(response.token, response.client);
         this.isSubmitting = false;
-        void this.router.navigateByUrl('/client/tabs/templates', { replaceUrl: true });
+        void this.router.navigateByUrl('/client/tabs/dashboard', { replaceUrl: true });
       },
       error: () => {
         this.message = 'Login failed. Check your trainer code, username, and password.';

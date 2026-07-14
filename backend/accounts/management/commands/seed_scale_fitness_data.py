@@ -1,7 +1,11 @@
+import calendar
 from datetime import date, time, timedelta
+from urllib.request import Request, urlopen
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
@@ -34,6 +38,7 @@ TRAINER_EMAIL = 'nolan.performance@example.com'
 TRAINER_PASSWORD = 'TrainerScale!2026'
 CLIENT_PASSWORD = 'ClientScale!2026'
 FEATURED_CLIENT_USERNAME = 'ava_martinez'
+CLIENT_COUNT = 100
 
 
 GROUPS = [
@@ -142,11 +147,24 @@ TEMPLATES = [
       {'key': 'next_focus', 'label': 'Next focus', 'field_type': 'short_text', 'placeholder': 'One priority for next week', 'options': [], 'scale': None},
     ],
   },
+  {
+    'name': 'Body Metrics Check-In',
+    'purpose': 'Captures monthly body composition, recovery, and cardiovascular trends.',
+    'cadence': 'monthly',
+    'accent': 'purple',
+    'fields': [
+      {'key': 'weight_lb', 'label': 'Body weight (lb)', 'field_type': 'number', 'placeholder': '165.0', 'options': [], 'scale': None},
+      {'key': 'waist_in', 'label': 'Waist (in)', 'field_type': 'number', 'placeholder': '33.5', 'options': [], 'scale': None},
+      {'key': 'resting_hr', 'label': 'Resting heart rate', 'field_type': 'number', 'placeholder': '64', 'options': [], 'scale': None},
+      {'key': 'energy', 'label': 'Average energy', 'field_type': 'rating', 'placeholder': '', 'options': [], 'scale': 10},
+      {'key': 'progress_note', 'label': 'Monthly reflection', 'field_type': 'long_text', 'placeholder': 'What changed this month?', 'options': [], 'scale': None},
+    ],
+  },
 ]
 
 
 def build_client_data(index):
-  first = FIRST_NAMES[index]
+  first = FIRST_NAMES[index % len(FIRST_NAMES)]
   last = LAST_NAMES[index % len(LAST_NAMES)]
   username = f'{first.lower()}_{last.lower()}_{index + 1:02d}'
   if index == 0:
@@ -167,11 +185,13 @@ def build_client_data(index):
     'age': age,
     'experience': experience,
     'mode': mode,
-    'phone': f'555-02{index + 1:02d}',
+    'phone': f'555-2{index + 1:03d}',
   }
 
 
 def registration_answers(client_data):
+  weight = 138 + (client_data['age'] % 15) * 4
+  target_delta = 12 if client_data['goal'] == 'Weight Loss' else -8 if client_data['goal'] == 'Muscle Gain' else 0
   return {
     'first_name': client_data['first_name'],
     'last_name': client_data['last_name'],
@@ -179,28 +199,53 @@ def registration_answers(client_data):
     'phone_number': client_data['phone'],
     'primary_goal': client_data['goal'],
     'training_experience': client_data['experience'],
-    'medical_conditions': 'None reported in demo intake.' if client_data['username'] != FEATURED_CLIENT_USERNAME else 'Past right knee irritation during running; no current pain. Prefers low-impact conditioning.',
+    'medical_conditions': 'No current restrictions; cleared for progressive exercise.' if client_data['username'] != FEATURED_CLIENT_USERNAME else 'Past right knee irritation during running; no current pain. Prefers low-impact conditioning.',
     'preferred_training_mode': client_data['mode'],
-    'height': '5 ft 6 in' if client_data['username'] == FEATURED_CLIENT_USERNAME else 'Demo height on file',
-    'current_weight': '168 lb' if client_data['username'] == FEATURED_CLIENT_USERNAME else 'Demo weight on file',
-    'target_weight': '150 lb' if client_data['username'] == FEATURED_CLIENT_USERNAME else '',
-    'sleep_average': '6.5 hours' if client_data['username'] == FEATURED_CLIENT_USERNAME else '',
-    'nutrition_preference': 'High-protein Mediterranean style, no shellfish' if client_data['username'] == FEATURED_CLIENT_USERNAME else '',
+    'age': client_data['age'],
+    'height': '5 ft 6 in' if client_data['username'] == FEATURED_CLIENT_USERNAME else f'{5 + client_data["age"] % 2} ft {2 + client_data["age"] % 9} in',
+    'current_weight': '168 lb' if client_data['username'] == FEATURED_CLIENT_USERNAME else f'{weight} lb',
+    'target_weight': '150 lb' if client_data['username'] == FEATURED_CLIENT_USERNAME else f'{weight - target_delta} lb',
+    'sleep_average': '6.5 hours' if client_data['username'] == FEATURED_CLIENT_USERNAME else f'{6.5 + (client_data["age"] % 4) * 0.5:.1f} hours',
+    'nutrition_preference': 'High-protein Mediterranean style, no shellfish' if client_data['username'] == FEATURED_CLIENT_USERNAME else 'Balanced, high-protein meals with flexible weekend planning',
+    'occupation_schedule': 'Hybrid office schedule with two evening commitments per week',
+    'weekly_availability': 'Three training sessions plus two short recovery sessions',
+    'consent_to_coaching': 'Yes',
   }
 
 
 def featured_additional_info():
+  values = [
+    ('Emergency Contact', 'Mia Martinez, sister, 555-2010'),
+    ('Preferred Training Days', 'Monday, Wednesday, Friday, Saturday'),
+    ('Equipment Access', 'Apartment gym, dumbbells to 40 lb, cable stack, treadmill, yoga mat'),
+    ('Work Schedule', 'Hybrid office, busiest Tuesday and Thursday afternoons'),
+    ('Nutrition Target', '135 g protein, 2.7 L water, 25 g fiber most days'),
+    ('Primary Barrier', 'Late meetings lead to skipped dinners and low evening energy'),
+    ('Coach Focus', 'Build lower-body strength without knee flare-ups and improve weekend meal planning'),
+    ('Measurements', 'Waist 34 in, hips 41 in, resting HR 68 bpm'),
+    ('Communication Preference', 'Text-style check-in after workouts, deeper review on Fridays'),
+    ('Motivation', 'Feel strong for hiking trip in October and build a sustainable routine'),
+  ]
   return [
-    {'label': 'Emergency Contact', 'value': 'Mia Martinez, sister, 555-2010'},
-    {'label': 'Preferred Training Days', 'value': 'Monday, Wednesday, Friday, Saturday'},
-    {'label': 'Equipment Access', 'value': 'Apartment gym, dumbbells to 40 lb, cable stack, treadmill, yoga mat'},
-    {'label': 'Work Schedule', 'value': 'Hybrid office, busiest Tuesday and Thursday afternoons'},
-    {'label': 'Nutrition Target', 'value': '135 g protein, 2.7 L water, 25 g fiber most days'},
-    {'label': 'Primary Barrier', 'value': 'Late meetings lead to skipped dinners and low evening energy'},
-    {'label': 'Coach Focus', 'value': 'Build lower-body strength without knee flare-ups and improve weekend meal planning'},
-    {'label': 'Measurements', 'value': 'Waist 34 in, hips 41 in, resting HR 68 bpm'},
-    {'label': 'Communication Preference', 'value': 'Text-style check-in after workouts, deeper review on Fridays'},
-    {'label': 'Motivation', 'value': 'Feel strong for hiking trip in October and build a sustainable routine'},
+    {'id': f'seed-info-{index}', 'title': title, 'type': 'text', 'visibility': 'client', 'text': text}
+    for index, (title, text) in enumerate(values, start=1)
+  ]
+
+
+def client_additional_info(client_data, index):
+  values = [
+    ('Goal Priority', f'{client_data["goal"]} with measurable monthly milestones'),
+    ('Preferred Mode', client_data['mode']),
+    ('Experience', client_data['experience']),
+    ('Training Availability', 'Three structured sessions and two optional recovery sessions per week'),
+    ('Equipment Access', ['Full commercial gym', 'Home dumbbells, bands, and mat', 'Apartment fitness center'][index % 3]),
+    ('Nutrition Focus', ['Protein consistency', 'Meal timing', 'Portion awareness', 'Hydration and fiber'][index % 4]),
+    ('Primary Barrier', ['Travel schedule', 'Evening fatigue', 'Inconsistent meal prep', 'Weekend routine'][index % 4]),
+    ('Communication Preference', ['Monday planning check-in', 'Post-workout message', 'Friday progress summary'][index % 3]),
+  ]
+  return [
+    {'id': f'seed-{index}-{item_index}', 'title': title, 'type': 'text', 'visibility': 'client', 'text': text}
+    for item_index, (title, text) in enumerate(values, start=1)
   ]
 
 
@@ -231,6 +276,16 @@ def tracking_answers(template_name, day_index):
       'meal_notes': 'Packed lunch, hit protein target, and planned dinner before late meetings.',
     }
 
+  if template_name == 'Body Metrics Check-In':
+    month_index = day_index // 30
+    return {
+      'weight_lb': round(168 - month_index * 2.6, 1),
+      'waist_in': round(34 - month_index * 0.35, 1),
+      'resting_hr': max(60, 68 - month_index),
+      'energy': min(9, 6 + month_index // 2),
+      'progress_note': 'Strength and energy are improving. Clothing fit is better and the knee remains calm with low-impact conditioning.',
+    }
+
   return {
     'weekly_win': 'Completed key sessions and kept nutrition notes current.',
     'barrier': 'Evening schedule was the main friction point.',
@@ -239,7 +294,7 @@ def tracking_answers(template_name, day_index):
 
 
 class Command(BaseCommand):
-  help = 'Seed a second trainer account with 50 clients, schedules, references, and detailed client data.'
+  help = 'Seed a full trainer account with 100 clients and six months of detailed featured-client data.'
 
   def handle(self, *args, **options):
     with transaction.atomic():
@@ -255,6 +310,8 @@ class Command(BaseCommand):
       self.seed_progress(trainer, clients[0])
       self.seed_chat(trainer, clients[0])
 
+    cache.delete(f'trainer-data-usage:v3:{trainer.pk}')
+
     trainer_token, _created = Token.objects.get_or_create(user=trainer)
     client_token = issue_client_token(clients[0])
 
@@ -265,7 +322,8 @@ class Command(BaseCommand):
     self.stdout.write(f'Featured client login: trainer_id=coach-nolan, username={clients[0].username}, password={CLIENT_PASSWORD}')
     self.stdout.write(f'Featured client token: {client_token.key}')
     featured_entry_count = TrackingEntry.objects.filter(client=clients[0], template__in=templates).count()
-    self.stdout.write(f'Created/updated: 1 trainer, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, 100 reminders, {featured_entry_count} tracking entries for {clients[0].first_name}.')
+    reminder_count = ClientReminder.objects.filter(trainer=trainer).count()
+    self.stdout.write(f'Created/updated: 1 trainer, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, {reminder_count} reminders, {featured_entry_count} six-month tracking entries for {clients[0].first_name}.')
 
   def seed_trainer(self):
     trainer, _created = User.objects.get_or_create(
@@ -310,16 +368,42 @@ class Command(BaseCommand):
       {'title': 'Strength Session', 'url': 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438'},
     ]
     profile.profile_visibility = {
-      'phone': True,
-      'social_links': True,
-      'certifications': True,
-      'gallery': True,
+      'professional_headline': True,
       'about': True,
+      'professional_summary': True,
+      'specializations': True,
+      'experience': True,
+      'languages': True,
+      'training_style': True,
+      'certification': True,
+      'images': True,
+      'links': True,
     }
     profile.terms_accepted = True
     profile.privacy_policy_accepted = True
+    self.seed_profile_uploads(profile)
     profile.save()
     return trainer
+
+  def seed_profile_uploads(self, profile):
+    uploads = [
+      ('profile_photo', 'nolan-brooks-profile.jpg', 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=700&h=700&fit=crop'),
+      ('transformation_photo', 'client-transformation.jpg', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1000&h=700&fit=crop'),
+      ('training_photo', 'coaching-floor.jpg', 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1000&h=700&fit=crop'),
+    ]
+    for field_name, filename, url in uploads:
+      file_field = getattr(profile, field_name)
+      if file_field:
+        continue
+      try:
+        request = Request(url, headers={'User-Agent': 'CoachFlow demo data seeder'})
+        with urlopen(request, timeout=20) as response:
+          content = response.read(2 * 1024 * 1024 + 1)
+        if len(content) > 2 * 1024 * 1024:
+          raise ValueError('demo image exceeded the 2 MB seed limit')
+        file_field.save(filename, ContentFile(content), save=False)
+      except Exception as exc:
+        self.stdout.write(self.style.WARNING(f'Could not load {field_name}: {exc}'))
 
   def seed_groups(self, trainer):
     groups = {}
@@ -350,7 +434,7 @@ class Command(BaseCommand):
 
   def seed_clients(self, trainer, groups, lead_form):
     clients = []
-    for index in range(50):
+    for index in range(CLIENT_COUNT):
       client_data = build_client_data(index)
       answers = registration_answers(client_data)
       lead, _created = LeadSubmission.objects.update_or_create(
@@ -366,11 +450,7 @@ class Command(BaseCommand):
           'converted_at': timezone.now(),
         },
       )
-      additional_info = featured_additional_info() if index == 0 else [
-        {'label': 'Goal Priority', 'value': client_data['goal']},
-        {'label': 'Preferred Mode', 'value': client_data['mode']},
-        {'label': 'Experience', 'value': client_data['experience']},
-      ]
+      additional_info = featured_additional_info() if index == 0 else client_additional_info(client_data, index)
       client, _created = ClientAccess.objects.update_or_create(
         trainer=trainer,
         email=client_data['email'],
@@ -381,6 +461,7 @@ class Command(BaseCommand):
           'last_name': client_data['last_name'],
           'username': client_data['username'],
           'temporary_password': make_password(CLIENT_PASSWORD),
+          'photo': f'https://i.pravatar.cc/300?img={(index % 70) + 1}',
           'registration_answers': answers,
           'additional_info': additional_info,
           'additional_info_shared': index == 0,
@@ -454,14 +535,22 @@ class Command(BaseCommand):
 
   def seed_featured_tracking(self, client, templates):
     end_date = date.today()
-    start_date = end_date - timedelta(days=89)
+    start_month = end_date.month - 6
+    start_year = end_date.year
+    if start_month <= 0:
+      start_month += 12
+      start_year -= 1
+    start_date = date(start_year, start_month, min(end_date.day, calendar.monthrange(start_year, start_month)[1]))
     TrackingEntry.objects.filter(client=client, template__in=templates, entry_date__gte=start_date, entry_date__lte=end_date).delete()
 
     entries = []
-    for day_index in range(90):
+    day_count = (end_date - start_date).days + 1
+    for day_index in range(day_count):
       entry_date = start_date + timedelta(days=day_index)
       for template_index, template in enumerate(templates):
         if template.cadence == 'weekly' and day_index % 7 != 0:
+          continue
+        if template.cadence == 'monthly' and entry_date.day != start_date.day:
           continue
 
         entries.append(
@@ -503,9 +592,12 @@ class Command(BaseCommand):
     ProgressEntry.objects.filter(trainer=trainer, client=client).delete()
     today = date.today()
     entries = [
-      ('Initial Assessment', today - timedelta(days=84), 'Baseline intake completed. Knee note captured. Training starts with controlled lower-body volume.', 'Baseline', 'Start daily habit scorecard and three strength days.'),
-      ('First Month Review', today - timedelta(days=56), 'Strong check-in consistency. Energy improving. Need better dinner planning on office days.', 'Improving', 'Prep two dinners before Tuesday.'),
-      ('Midpoint Review', today - timedelta(days=28), 'Strength sessions consistent. Weight trending down steadily. Knee remains calm with low-impact conditioning.', 'On Track', 'Add one upper-body progression and keep zone-2 walks.'),
+      ('Initial Assessment', today - timedelta(days=180), 'Baseline intake completed. Knee note captured. Training starts with controlled lower-body volume.', 'Baseline', 'Start daily habit scorecard and three strength days.'),
+      ('Month 1 Review', today - timedelta(days=150), 'Check-in rhythm established. Sleep and hydration are the first consistency targets.', 'Building', 'Keep the same training days and add a Sunday meal plan.'),
+      ('Month 2 Review', today - timedelta(days=120), 'Lower-body technique is more stable and average steps are trending upward.', 'Improving', 'Progress goblet squat while keeping bike intervals low impact.'),
+      ('Quarter Review', today - timedelta(days=90), 'Weight is trending down without a drop in strength. Office-day dinners remain the main barrier.', 'On Track', 'Prep two dinners before Tuesday and protect Friday review time.'),
+      ('Month 4 Review', today - timedelta(days=60), 'Workout completion and protein consistency improved. Knee remains calm.', 'On Track', 'Add one upper-body progression and a longer weekend walk.'),
+      ('Month 5 Review', today - timedelta(days=30), 'Energy and resting heart rate are improving. Nutrition is consistent through most weekends.', 'On Track', 'Practice one restaurant meal strategy before the hiking trip.'),
       ('Current Week Focus', today, 'Ava is ready for the next phase with slightly higher lower-body load and a tighter Friday review.', 'Active', 'Increase goblet squat load only if knee feedback stays green.'),
     ]
     ProgressEntry.objects.bulk_create(

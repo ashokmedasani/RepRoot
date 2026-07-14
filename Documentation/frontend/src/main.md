@@ -39,4 +39,8 @@ Standalone Angular components are preferred for the initial application structur
 
 ## Future improvements
 
-Add global providers for HTTP, animations, and app configuration when backend-connected pages are approved.
+Global HTTP and runtime error providers are registered. Future additions should preserve the centralized error and authentication behavior.
+
+## 2026-07-13 global error handling
+
+Registers the functional page-error HTTP interceptor and Angular global error handler. Validation and authentication errors keep their existing local behavior.

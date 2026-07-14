@@ -1,5 +1,15 @@
 # frontend/src/app/core/api/forms-groups-api.service.ts
 
+## 2026-07-13 Client Action Center follow-up
+
+Adds the typed `ClientProfileEditActivity` contract and extends the existing upcoming-reminders response type with profile-edit activities and their KPI count.
+
+## 2026-07-13 targeted refinement
+
+Adds manual client, public group registration, group-submission, reference ID, credential, and compact schedule-summary API contracts.
+
+Cross-cutting behavior and verification are recorded in `Documentation/CHANGELOG-refinements-2026-07-13.md`.
+
 ## What this file does
 
 Provides typed Angular HTTP methods for the Forms & Groups setup flow and public lead form flow.
@@ -37,6 +47,10 @@ Schedule summary typing and trainer-side client profile update typing were added
 ## Testing
 
 Verified by `npm run build`.
+
+## 2026-07-13 overdue schedule organization
+
+`ScheduleSummary` includes the backend-provided `overdue` count used by the Client Action Center and organized schedule queue.
 
 ## Connected files
 
