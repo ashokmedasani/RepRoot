@@ -1,15 +1,329 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { IonButton, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonTextarea, IonTitle, IonToolbar } from '@ionic/angular/standalone';
-import { ClientAccountRequest, ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
-import { MobileSupportIncidentsPage } from '../../shared/support-incidents.page';
+import { AlertController, ToastController } from '@ionic/angular';
+import {
+  IonBackButton,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonTitle,
+  IonToolbar
+} from '@ionic/angular/standalone';
 
-@Component({selector:'app-client-settings-mobile',standalone:true,imports:[FormsModule,IonButton,IonContent,IonHeader,IonInput,IonItem,IonLabel,IonList,IonListHeader,IonTextarea,IonTitle,IonToolbar,MobileSupportIncidentsPage],template:`
-<ion-header><ion-toolbar><ion-title>Settings</ion-title></ion-toolbar></ion-header><ion-content><div class="page-pad">
-@if(me;as data){<ion-list inset><ion-list-header><ion-label>My Account</ion-label></ion-list-header><ion-item><ion-label><p>Name</p><h3>{{data.client.first_name}} {{data.client.last_name}}</h3></ion-label></ion-item><ion-item><ion-label><p>Email</p><h3>{{data.client.email}}</h3></ion-label></ion-item><ion-item><ion-label><p>Group</p><h3>{{data.client.group_name}}</h3></ion-label></ion-item></ion-list>}
-<ion-list inset><ion-list-header><ion-label>Security</ion-label></ion-list-header><ion-item><ion-input label="Current password" labelPlacement="stacked" type="password" [(ngModel)]="currentPassword" name="currentPassword" /></ion-item><ion-item><ion-input label="New password" labelPlacement="stacked" type="password" [(ngModel)]="password" name="password" /></ion-item><ion-item><ion-input label="Confirm password" labelPlacement="stacked" type="password" [(ngModel)]="confirmPassword" name="confirmPassword" /></ion-item></ion-list><ion-button expand="block" (click)="changePassword()">Change Password</ion-button>
-<ion-list inset><ion-list-header><ion-label>Privacy & Legal</ion-label></ion-list-header><ion-item><ion-label class="ion-text-wrap"><h3>Terms & Conditions</h3><p>Use CoachFlow respectfully, keep credentials private, and provide accurate check-in information.</p></ion-label></ion-item><ion-item><ion-label class="ion-text-wrap"><h3>Privacy Policy</h3><p>Your profile, coaching history, messages, and check-ins are visible to your assigned trainer and protected as account data.</p></ion-label></ion-item></ion-list>
-<ion-list inset class="danger-list"><ion-list-header><ion-label color="danger">Delete Account</ion-label></ion-list-header>@if(deletionRequest?.status==='pending'){<ion-item><ion-label class="ion-text-wrap"><h3>Awaiting trainer review</h3><p>Your request is in the trainer action queue.</p></ion-label></ion-item><ion-button expand="block" fill="outline" color="danger" (click)="withdrawDeletion()">Withdraw Request</ion-button>}@else{<ion-item><ion-textarea label="Reason (optional)" labelPlacement="stacked" rows="3" [(ngModel)]="deletionNote" name="deletionNote" /></ion-item><ion-button expand="block" color="danger" (click)="requestDeletion()">Request Account Deletion</ion-button>}</ion-list>
-<app-mobile-support-incidents role="client" /><ion-button expand="block" fill="clear" (click)="logout()">Sign Out</ion-button>@if(message){<p [class]="messageType==='error'?'error-text':'empty-note'">{{message}}</p>}</div></ion-content>`})
-export class ClientSettingsPage implements OnInit{private readonly api=inject(ClientApiService);private readonly router=inject(Router);me:ClientMeResponse|null=null;deletionRequest:ClientAccountRequest|null=null;deletionNote='';currentPassword='';password='';confirmPassword='';message='';messageType:'success'|'error'='success';ngOnInit():void{this.api.getMe().subscribe({next:value=>this.me=value});this.api.getAccountDeletionRequest().subscribe({next:r=>this.deletionRequest=r.deletion_request})}changePassword():void{if(!this.currentPassword||!this.password||this.password!==this.confirmPassword){this.messageType='error';this.message='Complete all fields and make sure new passwords match.';return}this.api.changePassword(this.currentPassword,this.password,this.confirmPassword).subscribe({next:r=>{this.api.clearSession();this.message=r.message;void this.router.navigateByUrl('/client/login',{replaceUrl:true})},error:()=>{this.messageType='error';this.message='Password could not be changed.'}})}requestDeletion():void{this.api.requestAccountDeletion(this.deletionNote.trim()).subscribe({next:r=>{this.deletionRequest=r.deletion_request;this.messageType='success';this.message=r.message},error:()=>{this.messageType='error';this.message='Deletion request could not be sent.'}})}withdrawDeletion():void{this.api.withdrawAccountDeletionRequest().subscribe({next:r=>{this.deletionRequest=null;this.message=r.message},error:()=>{this.messageType='error';this.message='Request could not be withdrawn.'}})}logout():void{this.api.logout().subscribe({next:()=>this.finish(),error:()=>this.finish()})}private finish():void{this.api.clearSession();void this.router.navigateByUrl('/',{replaceUrl:true})}}
+import {
+  ClientDetailChangeRequest,
+  DynamicField
+} from '../../../core/api/forms-groups-api.service';
+import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
+
+/** Settings & Account — client information (edit via trainer-approved request), photo, password, deletion. */
+@Component({
+  selector: 'app-client-settings',
+  standalone: true,
+  imports: [DatePipe, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-back-button defaultHref="/client/tabs/more" /></ion-buttons>
+        <ion-title>Settings &amp; Account</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="page-pad">
+        @if (message) {
+          <p [class]="messageIsError ? 'error-text' : 'success-text'">{{ message }}</p>
+        }
+
+        @if (me; as data) {
+          <div class="profile-card">
+            @if (data.client.photo) {
+              <img class="avatar" [src]="data.client.photo" alt="" />
+            } @else {
+              <div class="avatar avatar-fallback">{{ initials }}</div>
+            }
+            <div style="flex:1;min-width:0">
+              <strong>{{ data.client.first_name }} {{ data.client.last_name }}</strong>
+              <small>{{ data.client.username }} · {{ data.client.group_name }}</small>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Profile photo</h3>
+            <input type="file" accept="image/*" (change)="onPhoto($event)" />
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <h3 style="margin:0">Client information</h3>
+              @if (!pendingRequest && !isEditing) {
+                <ion-button size="small" fill="outline" (click)="startEdit()">Request edit</ion-button>
+              }
+            </div>
+
+            @if (pendingRequest) {
+              <p class="hint-note" style="margin-top:.5rem">
+                Your edit request from {{ pendingRequest.created_at | date: 'dd MMM' }} is waiting for trainer review.
+              </p>
+            }
+
+            @if (isEditing) {
+              <div class="form-grid" style="margin-top:.7rem">
+                @for (field of editableFields; track field.key) {
+                  <label>
+                    <span>{{ field.label }}</span>
+                    <input [(ngModel)]="draftAnswers[field.key]" />
+                  </label>
+                }
+                <label><span>Note to trainer (optional)</span><input [(ngModel)]="editNote" /></label>
+              </div>
+              <div class="form-two" style="margin-top:.7rem">
+                <ion-button size="small" (click)="submitEdit()" [disabled]="isSubmittingEdit">
+                  {{ isSubmittingEdit ? 'Sending…' : 'Send for approval' }}
+                </ion-button>
+                <ion-button size="small" fill="clear" (click)="isEditing = false">Cancel</ion-button>
+              </div>
+              <p class="hint-note">Changes take effect after your trainer approves them.</p>
+            } @else {
+              <div class="kv-list" style="margin-top:.6rem">
+                <div class="kv"><span>Name</span><strong>{{ data.client.first_name }} {{ data.client.last_name }}</strong></div>
+                <div class="kv"><span>Email</span><strong>{{ data.client.email || '—' }}</strong></div>
+                <div class="kv"><span>Username</span><strong>{{ data.client.username }}</strong></div>
+                <div class="kv"><span>Group</span><strong>{{ data.client.group_name }}</strong></div>
+                <div class="kv"><span>Reference</span><strong>{{ data.client.reference_id }}</strong></div>
+                <div class="kv"><span>Joined</span><strong>{{ data.client.created_at | date: 'dd MMM yyyy' }}</strong></div>
+                <div class="kv"><span>Status</span><strong>{{ data.client.is_active ? 'Active' : 'Inactive' }}</strong></div>
+                @for (field of answeredFields; track field.key) {
+                  <div class="kv"><span>{{ field.label }}</span><strong>{{ field.value }}</strong></div>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="card">
+            <h3>Change password</h3>
+            <div class="form-grid">
+              <label><span>Current password</span><input type="password" [(ngModel)]="currentPassword" /></label>
+              <label><span>New password</span><input type="password" [(ngModel)]="newPassword" /></label>
+              <label><span>Confirm new password</span><input type="password" [(ngModel)]="confirmPassword" /></label>
+            </div>
+            <ion-button size="small" style="margin-top:.6rem" (click)="changePassword()"
+              [disabled]="isChangingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword">
+              {{ isChangingPassword ? 'Updating…' : 'Update password' }}
+            </ion-button>
+          </div>
+
+          <div class="card">
+            <h3>Account deletion</h3>
+            @if (deletionRequest && deletionRequest.status === 'pending') {
+              <p class="sub">Your deletion request is waiting for trainer review.</p>
+              <ion-button size="small" fill="outline" (click)="withdrawDeletion()">Withdraw request</ion-button>
+            } @else {
+              <p class="sub">Ask your trainer to delete your account and data. This requires their approval.</p>
+              <ion-button size="small" color="danger" fill="outline" (click)="requestDeletion()">Request deletion</ion-button>
+            }
+          </div>
+        }
+        <div class="bottom-space"></div>
+      </div>
+    </ion-content>
+  `
+})
+export class ClientSettingsPage implements OnInit {
+  private readonly clientApi = inject(ClientApiService);
+  private readonly alertController = inject(AlertController);
+  private readonly toastController = inject(ToastController);
+
+  me: ClientMeResponse | null = null;
+  pendingRequest: ClientDetailChangeRequest | null = null;
+  deletionRequest: ClientDetailChangeRequest | null = null;
+  isEditing = false;
+  isSubmittingEdit = false;
+  draftAnswers: Record<string, string> = {};
+  editNote = '';
+  currentPassword = '';
+  newPassword = '';
+  confirmPassword = '';
+  isChangingPassword = false;
+  message = '';
+  messageIsError = false;
+
+  get initials(): string {
+    const client = this.me?.client;
+    return `${client?.first_name?.[0] || ''}${client?.last_name?.[0] || ''}`.toUpperCase() || 'C';
+  }
+
+  get editableFields(): Array<{ key: string; label: string }> {
+    const fields = (this.me?.registration_fields || []) as DynamicField[];
+    const core = [
+      { key: 'first_name', label: 'First name' },
+      { key: 'last_name', label: 'Last name' },
+      { key: 'email', label: 'Email' }
+    ];
+    const custom = fields
+      .filter((field) => !field.is_core)
+      .map((field) => ({ key: field.key || field.label, label: field.label }));
+    return [...core, ...custom];
+  }
+
+  get answeredFields(): Array<{ key: string; label: string; value: string }> {
+    const answers = this.me?.client?.registration_answers || {};
+    const skip = new Set(['first_name', 'last_name', 'email']);
+    const fields = (this.me?.registration_fields || []) as DynamicField[];
+
+    return Object.entries(answers)
+      .filter(([key, value]) => !skip.has(key) && String(value ?? '').trim() !== '')
+      .map(([key, value]) => {
+        const field = fields.find((item) => (item.key || item.label) === key);
+        return { key, label: field?.label || key.replace(/_/g, ' '), value: String(value) };
+      });
+  }
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  onPhoto(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.clientApi.updatePhoto(String(reader.result)).subscribe({
+        next: (response) => {
+          if (this.me) {
+            this.me.client = response.client;
+          }
+
+          this.setMessage('Photo updated.', false);
+        },
+        error: () => this.setMessage('Photo could not be updated.', true)
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  startEdit(): void {
+    const answers = this.me?.client?.registration_answers || {};
+    this.draftAnswers = {};
+
+    for (const field of this.editableFields) {
+      const clientValue =
+        field.key === 'first_name'
+          ? this.me?.client?.first_name
+          : field.key === 'last_name'
+            ? this.me?.client?.last_name
+            : field.key === 'email'
+              ? this.me?.client?.email
+              : answers[field.key];
+      this.draftAnswers[field.key] = String(clientValue ?? '');
+    }
+
+    this.editNote = '';
+    this.isEditing = true;
+  }
+
+  submitEdit(): void {
+    this.isSubmittingEdit = true;
+    const proposed: Record<string, string> = {};
+    Object.entries(this.draftAnswers).forEach(([key, value]) => {
+      proposed[key] = String(value ?? '');
+    });
+
+    this.clientApi.submitDetailChangeRequest(proposed, this.editNote.trim()).subscribe({
+      next: (response) => {
+        this.pendingRequest = response.change_request;
+        this.isSubmittingEdit = false;
+        this.isEditing = false;
+        this.setMessage(response.message || 'Edit request sent to your trainer.', false);
+      },
+      error: () => {
+        this.isSubmittingEdit = false;
+        this.setMessage('Edit request could not be sent.', true);
+      }
+    });
+  }
+
+  changePassword(): void {
+    this.isChangingPassword = true;
+    this.clientApi.changePassword(this.currentPassword, this.newPassword, this.confirmPassword).subscribe({
+      next: (response) => {
+        this.isChangingPassword = false;
+        this.currentPassword = '';
+        this.newPassword = '';
+        this.confirmPassword = '';
+        this.setMessage(response.message || 'Password updated.', false);
+      },
+      error: () => {
+        this.isChangingPassword = false;
+        this.setMessage('Password change failed. Check your current password and strength.', true);
+      }
+    });
+  }
+
+  async requestDeletion(): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Request account deletion?',
+      message: 'Your trainer will review this request. Your data stays until it is approved.',
+      inputs: [{ name: 'note', type: 'textarea', placeholder: 'Optional note to your trainer' }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Request deletion',
+          role: 'destructive',
+          handler: (values: { note?: string }) => {
+            this.clientApi.requestAccountDeletion((values.note || '').trim()).subscribe({
+              next: (response) => {
+                this.deletionRequest = response.deletion_request;
+                this.setMessage(response.message || 'Deletion request sent.', false);
+              },
+              error: () => this.setMessage('Deletion request could not be sent.', true)
+            });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  withdrawDeletion(): void {
+    this.clientApi.withdrawAccountDeletionRequest().subscribe({
+      next: (response) => {
+        this.deletionRequest = null;
+        this.setMessage(response.message || 'Deletion request withdrawn.', false);
+      },
+      error: () => this.setMessage('Could not withdraw the request.', true)
+    });
+  }
+
+  private load(): void {
+    this.clientApi.getMe().subscribe({
+      next: (me) => (this.me = me),
+      error: () => this.setMessage('Could not load your profile.', true)
+    });
+    this.clientApi.getDetailChangeRequest().subscribe({
+      next: (response) => (this.pendingRequest = response.change_request?.status === 'pending' ? response.change_request : null),
+      error: () => undefined
+    });
+    this.clientApi.getAccountDeletionRequest().subscribe({
+      next: (response) => (this.deletionRequest = response.deletion_request),
+      error: () => undefined
+    });
+  }
+
+  private setMessage(text: string, isError: boolean): void {
+    this.message = text;
+    this.messageIsError = isError;
+    setTimeout(() => (this.message = ''), 4000);
+  }
+
+  private async toast(text: string): Promise<void> {
+    const toast = await this.toastController.create({ message: text, duration: 1800, position: 'bottom' });
+    await toast.present();
+  }
+}

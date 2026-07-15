@@ -1,51 +1,162 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonProgressBar, IonTitle, IonToolbar } from '@ionic/angular/standalone';
-import { TrainerAuthApiService, TrainerDataUsage } from '../../../core/api/trainer-auth-api.service';
-import { MobileSupportIncidentsPage } from '../../shared/support-incidents.page';
+import {
+  IonBackButton,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonHeader,
+  IonTitle,
+  IonToolbar
+} from '@ionic/angular/standalone';
 
+import { TrainerAuthApiService, TrainerDataUsage, TrainerProfile } from '../../../core/api/trainer-auth-api.service';
+
+/** Settings — My Account, Security (trainer code + change password), Plan & Storage. */
 @Component({
-  selector: 'app-trainer-settings-mobile', standalone: true,
-  imports: [FormsModule, IonBackButton, IonButton, IonButtons, IonContent, IonHeader, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonProgressBar, IonTitle, IonToolbar, MobileSupportIncidentsPage],
+  selector: 'app-trainer-settings',
+  standalone: true,
+  imports: [FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
   template: `
-    <ion-header><ion-toolbar><ion-buttons slot="start"><ion-back-button defaultHref="/trainer/tabs/more" /></ion-buttons><ion-title>Settings</ion-title></ion-toolbar></ion-header>
-    <ion-content><div class="page-pad">
-      @if (usage; as u) { <ion-list inset><ion-list-header><ion-label>Data Usage</ion-label></ion-list-header><ion-item><ion-label><h3>{{ u.plan_code === 'premium' ? 'Unlimited Storage' : u.usage_percent + '% used' }}</h3><p>{{ u.record_count }} records tracked</p><ion-progress-bar [value]="u.usage_percent / 100" /></ion-label></ion-item></ion-list> }
-      <ion-list inset><ion-list-header><ion-label>Change Password</ion-label></ion-list-header><ion-item><ion-input label="Current password" labelPlacement="stacked" type="password" [(ngModel)]="currentPassword" name="currentPassword" /></ion-item><ion-item><ion-input label="New password" labelPlacement="stacked" type="password" [(ngModel)]="password" name="password" /></ion-item><ion-item><ion-input label="Confirm password" labelPlacement="stacked" type="password" [(ngModel)]="confirmPassword" name="confirmPassword" /></ion-item></ion-list><ion-button expand="block" (click)="changePassword()">Change Password</ion-button>
-      <ion-list inset><ion-list-header><ion-label>Application Guide</ion-label></ion-list-header>@for (item of guide; track item.title) {<ion-item><ion-label class="ion-text-wrap"><h3>{{ item.title }}</h3><p>{{ item.detail }}</p></ion-label></ion-item>}</ion-list>
-      <ion-list inset><ion-list-header><ion-label>Legal</ion-label></ion-list-header><ion-item><ion-label class="ion-text-wrap"><h3>Terms &amp; Conditions</h3><p>Use the application professionally, protect client information, and keep account access secure.</p></ion-label></ion-item><ion-item><ion-label class="ion-text-wrap"><h3>Privacy Policy</h3><p>Trainer, client, message, tracking, and uploaded-file data remain account-scoped and access-controlled.</p></ion-label></ion-item></ion-list>
-      <app-mobile-support-incidents role="trainer" />
-      @if (message) { <p [class]="messageType === 'error' ? 'error-text' : 'empty-note'">{{ message }}</p> }
-    </div></ion-content>
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-back-button defaultHref="/trainer/tabs/more" /></ion-buttons>
+        <ion-title>Settings</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="page-pad">
+        <div class="card">
+          <h3>My Account</h3>
+          <div class="kv-list">
+            <div class="kv"><span>Name</span><strong>{{ profile?.first_name }} {{ profile?.last_name }}</strong></div>
+            <div class="kv"><span>Username</span><strong>{{ profile?.username }}</strong></div>
+            <div class="kv"><span>Email</span><strong>{{ profile?.email }}</strong></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Plan &amp; Storage</h3>
+          <div class="kv-list">
+            <div class="kv"><span>Plan</span><strong>{{ usage?.plan_name || '—' }}</strong></div>
+            <div class="kv"><span>Storage used</span><strong>{{ usagePercent }}%</strong></div>
+            <div class="kv"><span>Records</span><strong>{{ usage?.record_count || 0 }}</strong></div>
+          </div>
+          <div style="margin-top:.6rem;height:.6rem;border-radius:1rem;background:var(--app-surface-soft);overflow:hidden">
+            <div [style.width.%]="usagePercent" style="height:100%;background:var(--app-primary);border-radius:inherit"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Security</h3>
+          <div class="form-grid">
+            <label>
+              <span>Trainer code (clients log in with this)</span>
+              <div style="display:flex;gap:.5rem">
+                <input [(ngModel)]="trainerCode" autocapitalize="off" style="flex:1" />
+                <ion-button size="small" (click)="saveTrainerCode()" [disabled]="isSavingCode || !trainerCode.trim() || trainerCode === originalCode">
+                  {{ isSavingCode ? '…' : 'Update' }}
+                </ion-button>
+              </div>
+            </label>
+          </div>
+          @if (codeMessage) {
+            <p [class]="codeError ? 'error-text' : 'success-text'" style="margin:.4rem 0 0">{{ codeMessage }}</p>
+          }
+
+          <div class="form-grid" style="margin-top:1rem">
+            <label><span>Current password</span><input type="password" [(ngModel)]="currentPassword" /></label>
+            <label><span>New password</span><input type="password" [(ngModel)]="newPassword" /></label>
+            <label><span>Confirm new password</span><input type="password" [(ngModel)]="confirmPassword" /></label>
+          </div>
+          @if (passwordMessage) {
+            <p [class]="passwordError ? 'error-text' : 'success-text'" style="margin:.4rem 0 0">{{ passwordMessage }}</p>
+          }
+          <ion-button size="small" style="margin-top:.6rem" (click)="changePassword()" [disabled]="isChangingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword">
+            {{ isChangingPassword ? 'Updating…' : 'Change password' }}
+          </ion-button>
+        </div>
+
+        <div class="card">
+          <h3>Account deletion</h3>
+          <p class="sub" style="margin-bottom:0">
+            Trainer accounts are deleted through support so your client data is handled safely. Open Help &amp; Support from the More tab to request deletion.
+          </p>
+        </div>
+        <div class="bottom-space"></div>
+      </div>
+    </ion-content>
   `
 })
 export class TrainerSettingsPage implements OnInit {
-  private readonly api = inject(TrainerAuthApiService);
-  private readonly router = inject(Router);
-  usage: TrainerDataUsage | null = null;
-  currentPassword = '';
-  password = '';
-  confirmPassword = '';
-  message = '';
-  messageType: 'success' | 'error' = 'success';
-  readonly guide = [
-    { title: 'Dashboard', detail: 'KPIs, schedules, and client action requests.' },
-    { title: 'Forms & Groups', detail: 'Lead intake, registration requests, and group capacity.' },
-    { title: 'Clients', detail: 'Profiles, schedules, templates, entries, and progress.' },
-    { title: 'Templates', detail: 'Reusable tracking forms assigned to individual clients.' },
-    { title: 'References', detail: 'Your categorized resource library for client sharing.' }
-  ];
+  private readonly trainerAuth = inject(TrainerAuthApiService);
 
-  ngOnInit(): void { this.api.getDataUsage().subscribe({ next: (value) => this.usage = value }); }
+  profile: TrainerProfile | null = null;
+  usage: TrainerDataUsage | null = null;
+  trainerCode = '';
+  originalCode = '';
+  isSavingCode = false;
+  codeMessage = '';
+  codeError = false;
+  currentPassword = '';
+  newPassword = '';
+  confirmPassword = '';
+  isChangingPassword = false;
+  passwordMessage = '';
+  passwordError = false;
+
+  get usagePercent(): number {
+    return Math.round((this.usage?.usage_percent || 0) * 10) / 10;
+  }
+
+  ngOnInit(): void {
+    this.trainerAuth.getProfile().subscribe({
+      next: (profile) => {
+        this.profile = profile;
+        this.trainerCode = profile.trainer_id || profile.trainer_code || '';
+        this.originalCode = this.trainerCode;
+      },
+      error: () => undefined
+    });
+    this.trainerAuth.getDataUsage().subscribe({ next: (usage) => (this.usage = usage), error: () => undefined });
+  }
+
+  saveTrainerCode(): void {
+    this.isSavingCode = true;
+    this.codeMessage = '';
+    this.trainerAuth.updateTrainerCode(this.trainerCode.trim()).subscribe({
+      next: (response) => {
+        this.isSavingCode = false;
+        this.trainerCode = response.trainer_code;
+        this.originalCode = response.trainer_code;
+        this.codeError = false;
+        this.codeMessage = response.message || 'Trainer code updated.';
+      },
+      error: () => {
+        this.isSavingCode = false;
+        this.codeError = true;
+        this.codeMessage = 'Trainer code could not be updated (it may be taken).';
+      }
+    });
+  }
 
   changePassword(): void {
-    if (!this.currentPassword || !this.password || this.password !== this.confirmPassword) {
-      this.messageType = 'error'; this.message = 'Complete all fields and make sure new passwords match.'; return;
-    }
-    this.api.changePassword(this.currentPassword, this.password, this.confirmPassword).subscribe({
-      next: (response) => { this.api.clearSession(); this.message = response.message; void this.router.navigateByUrl('/trainer/login', { replaceUrl: true }); },
-      error: () => { this.messageType = 'error'; this.message = 'Password could not be changed.'; }
+    this.isChangingPassword = true;
+    this.passwordMessage = '';
+    this.trainerAuth.changePassword(this.currentPassword, this.newPassword, this.confirmPassword).subscribe({
+      next: (response) => {
+        this.isChangingPassword = false;
+        this.passwordError = false;
+        this.passwordMessage = response.message || 'Password changed.';
+        this.currentPassword = '';
+        this.newPassword = '';
+        this.confirmPassword = '';
+      },
+      error: () => {
+        this.isChangingPassword = false;
+        this.passwordError = true;
+        this.passwordMessage = 'Password change failed. Check your current password and password strength.';
+      }
     });
   }
 }

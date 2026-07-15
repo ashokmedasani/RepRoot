@@ -98,3 +98,19 @@ nav {
   .nav-item, .sign-out { padding: 0.65rem; }
   .nav-item:hover { transform: none; }
 }
+
+@media (max-width: 680px) {
+  .client-sidebar {
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  /* Icon-only brand so the nav strip keeps enough room on phones. */
+  .brand {
+    padding: 0.25rem;
+  }
+
+  .brand > span:not(.brand-mark) {
+    display: none;
+  }
+}

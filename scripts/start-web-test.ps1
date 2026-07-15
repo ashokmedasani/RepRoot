@@ -21,7 +21,7 @@ if (-not $lanIp) {
 }
 
 $allowedHosts = "localhost,127.0.0.1,10.0.2.2,$lanIp"
-$corsOrigins = "http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400,http://localhost:4401,http://127.0.0.1:4401,http://${lanIp}:4400,http://localhost,https://localhost,capacitor://localhost"
+$corsOrigins = "http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400,http://localhost:4401,http://127.0.0.1:4401,http://${lanIp}:4400,http://${lanIp}:4401,http://localhost,https://localhost,capacitor://localhost"
 
 # Django backend on all network interfaces so another device can reach it.
 $backendCommand = "`$env:DJANGO_ALLOWED_HOSTS='$allowedHosts'; `$env:CORS_ALLOWED_ORIGINS='$corsOrigins'; Set-Location '$backend'; .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000"

@@ -7,6 +7,20 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 4300
+    },
+    {
+      "name": "mobile",
+      "cwd": "mobile",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--", "--port", "4401"],
+      "port": 4401
+    },
+    {
+      "name": "backend",
+      "cwd": "backend",
+      "runtimeExecutable": ".venv\\Scripts\\python.exe",
+      "runtimeArgs": ["manage.py", "runserver", "127.0.0.1:8000"],
+      "port": 8000
     }
   ]
 }

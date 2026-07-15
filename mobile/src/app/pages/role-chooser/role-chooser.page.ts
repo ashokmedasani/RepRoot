@@ -15,7 +15,13 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
   template: `
     <ion-content class="ion-padding">
       <div class="chooser">
+        <div class="brand">
+          <div class="logo">CF</div>
+          <h1>CoachFlow</h1>
+          <p>Trainer &amp; Client Management</p>
+        </div>
         <div class="choices">
+          <p class="choose-note">Continue as</p>
           <ion-button expand="block" size="large" (click)="goTrainer()">
             <ion-icon slot="start" name="barbell-outline" />
             Trainer
@@ -67,6 +73,15 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
       .choices {
         display: grid;
         gap: 0.8rem;
+      }
+      .choose-note {
+        margin: 0 0 -0.2rem;
+        color: var(--app-muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-align: center;
+        text-transform: uppercase;
       }
     `
   ]

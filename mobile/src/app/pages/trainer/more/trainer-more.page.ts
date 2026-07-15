@@ -1,65 +1,131 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   IonContent,
   IonHeader,
   IonIcon,
-  IonItem,
-  IonLabel,
-  IonList,
   IonTitle,
   IonToolbar
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { folderOpenOutline, logOutOutline, personCircleOutline, settingsOutline } from 'ionicons/icons';
+import {
+  chevronForwardOutline,
+  folderOpenOutline,
+  helpBuoyOutline,
+  logOutOutline,
+  personOutline,
+  serverOutline,
+  settingsOutline
+} from 'ionicons/icons';
 
-import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
+import { TrainerAuthApiService, TrainerDataUsage, TrainerProfile } from '../../../core/api/trainer-auth-api.service';
 
-/** More tab: Profile, References, Settings, Logout. */
+/** More tab — profile header + menu rows, matching the reference design (Shop deferred). */
 @Component({
   selector: 'app-trainer-more',
   standalone: true,
-  imports: [RouterLink, IonHeader, IonToolbar, IonTitle, IonContent, IonList, IonItem, IonLabel, IonIcon],
+  imports: [RouterLink, IonHeader, IonToolbar, IonTitle, IonContent, IonIcon],
   template: `
     <ion-header>
-      <ion-toolbar>
-        <ion-title>More</ion-title>
-      </ion-toolbar>
+      <ion-toolbar><ion-title>More</ion-title></ion-toolbar>
     </ion-header>
     <ion-content>
-      <ion-list inset>
-        <ion-item button detail routerLink="/trainer/tabs/more/profile">
-          <ion-icon slot="start" name="person-circle-outline" />
-          <ion-label>Profile</ion-label>
-        </ion-item>
-        <ion-item button detail routerLink="/trainer/tabs/more/references">
-          <ion-icon slot="start" name="folder-open-outline" />
-          <ion-label>References</ion-label>
-        </ion-item>
-        <ion-item button detail routerLink="/trainer/tabs/more/settings">
-          <ion-icon slot="start" name="settings-outline" />
-          <ion-label>Settings</ion-label>
-        </ion-item>
-      </ion-list>
+      <div class="page-pad">
+        <a class="profile-card" routerLink="/trainer/tabs/more/profile" style="text-decoration:none">
+          @if (profile?.profile_photo_url) {
+            <img class="avatar" [src]="profile?.profile_photo_url" alt="" />
+          } @else {
+            <div class="avatar avatar-fallback">{{ initials }}</div>
+          }
+          <div style="flex:1;min-width:0">
+            <strong>{{ fullName }}</strong>
+            <small>{{ profile?.professional_headline || 'Personal Trainer' }}</small>
+          </div>
+          <ion-icon name="chevron-forward-outline" style="color:var(--app-muted)" />
+        </a>
 
-      <ion-list inset>
-        <ion-item button (click)="logout()">
-          <ion-icon slot="start" name="log-out-outline" color="danger" />
-          <ion-label color="danger">Log out</ion-label>
-        </ion-item>
-      </ion-list>
+        <div class="menu-card">
+          <a routerLink="/trainer/tabs/more/profile">
+            <ion-icon name="person-outline" />Trainer Profile<span class="chev">›</span>
+          </a>
+          <a routerLink="/trainer/tabs/manage/references">
+            <ion-icon name="folder-open-outline" />Reference Library<span class="chev">›</span>
+          </a>
+          <a routerLink="/trainer/tabs/more/settings">
+            <ion-icon name="server-outline" />
+            Plan &amp; Storage
+            <span style="margin-left:auto;margin-right:.4rem;color:var(--app-muted);font-size:.78rem;font-weight:700">
+              {{ usagePercent }}% used
+            </span>
+          </a>
+        </div>
+
+        <div class="menu-card">
+          <a routerLink="/trainer/tabs/more/settings">
+            <ion-icon name="settings-outline" />Settings<span class="chev">›</span>
+          </a>
+          <a routerLink="/trainer/tabs/more/support">
+            <ion-icon name="help-buoy-outline" />Help &amp; Support<span class="chev">›</span>
+          </a>
+        </div>
+
+        <div class="menu-card">
+          <button type="button" class="danger" (click)="logout()" [disabled]="isSigningOut">
+            <ion-icon name="log-out-outline" />{{ isSigningOut ? 'Signing out…' : 'Logout' }}
+          </button>
+        </div>
+      </div>
     </ion-content>
   `
 })
-export class TrainerMorePage {
+export class TrainerMorePage implements OnInit {
   private readonly trainerAuth = inject(TrainerAuthApiService);
   private readonly router = inject(Router);
 
+  profile: TrainerProfile | null = null;
+  usage: TrainerDataUsage | null = null;
+  isSigningOut = false;
+
   constructor() {
-    addIcons({ personCircleOutline, folderOpenOutline, settingsOutline, logOutOutline });
+    addIcons({
+      personOutline,
+      folderOpenOutline,
+      settingsOutline,
+      logOutOutline,
+      serverOutline,
+      helpBuoyOutline,
+      chevronForwardOutline
+    });
+  }
+
+  get fullName(): string {
+    if (!this.profile) {
+      return 'Trainer';
+    }
+
+    return `${this.profile.first_name || ''} ${this.profile.last_name || ''}`.trim() || this.profile.username;
+  }
+
+  get initials(): string {
+    return this.fullName
+      .split(/\s+/)
+      .map((part) => part[0] || '')
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  get usagePercent(): number {
+    return Math.round((this.usage?.usage_percent || 0) * 10) / 10;
+  }
+
+  ngOnInit(): void {
+    this.trainerAuth.getProfile().subscribe({ next: (profile) => (this.profile = profile), error: () => undefined });
+    this.trainerAuth.getDataUsage().subscribe({ next: (usage) => (this.usage = usage), error: () => undefined });
   }
 
   logout(): void {
+    this.isSigningOut = true;
     this.trainerAuth.logout().subscribe({
       next: () => this.finish(),
       error: () => this.finish()

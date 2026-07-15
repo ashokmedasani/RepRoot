@@ -1,10 +1,10 @@
 import { Routes } from '@angular/router';
 
 /**
- * Android navigation map:
+ * Android navigation map (reference design):
  * - Role chooser -> trainer or client login -> role tab shell.
- * - Trainer shell: Dashboard, Clients, Forms & Groups, Templates, More.
- * - Client shell: Dashboard, Templates, Trainer, Chat, Settings.
+ * - Trainer shell (5-tab design, Shop deferred): Dashboard, Clients, Manage, More.
+ * - Client shell: Dashboard, Programs, Progress, More.
  */
 export const routes: Routes = [
   {
@@ -29,20 +29,40 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/trainer/clients/trainer-clients.page').then((m) => m.TrainerClientsPage)
       },
       {
+        path: 'clients/new',
+        loadComponent: () => import('./pages/trainer/client-create/client-create.page').then((m) => m.ClientCreatePage)
+      },
+      {
         path: 'clients/:clientId',
         loadComponent: () => import('./pages/trainer/client-detail/client-detail.page').then((m) => m.ClientDetailPage)
       },
       {
-        path: 'forms-groups',
-        loadComponent: () => import('./pages/trainer/forms-groups/trainer-forms-groups.page').then((m) => m.TrainerFormsGroupsPage)
+        path: 'clients/:clientId/templates/:assignmentId',
+        loadComponent: () => import('./pages/trainer/client-template/client-template.page').then((m) => m.ClientTemplatePage)
       },
       {
         path: 'manage',
         loadComponent: () => import('./pages/trainer/manage/trainer-manage.page').then((m) => m.TrainerManagePage)
       },
       {
-        path: 'templates',
+        path: 'manage/forms-groups',
+        loadComponent: () => import('./pages/trainer/forms-groups/trainer-forms-groups.page').then((m) => m.TrainerFormsGroupsPage)
+      },
+      {
+        path: 'manage/groups/:groupId',
+        loadComponent: () => import('./pages/trainer/group-detail/group-detail.page').then((m) => m.GroupDetailPage)
+      },
+      {
+        path: 'manage/templates',
         loadComponent: () => import('./pages/trainer/templates/trainer-templates.page').then((m) => m.TrainerTemplatesPage)
+      },
+      {
+        path: 'manage/references',
+        loadComponent: () => import('./pages/trainer/references/trainer-references.page').then((m) => m.TrainerReferencesPage)
+      },
+      {
+        path: 'manage/schedule',
+        loadComponent: () => import('./pages/trainer/schedule/trainer-schedule.page').then((m) => m.TrainerSchedulePage)
       },
       {
         path: 'more',
@@ -53,13 +73,18 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/trainer/profile/trainer-profile.page').then((m) => m.TrainerProfilePage)
       },
       {
-        path: 'more/references',
-        loadComponent: () => import('./pages/trainer/references/trainer-references.page').then((m) => m.TrainerReferencesPage)
-      },
-      {
         path: 'more/settings',
         loadComponent: () => import('./pages/trainer/settings/trainer-settings.page').then((m) => m.TrainerSettingsPage)
       },
+      {
+        path: 'more/support',
+        loadComponent: () => import('./pages/shared/support-incidents.page').then((m) => m.SupportIncidentsPage),
+        data: { role: 'trainer' }
+      },
+      // Back-compat redirects for pre-redesign links.
+      { path: 'forms-groups', redirectTo: 'manage/forms-groups' },
+      { path: 'templates', redirectTo: 'manage/templates' },
+      { path: 'more/references', redirectTo: 'manage/references' },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },
@@ -76,8 +101,8 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/client/dashboard/client-dashboard.page').then((m) => m.ClientDashboardPage)
       },
       {
-        path: 'templates',
-        loadComponent: () => import('./pages/client/templates/client-templates.page').then((m) => m.ClientTemplatesPage)
+        path: 'programs',
+        loadComponent: () => import('./pages/client/programs/client-programs.page').then((m) => m.ClientProgramsPage)
       },
       {
         path: 'progress',
@@ -88,20 +113,27 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/client/more/client-more.page').then((m) => m.ClientMorePage)
       },
       {
-        path: 'trainer',
-        loadComponent: () => import('./pages/client/trainer/client-trainer.page').then((m) => m.ClientTrainerPage),
-        data: { title: 'My Trainer', note: 'Your trainer’s public profile.' }
+        path: 'more/profile',
+        loadComponent: () => import('./pages/client/settings/client-settings.page').then((m) => m.ClientSettingsPage)
       },
       {
-        path: 'chat',
-        loadComponent: () => import('./pages/client/chat/client-chat.page').then((m) => m.ClientChatPage),
-        data: { title: 'Trainer Chat', note: 'Direct messages with your trainer.' }
+        path: 'more/trainer',
+        loadComponent: () => import('./pages/client/trainer/client-trainer.page').then((m) => m.ClientTrainerPage)
       },
       {
-        path: 'settings',
-        loadComponent: () => import('./pages/client/settings/client-settings.page').then((m) => m.ClientSettingsPage),
-        data: { title: 'My Details', note: 'Account, registration details, edit requests, shared info.' }
+        path: 'more/chat',
+        loadComponent: () => import('./pages/client/chat/client-chat.page').then((m) => m.ClientChatPage)
       },
+      {
+        path: 'more/support',
+        loadComponent: () => import('./pages/shared/support-incidents.page').then((m) => m.SupportIncidentsPage),
+        data: { role: 'client' }
+      },
+      // Back-compat redirects for pre-redesign links.
+      { path: 'templates', redirectTo: 'programs' },
+      { path: 'trainer', redirectTo: 'more/trainer' },
+      { path: 'chat', redirectTo: 'more/chat' },
+      { path: 'settings', redirectTo: 'more/profile' },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

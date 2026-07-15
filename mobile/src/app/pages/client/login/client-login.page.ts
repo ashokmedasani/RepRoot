@@ -46,6 +46,11 @@ import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/clien
       </ion-toolbar>
     </ion-header>
     <ion-content class="ion-padding">
+      <div class="login-brand">
+        <div class="logo">CF</div>
+        <h1>Welcome back</h1>
+        <p>Sign in to your client portal</p>
+      </div>
       <form (ngSubmit)="login()">
         <ion-list inset>
           <ion-item>
@@ -96,7 +101,13 @@ import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/clien
         }
       </form>
     </ion-content>
-  `
+  `,
+  styles: [`
+    .login-brand { display: grid; justify-items: center; gap: .3rem; margin: 2.2rem 0 1.4rem; text-align: center; }
+    .login-brand .logo { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1.1rem; background: var(--app-primary); color: #fff; font-size: 1.4rem; font-weight: 800; }
+    .login-brand h1 { margin: .5rem 0 0; color: var(--app-text); font-size: 1.5rem; font-weight: 800; }
+    .login-brand p { margin: 0; color: var(--app-muted); font-size: .85rem; font-weight: 600; }
+  `]
 })
 export class ClientLoginPage {
   private readonly clientApi = inject(ClientApiService);

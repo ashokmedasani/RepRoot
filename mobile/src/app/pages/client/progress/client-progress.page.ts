@@ -1,45 +1,216 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { IonButton, IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar } from '@ionic/angular/standalone';
+import { FormsModule } from '@angular/forms';
+import {
+  IonContent,
+  IonHeader,
+  IonLabel,
+  IonRefresher,
+  IonRefresherContent,
+  IonSegment,
+  IonSegmentButton,
+  IonTitle,
+  IonToolbar
+} from '@ionic/angular/standalone';
 
 import { ClientApiService } from '../../../core/api/client-api.service';
-import { TemplateField, TrackingEntryRecord, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
+import { TrackingEntryRecord, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
+import { ChartSpec, DateRange } from '../../../shared/analytics/analytics.types';
+import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../shared/analytics/graph-engine';
+import { ChartCardComponent } from '../../../shared/chart-card.component';
 
-interface MetricSeries { template: string; field: string; unit: string; entries: { date: string; value: number }[]; }
+type ProgressTab = 'overview' | 'history';
 
+interface TemplateChartGroup {
+  template: TrackingTemplateRecord;
+  charts: ChartSpec[];
+  stats: NumericFieldStat[];
+}
+
+/** Progress — shareable branded graphs per program, quick stats, and full check-in history. */
 @Component({
-  selector: 'app-client-progress-mobile', standalone: true,
-  imports: [DatePipe, IonButton, IonContent, IonHeader, IonRefresher, IonRefresherContent, IonTitle, IonToolbar, RouterLink],
+  selector: 'app-client-progress',
+  standalone: true,
+  imports: [
+    DatePipe,
+    FormsModule,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonContent,
+    IonRefresher,
+    IonRefresherContent,
+    IonSegment,
+    IonSegmentButton,
+    IonLabel,
+    ChartCardComponent
+  ],
   template: `
-    <ion-header><ion-toolbar><ion-title>Progress</ion-title></ion-toolbar></ion-header>
-    <ion-content><ion-refresher slot="fixed" (ionRefresh)="refresh($event)"><ion-refresher-content /></ion-refresher><div class="page-pad">
-      <p class="empty-note">Your charts are generated from measurable values submitted in your assigned templates.</p>
-      @for (series of metricSeries; track series.template + series.field) {
-        <article class="metric-card"><div class="metric-heading"><div><small>{{ series.template }}</small><h2>{{ series.field }}</h2></div><strong>{{ series.entries[series.entries.length - 1].value }} {{ series.unit }}</strong></div><svg viewBox="0 0 320 150" role="img" [attr.aria-label]="series.field + ' progress chart'"><line x1="16" y1="130" x2="304" y2="130" /><polyline [attr.points]="chartPoints(series.entries)" /></svg><div class="metric-meta"><span>{{ series.entries.length }} entries</span><span>{{ series.entries[0].date | date:'mediumDate' }} – {{ series.entries[series.entries.length - 1].date | date:'mediumDate' }}</span></div></article>
-      } @empty { <div class="empty-state"><h2>No chart data yet</h2><p>Submit a number or rating in Templates and your progress will appear here.</p><ion-button routerLink="/client/tabs/templates">Record a check-in</ion-button></div> }
-    </div></ion-content>
-  `,
-  styles: [`.metric-card{margin:0 0 1rem;padding:1rem;border-radius:1rem;background:var(--app-surface);box-shadow:0 4px 18px rgba(15,35,70,.08)}.metric-heading{display:flex;justify-content:space-between;gap:.8rem;align-items:end}.metric-heading small{color:var(--app-muted)}.metric-heading h2{margin:.2rem 0;font-size:1.05rem}.metric-heading strong{color:var(--app-primary);font-size:1.1rem}svg{width:100%;height:150px;display:block;margin-top:.5rem}line{stroke:var(--app-border);stroke-width:1}polyline{fill:color-mix(in srgb,var(--app-primary) 13%,transparent);stroke:var(--app-primary);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.metric-meta{display:flex;justify-content:space-between;color:var(--app-muted);font-size:.75rem}.empty-state{text-align:center;padding:2rem 1rem}`]
+    <ion-header>
+      <ion-toolbar><ion-title>Progress</ion-title></ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <ion-refresher slot="fixed" (ionRefresh)="refresh($event)">
+        <ion-refresher-content />
+      </ion-refresher>
+      <div class="page-pad">
+        <ion-segment [(ngModel)]="tab" mode="md">
+          <ion-segment-button value="overview"><ion-label>Overview</ion-label></ion-segment-button>
+          <ion-segment-button value="history"><ion-label>History</ion-label></ion-segment-button>
+        </ion-segment>
+
+        @if (message) {
+          <p class="error-text">{{ message }}</p>
+        }
+
+        @if (tab === 'overview') {
+          <ion-segment [(ngModel)]="range" (ionChange)="rebuild()" mode="md">
+            <ion-segment-button [value]="7"><ion-label>7d</ion-label></ion-segment-button>
+            <ion-segment-button [value]="30"><ion-label>This Month</ion-label></ion-segment-button>
+            <ion-segment-button [value]="90"><ion-label>90d</ion-label></ion-segment-button>
+            <ion-segment-button [value]="0"><ion-label>All</ion-label></ion-segment-button>
+          </ion-segment>
+
+          @if (quickStats.length) {
+            <div class="section-row" style="margin-top:.25rem"><h2>Quick Stats</h2></div>
+            <div class="kpi-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+              @for (stat of quickStats.slice(0, 3); track stat.key) {
+                <div class="kpi-tile" style="padding:.7rem .75rem">
+                  <span style="font-size:.62rem">{{ stat.label }}</span>
+                  <strong style="font-size:1.15rem">{{ stat.latest }}<small style="font-size:.62rem"> {{ stat.unit }}</small></strong>
+                  <small>avg {{ stat.average }}</small>
+                </div>
+              }
+            </div>
+          }
+
+          @for (group of chartGroups; track group.template.id) {
+            <div class="section-row"><h2>{{ group.template.name }}</h2></div>
+            @for (chart of group.charts; track chart.title) {
+              <app-chart-card [spec]="chart" [shareContext]="group.template.name" />
+            }
+          } @empty {
+            <p class="empty-note" style="margin-top:1rem">Submit check-ins from the Programs tab to see your progress graphs here.</p>
+          }
+        }
+
+        @if (tab === 'history') {
+          @if (templates.length > 1) {
+            <div style="display:flex;gap:.45rem;overflow-x:auto;padding-bottom:.35rem">
+              <button type="button" (click)="historyTemplateId = 0"
+                [style.background]="historyTemplateId === 0 ? 'var(--app-primary-soft)' : 'var(--app-surface)'"
+                style="flex:0 0 auto;border:1px solid var(--app-border);border-radius:999px;color:var(--app-text);font-size:.78rem;font-weight:700;padding:.38rem .85rem">All</button>
+              @for (template of templates; track template.id) {
+                <button type="button" (click)="historyTemplateId = template.id"
+                  [style.background]="historyTemplateId === template.id ? 'var(--app-primary-soft)' : 'var(--app-surface)'"
+                  style="flex:0 0 auto;border:1px solid var(--app-border);border-radius:999px;color:var(--app-text);font-size:.78rem;font-weight:700;padding:.38rem .85rem">
+                  {{ template.name }}
+                </button>
+              }
+            </div>
+          }
+
+          <div class="row-list" style="margin-top:.5rem">
+            @for (entry of historyEntries; track entry.id) {
+              <div class="row-item">
+                <div class="row-main">
+                  <h3>{{ entry.entry_date | date: 'dd MMM yyyy' }}{{ entry.entry_time ? ' · ' + entry.entry_time.slice(0, 5) : '' }}</h3>
+                  <p>{{ entry.template_name }} · {{ summary(entry) }}</p>
+                </div>
+                @if (entry.edited_by_trainer) {
+                  <div class="row-side"><span class="pill info">Trainer</span></div>
+                }
+              </div>
+            } @empty {
+              <p class="empty-note">No check-ins recorded yet.</p>
+            }
+          </div>
+        }
+        <div class="bottom-space"></div>
+      </div>
+    </ion-content>
+  `
 })
 export class ClientProgressPage implements OnInit {
-  private readonly api = inject(ClientApiService);
+  private readonly clientApi = inject(ClientApiService);
+
+  tab: ProgressTab = 'overview';
+  range: DateRange = 30;
   templates: TrackingTemplateRecord[] = [];
   entries: TrackingEntryRecord[] = [];
+  chartGroups: TemplateChartGroup[] = [];
+  quickStats: NumericFieldStat[] = [];
+  historyTemplateId = 0;
+  message = '';
 
-  get metricSeries(): MetricSeries[] {
-    return this.templates.flatMap((template) => template.fields.filter((field) => field.field_type === 'number' || field.field_type === 'rating').map((field) => {
-      const key = field.key || field.label;
-      const entries = this.entries.filter((entry) => entry.template === template.id).map((entry) => ({ date: entry.entry_date, value: Number(entry.answers?.[key]) })).filter((entry) => Number.isFinite(entry.value)).sort((a, b) => a.date.localeCompare(b.date));
-      return { template: template.name, field: field.label, unit: field.field_type === 'rating' ? '/ ' + (field.scale || 5) : '', entries };
-    })).filter((series) => series.entries.length > 0);
+  get historyEntries(): TrackingEntryRecord[] {
+    const filtered = this.historyTemplateId
+      ? this.entries.filter((entry) => entry.template === this.historyTemplateId)
+      : this.entries;
+
+    return [...filtered]
+      .sort((a, b) => `${b.entry_date} ${b.entry_time || ''}`.localeCompare(`${a.entry_date} ${a.entry_time || ''}`))
+      .slice(0, 40);
   }
 
-  ngOnInit(): void { this.load(); }
-  refresh(event: CustomEvent): void { this.load(() => (event.target as HTMLIonRefresherElement).complete()); }
-  chartPoints(values: { value: number }[]): string {
-    const width = 288; const height = 110; const min = Math.min(...values.map((item) => item.value)); const max = Math.max(...values.map((item) => item.value)); const span = max - min || 1;
-    return values.map((item, index) => `${16 + (index * width) / Math.max(values.length - 1, 1)},${130 - ((item.value - min) / span) * height}`).join(' ');
+  ngOnInit(): void {
+    this.load();
   }
-  private load(done?: () => void): void { this.api.getTemplates().subscribe({ next: (templates) => { this.templates = templates.templates; done?.(); }, error: () => done?.() }); this.api.getEntries().subscribe({ next: (entries) => this.entries = entries.entries, error: () => this.entries = [] }); }
+
+  refresh(event: CustomEvent): void {
+    this.load(() => (event.target as HTMLIonRefresherElement).complete());
+  }
+
+  rebuild(): void {
+    const range = Number(this.range) as DateRange;
+    const groups: TemplateChartGroup[] = [];
+    const stats: NumericFieldStat[] = [];
+
+    for (const template of this.templates) {
+      const templateEntries = this.entries.filter((entry) => entry.template === template.id);
+
+      if (!templateEntries.length) {
+        continue;
+      }
+
+      const charts = buildFieldCharts(template.fields, templateEntries, range);
+      const templateStats = numericFieldStats(template.fields, templateEntries).filter((stat) => stat.hasData);
+      stats.push(...templateStats);
+
+      if (charts.length) {
+        groups.push({ template, charts, stats: templateStats });
+      }
+    }
+
+    this.chartGroups = groups;
+    this.quickStats = stats;
+  }
+
+  summary(entry: TrackingEntryRecord): string {
+    const values = Object.values(entry.answers || {})
+      .map((value) => String(value ?? '').trim())
+      .filter(Boolean);
+    return values.slice(0, 2).join(' · ') || entry.note || 'Submitted';
+  }
+
+  private load(done?: () => void): void {
+    this.clientApi.getTemplates().subscribe({
+      next: (response) => {
+        this.templates = response.templates;
+        this.rebuild();
+        done?.();
+      },
+      error: () => {
+        this.message = 'Could not load your programs.';
+        done?.();
+      }
+    });
+    this.clientApi.getEntries().subscribe({
+      next: (response) => {
+        this.entries = response.entries;
+        this.rebuild();
+      },
+      error: () => (this.entries = [])
+    });
+  }
 }

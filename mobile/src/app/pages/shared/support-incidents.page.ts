@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonBadge, IonButton, IonItem, IonLabel, IonList, IonListHeader, IonSelect, IonSelectOption, IonTextarea } from '@ionic/angular/standalone';
+import { ActivatedRoute } from '@angular/router';
+import { IonBackButton, IonBadge, IonButton, IonButtons, IonContent, IonHeader, IonItem, IonLabel, IonList, IonListHeader, IonSelect, IonSelectOption, IonTextarea, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 
 import { ClientApiService, ClientSupportIncident } from '../../core/api/client-api.service';
 import { MobileSupportIncident, TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
@@ -12,8 +13,15 @@ type Incident = MobileSupportIncident | ClientSupportIncident;
 @Component({
   selector: 'app-mobile-support-incidents',
   standalone: true,
-  imports: [DatePipe, FormsModule, IonBadge, IonButton, IonItem, IonLabel, IonList, IonListHeader, IonSelect, IonSelectOption, IonTextarea],
+  imports: [DatePipe, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonContent, IonBadge, IonButton, IonItem, IonLabel, IonList, IonListHeader, IonSelect, IonSelectOption, IonTextarea],
   template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-back-button [defaultHref]="role === 'trainer' ? '/trainer/tabs/more' : '/client/tabs/more'" /></ion-buttons>
+        <ion-title>Help &amp; Support</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
     <ion-list inset>
       <ion-list-header><ion-label>Support</ion-label></ion-list-header>
       <ion-item lines="none"><ion-label class="ion-text-wrap"><h3>Report a bug or send feedback</h3><p>Support requests are tracked here. You can have up to three active requests.</p></ion-label></ion-item>
@@ -31,13 +39,23 @@ type Incident = MobileSupportIncident | ClientSupportIncident;
         <ion-item lines="full"><ion-label class="ion-text-wrap"><div class="incident-line"><strong>{{ incident.incident_id }}</strong><ion-badge>{{ statusLabel(incident.status) }}</ion-badge></div><h3>{{ incident.subject }}</h3><p>{{ incident.created_at | date:'mediumDate' }} · {{ incident.description }}</p>@if (incident.status === 'waiting_for_user') { <ion-textarea label="Reply to support" labelPlacement="stacked" rows="2" [(ngModel)]="followUps[incident.incident_id]" [name]="'reply' + incident.id" /><ion-button size="small" (click)="followUp(incident)">Send reply</ion-button> } @if (incident.status === 'resolved' || incident.status === 'closed') { <ion-button size="small" fill="outline" (click)="reopen(incident)">Reopen</ion-button> }</ion-label></ion-item>
       } @empty { <ion-item lines="none"><ion-label color="medium">No support requests yet.</ion-label></ion-item> }
     </ion-list>
+    </ion-content>
   `,
   styles: [`.file-label{display:grid;gap:.35rem;width:100%;font-size:.85rem}.incident-line{display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem}`]
 })
 export class MobileSupportIncidentsPage implements OnInit {
   private readonly trainerApi = inject(TrainerAuthApiService);
   private readonly clientApi = inject(ClientApiService);
+  private readonly route = inject(ActivatedRoute);
   @Input() role: Role = 'client';
+
+  constructor() {
+    const routeRole = this.route.snapshot.data['role'] as Role | undefined;
+
+    if (routeRole) {
+      this.role = routeRole;
+    }
+  }
   incidents: Incident[] = [];
   activeCount = 0;
   activeLimit = 3;
@@ -73,3 +91,6 @@ export class MobileSupportIncidentsPage implements OnInit {
     request.subscribe({ next: (response) => { this.incidents = response.incidents; this.activeCount = response.active_count; this.activeLimit = response.active_limit; }, error: () => this.message = 'Support requests could not be loaded.' });
   }
 }
+
+/** Route alias used by app.routes.ts. */
+export { MobileSupportIncidentsPage as SupportIncidentsPage };

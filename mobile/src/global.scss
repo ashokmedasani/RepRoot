@@ -85,3 +85,89 @@ ion-content { --padding-bottom: env(safe-area-inset-bottom); }
   color: var(--ion-color-danger);
   font-weight: 600;
 }
+
+/* ---- redesign shared patterns (reference mock) ---- */
+
+/* Greeting hero used on dashboards */
+.hero-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.hero-head .hello small { display: block; color: var(--app-muted); font-size: .82rem; font-weight: 600; }
+.hero-head .hello strong { display: block; color: var(--app-text); font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; }
+.avatar { width: 2.8rem; height: 2.8rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--app-primary-soft); background: var(--app-surface-soft); }
+.avatar-sm { width: 2.35rem; height: 2.35rem; border-radius: 50%; object-fit: cover; background: var(--app-surface-soft); flex: 0 0 auto; }
+.avatar-fallback { display: grid; place-items: center; color: var(--app-primary-strong); background: var(--app-primary-soft); font-weight: 800; font-size: .95rem; }
+
+/* Card + section vocabulary */
+.card { border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: var(--app-surface); padding: 1rem; margin-top: .75rem; }
+.card h3 { margin: 0 0 .5rem; font-size: .95rem; font-weight: 800; color: var(--app-text); }
+.card .sub { margin: -.35rem 0 .6rem; color: var(--app-muted); font-size: .76rem; font-weight: 600; }
+.section-row { display: flex; align-items: center; justify-content: space-between; margin: 1.25rem 0 .5rem; }
+.section-row h2 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--app-text); }
+.section-row a, .section-row button.linklike { color: var(--app-primary); font-size: .8rem; font-weight: 700; text-decoration: none; background: none; border: 0; padding: 0; }
+
+/* List rows (clients, schedules, items) */
+.row-list { display: flex; flex-direction: column; gap: .6rem; }
+.row-item { display: flex; align-items: center; gap: .75rem; border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: var(--app-surface); padding: .7rem .85rem; color: var(--app-text); text-decoration: none; }
+.row-item .row-main { flex: 1; min-width: 0; }
+.row-item .row-main h3 { margin: 0; font-size: .92rem; font-weight: 700; color: var(--app-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-item .row-main p { margin: .12rem 0 0; font-size: .76rem; color: var(--app-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-item .row-side { text-align: right; flex: 0 0 auto; }
+.row-item .row-side strong { display: block; font-size: .82rem; font-weight: 800; }
+.row-item .row-side small { color: var(--app-muted); font-size: .68rem; font-weight: 700; }
+
+/* Status pill */
+.pill { display: inline-block; border-radius: 999px; padding: .18rem .6rem; font-size: .68rem; font-weight: 800; letter-spacing: .02em; }
+.pill.ok { color: var(--app-success); background: color-mix(in srgb, var(--app-success) 14%, transparent); }
+.pill.warn { color: #b45309; background: color-mix(in srgb, #f59e0b 18%, transparent); }
+.pill.bad { color: var(--ion-color-danger); background: color-mix(in srgb, var(--ion-color-danger) 12%, transparent); }
+.pill.info { color: var(--app-primary-strong); background: var(--app-primary-soft); }
+
+/* More menu (reference: icon + label + chevron rows) */
+.menu-card { border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: var(--app-surface); margin-top: .9rem; overflow: hidden; }
+.menu-card a, .menu-card button { display: flex; width: 100%; align-items: center; gap: .8rem; padding: .85rem 1rem; background: none; border: 0; border-bottom: 1px solid var(--app-border); color: var(--app-text); font-size: .92rem; font-weight: 650; text-decoration: none; text-align: left; }
+.menu-card a:last-child, .menu-card button:last-child { border-bottom: 0; }
+.menu-card ion-icon { font-size: 1.2rem; color: var(--app-primary); flex: 0 0 auto; }
+.menu-card .chev { margin-left: auto; color: var(--app-muted); font-size: 1rem; }
+.menu-card .danger, .menu-card .danger ion-icon { color: var(--ion-color-danger); }
+
+/* Profile header card (More tabs) */
+.profile-card { display: flex; align-items: center; gap: .85rem; border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: var(--app-surface); padding: 1rem; }
+.profile-card .avatar { width: 3.4rem; height: 3.4rem; }
+.profile-card strong { display: block; font-size: 1.05rem; font-weight: 800; color: var(--app-text); }
+.profile-card small { color: var(--app-muted); font-size: .78rem; font-weight: 600; }
+
+/* Forms */
+.form-grid { display: grid; gap: .65rem; margin-top: .5rem; }
+.form-grid label { display: block; }
+.form-grid label span { display: block; margin-bottom: .25rem; color: var(--app-muted); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.form-grid input, .form-grid select, .form-grid textarea { width: 100%; border: 1px solid var(--app-border); border-radius: var(--app-radius-md); background: var(--app-surface); color: var(--app-text); padding: .65rem .75rem; font-size: .95rem; font-family: inherit; }
+.form-grid textarea { min-height: 4.5rem; resize: vertical; }
+.form-two { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+.hint-note { margin: .4rem 0 0; color: var(--app-muted); font-size: .74rem; font-weight: 600; }
+.success-text { color: var(--app-success); font-weight: 700; font-size: .85rem; }
+
+/* Key/value detail rows */
+.kv-list { display: grid; gap: .45rem; }
+.kv-list .kv { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; }
+.kv-list .kv span { color: var(--app-muted); font-weight: 600; flex: 0 0 auto; }
+.kv-list .kv strong { color: var(--app-text); font-weight: 700; text-align: right; word-break: break-word; }
+
+/* Segments spacing */
+ion-segment { margin: .25rem 0 .75rem; }
+
+/* Chat */
+.chat-scroll { display: flex; flex-direction: column; gap: .5rem; padding-bottom: .75rem; }
+.chat-bubble { max-width: 82%; border-radius: 1rem; padding: .55rem .8rem; font-size: .9rem; line-height: 1.35; }
+.chat-bubble.mine { align-self: flex-end; background: var(--app-primary); color: #fff; border-bottom-right-radius: .3rem; }
+.chat-bubble.theirs { align-self: flex-start; background: var(--app-surface); border: 1px solid var(--app-border); color: var(--app-text); border-bottom-left-radius: .3rem; }
+.chat-bubble time { display: block; margin-top: .2rem; font-size: .62rem; opacity: .75; }
+.chat-input-row { display: flex; gap: .5rem; align-items: center; padding: .5rem 1rem calc(.6rem + env(safe-area-inset-bottom)); background: var(--app-surface); border-top: 1px solid var(--app-border); }
+.chat-input-row input { flex: 1; border: 1px solid var(--app-border); border-radius: 999px; padding: .6rem .9rem; background: var(--app-bg); color: var(--app-text); font-size: .95rem; }
+
+/* Checklist (client today plan) */
+.check-row { display: flex; align-items: center; gap: .7rem; padding: .55rem 0; border-bottom: 1px solid var(--app-border); }
+.check-row:last-child { border-bottom: 0; }
+.check-row .tick { width: 1.35rem; height: 1.35rem; border-radius: .4rem; border: 2px solid var(--app-border); display: grid; place-items: center; color: #fff; font-size: .9rem; flex: 0 0 auto; }
+.check-row.done .tick { background: var(--app-success); border-color: var(--app-success); }
+.check-row .check-main { flex: 1; min-width: 0; }
+.check-row .check-main strong { display: block; font-size: .88rem; color: var(--app-text); }
+.check-row .check-main small { color: var(--app-muted); font-size: .72rem; font-weight: 600; }

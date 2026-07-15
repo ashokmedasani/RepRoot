@@ -332,6 +332,20 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
+  .sidebar {
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  /* Icon-only brand so the nav strip keeps enough room on phones. */
+  .brand {
+    padding: 0.25rem;
+  }
+
+  .brand > span:not(.brand-mark) {
+    display: none;
+  }
+
   .trainer-workspace {
     padding: 1.5rem 1.25rem 2.5rem;
   }

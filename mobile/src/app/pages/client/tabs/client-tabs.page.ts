@@ -13,9 +13,9 @@ import { barChartOutline, clipboardOutline, ellipsisHorizontalOutline, gridOutli
       <ion-tab-bar slot="bottom">
         <ion-tab-button tab="dashboard">
           <ion-icon name="grid-outline" />
-          <ion-label>Home</ion-label>
+          <ion-label>Dashboard</ion-label>
         </ion-tab-button>
-        <ion-tab-button tab="templates">
+        <ion-tab-button tab="programs">
           <ion-icon name="clipboard-outline" />
           <ion-label>Programs</ion-label>
         </ion-tab-button>

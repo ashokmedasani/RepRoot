@@ -1,8 +1,101 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonButton, IonContent, IonFooter, IonHeader, IonInput, IonItem, IonLabel, IonList, IonTitle, IonToolbar } from '@ionic/angular/standalone';
+import {
+  IonBackButton,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonFooter,
+  IonHeader,
+  IonIcon,
+  IonTitle,
+  IonToolbar
+} from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { sendOutline } from 'ionicons/icons';
+
 import { ChatMessage, ClientApiService } from '../../../core/api/client-api.service';
 
-@Component({selector:'app-client-chat-mobile',standalone:true,imports:[DatePipe,FormsModule,IonButton,IonContent,IonFooter,IonHeader,IonInput,IonItem,IonLabel,IonList,IonTitle,IonToolbar],template:`<ion-header><ion-toolbar><ion-title>Trainer Chat</ion-title></ion-toolbar></ion-header><ion-content><div class="page-pad"><ion-list>@for(item of messages;track item.id){<ion-item lines="none" [class.mine]="item.sender==='client'"><ion-label class="ion-text-wrap"><small>{{item.sender==='client'?'You':'Trainer'}} · {{item.created_at|date:'short'}}</small><p>{{item.text}}</p></ion-label></ion-item>}@empty{<p class="empty-note">No messages yet. Start a conversation below.</p>}</ion-list>@if(message){<p class="error-text">{{message}}</p>}</div></ion-content><ion-footer><ion-toolbar><div class="composer"><ion-input placeholder="Write a message" [(ngModel)]="draft" name="draft" (keyup.enter)="send()"/><ion-button (click)="send()" [disabled]="!draft.trim()">Send</ion-button></div></ion-toolbar></ion-footer>`,styles:[`.composer{display:flex;gap:.4rem;padding:.4rem .6rem}.mine{--background:var(--app-primary-soft);margin-left:2rem;border-radius:.8rem}ion-label p{white-space:pre-wrap}`]})
-export class ClientChatPage implements OnInit{private readonly api=inject(ClientApiService);messages:ChatMessage[]=[];draft='';message='';ngOnInit():void{this.load()}send():void{const text=this.draft.trim();if(!text)return;this.api.sendChat(text).subscribe({next:r=>{this.messages=[...this.messages,r.chat_message];this.draft=''},error:()=>this.message='Message could not be sent.'})}private load():void{this.api.getChat().subscribe({next:r=>this.messages=r.messages,error:()=>this.message='Could not load messages.'})}}
+/** Direct messages with your trainer. */
+@Component({
+  selector: 'app-client-chat',
+  standalone: true,
+  imports: [DatePipe, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonIcon, IonContent, IonFooter],
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-back-button defaultHref="/client/tabs/more" /></ion-buttons>
+        <ion-title>Trainer Chat</ion-title>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content>
+      <div class="page-pad chat-scroll">
+        @for (chatMessage of messages; track chatMessage.id) {
+          <div class="chat-bubble" [class.mine]="chatMessage.sender === 'client'" [class.theirs]="chatMessage.sender === 'trainer'">
+            {{ chatMessage.text }}
+            <time>{{ chatMessage.created_at | date: 'dd MMM HH:mm' }}</time>
+          </div>
+        } @empty {
+          <p class="empty-note">No messages yet. Say hello to your trainer!</p>
+        }
+      </div>
+    </ion-content>
+    <ion-footer>
+      <div class="chat-input-row">
+        <input [(ngModel)]="draft" (keyup.enter)="send()" placeholder="Type a message…" />
+        <ion-button (click)="send()" [disabled]="!draft.trim()">
+          <ion-icon slot="icon-only" name="send-outline" />
+        </ion-button>
+      </div>
+    </ion-footer>
+  `
+})
+export class ClientChatPage implements OnInit, OnDestroy {
+  private readonly clientApi = inject(ClientApiService);
+
+  messages: ChatMessage[] = [];
+  draft = '';
+  private poll: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    addIcons({ sendOutline });
+  }
+
+  ngOnInit(): void {
+    this.loadMessages();
+    this.poll = setInterval(() => this.loadMessages(), 8000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.poll) {
+      clearInterval(this.poll);
+    }
+  }
+
+  send(): void {
+    const text = this.draft.trim();
+
+    if (!text) {
+      return;
+    }
+
+    this.draft = '';
+    this.clientApi.sendChat(text).subscribe({
+      next: (response) => (this.messages = [...this.messages, response.chat_message]),
+      error: () => (this.draft = text)
+    });
+  }
+
+  private loadMessages(): void {
+    const lastId = this.messages.length ? this.messages[this.messages.length - 1].id : undefined;
+    this.clientApi.getChat(lastId).subscribe({
+      next: (response) => {
+        if (response.messages.length) {
+          this.messages = [...this.messages, ...response.messages];
+        }
+      },
+      error: () => undefined
+    });
+  }
+}
