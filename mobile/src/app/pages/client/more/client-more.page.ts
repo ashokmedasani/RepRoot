@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   IonContent,
@@ -48,7 +48,11 @@ import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api
             <ion-icon name="person-outline" />Trainer Profile<span class="chev">›</span>
           </a>
           <a routerLink="/client/tabs/more/chat">
-            <ion-icon name="chatbubble-outline" />Messages<span class="chev">›</span>
+            <ion-icon name="chatbubble-outline" />Messages
+            @if (unreadMessages > 0) {
+              <span class="message-count">{{ badgeLabel }}</span>
+            }
+            <span class="chev">›</span>
           </a>
         </div>
 
@@ -68,14 +72,20 @@ import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api
         </div>
       </div>
     </ion-content>
-  `
+  `,
+  styles: [`
+    .message-count { display: inline-grid; min-width: 1.45rem; height: 1.45rem; margin-left: auto; place-items: center; border-radius: 999px; padding: 0 .38rem; background: #e11d48; color: #fff; font-size: .68rem; font-weight: 800; }
+    .message-count + .chev { margin-left: .2rem; }
+  `]
 })
-export class ClientMorePage implements OnInit {
+export class ClientMorePage implements OnInit, OnDestroy {
   private readonly clientApi = inject(ClientApiService);
   private readonly router = inject(Router);
 
   me: ClientMeResponse | null = null;
   isSigningOut = false;
+  unreadMessages = 0;
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     addIcons({ chatbubbleOutline, helpBuoyOutline, personOutline, settingsOutline, logOutOutline, chevronForwardOutline });
@@ -91,8 +101,20 @@ export class ClientMorePage implements OnInit {
     return `${client?.first_name?.[0] || ''}${client?.last_name?.[0] || ''}`.toUpperCase() || 'C';
   }
 
+  get badgeLabel(): string {
+    return this.unreadMessages > 99 ? '99+' : String(this.unreadMessages);
+  }
+
   ngOnInit(): void {
     this.clientApi.getMe().subscribe({ next: (me) => (this.me = me), error: () => (this.me = null) });
+    this.loadUnreadMessages();
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
+    }
   }
 
   logout(): void {
@@ -106,5 +128,12 @@ export class ClientMorePage implements OnInit {
   private finish(): void {
     this.clientApi.clearSession();
     void this.router.navigateByUrl('/', { replaceUrl: true });
+  }
+
+  private loadUnreadMessages(): void {
+    this.clientApi.getChatUnreadCount().subscribe({
+      next: (summary) => (this.unreadMessages = summary.unread_count),
+      error: () => (this.unreadMessages = 0)
+    });
   }
 }

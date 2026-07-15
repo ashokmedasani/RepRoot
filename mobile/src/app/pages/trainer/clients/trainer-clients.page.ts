@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
@@ -21,6 +21,7 @@ import { addOutline } from 'ionicons/icons';
 import { catchError, forkJoin, of } from 'rxjs';
 
 import { ClientAccessRecord, FormsGroupsApiService, TrainerGroup } from '../../../core/api/forms-groups-api.service';
+import { ChatApiService } from '../../../core/api/chat-api.service';
 
 /** Clients tab — searchable list with All / Active / Inactive filters, per the reference design. */
 @Component({
@@ -89,7 +90,7 @@ import { ClientAccessRecord, FormsGroupsApiService, TrainerGroup } from '../../.
 
         <div class="row-list" style="margin-top:.5rem">
           @for (client of filteredClients; track client.id) {
-            <a class="row-item" [routerLink]="['/trainer/tabs/clients', client.id]">
+            <a class="row-item client-row" [routerLink]="['/trainer/tabs/clients', client.id]">
               @if (client.photo) {
                 <img class="avatar-sm" [src]="client.photo" alt="" />
               } @else {
@@ -97,14 +98,11 @@ import { ClientAccessRecord, FormsGroupsApiService, TrainerGroup } from '../../.
               }
               <div class="row-main">
                 <h3>{{ client.first_name }} {{ client.last_name }}</h3>
-                <p>{{ client.email || client.username }}</p>
+                <p>{{ client.group_name || 'No group' }}</p>
               </div>
-              <div class="row-side">
-                <span class="pill" [class.ok]="client.is_active" [class.bad]="!client.is_active">
-                  {{ client.is_active ? 'Active' : 'Inactive' }}
-                </span>
-                <small style="display:block;margin-top:.2rem">{{ client.group_name }}</small>
-              </div>
+              @if (unreadFor(client.id); as unreadCount) {
+                <span class="message-count" [attr.aria-label]="unreadCount + ' unread messages'">{{ badgeLabel(unreadCount) }}</span>
+              }
             </a>
           } @empty {
             @if (!isLoading) {
@@ -120,10 +118,14 @@ import { ClientAccessRecord, FormsGroupsApiService, TrainerGroup } from '../../.
     .group-chips { display: flex; gap: .45rem; overflow-x: auto; padding-bottom: .35rem; scrollbar-width: none; }
     .group-chips button { flex: 0 0 auto; border: 1px solid var(--app-border); border-radius: 999px; background: var(--app-surface); color: var(--app-muted); font-size: .76rem; font-weight: 700; padding: .35rem .8rem; }
     .group-chips button.on { background: var(--app-primary-soft); border-color: var(--app-primary); color: var(--app-primary-strong); }
+    .client-row { min-height: 4.25rem; }
+    .client-row .row-main h3, .client-row .row-main p { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+    .message-count { display: inline-grid; min-width: 1.45rem; height: 1.45rem; flex: 0 0 auto; place-items: center; border-radius: 999px; padding: 0 .38rem; background: #e11d48; color: #fff; font-size: .68rem; font-weight: 800; }
   `]
 })
-export class TrainerClientsPage implements OnInit {
+export class TrainerClientsPage implements OnInit, OnDestroy {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
+  private readonly chatApi = inject(ChatApiService);
 
   readonly String = String;
 
@@ -134,6 +136,8 @@ export class TrainerClientsPage implements OnInit {
   searchTerm = '';
   groupFilter = 'all';
   statusFilter: 'all' | 'active' | 'inactive' = 'all';
+  unreadByClient: Record<string, number> = {};
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   get filteredClients(): ClientAccessRecord[] {
     const searchTerm = this.searchTerm.trim().toLowerCase();
@@ -161,6 +165,22 @@ export class TrainerClientsPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadUnreadMessages();
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
+    }
+  }
+
+  unreadFor(clientId: number): number {
+    return this.unreadByClient[String(clientId)] || 0;
+  }
+
+  badgeLabel(count: number): string {
+    return count > 99 ? '99+' : String(count);
   }
 
   refresh(event: CustomEvent): void {
@@ -203,6 +223,13 @@ export class TrainerClientsPage implements OnInit {
         this.isLoading = false;
         done?.();
       }
+    });
+  }
+
+  private loadUnreadMessages(): void {
+    this.chatApi.getTrainerUnreadCounts().subscribe({
+      next: (summary) => (this.unreadByClient = summary.by_client),
+      error: () => (this.unreadByClient = {})
     });
   }
 }

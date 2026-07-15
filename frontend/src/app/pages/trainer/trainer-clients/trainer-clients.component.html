@@ -80,6 +80,9 @@
                   <a [routerLink]="['/trainer/clients', client.id]" class="client-name">
                     <span class="avatar">{{ initials(client) }}</span>
                     <span>{{ client.first_name }} {{ client.last_name }}</span>
+                    @if (unreadFor(client.id); as unreadCount) {
+                      <span class="message-count" [attr.aria-label]="unreadCount + ' unread messages'">{{ badgeLabel(unreadCount) }}</span>
+                    }
                   </a>
                 </td>
                 <td>{{ client.email }}</td>

@@ -328,6 +328,12 @@ export class ClientApiService {
     });
   }
 
+  getChatUnreadCount(): Observable<{ unread_count: number }> {
+    return this.http.get<{ unread_count: number }>(`${this.apiBaseUrl}/client/chat/unread/`, {
+      headers: this.authHeaders()
+    });
+  }
+
   sendChat(text: string): Observable<{ chat_message: ChatMessage }> {
     return this.http.post<{ chat_message: ChatMessage }>(
       `${this.apiBaseUrl}/client/chat/`,

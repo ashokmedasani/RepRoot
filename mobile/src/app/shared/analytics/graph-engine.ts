@@ -165,7 +165,19 @@ export function decideChartForField(field: FieldLike, entries: EntryLike[], rang
   switch (field.field_type) {
     case 'number': {
       const data = timeSeries(field, inRange);
-      return data.length ? { kind: 'line', title: field.label, unit, data } : null;
+      if (!data.length) {
+        return null;
+      }
+
+      // A handful of daily values reads more clearly as rounded columns on a
+      // phone. Longer series become a smooth area trend.
+      return {
+        kind: data.length <= 8 ? 'bar' : 'line',
+        title: field.label,
+        unit,
+        data,
+        meta: { subtitle: data.length <= 8 ? 'Daily values' : 'Trend over time' }
+      };
     }
     case 'rating': {
       const data = ratingDistribution(field, inRange);
@@ -177,15 +189,25 @@ export function decideChartForField(field: FieldLike, entries: EntryLike[], rang
       const percent = completionPercent(field, inRange);
       return { kind: 'ring', title: field.label, data: [], meta: { percent, subtitle: 'Completion' } };
     }
-    case 'dropdown':
-    case 'short_text': {
+    case 'dropdown': {
       const data = frequency(field, inRange);
 
       if (!data.length) {
         return null;
       }
 
-      return { kind: data.length <= 3 ? 'pie' : 'bar', title: field.label, data };
+      return {
+        kind: data.length <= 4 ? 'pie' : 'hbar',
+        title: field.label,
+        data,
+        meta: { subtitle: 'Response breakdown' }
+      };
+    }
+    case 'short_text': {
+      const data = frequency(field, inRange);
+      return data.length
+        ? { kind: 'hbar', title: field.label, data, meta: { subtitle: 'Most common responses' } }
+        : null;
     }
     default:
       // long_text and any unknown/legacy types get no chart.

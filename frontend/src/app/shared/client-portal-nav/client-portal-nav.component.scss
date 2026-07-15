@@ -71,6 +71,19 @@ nav {
 .nav-item:hover { background: var(--app-surface-soft); color: var(--app-text); transform: translateX(2px); }
 .nav-item.active { border-color: color-mix(in srgb, var(--app-primary) 12%, transparent); background: var(--app-primary-soft); color: var(--app-primary-strong); font-weight: 700; }
 
+.nav-badge {
+  min-width: 1.35rem;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0.12rem 0.38rem;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
 .sign-out {
   border-color: var(--app-border);
   background: var(--app-surface);
@@ -94,9 +107,11 @@ nav {
   }
   nav { flex-direction: row; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 0; scrollbar-width: none; }
   nav::-webkit-scrollbar { display: none; }
-  .nav-item span, .sign-out span { display: none; }
+  .nav-item > span:not(.nav-badge), .sign-out span { display: none; }
   .nav-item, .sign-out { padding: 0.65rem; }
   .nav-item:hover { transform: none; }
+  .nav-item { position: relative; }
+  .nav-badge { position: absolute; top: .18rem; right: .12rem; min-width: 1.1rem; padding: .05rem .25rem; font-size: .58rem; line-height: .95rem; }
 }
 
 @media (max-width: 680px) {

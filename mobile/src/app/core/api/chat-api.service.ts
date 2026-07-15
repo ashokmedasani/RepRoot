@@ -11,6 +11,11 @@ export interface ChatMessageRecord {
   created_at: string;
 }
 
+export interface TrainerUnreadSummary {
+  unread_count: number;
+  by_client: Record<string, number>;
+}
+
 /** Trainer-side chat with a client. Mirrors the web chat-api service. */
 @Injectable({ providedIn: 'root' })
 export class ChatApiService {
@@ -30,6 +35,12 @@ export class ChatApiService {
       { text },
       { headers: this.trainerAuthHeaders() }
     );
+  }
+
+  getTrainerUnreadCounts(): Observable<TrainerUnreadSummary> {
+    return this.http.get<TrainerUnreadSummary>(`${this.apiBaseUrl}/trainer/chat/unread/`, {
+      headers: this.trainerAuthHeaders()
+    });
   }
 
   private buildAfterParams(afterId?: number): HttpParams {

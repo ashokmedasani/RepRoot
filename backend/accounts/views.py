@@ -5,7 +5,7 @@ from django.contrib.auth.hashers import make_password
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import Count, ProtectedError, Q
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import permissions, status
@@ -2277,6 +2277,30 @@ class TrainerClientChatView(APIView):
     return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)
 
 
+class TrainerChatUnreadView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    unread_rows = (
+      ChatMessage.objects.filter(
+        trainer=request.user,
+        client__is_active=True,
+        sender=ChatMessage.SENDER_CLIENT,
+        is_read=False,
+      )
+      .values('client_id')
+      .annotate(unread_count=Count('id'))
+    )
+    by_client = {str(row['client_id']): row['unread_count'] for row in unread_rows}
+
+    return Response(
+      {
+        'unread_count': sum(by_client.values()),
+        'by_client': by_client,
+      }
+    )
+
+
 class ClientPasswordChangeView(APIView):
   authentication_classes = [ClientTokenAuthentication]
   permission_classes = [IsAuthenticatedClient]
@@ -2685,6 +2709,21 @@ class ClientChatView(APIView):
     message = serializer.save(trainer=client_access.trainer, client=client_access, sender=ChatMessage.SENDER_CLIENT)
 
     return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)
+
+
+class ClientChatUnreadView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    unread_count = ChatMessage.objects.filter(
+      trainer=request.auth.trainer,
+      client=request.auth,
+      sender=ChatMessage.SENDER_TRAINER,
+      is_read=False,
+    ).count()
+
+    return Response({'unread_count': unread_count})
 
 
 def _support_reporter_filter(role, reporter):

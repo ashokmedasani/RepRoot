@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -24,6 +24,7 @@ import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/tr
 import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
 import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+import { ChatApiService } from '../../../core/api/chat-api.service';
 
 @Component({
   selector: 'app-trainer-client-profile',
@@ -32,7 +33,7 @@ import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/c
   templateUrl: './trainer-client-profile.component.html',
   styleUrl: './trainer-client-profile.component.scss'
 })
-export class TrainerClientProfileComponent implements OnInit {
+export class TrainerClientProfileComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
@@ -40,6 +41,7 @@ export class TrainerClientProfileComponent implements OnInit {
   private readonly referencesApi = inject(ReferencesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly chatApi = inject(ChatApiService);
 
   clientId = 0;
   profile: ClientAccessDetailResponse | null = null;
@@ -94,6 +96,8 @@ export class TrainerClientProfileComponent implements OnInit {
   };
 
   workspaceTab: 'workspace' | 'chat' | 'actions' = 'workspace';
+  chatUnreadCount = 0;
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   reminders: ClientReminder[] = [];
   isSavingReminder = false;
@@ -103,6 +107,32 @@ export class TrainerClientProfileComponent implements OnInit {
     this.clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.loadProfile();
     this.loadReminders();
+    this.loadUnreadMessages();
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
+    }
+  }
+
+  selectWorkspaceTab(tab: 'workspace' | 'chat' | 'actions'): void {
+    this.workspaceTab = tab;
+    if (tab === 'chat') {
+      this.chatUnreadCount = 0;
+    }
+  }
+
+  chatBadgeLabel(): string {
+    return this.chatUnreadCount > 99 ? '99+' : String(this.chatUnreadCount);
+  }
+
+  private loadUnreadMessages(): void {
+    this.chatApi.getTrainerUnreadCounts().subscribe({
+      next: (summary) => (this.chatUnreadCount = summary.by_client[String(this.clientId)] || 0),
+      error: () => (this.chatUnreadCount = 0)
+    });
   }
 
   // ----- follow-up scheduler -----

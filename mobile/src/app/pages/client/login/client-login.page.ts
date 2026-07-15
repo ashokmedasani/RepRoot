@@ -83,12 +83,15 @@ import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/clien
             <ion-input
               label="Password"
               labelPlacement="floating"
-              type="password"
+              [type]="passwordVisible ? 'text' : 'password'"
               name="password"
               [(ngModel)]="password"
               autocomplete="current-password"
               required
             />
+            <ion-button type="button" slot="end" fill="clear" size="small" (click)="passwordVisible = !passwordVisible">
+              {{ passwordVisible ? 'Hide' : 'Show' }}
+            </ion-button>
           </ion-item>
         </ion-list>
 
@@ -104,7 +107,7 @@ import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/clien
   `,
   styles: [`
     .login-brand { display: grid; justify-items: center; gap: .3rem; margin: 2.2rem 0 1.4rem; text-align: center; }
-    .login-brand .logo { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1.1rem; background: var(--app-primary); color: #fff; font-size: 1.4rem; font-weight: 800; }
+    .login-brand .logo { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: var(--app-radius-lg); background: linear-gradient(145deg, var(--app-primary), var(--app-accent)); box-shadow: 0 .8rem 1.8rem rgba(37, 99, 235, .2); color: #fff; font-size: 1.4rem; font-weight: 800; }
     .login-brand h1 { margin: .5rem 0 0; color: var(--app-text); font-size: 1.5rem; font-weight: 800; }
     .login-brand p { margin: 0; color: var(--app-muted); font-size: .85rem; font-weight: 600; }
   `]
@@ -116,6 +119,7 @@ export class ClientLoginPage {
   trainerCode = '';
   username = '';
   password = '';
+  passwordVisible = false;
   isSubmitting = false;
   message = '';
 

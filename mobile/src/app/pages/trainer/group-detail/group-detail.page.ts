@@ -31,6 +31,7 @@ import {
   GroupUsersResponse,
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
+import { MobileFormFieldEditorComponent } from '../../../shared/mobile-form-field-editor.component';
 
 type GroupTab = 'members' | 'registration' | 'settings';
 
@@ -54,7 +55,8 @@ type GroupTab = 'members' | 'registration' | 'settings';
     IonRefresherContent,
     IonSegment,
     IonSegmentButton,
-    IonLabel
+    IonLabel,
+    MobileFormFieldEditorComponent
   ],
   template: `
     <ion-header>
@@ -136,32 +138,7 @@ type GroupTab = 'members' | 'registration' | 'settings';
             <div class="card">
               <h3>Registration questions</h3>
               <p class="hint-note">Name and email are always collected. Add group-specific questions below.</p>
-              @for (field of customFields; track $index) {
-                <div style="border:1px dashed var(--app-border);border-radius:.7rem;padding:.7rem;margin-top:.6rem">
-                  <div class="form-two">
-                    <label><span style="display:block;margin-bottom:.25rem;color:var(--app-muted);font-size:.72rem;font-weight:800;text-transform:uppercase">Question</span><input [(ngModel)]="field.label" style="width:100%;border:1px solid var(--app-border);border-radius:.6rem;padding:.55rem .7rem;background:var(--app-surface);color:var(--app-text)" /></label>
-                    <label><span style="display:block;margin-bottom:.25rem;color:var(--app-muted);font-size:.72rem;font-weight:800;text-transform:uppercase">Type</span>
-                      <select [(ngModel)]="field.field_type" style="width:100%;border:1px solid var(--app-border);border-radius:.6rem;padding:.55rem .7rem;background:var(--app-surface);color:var(--app-text)">
-                        <option value="short_text">Short text</option>
-                        <option value="long_text">Long text</option>
-                        <option value="number">Number</option>
-                        <option value="phone">Phone</option>
-                        <option value="dropdown">Dropdown</option>
-                        <option value="yes_no">Yes / No</option>
-                        <option value="date">Date</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.4rem">
-                    <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--app-muted)">
-                      <input type="checkbox" [(ngModel)]="field.required" />Required
-                    </label>
-                    <ion-button size="small" fill="clear" color="danger" (click)="customFields.splice($index, 1)">
-                      <ion-icon slot="icon-only" name="trash-outline" />
-                    </ion-button>
-                  </div>
-                </div>
-              }
+              <app-mobile-form-field-editor [fields]="customFields" />
               <ion-button size="small" fill="outline" style="margin-top:.6rem" (click)="addField()">
                 <ion-icon slot="start" name="add-outline" />Add question
               </ion-button>

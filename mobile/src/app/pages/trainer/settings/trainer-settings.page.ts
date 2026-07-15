@@ -11,12 +11,13 @@ import {
 } from '@ionic/angular/standalone';
 
 import { TrainerAuthApiService, TrainerDataUsage, TrainerProfile } from '../../../core/api/trainer-auth-api.service';
+import { PasswordInputComponent } from '../../../shared/password-input.component';
 
 /** Settings — My Account, Security (trainer code + change password), Plan & Storage. */
 @Component({
   selector: 'app-trainer-settings',
   standalone: true,
-  imports: [FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
+  imports: [FormsModule, PasswordInputComponent, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -65,9 +66,9 @@ import { TrainerAuthApiService, TrainerDataUsage, TrainerProfile } from '../../.
           }
 
           <div class="form-grid" style="margin-top:1rem">
-            <label><span>Current password</span><input type="password" [(ngModel)]="currentPassword" /></label>
-            <label><span>New password</span><input type="password" [(ngModel)]="newPassword" /></label>
-            <label><span>Confirm new password</span><input type="password" [(ngModel)]="confirmPassword" /></label>
+            <label><span>Current password</span><app-password-input [(ngModel)]="currentPassword" /></label>
+            <label><span>New password</span><app-password-input [(ngModel)]="newPassword" autocomplete="new-password" /></label>
+            <label><span>Confirm new password</span><app-password-input [(ngModel)]="confirmPassword" autocomplete="new-password" /></label>
           </div>
           @if (passwordMessage) {
             <p [class]="passwordError ? 'error-text' : 'success-text'" style="margin:.4rem 0 0">{{ passwordMessage }}</p>

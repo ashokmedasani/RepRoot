@@ -31,6 +31,7 @@ import {
   LeadSubmission,
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
+import { MobileFormFieldEditorComponent } from '../../../shared/mobile-form-field-editor.component';
 
 type FormsTab = 'form' | 'requests' | 'groups';
 
@@ -54,7 +55,8 @@ type FormsTab = 'form' | 'requests' | 'groups';
     IonRefresherContent,
     IonSegment,
     IonSegmentButton,
-    IonLabel
+    IonLabel,
+    MobileFormFieldEditorComponent
   ],
   template: `
     <ion-header>
@@ -111,39 +113,7 @@ type FormsTab = 'form' | 'requests' | 'groups';
                 <label><span>Form title</span><input [(ngModel)]="formTitle" placeholder="e.g. Start Training With Me" /></label>
               </div>
               <p class="hint-note">Core fields (name, email) are always included. Add your own questions below.</p>
-              @for (field of customFields; track $index) {
-                <div class="field-editor">
-                  <div class="form-two">
-                    <label><span>Question</span><input [(ngModel)]="field.label" /></label>
-                    <label>
-                      <span>Type</span>
-                      <select [(ngModel)]="field.field_type">
-                        <option value="short_text">Short text</option>
-                        <option value="long_text">Long text</option>
-                        <option value="number">Number</option>
-                        <option value="phone">Phone</option>
-                        <option value="dropdown">Dropdown</option>
-                        <option value="yes_no">Yes / No</option>
-                        <option value="date">Date</option>
-                      </select>
-                    </label>
-                  </div>
-                  @if (field.field_type === 'dropdown') {
-                    <label style="display:block;margin-top:.4rem">
-                      <span style="display:block;margin-bottom:.25rem;color:var(--app-muted);font-size:.72rem;font-weight:800;text-transform:uppercase">Options (comma separated)</span>
-                      <input [ngModel]="(field.options || []).join(', ')" (ngModelChange)="setOptions(field, $event)" style="width:100%;border:1px solid var(--app-border);border-radius:.6rem;padding:.55rem .7rem;background:var(--app-surface);color:var(--app-text)" />
-                    </label>
-                  }
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.4rem">
-                    <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--app-muted)">
-                      <input type="checkbox" [(ngModel)]="field.required" />Required
-                    </label>
-                    <ion-button size="small" fill="clear" color="danger" (click)="customFields.splice($index, 1)">
-                      <ion-icon slot="icon-only" name="trash-outline" />
-                    </ion-button>
-                  </div>
-                </div>
-              }
+              <app-mobile-form-field-editor [fields]="customFields" />
               <ion-button size="small" fill="outline" style="margin-top:.6rem" (click)="addField()">
                 <ion-icon slot="start" name="add-outline" />Add question
               </ion-button>
@@ -280,10 +250,7 @@ type FormsTab = 'form' | 'requests' | 'groups';
         <div class="bottom-space"></div>
       </div>
     </ion-content>
-  `,
-  styles: [`
-    .field-editor { border: 1px dashed var(--app-border); border-radius: var(--app-radius-md); padding: .7rem; margin-top: .6rem; }
-  `]
+  `
 })
 export class TrainerFormsGroupsPage implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
@@ -365,13 +332,6 @@ export class TrainerFormsGroupsPage implements OnInit {
 
   addField(): void {
     this.customFields.push({ label: '', field_type: 'short_text', required: false, placeholder: '', help_text: '' });
-  }
-
-  setOptions(field: DynamicField, raw: string): void {
-    field.options = raw
-      .split(',')
-      .map((option) => option.trim())
-      .filter(Boolean);
   }
 
   saveForm(): void {

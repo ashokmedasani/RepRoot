@@ -102,6 +102,20 @@ nav {
   border-color: color-mix(in srgb, var(--app-primary) 12%, transparent);
 }
 
+.nav-badge {
+  min-width: 1.35rem;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0.12rem 0.38rem;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.15rem;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.28);
+}
+
 .data-usage {
   display: flex;
   align-items: center;
@@ -296,7 +310,7 @@ button:disabled {
     display: none;
   }
 
-  .nav-item span,
+  .nav-item > span:not(.nav-badge),
   .signout span,
   .data-usage small {
     display: none;
@@ -306,6 +320,20 @@ button:disabled {
   .signout {
     padding: 0.65rem;
     border-radius: var(--app-radius-md);
+  }
+
+  .nav-badge {
+    position: absolute;
+    top: 0.18rem;
+    right: 0.12rem;
+    min-width: 1.1rem;
+    padding: 0.05rem 0.25rem;
+    font-size: 0.58rem;
+    line-height: 0.95rem;
+  }
+
+  .nav-item {
+    position: relative;
   }
 
   .data-usage {

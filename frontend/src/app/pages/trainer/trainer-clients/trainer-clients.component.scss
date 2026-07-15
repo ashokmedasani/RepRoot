@@ -143,6 +143,18 @@ tbody tr:last-child td {
   color: var(--app-primary-strong);
 }
 
+.message-count {
+  min-width: 1.35rem;
+  border-radius: 999px;
+  padding: 0.12rem 0.38rem;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
 .avatar {
   display: inline-grid;
   width: 2rem;

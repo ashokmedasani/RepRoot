@@ -1,8 +1,9 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
+import { ChatApiService } from '../../core/api/chat-api.service';
 
 type TrainerSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'references' | 'settings';
 
@@ -13,8 +14,9 @@ type TrainerSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | '
   templateUrl: './trainer-page-shell.component.html',
   styleUrl: './trainer-page-shell.component.scss'
 })
-export class TrainerPageShellComponent implements OnInit {
+export class TrainerPageShellComponent implements OnInit, OnDestroy {
   private readonly trainerAuthApi = inject(TrainerAuthApiService);
+  private readonly chatApi = inject(ChatApiService);
   private readonly router = inject(Router);
 
   @Input({ required: true }) title = '';
@@ -27,8 +29,12 @@ export class TrainerPageShellComponent implements OnInit {
   isSigningOut = false;
   dataUsagePercent = 0;
   isUnlimitedStorage = false;
+  unreadMessages = 0;
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
+    this.loadUnreadMessages();
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
     this.trainerAuthApi.getDataUsage().subscribe({
       next: (usage) => {
         this.dataUsagePercent = Math.max(0, Math.min(100, usage.usage_percent));
@@ -38,6 +44,23 @@ export class TrainerPageShellComponent implements OnInit {
         this.dataUsagePercent = 0;
         this.isUnlimitedStorage = false;
       }
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
+    }
+  }
+
+  badgeLabel(count: number): string {
+    return count > 99 ? '99+' : String(count);
+  }
+
+  private loadUnreadMessages(): void {
+    this.chatApi.getTrainerUnreadCounts().subscribe({
+      next: (summary) => (this.unreadMessages = summary.unread_count),
+      error: () => (this.unreadMessages = 0)
     });
   }
 

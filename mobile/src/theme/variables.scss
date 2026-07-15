@@ -4,42 +4,48 @@
  */
 
 :root {
-  /* App tokens (same names as the web app) */
-  --app-bg: #f7fbff;
+  /* CoachFlow mobile design system */
+  --app-bg: #f4f7fb;
   --app-surface: #ffffff;
-  --app-surface-soft: #eef7ff;
-  --app-text: #122033;
+  --app-surface-soft: #edf3f9;
+  --app-text: #14213d;
   --app-muted: #64748b;
-  --app-border: #d7e5f5;
-  --app-primary: #0b7de3;
-  --app-primary-strong: #075ea8;
-  --app-primary-soft: #dff0ff;
-  --app-accent: #20a3b8;
-  --app-success: #1f9d63;
+  --app-border: #dbe5ef;
+  --app-primary: #2563eb;
+  --app-primary-strong: #1d4ed8;
+  --app-primary-soft: #e8f0ff;
+  --app-accent: #0f9f9d;
+  --app-success: #159567;
+  --app-radius-sm: 0.625rem;
   --app-radius-md: 0.75rem;
-  --app-radius-lg: 0.9rem;
+  --app-radius-lg: 1rem;
+  --app-radius-xl: 1.25rem;
+  --app-shadow-sm: 0 0.35rem 1rem rgba(20, 33, 61, 0.06);
+  --app-shadow-md: 0 0.85rem 2rem rgba(20, 33, 61, 0.09);
+  --app-focus-ring: 0 0 0 0.2rem rgba(37, 99, 235, 0.14);
 
   /* Ionic mapping */
-  --ion-color-primary: #0b7de3;
-  --ion-color-primary-rgb: 11, 125, 227;
+  --ion-font-family: 'Manrope Variable', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ion-color-primary: #2563eb;
+  --ion-color-primary-rgb: 37, 99, 235;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #075ea8;
-  --ion-color-primary-tint: #2f92e8;
+  --ion-color-primary-shade: #1d4ed8;
+  --ion-color-primary-tint: #4b7bef;
 
-  --ion-color-secondary: #20a3b8;
-  --ion-color-secondary-rgb: 32, 163, 184;
+  --ion-color-secondary: #0f9f9d;
+  --ion-color-secondary-rgb: 15, 159, 157;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
-  --ion-color-secondary-shade: #1c8fa2;
-  --ion-color-secondary-tint: #36acc0;
+  --ion-color-secondary-shade: #0d8c8a;
+  --ion-color-secondary-tint: #27a9a7;
 
-  --ion-color-success: #1f9d63;
-  --ion-color-success-rgb: 31, 157, 99;
+  --ion-color-success: #159567;
+  --ion-color-success-rgb: 21, 149, 103;
   --ion-color-success-contrast: #ffffff;
   --ion-color-success-contrast-rgb: 255, 255, 255;
-  --ion-color-success-shade: #1b8a57;
-  --ion-color-success-tint: #35a773;
+  --ion-color-success-shade: #12835b;
+  --ion-color-success-tint: #2ca077;
 
   --ion-color-danger: #d92d20;
   --ion-color-danger-rgb: 217, 45, 32;
@@ -48,53 +54,56 @@
   --ion-color-danger-shade: #bf281c;
   --ion-color-danger-tint: #dd4236;
 
-  --ion-background-color: #f7fbff;
-  --ion-background-color-rgb: 247, 251, 255;
-  --ion-text-color: #122033;
-  --ion-text-color-rgb: 18, 32, 51;
+  --ion-background-color: #f4f7fb;
+  --ion-background-color-rgb: 244, 247, 251;
+  --ion-text-color: #14213d;
+  --ion-text-color-rgb: 20, 33, 61;
   --ion-toolbar-background: #ffffff;
-  --ion-toolbar-color: #122033;
+  --ion-toolbar-color: #14213d;
   --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-color: #64748b;
-  --ion-tab-bar-color-selected: #0b7de3;
+  --ion-tab-bar-color-selected: #2563eb;
   --ion-item-background: #ffffff;
   --ion-card-background: #ffffff;
-  --ion-border-color: #d7e5f5;
+  --ion-border-color: #dbe5ef;
 }
 
 /* Dark mode mirrors the web [data-theme='dark'] palette. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --app-bg: #101820;
-    --app-surface: #172230;
-    --app-surface-soft: #203144;
-    --app-text: #f6f9fc;
-    --app-muted: #adbac8;
-    --app-border: #2f4358;
-    --app-primary: #58a6ff;
-    --app-primary-strong: #8fc7ff;
-    --app-primary-soft: #193654;
-    --app-accent: #6ee7d8;
-    --app-success: #69db91;
+    --app-bg: #0e1624;
+    --app-surface: #172235;
+    --app-surface-soft: #202e43;
+    --app-text: #f4f7fb;
+    --app-muted: #a9b7c8;
+    --app-border: #304158;
+    --app-primary: #72a2ff;
+    --app-primary-strong: #a7c4ff;
+    --app-primary-soft: #203b68;
+    --app-accent: #62d4ce;
+    --app-success: #67d49b;
+    --app-shadow-sm: 0 0.35rem 1rem rgba(0, 0, 0, 0.18);
+    --app-shadow-md: 0 0.85rem 2rem rgba(0, 0, 0, 0.24);
+    --app-focus-ring: 0 0 0 0.2rem rgba(114, 162, 255, 0.2);
 
-    --ion-color-primary: #58a6ff;
-    --ion-color-primary-rgb: 88, 166, 255;
-    --ion-color-primary-contrast: #101820;
-    --ion-color-primary-contrast-rgb: 16, 24, 32;
-    --ion-color-primary-shade: #4d92e0;
-    --ion-color-primary-tint: #69afff;
+    --ion-color-primary: #72a2ff;
+    --ion-color-primary-rgb: 114, 162, 255;
+    --ion-color-primary-contrast: #0e1624;
+    --ion-color-primary-contrast-rgb: 14, 22, 36;
+    --ion-color-primary-shade: #648fe0;
+    --ion-color-primary-tint: #80abff;
 
-    --ion-background-color: #101820;
-    --ion-background-color-rgb: 16, 24, 32;
-    --ion-text-color: #f6f9fc;
-    --ion-text-color-rgb: 246, 249, 252;
-    --ion-toolbar-background: #172230;
-    --ion-toolbar-color: #f6f9fc;
-    --ion-tab-bar-background: #172230;
-    --ion-tab-bar-color: #adbac8;
-    --ion-tab-bar-color-selected: #58a6ff;
-    --ion-item-background: #172230;
-    --ion-card-background: #172230;
-    --ion-border-color: #2f4358;
+    --ion-background-color: #0e1624;
+    --ion-background-color-rgb: 14, 22, 36;
+    --ion-text-color: #f4f7fb;
+    --ion-text-color-rgb: 244, 247, 251;
+    --ion-toolbar-background: #172235;
+    --ion-toolbar-color: #f4f7fb;
+    --ion-tab-bar-background: #172235;
+    --ion-tab-bar-color: #a9b7c8;
+    --ion-tab-bar-color-selected: #72a2ff;
+    --ion-item-background: #172235;
+    --ion-card-background: #172235;
+    --ion-border-color: #304158;
   }
 }

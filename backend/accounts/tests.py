@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .models import (
+  ChatMessage,
   ClientAccess,
   ClientDetailChangeRequest,
   ClientRegistrationForm,
@@ -402,3 +403,50 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(logout.status_code, 200, logout.data)
     me = self.client.get('/api/accounts/client/me/', HTTP_AUTHORIZATION=authorization)
     self.assertEqual(me.status_code, 401)
+
+  def test_chat_unread_counts_clear_only_when_recipient_opens_chat(self):
+    created = self.client.post(
+      '/api/accounts/trainer/forms-groups/clients/manual/',
+      self.manual_payload(send_credentials=False),
+      format='json',
+    )
+    self.assertEqual(created.status_code, 201, created.data)
+    client_access = ClientAccess.objects.get(pk=created.data['client_access']['id'])
+
+    ChatMessage.objects.create(
+      trainer=self.user,
+      client=client_access,
+      sender=ChatMessage.SENDER_CLIENT,
+      text='Can you review my workout?',
+    )
+    trainer_unread = self.client.get('/api/accounts/trainer/chat/unread/')
+    self.assertEqual(trainer_unread.status_code, 200, trainer_unread.data)
+    self.assertEqual(trainer_unread.data['unread_count'], 1)
+    self.assertEqual(trainer_unread.data['by_client'][str(client_access.id)], 1)
+
+    opened_by_trainer = self.client.get(f'/api/accounts/trainer/clients/{client_access.id}/chat/')
+    self.assertEqual(opened_by_trainer.status_code, 200, opened_by_trainer.data)
+    self.assertEqual(self.client.get('/api/accounts/trainer/chat/unread/').data['unread_count'], 0)
+
+    self.client.post(
+      f'/api/accounts/trainer/clients/{client_access.id}/chat/',
+      {'text': 'I reviewed it and left feedback.'},
+      format='json',
+    )
+    self.client.force_authenticate(user=None)
+    login = self.client.post(
+      '/api/accounts/client/login/',
+      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      format='json',
+    )
+    authorization = f'ClientToken {login.data["token"]}'
+    client_unread = self.client.get('/api/accounts/client/chat/unread/', HTTP_AUTHORIZATION=authorization)
+    self.assertEqual(client_unread.status_code, 200, client_unread.data)
+    self.assertEqual(client_unread.data['unread_count'], 1)
+
+    opened_by_client = self.client.get('/api/accounts/client/chat/', HTTP_AUTHORIZATION=authorization)
+    self.assertEqual(opened_by_client.status_code, 200, opened_by_client.data)
+    self.assertEqual(
+      self.client.get('/api/accounts/client/chat/unread/', HTTP_AUTHORIZATION=authorization).data['unread_count'],
+      0,
+    )

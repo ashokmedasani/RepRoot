@@ -9,6 +9,15 @@ export interface ChatMessageRecord {
   created_at: string;
 }
 
+export interface TrainerUnreadSummary {
+  unread_count: number;
+  by_client: Record<string, number>;
+}
+
+export interface ClientUnreadSummary {
+  unread_count: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ChatApiService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
@@ -30,6 +39,12 @@ export class ChatApiService {
     );
   }
 
+  getTrainerUnreadCounts(): Observable<TrainerUnreadSummary> {
+    return this.http.get<TrainerUnreadSummary>(`${this.apiBaseUrl}/trainer/chat/unread/`, {
+      headers: this.getTrainerAuthHeaders()
+    });
+  }
+
   getClientMessages(afterId?: number): Observable<{ messages: ChatMessageRecord[] }> {
     return this.http.get<{ messages: ChatMessageRecord[] }>(`${this.apiBaseUrl}/client/chat/`, {
       headers: this.getClientAuthHeaders(),
@@ -43,6 +58,12 @@ export class ChatApiService {
       { text },
       { headers: this.getClientAuthHeaders() }
     );
+  }
+
+  getClientUnreadCount(): Observable<ClientUnreadSummary> {
+    return this.http.get<ClientUnreadSummary>(`${this.apiBaseUrl}/client/chat/unread/`, {
+      headers: this.getClientAuthHeaders()
+    });
   }
 
   private buildAfterParams(afterId?: number): HttpParams {

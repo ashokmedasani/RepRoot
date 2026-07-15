@@ -37,7 +37,7 @@ import {
   TrackingTemplateRecord
 } from '../../../core/api/templates-api.service';
 
-type DetailTab = 'overview' | 'tracking' | 'chat' | 'actions';
+type DetailTab = 'info' | 'overview' | 'tracking' | 'chat' | 'actions';
 
 /** Trainer view of one client: profile, edit requests, schedules, tracking, chat, and account actions. */
 @Component({
@@ -81,22 +81,28 @@ type DetailTab = 'overview' | 'tracking' | 'chat' | 'actions';
             }
             <div style="flex:1;min-width:0">
               <strong>{{ client.first_name }} {{ client.last_name }}</strong>
-              <small>{{ client.group_name }} · {{ client.reference_id }}</small>
+              <small>{{ client.group_name || 'No group' }}</small>
             </div>
             <span class="pill" [class.ok]="client.is_active" [class.bad]="!client.is_active">
               {{ client.is_active ? 'Active' : 'Inactive' }}
             </span>
           </div>
 
-          <ion-segment [(ngModel)]="tab" mode="md">
-            <ion-segment-button value="overview"><ion-label>Overview</ion-label></ion-segment-button>
+          <ion-segment class="detail-tabs" [(ngModel)]="tab" mode="md" [scrollable]="true">
+            <ion-segment-button value="info"><ion-label>Info</ion-label></ion-segment-button>
+            <ion-segment-button value="overview"><ion-label>Activity</ion-label></ion-segment-button>
             <ion-segment-button value="tracking"><ion-label>Tracking</ion-label></ion-segment-button>
-            <ion-segment-button value="chat"><ion-label>Chat</ion-label></ion-segment-button>
+            <ion-segment-button value="chat">
+              <ion-label>Chat</ion-label>
+              @if (chatUnreadCount > 0) {
+                <span class="segment-count">{{ chatBadgeLabel }}</span>
+              }
+            </ion-segment-button>
             <ion-segment-button value="actions"><ion-label>Actions</ion-label></ion-segment-button>
           </ion-segment>
 
-          <!-- ============ OVERVIEW ============ -->
-          @if (tab === 'overview') {
+          <!-- ============ CLIENT INFORMATION ============ -->
+          @if (tab === 'info') {
             @if (detail?.pending_change_request; as request) {
               <div class="card" style="border-color: var(--app-primary)">
                 <h3>{{ request.request_type === 'account_deletion' ? 'Account deletion requested' : 'Profile edit awaiting review' }}</h3>
@@ -137,7 +143,10 @@ type DetailTab = 'overview' | 'tracking' | 'chat' | 'actions';
                 }
               </div>
             </div>
+          }
 
+          <!-- ============ ACTIVITY ============ -->
+          @if (tab === 'overview') {
             <div class="card">
               <h3>Follow-up schedules</h3>
               @for (reminder of reminders; track reminder.id) {
@@ -283,7 +292,12 @@ type DetailTab = 'overview' | 'tracking' | 'chat' | 'actions';
         <div class="bottom-space"></div>
       </div>
     </ion-content>
-  `
+  `,
+  styles: [`
+    .detail-tabs { margin-top: .8rem; }
+    .detail-tabs ion-segment-button { min-width: 5.25rem; }
+    .segment-count { position: absolute; top: .16rem; right: .28rem; display: inline-grid; min-width: 1.2rem; height: 1.2rem; place-items: center; border-radius: 999px; padding: 0 .28rem; background: #e11d48; color: #fff; font-size: .61rem; font-weight: 800; }
+  `]
 })
 export class ClientDetailPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
@@ -294,7 +308,7 @@ export class ClientDetailPage implements OnInit, OnDestroy {
   private readonly toastController = inject(ToastController);
 
   clientId = 0;
-  tab: DetailTab = 'overview';
+  tab: DetailTab = 'info';
   detail: ClientAccessDetailResponse | null = null;
   client: ClientAccessRecord | null = null;
   registrationFields: DynamicField[] = [];
@@ -304,6 +318,7 @@ export class ClientDetailPage implements OnInit, OnDestroy {
   allTemplates: TrackingTemplateRecord[] = [];
   chatMessages: ChatMessageRecord[] = [];
   chatDraft = '';
+  chatUnreadCount = 0;
   trainerNotes = '';
   message = '';
   isSavingNotes = false;
@@ -317,6 +332,7 @@ export class ClientDetailPage implements OnInit, OnDestroy {
   reminderTime = '';
 
   private chatPoll: ReturnType<typeof setInterval> | null = null;
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     addIcons({ sendOutline, checkmarkOutline, closeOutline, addOutline, trashOutline });
@@ -335,6 +351,10 @@ export class ClientDetailPage implements OnInit, OnDestroy {
       default:
         return 'Public enquiry';
     }
+  }
+
+  get chatBadgeLabel(): string {
+    return this.chatUnreadCount > 99 ? '99+' : String(this.chatUnreadCount);
   }
 
   get assignableTemplates(): TrackingTemplateRecord[] {
@@ -360,16 +380,21 @@ export class ClientDetailPage implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.load();
+    this.loadUnreadMessages();
     this.chatPoll = setInterval(() => {
       if (this.tab === 'chat') {
         this.loadChat();
       }
     }, 8000);
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
   }
 
   ngOnDestroy(): void {
     if (this.chatPoll) {
       clearInterval(this.chatPoll);
+    }
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
     }
   }
 
@@ -630,6 +655,13 @@ export class ClientDetailPage implements OnInit, OnDestroy {
         }
       },
       error: () => undefined
+    });
+  }
+
+  private loadUnreadMessages(): void {
+    this.chatApi.getTrainerUnreadCounts().subscribe({
+      next: (summary) => (this.chatUnreadCount = summary.by_client[String(this.clientId)] || 0),
+      error: () => (this.chatUnreadCount = 0)
     });
   }
 

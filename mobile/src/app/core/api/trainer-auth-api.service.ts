@@ -23,6 +23,33 @@ export interface TrainerLoginResponse {
   message: string;
 }
 
+export interface TrainerSignupPayload {
+  email: string;
+  username: string;
+  password: string;
+  confirm_password: string;
+  email_verification_token: string;
+}
+
+export interface UsernameAvailabilityResponse {
+  username: string;
+  available: boolean;
+  message: string;
+}
+
+export interface EmailOtpRequestResponse {
+  email: string;
+  available?: boolean;
+  message: string;
+  dev_otp?: string;
+}
+
+export interface EmailOtpVerifyResponse {
+  email: string;
+  email_verification_token: string;
+  message: string;
+}
+
 /** Subset kept for earlier mobile pages; the full profile is TrainerProfile. */
 export interface TrainerProfileSummary {
   first_name: string;
@@ -107,6 +134,22 @@ export class TrainerAuthApiService {
 
   login(identifier: string, password: string): Observable<TrainerLoginResponse> {
     return this.http.post<TrainerLoginResponse>(`${this.apiBaseUrl}/trainer/login/`, { identifier, password });
+  }
+
+  checkUsername(username: string): Observable<UsernameAvailabilityResponse> {
+    return this.http.post<UsernameAvailabilityResponse>(`${this.apiBaseUrl}/trainer/check-username/`, { username });
+  }
+
+  requestEmailOtp(email: string): Observable<EmailOtpRequestResponse> {
+    return this.http.post<EmailOtpRequestResponse>(`${this.apiBaseUrl}/trainer/request-email-otp/`, { email });
+  }
+
+  verifyEmailOtp(email: string, otp: string): Observable<EmailOtpVerifyResponse> {
+    return this.http.post<EmailOtpVerifyResponse>(`${this.apiBaseUrl}/trainer/verify-email-otp/`, { email, otp });
+  }
+
+  signup(payload: TrainerSignupPayload): Observable<TrainerLoginResponse> {
+    return this.http.post<TrainerLoginResponse>(`${this.apiBaseUrl}/trainer/signup/`, payload);
   }
 
   logout(): Observable<{ message: string }> {

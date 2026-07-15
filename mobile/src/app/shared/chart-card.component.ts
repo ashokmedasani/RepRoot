@@ -44,7 +44,18 @@ Chart.register(...registerables);
           }
         </div>
       } @else {
-        <div class="chart-canvas-wrap" [class.ring-wrap]="spec?.kind === 'ring' || spec?.kind === 'pie'">
+        @if (chartHighlights.length) {
+          <div class="chart-highlights">
+            @for (item of chartHighlights; track item.label) {
+              <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+            }
+          </div>
+        }
+        <div
+          class="chart-canvas-wrap"
+          [class.ring-wrap]="spec?.kind === 'ring' || spec?.kind === 'pie'"
+          [style.height.px]="chartHeight"
+        >
           <canvas #canvas></canvas>
           @if (spec?.kind === 'ring') {
             <div class="ring-center">
@@ -57,12 +68,17 @@ Chart.register(...registerables);
     </div>
   `,
   styles: [`
-    .chart-panel { border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: var(--app-surface); padding: .9rem 1rem 1rem; margin-top: .75rem; }
+    .chart-panel { overflow: hidden; border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); background: linear-gradient(155deg, var(--app-surface), color-mix(in srgb, var(--app-primary-soft) 18%, var(--app-surface))); padding: .9rem 1rem 1rem; margin-top: .75rem; box-shadow: var(--app-shadow-sm); }
     .chart-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
     .chart-panel-titles h3 { margin: 0; font-size: .92rem; font-weight: 800; color: var(--app-text); }
     .chart-panel-titles p { margin: .15rem 0 0; font-size: .72rem; font-weight: 600; color: var(--app-muted); }
     .chart-share { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border: 1px solid var(--app-border); border-radius: .65rem; background: var(--app-surface-soft); color: var(--app-primary); font-size: 1.05rem; }
-    .chart-canvas-wrap { position: relative; margin-top: .6rem; height: 220px; }
+    .chart-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin-top: .65rem; }
+    .chart-highlights div { border: 1px solid color-mix(in srgb, var(--app-border) 75%, transparent); border-radius: var(--app-radius-sm); padding: .45rem .55rem; background: color-mix(in srgb, var(--app-surface) 80%, transparent); }
+    .chart-highlights span, .chart-highlights strong { display: block; }
+    .chart-highlights span { color: var(--app-muted); font-size: .62rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+    .chart-highlights strong { margin-top: .08rem; color: var(--app-text); font-size: .84rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-canvas-wrap { position: relative; margin-top: .55rem; min-height: 180px; }
     .chart-canvas-wrap.ring-wrap { height: 200px; display: grid; place-items: center; }
     .ring-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
     .ring-center strong { font-size: 1.35rem; font-weight: 800; color: var(--app-text); }
@@ -124,6 +140,57 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
     return `${meta.value ?? 0}${meta.unit ? ` ${meta.unit}` : ''}`;
   }
 
+  get chartHeight(): number {
+    const kind = this.spec?.kind;
+    const count = this.spec?.data.length || 0;
+
+    if (kind === 'hbar') {
+      return Math.min(310, Math.max(190, count * 34 + 64));
+    }
+
+    if (kind === 'pie') {
+      return 230;
+    }
+
+    if (kind === 'ring') {
+      return 200;
+    }
+
+    return 205;
+  }
+
+  get chartHighlights(): Array<{ label: string; value: string }> {
+    const spec = this.spec;
+
+    if (!spec || !spec.data.length || spec.kind === 'pie' || spec.kind === 'ring') {
+      return [];
+    }
+
+    const values = spec.data.map((point) => point.value);
+    const total = values.reduce((sum, value) => sum + value, 0);
+    const suffix = spec.unit ? ` ${spec.unit}` : '';
+
+    if (spec.kind === 'line') {
+      return [
+        { label: 'Latest', value: `${values[values.length - 1]}${suffix}` },
+        { label: 'Average', value: `${Math.round((total / values.length) * 10) / 10}${suffix}` }
+      ];
+    }
+
+    if (spec.kind === 'hbar' && spec.meta?.average !== undefined) {
+      return [
+        { label: 'Average', value: String(spec.meta.average) },
+        { label: 'Responses', value: String(total) }
+      ];
+    }
+
+    const topIndex = values.indexOf(Math.max(...values));
+    return [
+      { label: spec.meta?.subtitle === 'Daily values' ? 'Total' : 'Responses', value: `${total}${suffix}` },
+      { label: 'Highest', value: `${spec.data[topIndex]?.label || '—'} · ${values[topIndex]}${suffix}` }
+    ];
+  }
+
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.render();
@@ -164,7 +231,7 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
     const accent = styles.getPropertyValue('--app-accent').trim() || '#20a3b8';
     const success = styles.getPropertyValue('--app-success').trim() || '#1f9d63';
     const muted = styles.getPropertyValue('--app-muted').trim() || '#64748b';
-    const border = styles.getPropertyValue('--app-border').trim() || '#d7e5f5';
+    const surface = styles.getPropertyValue('--app-surface').trim() || '#ffffff';
     const surfaceSoft = styles.getPropertyValue('--app-surface-soft').trim() || '#eef7ff';
     const palette = [primary, accent, success, '#8b5cf6', '#f59e0b', '#ef4444', '#14b8a6', '#64748b'];
 
@@ -176,9 +243,18 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
     const baseOptions = {
       responsive: true,
       maintainAspectRatio: false,
+      animation: { duration: 550 },
+      interaction: { mode: 'index' as const, intersect: false },
+      layout: { padding: { top: 4, right: 2, bottom: 0, left: 0 } },
       plugins: {
         legend: { display: false },
         tooltip: {
+          backgroundColor: '#14213d',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          displayColors: false,
+          padding: 10,
+          cornerRadius: 10,
           callbacks: {
             afterLabel: (ctx: { dataIndex: number }) => tooltips[ctx.dataIndex] || ''
           }
@@ -187,6 +263,11 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
     };
 
     if (spec.kind === 'line') {
+      const context = canvas.getContext('2d');
+      const gradient = context?.createLinearGradient(0, 0, 0, this.chartHeight);
+      gradient?.addColorStop(0, `${primary}42`);
+      gradient?.addColorStop(0.72, `${primary}12`);
+      gradient?.addColorStop(1, `${primary}00`);
       this.chart = new Chart(canvas, {
         type: 'line',
         data: {
@@ -194,19 +275,22 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
           datasets: [{
             data: values,
             borderColor: primary,
-            backgroundColor: `${primary}26`,
+            backgroundColor: gradient || `${primary}22`,
             fill: true,
-            tension: 0.35,
-            pointRadius: 3,
+            tension: 0.42,
+            pointRadius: values.length > 14 ? 0 : 3.5,
+            pointHoverRadius: 5,
             pointBackgroundColor: primary,
-            borderWidth: 2
+            pointBorderColor: surface,
+            pointBorderWidth: 2,
+            borderWidth: 2.5
           }]
         },
         options: {
           ...baseOptions,
           scales: {
-            x: { ticks: { color: muted, maxTicksLimit: 6 }, grid: { display: false } },
-            y: { ticks: { color: muted }, grid: { color: border } }
+            x: { ticks: { color: muted, maxTicksLimit: 5, maxRotation: 0, font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+            y: { ticks: { color: muted, maxTicksLimit: 4, font: { size: 10 } }, grid: { display: false }, border: { display: false } }
           }
         }
       });
@@ -217,33 +301,35 @@ export class ChartCardComponent implements AfterViewInit, OnChanges, OnDestroy {
           labels,
           datasets: [{
             data: values,
-            backgroundColor: spec.kind === 'hbar' ? primary : labels.map((_, index) => palette[index % palette.length]),
-            borderRadius: 6,
-            maxBarThickness: 34
+            backgroundColor: spec.kind === 'hbar' ? labels.map((_, index) => `${palette[index % palette.length]}D9`) : labels.map((_, index) => `${palette[index % palette.length]}E6`),
+            borderRadius: spec.kind === 'hbar' ? 10 : 12,
+            borderSkipped: false,
+            maxBarThickness: spec.kind === 'hbar' ? 18 : 32,
+            categoryPercentage: .72,
+            barPercentage: .76
           }]
         },
         options: {
           ...baseOptions,
           indexAxis: spec.kind === 'hbar' ? ('y' as const) : ('x' as const),
           scales: {
-            x: { ticks: { color: muted, precision: 0 }, grid: { color: spec.kind === 'hbar' ? border : 'transparent' } },
-            y: { ticks: { color: muted, precision: 0 }, grid: { color: spec.kind === 'hbar' ? 'transparent' : border } }
+            x: { ticks: { color: muted, precision: 0, maxTicksLimit: 5, maxRotation: 0, font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+            y: { ticks: { color: muted, precision: 0, font: { size: 10 } }, grid: { display: false }, border: { display: false } }
           }
         }
       });
     } else if (spec.kind === 'pie') {
       this.chart = new Chart(canvas, {
-        type: 'doughnut',
+        type: 'pie',
         data: {
           labels,
-          datasets: [{ data: values, backgroundColor: labels.map((_, index) => palette[index % palette.length]), borderWidth: 0 }]
+          datasets: [{ data: values, backgroundColor: labels.map((_, index) => palette[index % palette.length]), borderColor: surface, borderWidth: 3, spacing: 2 }]
         },
         options: {
           ...baseOptions,
-          cutout: '55%',
           plugins: {
             ...baseOptions.plugins,
-            legend: { display: true, position: 'bottom' as const, labels: { color: muted, boxWidth: 10, font: { size: 10 } } }
+            legend: { display: true, position: 'bottom' as const, labels: { color: muted, boxWidth: 9, boxHeight: 9, usePointStyle: true, pointStyle: 'circle', padding: 14, font: { size: 10, weight: 600 } } }
           }
         }
       });

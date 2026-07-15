@@ -17,6 +17,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/trainer/login/trainer-login.page').then((m) => m.TrainerLoginPage)
   },
   {
+    path: 'trainer/signup',
+    loadComponent: () => import('./pages/trainer/signup/trainer-signup.page').then((m) => m.TrainerSignupPage)
+  },
+  {
     path: 'trainer/tabs',
     loadComponent: () => import('./pages/trainer/tabs/trainer-tabs.page').then((m) => m.TrainerTabsPage),
     children: [

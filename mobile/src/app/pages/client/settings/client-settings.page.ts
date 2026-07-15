@@ -17,12 +17,13 @@ import {
   DynamicField
 } from '../../../core/api/forms-groups-api.service';
 import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
+import { PasswordInputComponent } from '../../../shared/password-input.component';
 
 /** Settings & Account — client information (edit via trainer-approved request), photo, password, deletion. */
 @Component({
   selector: 'app-client-settings',
   standalone: true,
-  imports: [DatePipe, FormsModule, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
+  imports: [DatePipe, FormsModule, PasswordInputComponent, IonHeader, IonToolbar, IonTitle, IonButtons, IonBackButton, IonButton, IonContent],
   template: `
     <ion-header>
       <ion-toolbar>
@@ -104,9 +105,9 @@ import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api
           <div class="card">
             <h3>Change password</h3>
             <div class="form-grid">
-              <label><span>Current password</span><input type="password" [(ngModel)]="currentPassword" /></label>
-              <label><span>New password</span><input type="password" [(ngModel)]="newPassword" /></label>
-              <label><span>Confirm new password</span><input type="password" [(ngModel)]="confirmPassword" /></label>
+              <label><span>Current password</span><app-password-input [(ngModel)]="currentPassword" /></label>
+              <label><span>New password</span><app-password-input [(ngModel)]="newPassword" autocomplete="new-password" /></label>
+              <label><span>Confirm new password</span><app-password-input [(ngModel)]="confirmPassword" autocomplete="new-password" /></label>
             </div>
             <ion-button size="small" style="margin-top:.6rem" (click)="changePassword()"
               [disabled]="isChangingPassword || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword">

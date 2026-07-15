@@ -39,8 +39,10 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
       .chooser {
         display: grid;
         align-content: center;
-        gap: 3rem;
+        gap: 2.5rem;
         min-height: 100%;
+        max-width: 28rem;
+        margin: 0 auto;
       }
       .brand {
         display: grid;
@@ -53,8 +55,9 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
         place-items: center;
         width: 4.5rem;
         height: 4.5rem;
-        border-radius: 1.2rem;
-        background: var(--app-primary);
+        border-radius: var(--app-radius-xl);
+        background: linear-gradient(145deg, var(--app-primary), var(--app-accent));
+        box-shadow: 0 1rem 2rem rgba(37, 99, 235, 0.22);
         color: #ffffff;
         font-size: 1.6rem;
         font-weight: 800;
@@ -73,6 +76,11 @@ import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
       .choices {
         display: grid;
         gap: 0.8rem;
+        padding: 1rem;
+        border: 1px solid var(--app-border);
+        border-radius: var(--app-radius-xl);
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-md);
       }
       .choose-note {
         margin: 0 0 -0.2rem;

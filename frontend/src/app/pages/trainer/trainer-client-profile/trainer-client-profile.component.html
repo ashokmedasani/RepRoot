@@ -144,9 +144,14 @@
       }
 
       <nav class="ws-tabs" aria-label="Client sections">
-        <button type="button" [class.active]="workspaceTab === 'workspace'" (click)="workspaceTab = 'workspace'">Client Workspace</button>
-        <button type="button" [class.active]="workspaceTab === 'chat'" (click)="workspaceTab = 'chat'">Chat</button>
-        <button type="button" [class.active]="workspaceTab === 'actions'" (click)="workspaceTab = 'actions'">Actions</button>
+        <button type="button" [class.active]="workspaceTab === 'workspace'" (click)="selectWorkspaceTab('workspace')">Client Workspace</button>
+        <button type="button" [class.active]="workspaceTab === 'chat'" (click)="selectWorkspaceTab('chat')">
+          Chat
+          @if (chatUnreadCount > 0) {
+            <span class="message-count">{{ chatBadgeLabel() }}</span>
+          }
+        </button>
+        <button type="button" [class.active]="workspaceTab === 'actions'" (click)="selectWorkspaceTab('actions')">Actions</button>
       </nav>
 
       @if (workspaceTab === 'workspace') {

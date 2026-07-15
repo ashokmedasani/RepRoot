@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
@@ -11,6 +11,7 @@ import {
   TrainerGroup
 } from '../../../core/api/forms-groups-api.service';
 import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { ChatApiService } from '../../../core/api/chat-api.service';
 
 @Component({
   selector: 'app-trainer-clients',
@@ -19,8 +20,9 @@ import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/tr
   templateUrl: './trainer-clients.component.html',
   styleUrl: './trainer-clients.component.scss'
 })
-export class TrainerClientsComponent implements OnInit {
+export class TrainerClientsComponent implements OnInit, OnDestroy {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
+  private readonly chatApi = inject(ChatApiService);
 
   clients: ClientAccessRecord[] = [];
   groups: TrainerGroup[] = [];
@@ -29,9 +31,27 @@ export class TrainerClientsComponent implements OnInit {
   searchTerm = '';
   groupFilter = 'all';
   statusFilter = 'all';
+  unreadByClient: Record<string, number> = {};
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.loadClients();
+    this.loadUnreadMessages();
+    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) {
+      clearInterval(this.unreadPoll);
+    }
+  }
+
+  unreadFor(clientId: number): number {
+    return this.unreadByClient[String(clientId)] || 0;
+  }
+
+  badgeLabel(count: number): string {
+    return count > 99 ? '99+' : String(count);
   }
 
   get activeClients(): ClientAccessRecord[] {
@@ -112,5 +132,12 @@ export class TrainerClientsComponent implements OnInit {
 
     const firstError = Object.values(apiError.error)[0];
     return Array.isArray(firstError) ? firstError[0] : firstError || fallbackMessage;
+  }
+
+  private loadUnreadMessages(): void {
+    this.chatApi.getTrainerUnreadCounts().subscribe({
+      next: (summary) => (this.unreadByClient = summary.by_client),
+      error: () => (this.unreadByClient = {})
+    });
   }
 }
