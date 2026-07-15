@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import {
@@ -20,6 +20,7 @@ import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/c
 export class TrainerTemplatesComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   templates: TrackingTemplateRecord[] = [];
   standardTemplates: StandardTemplateRecord[] = [];
@@ -98,16 +99,23 @@ export class TrainerTemplatesComponent implements OnInit {
         this.templates = response.templates;
         this.maxTemplates = response.max_templates;
         this.isLoading = false;
+        // Updates that follow the confirmation-dialog await were not picked
+        // up by a change-detection cycle, leaving deleted templates on
+        // screen until a manual refresh. Detect explicitly so the list
+        // always reflects the latest server state.
+        this.changeDetector.detectChanges();
       },
       error: (error: unknown) => {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Templates could not be loaded.');
         this.isLoading = false;
+        this.changeDetector.detectChanges();
       }
     });
     this.templatesApi.getStandardTemplates().subscribe({
       next: (response) => {
         this.standardTemplates = response.standard_templates;
+        this.changeDetector.detectChanges();
       },
       error: () => {
         this.standardTemplates = [];

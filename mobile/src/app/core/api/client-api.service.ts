@@ -160,8 +160,8 @@ export class ClientApiService {
     currentPassword: string,
     password: string,
     confirmPassword: string
-  ): Observable<{ client: ClientAccessRecord; message: string }> {
-    return this.http.post<{ client: ClientAccessRecord; message: string }>(
+  ): Observable<{ token: string; client: ClientAccessRecord; message: string }> {
+    return this.http.post<{ token: string; client: ClientAccessRecord; message: string }>(
       `${this.apiBaseUrl}/client/change-password/`,
       { current_password: currentPassword, password, confirm_password: confirmPassword },
       { headers: this.authHeaders() }

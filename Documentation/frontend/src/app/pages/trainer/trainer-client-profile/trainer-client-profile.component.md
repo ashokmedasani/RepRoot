@@ -1,5 +1,9 @@
 # frontend/src/app/pages/trainer/trainer-client-profile/trainer-client-profile.component.ts
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+Password reset now prompts the trainer to define the temporary password (a generated suggestion is prefilled), matching manual client creation.
+
 ## 2026-07-13 Actions-tab follow-up
 
 The client workspace state now supports three peer sections: Client Workspace, Chat, and Actions.

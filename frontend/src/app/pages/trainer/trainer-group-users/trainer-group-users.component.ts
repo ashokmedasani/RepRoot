@@ -164,7 +164,7 @@ export class TrainerGroupUsersComponent implements OnInit {
       kind: 'warning',
       title: 'Reset password for',
       target: `${client.first_name} ${client.last_name}`,
-      impact: `A new temporary password will be generated and sent to ${client.email}. The client must change it at next login.`,
+      impact: `You will set a new temporary password, which is emailed to ${client.email}. The client must change it at next login.`,
       confirmLabel: 'Reset Password'
     });
 
@@ -172,7 +172,19 @@ export class TrainerGroupUsersComponent implements OnInit {
       return;
     }
 
-    this.formsGroupsApi.resetClientPassword(client.id).subscribe({
+    // Option A: the trainer defines the temporary password, exactly like
+    // manual client creation. A generated suggestion is offered as default.
+    const suggested = this.generateTemporaryPassword();
+    const entered = window.prompt(
+      'Set the temporary password for this client (min 8 characters, 1 special character):',
+      suggested
+    );
+
+    if (entered === null) {
+      return;
+    }
+
+    this.formsGroupsApi.resetClientPassword(client.id, entered.trim() || suggested).subscribe({
       next: (response) => {
         this.messageType = 'success';
         this.message = response.message;
@@ -184,6 +196,15 @@ export class TrainerGroupUsersComponent implements OnInit {
         this.message = formatApiError(error, 'Client password could not be reset.');
       }
     });
+  }
+
+  private generateTemporaryPassword(): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const random = new Uint32Array(9);
+    crypto.getRandomValues(random);
+    let value = '';
+    random.forEach((n) => (value += alphabet[n % alphabet.length]));
+    return `${value.slice(0, 8)}!${value.slice(8)}`;
   }
 
   copyRegistrationLink(): void {

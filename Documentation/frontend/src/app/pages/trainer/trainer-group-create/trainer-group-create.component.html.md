@@ -1,5 +1,9 @@
 # frontend/src/app/pages/trainer/trainer-group-create/trainer-group-create.component.html
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+After group creation the app now navigates directly to the group registration form setup (the route segments were previously combined into one URL-encoded piece, so navigation silently failed and required a manual refresh).
+
 ## 2026-07-13 responsibilities
 
 Integrates the targeted onboarding, dashboard, profile, Security, reference-library, confirmation, or navigation refinements while preserving existing APIs, business logic, and theme behavior.

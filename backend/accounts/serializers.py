@@ -221,6 +221,16 @@ def validate_password_strength(password: str) -> None:
     raise serializers.ValidationError('Password must be at least 8 characters and include 1 special character.')
 
 
+USERNAME_ALLOWED_PATTERN = re.compile(r'^[A-Za-z0-9.\-]+$')
+USERNAME_CHARSET_MESSAGE = "Only letters, numbers, '.' and '-' are allowed."
+
+
+def validate_username_charset(username: str) -> None:
+  """Usernames may only contain letters, digits, dot, and hyphen (no spaces)."""
+  if not USERNAME_ALLOWED_PATTERN.match(username):
+    raise serializers.ValidationError(USERNAME_CHARSET_MESSAGE)
+
+
 class UsernameAvailabilitySerializer(serializers.Serializer):
   username = serializers.CharField(max_length=10)
 
@@ -232,6 +242,8 @@ class UsernameAvailabilitySerializer(serializers.Serializer):
 
     if len(username) < 5:
       raise serializers.ValidationError('Username must be at least 5 characters.')
+
+    validate_username_charset(username)
 
     return username
 
@@ -272,6 +284,8 @@ class TrainerSignupSerializer(serializers.Serializer):
 
   def validate_username(self, value: str) -> str:
     username = value.strip().lower()
+
+    validate_username_charset(username)
 
     if User.objects.filter(username__iexact=username).exists():
       raise serializers.ValidationError('Username is already taken.')
@@ -837,6 +851,8 @@ class ClientAccessCreateSerializer(serializers.Serializer):
 
     if not username:
       raise serializers.ValidationError('Client username is required.')
+
+    validate_username_charset(username)
 
     trainer = self.context.get('trainer')
 

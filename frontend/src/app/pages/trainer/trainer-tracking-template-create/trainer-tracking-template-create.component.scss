@@ -24,17 +24,24 @@ p {
   font-weight: 700;
 }
 
+/* Details + summary sit in a compact top row; the field builder below spans
+   the full width so it is the primary editing area. */
 .builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.builder-top {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr);
   gap: 1rem;
   align-items: start;
 }
 
-.builder-main,
-.builder-side {
-  display: grid;
-  gap: 1rem;
+.builder-fields {
+  width: 100%;
 }
 
 .section-heading {
@@ -173,7 +180,7 @@ textarea {
 }
 
 @media (max-width: 1000px) {
-  .builder-layout,
+  .builder-top,
   .info-grid,
   .field-row {
     grid-template-columns: 1fr;

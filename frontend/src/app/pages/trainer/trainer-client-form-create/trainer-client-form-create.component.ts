@@ -43,11 +43,16 @@ export class TrainerClientFormCreateComponent implements OnInit {
           .filter((field) => !field.is_core)
           .map((field) => ({ ...field }));
 
-        // Legacy groups created before the universal template existed have no
-        // custom fields yet - pre-populate the builder so the form is never
-        // empty and always includes the required personal information.
+        // First-time setup: reuse the custom fields the trainer already built
+        // on the Lead Form so the same questions never have to be recreated.
+        // Groups without a lead-form field set fall back to the universal
+        // template so the form is never empty.
         if (this.customFields.length === 0) {
-          this.customFields = buildUniversalClientFormFields();
+          const leadFormFields = (overview.lead_form?.fields || [])
+            .filter((field) => !field.is_core)
+            .map((field) => ({ ...field, isEditing: false }));
+
+          this.customFields = leadFormFields.length ? leadFormFields : buildUniversalClientFormFields();
         }
 
         this.isLoading = false;

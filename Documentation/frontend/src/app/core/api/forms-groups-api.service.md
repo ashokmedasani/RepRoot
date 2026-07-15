@@ -1,5 +1,9 @@
 # frontend/src/app/core/api/forms-groups-api.service.ts
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+resetClientPassword accepts an optional trainer-defined temporary password (Option A consistency with manual creation).
+
 ## 2026-07-13 Client Action Center follow-up
 
 Adds the typed `ClientProfileEditActivity` contract and extends the existing upcoming-reminders response type with profile-edit activities and their KPI count.

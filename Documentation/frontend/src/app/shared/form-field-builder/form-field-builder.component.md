@@ -1,5 +1,9 @@
 # frontend/src/app/shared/form-field-builder/form-field-builder.component.ts
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+The per-field action button is labeled 'Edit' (was 'Settings'); Move Up, Move Down, Duplicate, and Delete remain alongside it.
+
 ## What this file does
 
 Controls the reusable custom field builder used by guided Forms & Groups setup pages.

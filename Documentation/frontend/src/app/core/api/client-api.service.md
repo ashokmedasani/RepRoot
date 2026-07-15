@@ -1,5 +1,9 @@
 # frontend/src/app/core/api/client-api.service.ts
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+changePassword now returns the rotated auth token issued by the backend.
+
 ## 2026-07-13 targeted refinement
 
 Adds Client Dashboard types/API access and nullable onboarding-source/reference fields used by the redesigned client portal.

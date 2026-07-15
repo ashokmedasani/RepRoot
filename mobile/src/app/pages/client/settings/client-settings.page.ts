@@ -253,6 +253,12 @@ export class ClientSettingsPage implements OnInit {
     this.isChangingPassword = true;
     this.clientApi.changePassword(this.currentPassword, this.newPassword, this.confirmPassword).subscribe({
       next: (response) => {
+        // The backend rotates the token on password change - keep the
+        // session alive by storing the fresh one.
+        if (response.token) {
+          this.clientApi.storeSession(response.token, response.client);
+        }
+
         this.isChangingPassword = false;
         this.currentPassword = '';
         this.newPassword = '';

@@ -36,7 +36,7 @@
         </span>
         <div class="kpi-copy">
           <span>Total Groups</span>
-          <strong>{{ overview.groups.length }} / {{ overview.max_groups }}</strong>
+          <strong>{{ overview.groups.length }}</strong>
           @if (groupsThisWeek > 0) {
             <small class="up">&uarr; {{ groupsThisWeek }} this week</small>
           } @else {
@@ -51,7 +51,7 @@
         </span>
         <div class="kpi-copy">
           <span>Total Templates</span>
-          <strong>{{ templates.length }} / {{ maxTemplates }}</strong>
+          <strong>{{ templates.length }}</strong>
           @if (templatesThisWeek > 0) {
             <small class="up">&uarr; {{ templatesThisWeek }} this week</small>
           } @else {
@@ -81,6 +81,32 @@
           <small>Template assignments</small>
         </div>
       </article>
+    </section>
+
+    <!-- Pending requests lead the activity area: they are the trainer's top priority. -->
+    <section class="activity-card pending-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Pending Requests</h2>
+          <p>New applicants waiting for your review.</p>
+        </div>
+        <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
+      </div>
+      <app-fixed-height-list [visibleRows]="5">
+        <div class="mini-list">
+          @for (submission of pendingRequests; track submission.id) {
+            <a routerLink="/trainer/forms-groups">
+              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
+              <span>
+                <strong>{{ submission.applicant_name }}</strong>
+                <small>{{ submission.email }} - {{ submission.submitted_at | date: 'mediumDate' }}</small>
+              </span>
+            </a>
+          } @empty {
+            <p class="empty-note">No pending requests right now.</p>
+          }
+        </div>
+      </app-fixed-height-list>
     </section>
 
     <section class="overview-panel">
@@ -248,8 +274,8 @@
     <section class="accordion-panel">
       <button type="button" class="accordion-trigger" (click)="toggleActivity()" [attr.aria-expanded]="isActivityOpen">
         <span class="trigger-copy">
-          <strong>Activity</strong>
-          <small>{{ pendingRequests.length }} requests &middot; {{ allRecentClients.length }} clients &middot; {{ templates.length }} templates</small>
+          <strong>Recent Activity</strong>
+          <small>{{ allRecentClients.length }} clients &middot; {{ templates.length }} templates</small>
         </span>
         <span class="trigger-side">
           <span class="caret" [class.open]="isActivityOpen" aria-hidden="true">&#9662;</span>
@@ -257,32 +283,7 @@
       </button>
 
       @if (isActivityOpen) {
-        <div class="accordion-body dashboard-grid">
-          <article class="activity-card">
-        <div class="panel-heading">
-          <div>
-            <h2>Pending Requests</h2>
-            <p>New applicants waiting for your review.</p>
-          </div>
-          <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
-        </div>
-        <app-fixed-height-list [visibleRows]="5">
-        <div class="mini-list">
-          @for (submission of pendingRequests; track submission.id) {
-            <a routerLink="/trainer/forms-groups">
-              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
-              <span>
-                <strong>{{ submission.applicant_name }}</strong>
-                <small>{{ submission.email }} - {{ submission.submitted_at | date: 'mediumDate' }}</small>
-              </span>
-            </a>
-          } @empty {
-            <p class="empty-note">No pending requests right now.</p>
-          }
-        </div>
-        </app-fixed-height-list>
-          </article>
-
+        <div class="accordion-body dashboard-grid two-col">
           <article class="activity-card">
         <div class="panel-heading">
           <div>

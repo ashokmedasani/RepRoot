@@ -395,7 +395,7 @@ export class TrainerFormsGroupsPage implements OnInit {
   startApprove(submission: LeadSubmission): void {
     this.approvingId = submission.id;
     this.approveGroupId = this.overview?.groups?.length === 1 ? this.overview.groups[0].id : 0;
-    this.approveUsername = `${submission.first_name}_${submission.last_name}`.toLowerCase().replace(/[^a-z0-9_]+/g, '');
+    this.approveUsername = `${submission.first_name}.${submission.last_name}`.toLowerCase().replace(/[^a-z0-9.-]+/g, '');
     this.generateApprovePassword();
   }
 

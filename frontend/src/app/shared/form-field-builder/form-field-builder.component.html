@@ -63,8 +63,8 @@
               <button type="button" title="Move up" [disabled]="$index === 0" (click)="moveField($index, -1)">Up</button>
               <button type="button" title="Move down" [disabled]="$index === customFields.length - 1" (click)="moveField($index, 1)">Down</button>
               <button type="button" title="Duplicate field" (click)="duplicateField($index)">Duplicate</button>
-              <button type="button" title="Edit field settings" (click)="field.isEditing = !field.isEditing">
-                {{ field.isEditing ? 'Done' : 'Settings' }}
+              <button type="button" title="Edit field" (click)="field.isEditing = !field.isEditing">
+                {{ field.isEditing ? 'Done' : 'Edit' }}
               </button>
               <button type="button" class="danger" title="Delete field" (click)="removeField($index)">Delete</button>
             </div>

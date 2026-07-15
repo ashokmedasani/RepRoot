@@ -1,5 +1,9 @@
 # frontend/src/app/pages/trainer/trainer-client-form-create/trainer-client-form-create.component.html
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+First-time registration form setup pre-populates the builder with the Lead Form's custom fields so trainers never recreate the same questions; the universal template remains the fallback when the lead form has no custom fields.
+
 ## 2026-07-13 responsibilities
 
 Clarifies public lead enquiries versus known-client group registration, exposes the manual Add Client shortcut, and applies shared fixed-height and confirmation behavior to overview records.

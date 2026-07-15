@@ -1,5 +1,9 @@
 # backend/accounts/views.py
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+Client password change now rotates the auth token and returns the fresh token in the response, fixing the post-change "Invalid token" login failure. Client password reset accepts an optional trainer-defined `password` (validated for strength) for consistency with manual client creation; a secure password is generated only when none is provided.
+
 ## 2026-07-13 Client Action Center follow-up
 
 The existing trainer upcoming-reminders response now also returns trainer-owned pending client profile edits and a `pending_profile_edits` summary count. Each activity includes the client, group, request time, note, and number of actually changed editable fields. No endpoint or model was replaced.

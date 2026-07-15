@@ -50,7 +50,12 @@ export class TrainerGroupCreateComponent implements OnInit {
       next: (response) => {
         this.messageType = 'success';
         this.message = 'Group created successfully. Review and confirm the client creation form for this group.';
-        void this.router.navigate(['/trainer/groups', response.group.id, 'client-form/create']);
+        // Each path piece must be its own segment - a combined
+        // 'client-form/create' string gets URL-encoded and never matches the
+        // route, which stranded trainers on this page until they refreshed.
+        void this.router.navigate(['/trainer/groups', response.group.id, 'client-form', 'create'], {
+          queryParams: { from: 'group-create' }
+        });
       },
       error: (error: unknown) => {
         this.messageType = 'error';

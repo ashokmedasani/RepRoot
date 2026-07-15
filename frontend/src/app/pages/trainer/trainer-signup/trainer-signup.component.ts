@@ -507,6 +507,10 @@ export class TrainerSignupComponent implements OnDestroy {
       return 'Username must be no more than 10 characters.';
     }
 
+    if (/\s/.test(username) || !/^[A-Za-z0-9.-]+$/.test(username)) {
+      return "Only letters, numbers, '.' and '-' are allowed.";
+    }
+
     return '';
   }
 

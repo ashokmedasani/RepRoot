@@ -1,5 +1,9 @@
 # backend/accounts/serializers.py
 
+## 2026-07-15 UI, workflow, and bug fixes
+
+Usernames (trainer signup, availability check, and client creation) now allow only letters, numbers, '.' and '-' via `validate_username_charset`. Any other character (including spaces) returns "Only letters, numbers, '.' and '-' are allowed."
+
 ## 2026-07-13 targeted refinement
 
 Validates manual and known-client group registration, trainer-scoped username uniqueness, credential options, current-password changes, and public registration payloads.

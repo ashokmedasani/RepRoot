@@ -1632,7 +1632,22 @@ class ClientAccessPasswordResetView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    temporary_password = f'{get_random_string(8)}!7'
+    # Consistent with manual client creation (Option A): the trainer defines
+    # the temporary password. A generated one is used only when none is sent.
+    temporary_password = str(request.data.get('password', '') or '').strip()
+
+    if temporary_password:
+      from rest_framework.serializers import ValidationError as SerializerValidationError
+
+      from .serializers import validate_password_strength
+
+      try:
+        validate_password_strength(temporary_password)
+      except SerializerValidationError as error:
+        return Response({'message': error.detail[0]}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+      temporary_password = f'{get_random_string(8)}!7'
+
     client_access.temporary_password = make_password(temporary_password)
     client_access.must_change_password = True
     client_access.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
@@ -2270,10 +2285,15 @@ class ClientPasswordChangeView(APIView):
     serializer = ClientPasswordChangeSerializer(data=request.data, context={'client_access': request.auth})
     serializer.is_valid(raise_exception=True)
     client_access = serializer.save()
+    # Old tokens must die with the old password, but the client stays signed
+    # in: issue a fresh token so the session continues without an
+    # "Invalid token" failure right after the change.
     ClientAuthToken.objects.filter(client=client_access).delete()
+    token = issue_client_token(client_access)
 
     return Response(
       {
+        'token': token.key,
         'client': ClientAccessSerializer(client_access, context={'include_trainer_notes': True}).data,
         'message': 'Password changed successfully.',
       }

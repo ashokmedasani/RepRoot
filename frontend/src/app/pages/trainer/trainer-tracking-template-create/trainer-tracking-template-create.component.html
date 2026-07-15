@@ -17,7 +17,7 @@
     </section>
   } @else {
     <section class="builder-layout">
-      <div class="builder-main">
+      <div class="builder-top">
         <article class="panel">
           <h2>Template Details</h2>
           <div class="info-grid">
@@ -48,7 +48,20 @@
           </label>
         </article>
 
-        <article class="panel">
+        <article class="panel summary-panel">
+          <h2>Summary</h2>
+          <ul>
+            <li>{{ fields.length }} fields</li>
+            <li>{{ templateInfo.cadence }} check-in</li>
+          </ul>
+          <p class="side-note">References are shared per client when you assign this template from a client profile.</p>
+          <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveTemplate()">
+            {{ isSaving ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template' }}
+          </button>
+        </article>
+      </div>
+
+      <article class="panel builder-fields">
           <div class="section-heading">
             <div>
               <h2>Fields <span class="field-count">Fields: {{ fields.length }} / {{ maxFields }}</span></h2>
@@ -111,21 +124,6 @@
             }
           </div>
         </article>
-      </div>
-
-      <aside class="builder-side">
-        <article class="panel summary-panel">
-          <h2>Summary</h2>
-          <ul>
-            <li>{{ fields.length }} fields</li>
-            <li>{{ templateInfo.cadence }} check-in</li>
-          </ul>
-          <p class="side-note">References are shared per client when you assign this template from a client profile.</p>
-          <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveTemplate()">
-            {{ isSaving ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Template' }}
-          </button>
-        </article>
-      </aside>
     </section>
   }
 </app-trainer-page-shell>

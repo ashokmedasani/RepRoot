@@ -334,7 +334,7 @@ export class GroupDetailPage implements OnInit {
 
   startConvert(submission: GroupRegistrationSubmission): void {
     this.convertingId = submission.id;
-    this.convertUsername = `${submission.first_name}_${submission.last_name}`.toLowerCase().replace(/[^a-z0-9_]+/g, '');
+    this.convertUsername = `${submission.first_name}.${submission.last_name}`.toLowerCase().replace(/[^a-z0-9.-]+/g, '');
     this.generateConvertPassword();
   }
 

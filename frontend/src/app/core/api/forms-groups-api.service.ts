@@ -513,10 +513,10 @@ export class FormsGroupsApiService {
     );
   }
 
-  resetClientPassword(clientId: number): Observable<{ temporary_password: string; message: string }> {
+  resetClientPassword(clientId: number, password = ''): Observable<{ temporary_password: string; message: string }> {
     return this.http.post<{ temporary_password: string; message: string }>(
       `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reset-password/`,
-      {},
+      password ? { password } : {},
       { headers: this.getAuthHeaders() }
     );
   }

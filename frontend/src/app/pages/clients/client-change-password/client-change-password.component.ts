@@ -46,6 +46,13 @@ export class ClientChangePasswordComponent {
       .changePassword(this.passwordForm.currentPassword, this.passwordForm.password, this.passwordForm.confirmPassword)
       .subscribe({
         next: (response) => {
+          // The backend rotates the auth token when the password changes -
+          // store the fresh one so the session continues without an
+          // "Invalid token" error on the next request.
+          if (response.token) {
+            window.sessionStorage.setItem('client-auth-token', response.token);
+          }
+
           window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
           this.isSubmitting = false;
           void this.router.navigate(['/client/dashboard']);

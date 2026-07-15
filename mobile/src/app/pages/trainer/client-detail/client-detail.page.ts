@@ -512,23 +512,37 @@ export class ClientDetailPage implements OnInit, OnDestroy {
   }
 
   async resetPassword(): Promise<void> {
+    // Option A: the trainer defines the temporary password (same as manual
+    // creation). A generated suggestion is prefilled.
+    const suggested = this.generateTemporaryPassword();
     const alert = await this.alertController.create({
-      header: 'Reset password?',
-      message: 'A new temporary password is generated. The current password stops working immediately.',
+      header: 'Reset password',
+      message: 'Set the temporary password (min 8 characters, 1 special). The current password stops working immediately.',
+      inputs: [{ name: 'password', type: 'text', value: suggested, placeholder: 'Temporary password' }],
       buttons: [
         { text: 'Cancel', role: 'cancel' },
         {
           text: 'Reset',
-          handler: () => {
-            this.formsGroupsApi.resetClientPassword(this.clientId).subscribe({
+          handler: (values: { password?: string }) => {
+            const temporaryPassword = (values.password || '').trim() || suggested;
+            this.formsGroupsApi.resetClientPassword(this.clientId, temporaryPassword).subscribe({
               next: (response) => (this.temporaryPassword = response.temporary_password),
-              error: () => this.toast('Could not reset the password.')
+              error: () => this.toast('Could not reset the password. Check password strength.')
             });
           }
         }
       ]
     });
     await alert.present();
+  }
+
+  private generateTemporaryPassword(): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const random = new Uint32Array(9);
+    crypto.getRandomValues(random);
+    let value = '';
+    random.forEach((n) => (value += alphabet[n % alphabet.length]));
+    return `${value.slice(0, 8)}!${value.slice(8)}`;
   }
 
   async resetClient(): Promise<void> {
