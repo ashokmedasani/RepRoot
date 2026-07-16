@@ -15,6 +15,7 @@ import '../features/trainer/trainer_more_page.dart';
 import '../features/trainer/trainer_schedule_page.dart';
 import '../features/trainer/trainer_settings_page.dart';
 import '../features/trainer/trainer_tabs_shell.dart';
+import '../features/trainer/trainer_templates_page.dart';
 
 /// Route paths mirror mobile/src/app/app.routes.ts exactly so the two apps
 /// navigate identically and deep links stay portable.
@@ -134,10 +135,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'templates',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Templates',
-                      phase: 'Phase 4',
-                    ),
+                    builder: (context, state) => const TrainerTemplatesPage(),
                   ),
                   GoRoute(
                     path: 'references',
