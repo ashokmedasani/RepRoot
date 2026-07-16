@@ -1,0 +1,544 @@
+{
+  "meta": {
+    "tzOffsetMinutes": 240,
+    "note": "generated from mobile/src/app/shared/analytics/graph-engine.ts"
+  },
+  "fieldKey": {
+    "withKey": "weight",
+    "withoutKey": "No key field"
+  },
+  "extractUnit": {
+    "withUnit": "kg",
+    "withoutUnit": "",
+    "empty": "",
+    "nested": "kg"
+  },
+  "dailySums": [
+    {
+      "date": "2026-07-10",
+      "value": 80.5,
+      "times": [
+        "08:30",
+        "18:00"
+      ]
+    },
+    {
+      "date": "2026-07-11",
+      "value": 79.46,
+      "times": [
+        "09:00"
+      ]
+    },
+    {
+      "date": "2026-07-12",
+      "value": 79,
+      "times": [
+        "07:15"
+      ]
+    },
+    {
+      "date": "2026-07-13",
+      "value": 0,
+      "times": []
+    },
+    {
+      "date": "2026-07-14",
+      "value": 78.5,
+      "times": [
+        "10:00"
+      ]
+    }
+  ],
+  "dailySumsReps": [
+    {
+      "date": "2026-07-10",
+      "value": 15,
+      "times": [
+        "08:30",
+        "18:00"
+      ]
+    },
+    {
+      "date": "2026-07-11",
+      "value": 8,
+      "times": [
+        "09:00"
+      ]
+    },
+    {
+      "date": "2026-07-12",
+      "value": 12,
+      "times": [
+        "07:15"
+      ]
+    },
+    {
+      "date": "2026-07-14",
+      "value": 9,
+      "times": [
+        "10:00"
+      ]
+    }
+  ],
+  "timeSeries": [
+    {
+      "label": "7/9",
+      "value": 80.5,
+      "tooltip": "2026-07-10 at 08:30, 18:00"
+    },
+    {
+      "label": "7/10",
+      "value": 79.46,
+      "tooltip": "2026-07-11 at 09:00"
+    },
+    {
+      "label": "7/11",
+      "value": 79,
+      "tooltip": "2026-07-12 at 07:15"
+    },
+    {
+      "label": "7/12",
+      "value": 0,
+      "tooltip": "2026-07-13"
+    },
+    {
+      "label": "7/13",
+      "value": 78.5,
+      "tooltip": "2026-07-14 at 10:00"
+    }
+  ],
+  "frequency": [
+    {
+      "label": "Breakfast",
+      "value": 2
+    },
+    {
+      "label": "Dinner",
+      "value": 1
+    },
+    {
+      "label": "Lunch",
+      "value": 1
+    },
+    {
+      "label": "Snack",
+      "value": 1
+    }
+  ],
+  "frequencyNote": [
+    {
+      "label": "good",
+      "value": 2
+    },
+    {
+      "label": "ok",
+      "value": 2
+    },
+    {
+      "label": "bad",
+      "value": 1
+    }
+  ],
+  "ratingDistribution": [
+    {
+      "label": "1",
+      "value": 1
+    },
+    {
+      "label": "2",
+      "value": 1
+    },
+    {
+      "label": "3",
+      "value": 1
+    },
+    {
+      "label": "4",
+      "value": 1
+    },
+    {
+      "label": "5",
+      "value": 1
+    }
+  ],
+  "ratingDistributionClampHigh": [
+    {
+      "label": "1",
+      "value": 0
+    },
+    {
+      "label": "2",
+      "value": 0
+    },
+    {
+      "label": "3",
+      "value": 0
+    },
+    {
+      "label": "4",
+      "value": 0
+    },
+    {
+      "label": "5",
+      "value": 0
+    },
+    {
+      "label": "6",
+      "value": 0
+    },
+    {
+      "label": "7",
+      "value": 0
+    },
+    {
+      "label": "8",
+      "value": 0
+    },
+    {
+      "label": "9",
+      "value": 0
+    },
+    {
+      "label": "10",
+      "value": 0
+    }
+  ],
+  "ratingDistributionScaleZero": [
+    {
+      "label": "1",
+      "value": 0
+    },
+    {
+      "label": "2",
+      "value": 0
+    },
+    {
+      "label": "3",
+      "value": 0
+    },
+    {
+      "label": "4",
+      "value": 0
+    },
+    {
+      "label": "5",
+      "value": 0
+    }
+  ],
+  "average": 52.9,
+  "averageMood": 2.5,
+  "completionPercent": 80,
+  "numericFieldStats": [
+    {
+      "key": "weight",
+      "label": "Body weight (kg)",
+      "unit": "kg",
+      "count": 6,
+      "average": 52.9,
+      "latest": 78.5,
+      "min": 0,
+      "max": 80,
+      "hasData": true
+    },
+    {
+      "key": "reps",
+      "label": "Reps",
+      "unit": "",
+      "count": 5,
+      "average": 8.8,
+      "latest": 9,
+      "min": 5,
+      "max": 12,
+      "hasData": true
+    }
+  ],
+  "decide": {
+    "numberShort": {
+      "kind": "bar",
+      "title": "Body weight (kg)",
+      "unit": "kg",
+      "data": [
+        {
+          "label": "7/9",
+          "value": 80.5,
+          "tooltip": "2026-07-10 at 08:30, 18:00"
+        },
+        {
+          "label": "7/10",
+          "value": 79.46,
+          "tooltip": "2026-07-11 at 09:00"
+        },
+        {
+          "label": "7/11",
+          "value": 79,
+          "tooltip": "2026-07-12 at 07:15"
+        },
+        {
+          "label": "7/12",
+          "value": 0,
+          "tooltip": "2026-07-13"
+        },
+        {
+          "label": "7/13",
+          "value": 78.5,
+          "tooltip": "2026-07-14 at 10:00"
+        }
+      ],
+      "meta": {
+        "subtitle": "Daily values"
+      }
+    },
+    "numberLong": {
+      "kind": "line",
+      "title": "Body weight (kg)",
+      "unit": "kg",
+      "data": [
+        {
+          "label": "5/31",
+          "value": 71,
+          "tooltip": "2026-06-01 at 08:00"
+        },
+        {
+          "label": "6/1",
+          "value": 72,
+          "tooltip": "2026-06-02 at 08:00"
+        },
+        {
+          "label": "6/2",
+          "value": 73,
+          "tooltip": "2026-06-03 at 08:00"
+        },
+        {
+          "label": "6/3",
+          "value": 74,
+          "tooltip": "2026-06-04 at 08:00"
+        },
+        {
+          "label": "6/4",
+          "value": 75,
+          "tooltip": "2026-06-05 at 08:00"
+        },
+        {
+          "label": "6/5",
+          "value": 76,
+          "tooltip": "2026-06-06 at 08:00"
+        },
+        {
+          "label": "6/6",
+          "value": 77,
+          "tooltip": "2026-06-07 at 08:00"
+        },
+        {
+          "label": "6/7",
+          "value": 78,
+          "tooltip": "2026-06-08 at 08:00"
+        },
+        {
+          "label": "6/8",
+          "value": 79,
+          "tooltip": "2026-06-09 at 08:00"
+        },
+        {
+          "label": "6/9",
+          "value": 80,
+          "tooltip": "2026-06-10 at 08:00"
+        }
+      ],
+      "meta": {
+        "subtitle": "Trend over time"
+      }
+    },
+    "rating": {
+      "kind": "hbar",
+      "title": "Mood",
+      "data": [
+        {
+          "label": "1",
+          "value": 1
+        },
+        {
+          "label": "2",
+          "value": 1
+        },
+        {
+          "label": "3",
+          "value": 1
+        },
+        {
+          "label": "4",
+          "value": 1
+        },
+        {
+          "label": "5",
+          "value": 1
+        }
+      ],
+      "meta": {
+        "average": 2.5,
+        "subtitle": "Rating distribution"
+      }
+    },
+    "yesNo": {
+      "kind": "ring",
+      "title": "Workout done",
+      "data": [],
+      "meta": {
+        "percent": 80,
+        "subtitle": "Completion"
+      }
+    },
+    "dropdownSmall": {
+      "kind": "pie",
+      "title": "Meal type",
+      "data": [
+        {
+          "label": "Breakfast",
+          "value": 2
+        },
+        {
+          "label": "Dinner",
+          "value": 1
+        },
+        {
+          "label": "Lunch",
+          "value": 1
+        },
+        {
+          "label": "Snack",
+          "value": 1
+        }
+      ],
+      "meta": {
+        "subtitle": "Response breakdown"
+      }
+    },
+    "dropdownBig": {
+      "kind": "hbar",
+      "title": "Meal six",
+      "data": [
+        {
+          "label": "A",
+          "value": 1
+        },
+        {
+          "label": "B",
+          "value": 1
+        },
+        {
+          "label": "C",
+          "value": 1
+        },
+        {
+          "label": "D",
+          "value": 1
+        },
+        {
+          "label": "E",
+          "value": 1
+        },
+        {
+          "label": "F",
+          "value": 1
+        }
+      ],
+      "meta": {
+        "subtitle": "Response breakdown"
+      }
+    },
+    "shortText": {
+      "kind": "hbar",
+      "title": "Note",
+      "data": [
+        {
+          "label": "good",
+          "value": 2
+        },
+        {
+          "label": "ok",
+          "value": 2
+        },
+        {
+          "label": "bad",
+          "value": 1
+        }
+      ],
+      "meta": {
+        "subtitle": "Most common responses"
+      }
+    },
+    "longText": null,
+    "numberEmpty": null
+  },
+  "buildFieldCharts": [
+    {
+      "kind": "bar",
+      "title": "Body weight (kg)"
+    },
+    {
+      "kind": "hbar",
+      "title": "Mood"
+    },
+    {
+      "kind": "ring",
+      "title": "Workout done"
+    },
+    {
+      "kind": "pie",
+      "title": "Meal type"
+    }
+  ],
+  "buildOverviewCards": [
+    {
+      "kind": "summary",
+      "title": "Body weight (kg)",
+      "unit": "kg",
+      "data": [],
+      "meta": {
+        "value": 78.5,
+        "unit": "kg",
+        "delta": 78.5,
+        "deltaText": "+78.5 vs prev"
+      }
+    },
+    {
+      "kind": "summary",
+      "title": "Mood",
+      "data": [],
+      "meta": {
+        "value": 2.5,
+        "subtitle": "avg of 5"
+      }
+    },
+    {
+      "kind": "summary",
+      "title": "Workout done",
+      "data": [],
+      "meta": {
+        "valueText": "80%",
+        "subtitle": "completed"
+      }
+    }
+  ],
+  "negativeDelta": [
+    {
+      "kind": "summary",
+      "title": "Body weight (kg)",
+      "unit": "kg",
+      "data": [],
+      "meta": {
+        "value": 79.75,
+        "unit": "kg",
+        "delta": -0.2,
+        "deltaText": "-0.2 vs prev"
+      }
+    }
+  ],
+  "sortByTime": [
+    "2026-07-10 08:30:00",
+    "2026-07-10 18:00:00",
+    "2026-07-11 09:00:00",
+    "2026-07-12 07:15:00",
+    "2026-07-13 ",
+    "2026-07-14 10:00:00"
+  ]
+}
