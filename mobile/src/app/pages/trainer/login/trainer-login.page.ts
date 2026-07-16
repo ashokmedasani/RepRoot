@@ -103,7 +103,17 @@ export class TrainerLoginPage {
       next: (response) => {
         this.trainerAuth.storeToken(response.token);
         this.isSubmitting = false;
-        void this.router.navigateByUrl('/trainer/tabs/dashboard', { replaceUrl: true });
+        // Same rule as the web portal: incomplete profiles finish setup
+        // (name + trainer code) before reaching the dashboard.
+        this.trainerAuth.getProfileStatus().subscribe({
+          next: (status) => {
+            void this.router.navigateByUrl(
+              status.profile_setup_completed ? '/trainer/tabs/dashboard' : '/trainer/tabs/more/profile?setup=1',
+              { replaceUrl: true }
+            );
+          },
+          error: () => void this.router.navigateByUrl('/trainer/tabs/dashboard', { replaceUrl: true })
+        });
       },
       error: () => {
         this.message = 'Login failed. Check your credentials and backend URL.';

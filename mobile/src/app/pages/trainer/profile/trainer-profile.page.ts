@@ -1,5 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ToastController } from '@ionic/angular';
 import {
   IonBackButton,
@@ -33,6 +34,15 @@ import { TrainerAuthApiService, TrainerProfile } from '../../../core/api/trainer
     </ion-header>
     <ion-content>
       <div class="page-pad">
+        @if (isSetupMode) {
+          <div class="card" style="border-color: var(--app-primary); margin-top: 0">
+            <h3>Finish setting up your profile</h3>
+            <p class="sub" style="margin-bottom: 0">
+              Add your name, trainer code, gender, birth month and year, and location. Clients use the trainer code to log in, so it is required before onboarding anyone.
+            </p>
+          </div>
+        }
+
         @if (message) {
           <p [class]="messageIsError ? 'error-text' : 'success-text'">{{ message }}</p>
         }
@@ -63,12 +73,41 @@ import { TrainerAuthApiService, TrainerProfile } from '../../../core/api/trainer
                   <label><span>First name</span><input [(ngModel)]="draft.first_name" /></label>
                   <label><span>Last name</span><input [(ngModel)]="draft.last_name" /></label>
                 </div>
+                <label>
+                  <span>Trainer code (clients log in with this)</span>
+                  <input [(ngModel)]="draft.trainer_id" autocapitalize="off" placeholder="e.g. fitjohn" />
+                </label>
+                <div class="form-two">
+                  <label>
+                    <span>Gender</span>
+                    <select [(ngModel)]="draft.gender">
+                      <option value="" disabled>Select</option>
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="non_binary">Non-binary</option>
+                      <option value="prefer_not_to_say">Prefer not to say</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Birth month</span>
+                    <select [(ngModel)]="draft.birth_month">
+                      <option [ngValue]="null" disabled>Select</option>
+                      @for (month of months; track month.value) {
+                        <option [ngValue]="month.value">{{ month.label }}</option>
+                      }
+                    </select>
+                  </label>
+                </div>
+                <div class="form-two">
+                  <label><span>Birth year</span><input type="number" min="1920" max="2010" [(ngModel)]="draft.birth_year" placeholder="e.g. 1990" /></label>
+                  <label><span>Phone</span><input [(ngModel)]="draft.phone" inputmode="tel" /></label>
+                </div>
+                <div class="form-two">
+                  <label><span>Country</span><input [(ngModel)]="draft.country" placeholder="e.g. India" /></label>
+                  <label><span>State / Region</span><input [(ngModel)]="draft.state" placeholder="e.g. Telangana" /></label>
+                </div>
                 <label><span>Headline</span><input [(ngModel)]="draft.professional_headline" placeholder="e.g. Strength & Conditioning Coach" /></label>
                 <label><span>About me</span><textarea [(ngModel)]="draft.about_me"></textarea></label>
-                <div class="form-two">
-                  <label><span>Phone</span><input [(ngModel)]="draft.phone" inputmode="tel" /></label>
-                  <label><span>Country</span><input [(ngModel)]="draft.country" /></label>
-                </div>
               </div>
             </div>
             <div class="card">
@@ -154,16 +193,26 @@ import { TrainerAuthApiService, TrainerProfile } from '../../../core/api/trainer
 export class TrainerProfilePage implements OnInit {
   private readonly trainerAuth = inject(TrainerAuthApiService);
   private readonly toastController = inject(ToastController);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   profile: TrainerProfile | null = null;
   draft: Partial<TrainerProfile> = {};
   visibility: Record<string, boolean> = {};
   isEditing = false;
   isSaving = false;
+  isSetupMode = false;
   message = '';
   messageIsError = false;
   photoPreview = '';
   photoFile: File | null = null;
+
+  readonly months = [
+    { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
+    { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
+    { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
+    { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' }
+  ];
 
   /** Same six Private/Public sections the web trainer profile exposes. */
   readonly visibilitySections: Array<{ key: string; label: string }> = [
@@ -180,6 +229,12 @@ export class TrainerProfilePage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.isSetupMode = this.route.snapshot.queryParamMap.get('setup') === '1';
+
+    if (this.isSetupMode) {
+      this.isEditing = true;
+    }
+
     this.load();
   }
 
@@ -199,9 +254,27 @@ export class TrainerProfilePage implements OnInit {
       return;
     }
 
+    const merged = { ...this.profile, ...this.draft };
+
+    const requiredForSetup: Array<[unknown, string]> = [
+      [merged.first_name, 'first name'],
+      [merged.last_name, 'last name'],
+      [merged.trainer_id, 'trainer code'],
+      [merged.gender, 'gender'],
+      [merged.birth_month, 'birth month'],
+      [merged.birth_year, 'birth year'],
+      [merged.country, 'country'],
+      [merged.state, 'state']
+    ];
+    const missing = requiredForSetup.filter(([value]) => value === null || value === undefined || String(value).trim() === '').map(([, label]) => label);
+
+    if (missing.length) {
+      this.setMessage(`Required: ${missing.join(', ')}.`, true);
+      return;
+    }
+
     this.isSaving = true;
     const formData = new FormData();
-    const merged = { ...this.profile, ...this.draft };
     const scalarKeys: Array<keyof TrainerProfile> = [
       'first_name',
       'middle_name',
@@ -259,10 +332,16 @@ export class TrainerProfilePage implements OnInit {
         this.photoFile = null;
         this.photoPreview = '';
         this.setMessage(response.message || 'Profile saved.', false);
+
+        // Setup complete - continue to the dashboard like the web portal.
+        if (this.isSetupMode) {
+          this.isSetupMode = false;
+          void this.router.navigateByUrl('/trainer/tabs/dashboard', { replaceUrl: true });
+        }
       },
       error: () => {
         this.isSaving = false;
-        this.setMessage('Profile could not be saved.', true);
+        this.setMessage('Profile could not be saved. The trainer code may already be taken.', true);
       }
     });
   }

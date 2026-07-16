@@ -16,6 +16,13 @@ export class ErrorNavigationService {
   constructor(private readonly router: Router) {}
 
   shouldDisplayHttpError(error: HttpErrorResponse, method: string): boolean {
+    // Silent background polls (for example chat unread counts) must never
+    // hijack the page into the error view - a failed poll is not a page
+    // failure. This bit a brand-new trainer right after profile setup.
+    if (error.url && error.url.includes('/chat/unread/')) {
+      return false;
+    }
+
     return (
       error.status === 0 ||
       error.status === 403 ||

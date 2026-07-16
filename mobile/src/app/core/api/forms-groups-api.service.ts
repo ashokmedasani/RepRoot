@@ -159,9 +159,6 @@ export interface ScheduleSummary {
   nearest_date: string;
 }
 
-/** Back-compat alias used by earlier mobile pages. */
-export type ReminderSummary = ScheduleSummary;
-
 export interface ClientProfileEditActivity {
   id: number;
   client: number;

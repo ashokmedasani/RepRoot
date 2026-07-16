@@ -39,3 +39,13 @@
 ## Known issues / notes
 - The missed change-detection pattern fixed on the Templates page (updates after a confirmation-dialog await) could exist on other pages that combine the confirmation dialog with in-place list updates; none showed the symptom during this pass, but flagging for future audit.
 - The trainer plan currently allows 5 groups; testing created "Group 5" with a registration form synced from the lead form — rename and reuse it, since the Starter plan group limit is now reached.
+
+## Full new-account diagnostics (later on 2026-07-15)
+
+Two fresh trainer accounts were created end to end — one on the web portal, one in the mobile app — exercising signup, OTP, profile setup, lead form, group, registration form, templates, references, manual client creation, and the client first-login password flow.
+
+Fixed during diagnostics:
+- Web: a background chat-unread poll returning an error no longer hijacks the page to the global error view (this threw a brand-new trainer onto a 404 page right after profile setup).
+- Mobile: signup/login now route incomplete profiles to a guided profile-setup mode (name, trainer code, gender, birth month/year, country, state) before the dashboard, matching the web's required first-login step. Previously a mobile-created trainer reached the dashboard with no trainer code, so their clients could never log in.
+- Mobile profile edit gained the missing setup fields (trainer code, gender, birth month/year, state) and client-side required-field messages.
+- Removed unused back-compat aliases from mobile API services (dead code).

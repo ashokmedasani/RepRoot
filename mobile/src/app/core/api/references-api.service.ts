@@ -33,9 +33,6 @@ export interface TrainerReferenceRecord {
   updated_at: string;
 }
 
-/** Back-compat alias used by earlier mobile pages. */
-export type MobileReference = TrainerReferenceRecord;
-
 export interface ReferencePayload {
   category: number;
   subcategory: string;

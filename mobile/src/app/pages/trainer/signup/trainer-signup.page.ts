@@ -253,7 +253,9 @@ export class TrainerSignupPage {
       next: (response) => {
         this.api.storeToken(response.token);
         this.isSubmitting = false;
-        void this.router.navigateByUrl('/trainer/tabs/dashboard', { replaceUrl: true });
+        // New accounts always need profile setup (name + trainer code)
+        // before the dashboard, matching the web portal's first-login step.
+        void this.router.navigateByUrl('/trainer/tabs/more/profile?setup=1', { replaceUrl: true });
       },
       error: (error: unknown) => {
         this.isSubmitting = false;

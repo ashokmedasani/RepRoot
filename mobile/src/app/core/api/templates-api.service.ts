@@ -219,11 +219,6 @@ export class TemplatesApiService {
     );
   }
 
-  /** Back-compat alias used by earlier mobile pages. */
-  getClientAssignments(clientId: number): Observable<{ assignments: TemplateAssignmentRecord[] }> {
-    return this.getAssignments(clientId);
-  }
-
   private buildEntryParams(filters: EntryFilters): HttpParams {
     let params = new HttpParams();
 
