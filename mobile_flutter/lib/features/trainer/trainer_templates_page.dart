@@ -201,12 +201,46 @@ class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
   }
 
   Future<void> _remove(TrackingTemplateRecord template) async {
+    // A template still assigned to clients cannot be deleted: the trainer must
+    // unassign it from each client first. This protects clients from silently
+    // losing a tracker they are actively logging against.
+    if (template.assignedCount > 0) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('${template.name} is in use'),
+          content: Text(
+            'This template is assigned to ${template.assignedCount} '
+            '${template.assignedCount == 1 ? 'client' : 'clients'}.\n\n'
+            'Remove it from every client first, then you can delete it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => context.pop(),
+              child: const Text('Close'),
+            ),
+            FilledButton(
+              onPressed: () {
+                context.pop();
+                context.go(Routes.trainerClients);
+              },
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
+              child: const Text('Open Clients'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete ${template.name}?'),
         content: const Text(
-          'Assigned clients lose access to this template. Past entries stay saved.',
+          'This template is not assigned to anyone. Past entries stay saved.',
         ),
         actions: [
           TextButton(
@@ -325,10 +359,19 @@ class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
                     ),
                     IconButton(
                       onPressed: () => _remove(template),
-                      icon: const Icon(Icons.delete_outline),
+                      icon: Icon(
+                        template.assignedCount > 0
+                            ? Icons.lock_outline
+                            : Icons.delete_outline,
+                      ),
                       iconSize: AppSize.iconRow,
-                      color: context.colors.error,
-                      tooltip: 'Delete',
+                      // Locked reads as unavailable, not as a destructive action.
+                      color: template.assignedCount > 0
+                          ? context.tokens.muted
+                          : context.colors.error,
+                      tooltip: template.assignedCount > 0
+                          ? 'Assigned to ${template.assignedCount} — unassign first'
+                          : 'Delete',
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
