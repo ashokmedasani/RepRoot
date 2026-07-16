@@ -8,6 +8,7 @@ import '../features/auth/trainer_profile_setup_page.dart';
 import '../features/auth/trainer_signup_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/placeholder_page.dart';
+import '../features/trainer/trainer_client_create_page.dart';
 import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
 import '../features/trainer/trainer_manage_page.dart';
@@ -97,10 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'new',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'New client',
-                      phase: 'Phase 4',
-                    ),
+                    builder: (context, state) => const TrainerClientCreatePage(),
                   ),
                   GoRoute(
                     path: ':clientId',
