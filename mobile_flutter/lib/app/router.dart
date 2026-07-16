@@ -14,6 +14,7 @@ import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
 import '../features/trainer/trainer_manage_page.dart';
 import '../features/trainer/trainer_more_page.dart';
+import '../features/trainer/trainer_references_page.dart';
 import '../features/trainer/trainer_schedule_page.dart';
 import '../features/trainer/trainer_settings_page.dart';
 import '../features/trainer/trainer_tabs_shell.dart';
@@ -147,10 +148,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'references',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'References',
-                      phase: 'Phase 4',
-                    ),
+                    builder: (context, state) => const TrainerReferencesPage(),
                   ),
                   GoRoute(
                     path: 'schedule',
