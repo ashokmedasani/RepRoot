@@ -30,7 +30,9 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+# Unanchored: Flutter's default "/build/" only covers the project root, so
+# android/build/ leaked Gradle reports into git.
+build/
 /coverage/
 
 # Symbolication related
