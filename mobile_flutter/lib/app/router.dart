@@ -12,6 +12,8 @@ import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
 import '../features/trainer/trainer_manage_page.dart';
 import '../features/trainer/trainer_more_page.dart';
+import '../features/trainer/trainer_schedule_page.dart';
+import '../features/trainer/trainer_settings_page.dart';
 import '../features/trainer/trainer_tabs_shell.dart';
 
 /// Route paths mirror mobile/src/app/app.routes.ts exactly so the two apps
@@ -146,10 +148,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'schedule',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Schedule',
-                      phase: 'Phase 4',
-                    ),
+                    builder: (context, state) => const TrainerSchedulePage(),
                   ),
                 ],
               ),
@@ -170,10 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'settings',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Settings',
-                      phase: 'Phase 4',
-                    ),
+                    builder: (context, state) => const TrainerSettingsPage(),
                   ),
                   GoRoute(
                     path: 'support',

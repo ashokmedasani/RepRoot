@@ -17,6 +17,15 @@ String shortDate(String iso) {
   return '${date.day.toString().padLeft(2, '0')} ${_months[date.month - 1]}';
 }
 
+/// `date: 'EEE dd MMM'` -> "Wed 15 Jul"
+String weekdayDate(String iso) {
+  final date = DateTime.tryParse(iso);
+  if (date == null) return iso;
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return '${days[date.weekday - 1]} ${date.day.toString().padLeft(2, '0')} '
+      '${_months[date.month - 1]}';
+}
+
 /// `date: 'dd MMM yyyy'` -> "15 Jul 2026"
 String longDate(String iso) {
   final date = DateTime.tryParse(iso);
