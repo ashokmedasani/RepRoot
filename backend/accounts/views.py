@@ -2041,6 +2041,25 @@ class TrackingTemplateDetailView(APIView):
     if template is None:
       return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    # A template still assigned to clients cannot be deleted: the trainer must
+    # unassign it from each client first. TemplateAssignment cascades on this
+    # FK, so without this check the delete would silently strip the template
+    # from every client who is actively logging against it.
+    assigned_count = template.assignments.count()
+
+    if assigned_count:
+      return Response(
+        {
+          'message': (
+            f'This template is assigned to {assigned_count} '
+            f'{"client" if assigned_count == 1 else "clients"}. '
+            'Remove it from every client before deleting it.'
+          ),
+          'assigned_count': assigned_count,
+        },
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
     template.delete()
     return Response({'message': 'Template deleted. Past client entries are kept.'})
 

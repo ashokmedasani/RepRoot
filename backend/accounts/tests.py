@@ -15,6 +15,8 @@ from .models import (
   ReferenceCategory,
   SupportIncident,
   SupportIncidentMessage,
+  TemplateAssignment,
+  TrackingTemplate,
   TrainerGroup,
   TrainerProfile,
   UNIVERSAL_CORE_FIELDS,
@@ -450,3 +452,57 @@ class WorkflowRefinementTests(APITestCase):
       self.client.get('/api/accounts/client/chat/unread/', HTTP_AUTHORIZATION=authorization).data['unread_count'],
       0,
     )
+
+  def test_assigned_template_cannot_be_deleted_until_unassigned(self):
+    """A template in use must be unassigned from every client before deletion.
+
+    TemplateAssignment cascades on the template FK, so without the guard the
+    delete would silently strip an actively-used tracker from every client.
+    """
+    created = self.client.post(
+      '/api/accounts/trainer/templates/',
+      {
+        'name': 'Daily Habits',
+        'purpose': 'Track habits',
+        'cadence': 'daily',
+        'accent': '#0b7de3',
+        'custom_fields': [{'label': 'Steps', 'field_type': 'number', 'placeholder': ''}],
+      },
+      format='json',
+    )
+    self.assertEqual(created.status_code, 201, created.data)
+    template_id = created.data['template']['id']
+
+    made_client = self.client.post(
+      '/api/accounts/trainer/forms-groups/clients/manual/',
+      self.manual_payload(),
+      format='json',
+    )
+    self.assertEqual(made_client.status_code, 201, made_client.data)
+    client_id = made_client.data['client_access']['id']
+
+    assigned = self.client.post(
+      f'/api/accounts/trainer/forms-groups/clients/{client_id}/assignments/',
+      {'template_id': template_id, 'reference_ids': []},
+      format='json',
+    )
+    self.assertEqual(assigned.status_code, 201, assigned.data)
+    assignment_id = assigned.data['assignment']['id']
+
+    # Assigned: the delete must be refused and the template must survive.
+    refused = self.client.delete(f'/api/accounts/trainer/templates/{template_id}/')
+    self.assertEqual(refused.status_code, 400, refused.data)
+    self.assertEqual(refused.data['assigned_count'], 1)
+    self.assertIn('Remove it from every client', refused.data['message'])
+    self.assertTrue(TrackingTemplate.objects.filter(id=template_id).exists())
+    self.assertTrue(TemplateAssignment.objects.filter(id=assignment_id).exists())
+
+    # Unassigned: the delete now goes through.
+    unassigned = self.client.delete(
+      f'/api/accounts/trainer/forms-groups/clients/{client_id}/assignments/{assignment_id}/'
+    )
+    self.assertEqual(unassigned.status_code, 200, unassigned.data)
+
+    deleted = self.client.delete(f'/api/accounts/trainer/templates/{template_id}/')
+    self.assertEqual(deleted.status_code, 200, deleted.data)
+    self.assertFalse(TrackingTemplate.objects.filter(id=template_id).exists())

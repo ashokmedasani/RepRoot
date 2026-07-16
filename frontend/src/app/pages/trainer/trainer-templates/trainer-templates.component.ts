@@ -64,11 +64,23 @@ export class TrainerTemplatesComponent implements OnInit {
   }
 
   async deleteTemplate(template: TrackingTemplateRecord): Promise<void> {
+    // A template still assigned to clients cannot be deleted; the trainer must
+    // unassign it from each client first. The backend enforces this too — this
+    // check only spares the round trip and explains it up front.
+    if (template.assigned_count > 0) {
+      this.messageType = 'error';
+      this.message =
+        `${template.name} is assigned to ${template.assigned_count} ` +
+        `${template.assigned_count === 1 ? 'client' : 'clients'}. ` +
+        'Remove it from every client before deleting it.';
+      return;
+    }
+
     const confirmed = await this.confirmation.confirm({
       kind: 'delete',
       title: 'Delete',
       target: template.name,
-      impact: 'Assigned clients will stop seeing this template. Past submitted entries will be retained.',
+      impact: 'This template is not assigned to anyone. Past submitted entries will be retained.',
       confirmLabel: 'Delete Template'
     });
 
