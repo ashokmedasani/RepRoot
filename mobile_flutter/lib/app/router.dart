@@ -8,6 +8,8 @@ import '../features/auth/trainer_profile_setup_page.dart';
 import '../features/auth/trainer_signup_page.dart';
 import '../features/client/client_change_password_page.dart';
 import '../features/client/client_dashboard_page.dart';
+import '../features/client/client_programs_page.dart';
+import '../features/client/client_progress_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/placeholder_page.dart';
 import '../features/trainer/trainer_client_create_page.dart';
@@ -216,10 +218,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.clientPrograms,
-                builder: (context, state) => const PlaceholderPage(
-                  title: 'Programs',
-                  phase: 'Phase 5',
-                ),
+                builder: (context, state) => const ClientProgramsPage(),
               ),
             ],
           ),
@@ -227,10 +226,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.clientProgress,
-                builder: (context, state) => const PlaceholderPage(
-                  title: 'Progress',
-                  phase: 'Phase 5',
-                ),
+                builder: (context, state) => const ClientProgressPage(),
               ),
             ],
           ),

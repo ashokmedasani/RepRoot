@@ -199,8 +199,16 @@ class AppTheme {
       dividerTheme: DividerThemeData(color: tokens.border, thickness: 1, space: 1),
       chipTheme: ChipThemeData(
         backgroundColor: tokens.surfaceSoft,
+        // Material selects chips with secondaryContainer, which is the teal
+        // accent here — a selected chip must read as brand blue, same as the
+        // segmented buttons.
+        selectedColor: tokens.primarySoft,
+        checkmarkColor: scheme.primary,
         side: BorderSide(color: tokens.border),
         labelStyle: textTheme.labelMedium,
+        secondaryLabelStyle: textTheme.labelMedium?.copyWith(
+          color: tokens.primaryStrong,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.smAll),
       ),
