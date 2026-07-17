@@ -1,50 +1,96 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/api/client_api.dart';
 import '../../core/theme/app_tokens.dart';
 
 /// Client bottom-tab shell: Dashboard | Programs | Progress | More.
+/// The unread badge sits on More, since chat lives under it.
 ///
-/// Phase 5 adds the forced-password-change gate here (the Ionic client tabs
-/// page enforces must_change_password before any tab renders).
-class ClientTabsShell extends StatelessWidget {
+/// The forced password change is NOT gated here — it is gated at login and on
+/// session restore (see ClientChangePasswordPage), matching the web portal.
+class ClientTabsShell extends ConsumerStatefulWidget {
   const ClientTabsShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
+  ConsumerState<ClientTabsShell> createState() => _ClientTabsShellState();
+}
+
+class _ClientTabsShellState extends ConsumerState<ClientTabsShell> {
+  int _unread = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnread();
+    // Same 5s cadence as the Ionic tabs page.
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _loadUnread());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUnread() async {
+    try {
+      final count = await ref.read(clientApiProvider).getChatUnreadCount();
+      if (mounted) setState(() => _unread = count);
+    } catch (_) {
+      if (mounted) setState(() => _unread = 0);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: context.tokens.border)),
         ),
         child: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: (index) => navigationShell.goBranch(
+          selectedIndex: widget.navigationShell.currentIndex,
+          onDestinationSelected: (index) => widget.navigationShell.goBranch(
             index,
-            initialLocation: index == navigationShell.currentIndex,
+            initialLocation: index == widget.navigationShell.currentIndex,
           ),
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.grid_view_outlined),
               selectedIcon: Icon(Icons.grid_view_rounded),
               label: 'Dashboard',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.list_alt_outlined),
               selectedIcon: Icon(Icons.list_alt_rounded),
               label: 'Programs',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.show_chart_outlined),
               selectedIcon: Icon(Icons.show_chart_rounded),
               label: 'Progress',
             ),
             NavigationDestination(
-              icon: Icon(Icons.more_horiz_outlined),
-              selectedIcon: Icon(Icons.more_horiz_rounded),
+              icon: Badge(
+                isLabelVisible: _unread > 0,
+                label: Text(_unread > 99 ? '99+' : '$_unread'),
+                backgroundColor: const Color(0xFFE11D48),
+                child: const Icon(Icons.more_horiz_outlined),
+              ),
+              selectedIcon: Badge(
+                isLabelVisible: _unread > 0,
+                label: Text(_unread > 99 ? '99+' : '$_unread'),
+                backgroundColor: const Color(0xFFE11D48),
+                child: const Icon(Icons.more_horiz_rounded),
+              ),
               label: 'More',
             ),
           ],

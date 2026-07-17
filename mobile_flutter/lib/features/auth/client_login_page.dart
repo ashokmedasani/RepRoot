@@ -110,7 +110,14 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
       }
       await api.storeSession(response.token, client);
       if (!mounted) return;
-      context.go(Routes.clientDashboard);
+      // A trainer-issued temporary password must be replaced before the client
+      // can use the app. The Ionic app skipped this and went straight to the
+      // dashboard; the web portal gates here, and so do we.
+      context.go(
+        client.mustChangePassword
+            ? Routes.clientChangePassword
+            : Routes.clientDashboard,
+      );
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {

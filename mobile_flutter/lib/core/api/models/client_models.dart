@@ -197,6 +197,54 @@ class ClientLoginResponse {
   }
 }
 
+class ClientDashboardSummary {
+  const ClientDashboardSummary({
+    required this.totalEntries,
+    required this.entriesThisWeek,
+    required this.entriesLast30Days,
+    required this.activeDaysLast30,
+    required this.consistencyPercent,
+    required this.currentStreak,
+    required this.lastEntryDate,
+    required this.completedSchedulesLast30,
+    required this.activeTemplates,
+    required this.overdue,
+    required this.due24Hours,
+    required this.due7Days,
+  });
+
+  final int totalEntries;
+  final int entriesThisWeek;
+  final int entriesLast30Days;
+  final int activeDaysLast30;
+  final int consistencyPercent;
+  final int currentStreak;
+  final String lastEntryDate;
+  final int completedSchedulesLast30;
+  final int activeTemplates;
+  final int overdue;
+  final int due24Hours;
+  final int due7Days;
+
+  factory ClientDashboardSummary.fromJson(Map<String, dynamic> json) {
+    int n(String key) => (json[key] as num?)?.toInt() ?? 0;
+    return ClientDashboardSummary(
+      totalEntries: n('total_entries'),
+      entriesThisWeek: n('entries_this_week'),
+      entriesLast30Days: n('entries_last_30_days'),
+      activeDaysLast30: n('active_days_last_30'),
+      consistencyPercent: n('consistency_percent'),
+      currentStreak: n('current_streak'),
+      lastEntryDate: json['last_entry_date'] as String? ?? '',
+      completedSchedulesLast30: n('completed_schedules_last_30'),
+      activeTemplates: n('active_templates'),
+      overdue: n('overdue'),
+      due24Hours: n('due_24_hours'),
+      due7Days: n('due_7_days'),
+    );
+  }
+}
+
 class TrainerDirectoryEntry {
   const TrainerDirectoryEntry({
     required this.trainerId,

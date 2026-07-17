@@ -5,12 +5,54 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../session/session_store.dart';
 import 'api_client.dart';
+import 'chat_api.dart';
 import 'models/client_models.dart';
+import 'models/forms_groups_models.dart';
+import 'models/template_models.dart';
 
-/// Client portal API — auth slice.
-/// Ported from mobile/src/app/core/api/client-api.service.ts. The remaining
-/// data endpoints (dashboard, programs, progress, chat) land with their
-/// screens in Phase 5.
+/// The client's own view of their account, group, and trainer.
+class ClientMeResponse {
+  const ClientMeResponse({
+    required this.client,
+    required this.group,
+    required this.registrationFields,
+    required this.sharedAdditionalInfo,
+  });
+
+  final ClientAccessRecord client;
+  final TrainerGroup? group;
+  final List<DynamicField> registrationFields;
+  final List<AdditionalInfoItem> sharedAdditionalInfo;
+
+  factory ClientMeResponse.fromJson(Map<String, dynamic> json) {
+    final group = json['group'];
+    return ClientMeResponse(
+      client: ClientAccessRecord.fromJson(
+        json['client'] as Map<String, dynamic>? ?? {},
+      ),
+      group: group is Map<String, dynamic> ? TrainerGroup.fromJson(group) : null,
+      registrationFields: (json['registration_fields'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(DynamicField.fromJson)
+          .toList(),
+      sharedAdditionalInfo:
+          (json['shared_additional_info'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map(AdditionalInfoItem.fromJson)
+              .toList(),
+    );
+  }
+}
+
+class ClientDashboardResponse {
+  const ClientDashboardResponse({required this.summary, required this.schedules});
+
+  final ClientDashboardSummary summary;
+  final List<ClientReminder> schedules;
+}
+
+/// Client portal API.
+/// Ported from mobile/src/app/core/api/client-api.service.ts.
 class ClientApi {
   ClientApi(this._dio, this._session);
 
@@ -84,6 +126,221 @@ class ClientApi {
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  // ----- data -----
+
+  Future<ClientMeResponse> getMe() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>('/client/me/', options: _auth);
+      return ClientMeResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<ClientDashboardResponse> getDashboard() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/dashboard/',
+        options: _auth,
+      );
+      return ClientDashboardResponse(
+        summary: ClientDashboardSummary.fromJson(
+          res.data?['summary'] as Map<String, dynamic>? ?? {},
+        ),
+        schedules: (res.data?['schedules'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(ClientReminder.fromJson)
+            .toList(),
+      );
+    });
+  }
+
+  Future<List<TrackingTemplateRecord>> getTemplates() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/templates/',
+        options: _auth,
+      );
+      return (res.data?['templates'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrackingTemplateRecord.fromJson)
+          .toList();
+    });
+  }
+
+  Future<List<TrackingEntryRecord>> getEntries({
+    EntryFilters filters = const EntryFilters(),
+  }) {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/entries/',
+        queryParameters: filters.toQuery(),
+        options: _auth,
+      );
+      return (res.data?['entries'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrackingEntryRecord.fromJson)
+          .toList();
+    });
+  }
+
+  Future<List<ProgressEntry>> getProgress() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/progress/',
+        options: _auth,
+      );
+      return (res.data?['progress'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ProgressEntry.fromJson)
+          .toList();
+    });
+  }
+
+  Future<TrackingEntryRecord> submitEntry({
+    required int templateId,
+    required String entryDate,
+    required String entryTime,
+    required Map<String, String> answers,
+    String note = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/entries/',
+        data: {
+          'template_id': templateId,
+          'entry_date': entryDate,
+          'entry_time': entryTime,
+          'answers': answers,
+          'note': note,
+        },
+        options: _auth,
+      );
+      return TrackingEntryRecord.fromJson(
+        res.data?['entry'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  // ----- chat -----
+
+  Future<int> getChatUnreadCount() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/chat/unread/',
+        options: _auth,
+      );
+      return (res.data?['unread_count'] as num?)?.toInt() ?? 0;
+    });
+  }
+
+  Future<List<ChatMessageRecord>> getChatMessages({int? afterId}) {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/chat/',
+        queryParameters:
+            afterId != null && afterId > 0 ? {'after': '$afterId'} : null,
+        options: _auth,
+      );
+      return (res.data?['messages'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChatMessageRecord.fromJson)
+          .toList();
+    });
+  }
+
+  Future<ChatMessageRecord> sendChatMessage(String text) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/chat/',
+        data: {'text': text},
+        options: _auth,
+      );
+      return ChatMessageRecord.fromJson(
+        res.data?['chat_message'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  // ----- profile change / deletion requests -----
+
+  Future<ClientDetailChangeRequest?> getDetailChangeRequest() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/detail-change-request/',
+        options: _auth,
+      );
+      final request = res.data?['change_request'];
+      return request is Map<String, dynamic>
+          ? ClientDetailChangeRequest.fromJson(request)
+          : null;
+    });
+  }
+
+  Future<ClientDetailChangeRequest> submitDetailChangeRequest(
+    Map<String, String> proposedAnswers, {
+    String note = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/detail-change-request/',
+        data: {'proposed_answers': proposedAnswers, 'note': note},
+        options: _auth,
+      );
+      return ClientDetailChangeRequest.fromJson(
+        res.data?['change_request'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  Future<ClientDetailChangeRequest?> getAccountDeletionRequest() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/account-deletion-request/',
+        options: _auth,
+      );
+      final request = res.data?['deletion_request'];
+      return request is Map<String, dynamic>
+          ? ClientDetailChangeRequest.fromJson(request)
+          : null;
+    });
+  }
+
+  Future<ClientDetailChangeRequest> requestAccountDeletion({String note = ''}) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/account-deletion-request/',
+        data: {'note': note},
+        options: _auth,
+      );
+      return ClientDetailChangeRequest.fromJson(
+        res.data?['deletion_request'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  Future<String> withdrawAccountDeletionRequest() {
+    return runApi(() async {
+      final res = await _dio.delete<Map<String, dynamic>>(
+        '/client/account-deletion-request/',
+        options: _auth,
+      );
+      return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  /// [photo] is a data URL / base64 string, matching the TS.
+  Future<ClientAccessRecord> updatePhoto(String photo) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/client/photo/',
+        data: {'photo': photo},
+        options: _auth,
+      );
+      return ClientAccessRecord.fromJson(
+        res.data?['client'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 

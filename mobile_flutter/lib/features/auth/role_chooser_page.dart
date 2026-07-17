@@ -29,9 +29,20 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
     if (!mounted) return;
     if (ref.read(trainerAuthApiProvider).hasSession()) {
       context.go(Routes.trainerDashboard);
-    } else if (ref.read(clientApiProvider).hasSession()) {
-      context.go(Routes.clientDashboard);
+      return;
     }
+
+    final clientApi = ref.read(clientApiProvider);
+    if (!clientApi.hasSession()) return;
+
+    // Restoring a session must honour the password gate too, otherwise a client
+    // could skip it by relaunching the app.
+    final stored = clientApi.storedClient();
+    context.go(
+      stored?.mustChangePassword ?? false
+          ? Routes.clientChangePassword
+          : Routes.clientDashboard,
+    );
   }
 
   @override

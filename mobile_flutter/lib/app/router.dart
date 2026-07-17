@@ -6,6 +6,8 @@ import '../features/auth/role_chooser_page.dart';
 import '../features/auth/trainer_login_page.dart';
 import '../features/auth/trainer_profile_setup_page.dart';
 import '../features/auth/trainer_signup_page.dart';
+import '../features/client/client_change_password_page.dart';
+import '../features/client/client_dashboard_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/placeholder_page.dart';
 import '../features/trainer/trainer_client_create_page.dart';
@@ -51,6 +53,7 @@ class Routes {
   static const trainerSupport = '/trainer/tabs/more/support';
 
   static const clientLogin = '/client/login';
+  static const clientChangePassword = '/client/change-password';
   static const clientDashboard = '/client/tabs/dashboard';
   static const clientPrograms = '/client/tabs/programs';
   static const clientProgress = '/client/tabs/progress';
@@ -80,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.clientLogin,
         builder: (context, state) => const ClientLoginPage(),
+      ),
+      GoRoute(
+        path: Routes.clientChangePassword,
+        builder: (context, state) => const ClientChangePasswordPage(),
       ),
 
       // Trainer tab shell: Dashboard | Clients | Manage | More
@@ -201,10 +208,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.clientDashboard,
-                builder: (context, state) => const PlaceholderPage(
-                  title: 'Dashboard',
-                  phase: 'Phase 5',
-                ),
+                builder: (context, state) => const ClientDashboardPage(),
               ),
             ],
           ),
