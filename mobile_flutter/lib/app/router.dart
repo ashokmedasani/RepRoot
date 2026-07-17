@@ -12,6 +12,7 @@ import '../features/trainer/trainer_client_create_page.dart';
 import '../features/trainer/trainer_client_detail_page.dart';
 import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
+import '../features/trainer/trainer_forms_groups_page.dart';
 import '../features/trainer/trainer_manage_page.dart';
 import '../features/trainer/trainer_more_page.dart';
 import '../features/trainer/trainer_references_page.dart';
@@ -130,9 +131,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'forms-groups',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Forms & Groups',
-                      phase: 'Phase 4',
+                    builder: (context, state) => TrainerFormsGroupsPage(
+                      initialTab: state.uri.queryParameters['tab'],
                     ),
                   ),
                   GoRoute(
