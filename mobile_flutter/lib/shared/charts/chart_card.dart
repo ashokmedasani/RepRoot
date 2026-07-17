@@ -365,7 +365,10 @@ class _BarChart extends StatelessWidget {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 26,
+              // Category labels can be words ("Profile edits"), not just dates,
+              // so they need room for two lines and a hard width cap —
+              // unconstrained they run into the neighbouring label.
+              reservedSize: 38,
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index < 0 || index >= points.length) {
@@ -373,9 +376,19 @@ class _BarChart extends StatelessWidget {
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
-                  child: Text(
-                    points[index].label,
-                    style: context.text.labelSmall?.copyWith(color: tokens.muted),
+                  child: SizedBox(
+                    width: 62,
+                    child: Text(
+                      points[index].label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.labelSmall?.copyWith(
+                        color: tokens.muted,
+                        fontSize: 9.5,
+                        height: 1.15,
+                      ),
+                    ),
                   ),
                 );
               },
