@@ -25,6 +25,13 @@ param(
   [int]$Top = 0,
   # Also build+install the app and attach for hot reload once booted.
   [switch]$Run,
+  # Cold boot, ignoring the saved snapshot. Use when the emulator has wedged -
+  # a symptom is input dying and screenshots coming back black, with
+  # "Application Not Responding: system" holding window focus.
+  [switch]$ColdBoot,
+  # Kill a running emulator first. `adb emu kill` does not always take; this
+  # kills the qemu process outright.
+  [switch]$Force,
   # Emulator reaches this PC on 10.0.2.2; localhost would mean the emulator.
   [string]$ApiBaseUrl = 'http://10.0.2.2:8000'
 )
@@ -37,13 +44,28 @@ $adb = "$sdk\platform-tools\adb.exe"
 
 if (-not (Test-Path $emulatorExe)) { throw "emulator.exe not found at $emulatorExe" }
 
+# --- force kill first? ---
+if ($Force) {
+  Get-Process | Where-Object { $_.ProcessName -like '*qemu*' -or $_.ProcessName -like '*emulator*' } |
+    ForEach-Object { Write-Host "Killing $($_.ProcessName) ($($_.Id))" -ForegroundColor Yellow; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+  Start-Sleep -Seconds 4
+  & $adb kill-server 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  & $adb start-server 2>$null | Out-Null
+}
+
 # --- already running? ---
 $running = (& $adb devices) -match 'emulator-\d+\s+device'
 if ($running) {
   Write-Host "Emulator already running - repositioning only." -ForegroundColor Yellow
 } else {
-  Write-Host "Launching $Avd at scale $Scale ..." -ForegroundColor Cyan
-  Start-Process -FilePath $emulatorExe -ArgumentList @('-avd', $Avd, '-scale', $Scale)
+  # Always launch through here rather than calling emulator.exe directly: the
+  # AVD stores window.scale = -1, so a direct launch reverts to full 1080x2400
+  # and Windows parks it above the top of the screen.
+  $args = @('-avd', $Avd, '-scale', $Scale)
+  if ($ColdBoot) { $args += '-no-snapshot-load' }
+  Write-Host "Launching $Avd at scale $Scale$(if ($ColdBoot) { ' (cold boot)' }) ..." -ForegroundColor Cyan
+  Start-Process -FilePath $emulatorExe -ArgumentList $args
 
   Write-Host "Waiting for boot (first start can take a minute) ..." -ForegroundColor Cyan
   $deadline = (Get-Date).AddMinutes(5)
