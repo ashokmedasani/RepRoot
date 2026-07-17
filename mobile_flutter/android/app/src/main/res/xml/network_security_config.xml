@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds talk HTTPS only. Sessions carry a trainer/client token in an
+  Authorization header on every request, so plaintext HTTP would put that token
+  on the wire for anyone on the same network to lift.
+
+  Dev needs plaintext (the Django backend runs on http://10.0.2.2:8000 for the
+  emulator, or an http:// LAN address for a real device), so the debug and
+  profile source sets replace this with a permissive config. Nothing is loosened
+  for the build that would actually ship.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

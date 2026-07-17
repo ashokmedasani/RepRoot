@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dev only. The backend runs as plain http://10.0.2.2:8000 (the emulator's alias
+  for the host) or an http:// LAN address when testing on a real phone, so debug
+  and profile builds have to permit cleartext. The release build does not - see
+  main/res/xml/network_security_config.xml.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
