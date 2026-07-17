@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_tokens.dart';
 import '../widgets/app_widgets.dart';
 import 'analytics_types.dart';
+import 'branded_share.dart';
 
 /// Renders a ChartSpec from the graph engine.
 /// Flutter equivalent of mobile/src/app/shared/chart-card.component.ts.
@@ -11,19 +12,68 @@ import 'analytics_types.dart';
 /// The engine decides the chart kind; this only draws it. fl_chart is not
 /// pixel-identical to Chart.js — per the migration plan the target is data
 /// correctness and equivalent readability, not identical rendering.
-class ChartCard extends StatelessWidget {
+class ChartCard extends StatefulWidget {
   const ChartCard({
     super.key,
     required this.spec,
     this.shareContext = '',
-    this.onShare,
   });
 
   final ChartSpec spec;
 
-  /// Passed through to the branded-share export (Phase 3 follow-up).
+  /// Extra context printed on the branded share image, e.g. client or template
+  /// name. Falls back to the card's own subtitle when empty.
   final String shareContext;
-  final VoidCallback? onShare;
+
+  @override
+  State<ChartCard> createState() => _ChartCardState();
+}
+
+class _ChartCardState extends State<ChartCard> {
+  /// Wraps only the chart body, so the export gets the graph without the
+  /// card's title row — the branded header reprints the title itself.
+  final _chartKey = GlobalKey();
+  bool _sharing = false;
+
+  String get _subtitle {
+    final meta = widget.spec.meta;
+    return [
+      if (meta?.subtitle.isNotEmpty ?? false) meta!.subtitle,
+      // A summary card already prints the unit next to its value, and the unit
+      // is usually in the title too ("Body weight (lb)") — three times is noise.
+      if (widget.spec.unit.isNotEmpty && widget.spec.kind != ChartKind.summary)
+        widget.spec.unit,
+      if (meta?.average != null) 'avg ${_trim(meta!.average!)}',
+    ].join(' · ');
+  }
+
+  Future<void> _share() async {
+    // toImage on a boundary that is mid-paint throws; a second tap while the
+    // sheet is opening is the easy way to hit that.
+    if (_sharing) return;
+    setState(() => _sharing = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final shared = await BrandedShare.shareChart(
+        boundaryKey: _chartKey,
+        title: widget.spec.title,
+        subtitle: widget.shareContext.isNotEmpty ? widget.shareContext : _subtitle,
+        brightness: Theme.of(context).brightness,
+      );
+      if (!shared) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Chart is not ready to share yet.')),
+        );
+      }
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not share this chart.')),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,9 +83,19 @@ class ChartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(spec: spec, onShare: onShare),
+            _Header(
+              spec: widget.spec,
+              subtitle: _subtitle,
+              // Nothing to export from a single number — matches the Ionic
+              // card, which also hides Share on summary specs.
+              onShare: widget.spec.kind == ChartKind.summary ? null : _share,
+              sharing: _sharing,
+            ),
             const SizedBox(height: AppSpacing.md),
-            _ChartBody(spec: spec),
+            RepaintBoundary(
+              key: _chartKey,
+              child: _ChartBody(spec: widget.spec),
+            ),
           ],
         ),
       ),
@@ -44,22 +104,20 @@ class ChartCard extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.spec, this.onShare});
+  const _Header({
+    required this.spec,
+    required this.subtitle,
+    required this.sharing,
+    this.onShare,
+  });
 
   final ChartSpec spec;
+  final String subtitle;
+  final bool sharing;
   final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
-    final meta = spec.meta;
-    final subtitle = [
-      if (meta?.subtitle.isNotEmpty ?? false) meta!.subtitle,
-      // A summary card already prints the unit next to its value, and the unit
-      // is usually in the title too ("Body weight (lb)") — three times is noise.
-      if (spec.unit.isNotEmpty && spec.kind != ChartKind.summary) spec.unit,
-      if (meta?.average != null) 'avg ${_trim(meta!.average!)}',
-    ].join(' · ');
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -77,8 +135,19 @@ class _Header extends StatelessWidget {
         ),
         if (onShare != null)
           IconButton(
-            onPressed: onShare,
-            icon: const Icon(Icons.ios_share),
+            onPressed: sharing ? null : onShare,
+            icon: sharing
+                ? SizedBox.square(
+                    dimension: AppSize.iconRow,
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.tokens.muted,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.ios_share),
             iconSize: AppSize.iconRow,
             tooltip: 'Share chart',
             visualDensity: VisualDensity.compact,
@@ -255,9 +324,14 @@ class _LineChart extends StatelessWidget {
     final colors = context.colors;
     final tokens = context.tokens;
     final points = spec.data;
+    final bounds = _paddedBounds(points);
+    final interval = _labelInterval(points.length);
+    final last = points.length - 1;
 
     return LineChart(
       LineChartData(
+        minY: bounds.min,
+        maxY: bounds.max,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
@@ -279,12 +353,19 @@ class _LineChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 26,
-              interval: _labelInterval(points.length),
+              interval: interval,
               getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index < 0 || index >= points.length) {
                   return const SizedBox.shrink();
                 }
+                // Same trap as the left axis: fl_chart labels the axis max on
+                // top of the interval sequence. The last point sits hard on the
+                // plot's right edge, so its label is both half outside the card
+                // (it exported as "7/") and printed over the interval tick a
+                // day or two behind it. Drop it — the tick before it reads fine
+                // and a tap still gives the exact date.
+                if (index == last) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: Text(
@@ -330,6 +411,36 @@ class _LineChart extends StatelessWidget {
 
   /// Keeps the x-axis readable on a phone by thinning labels on long series.
   double _labelInterval(int count) => count <= 8 ? 1 : (count / 6).ceilToDouble();
+
+  /// fl_chart fits the y-axis exactly to the data, which puts the highest point
+  /// on the top edge — and since the line is curved, the spline overshoots that
+  /// point and gets clipped, so every peak rendered with a flat top. Chart.js
+  /// rounds its scale outward to nice bounds, which is why the Ionic chart never
+  /// showed this; padding the range gives the same breathing room.
+  ({double min, double max}) _paddedBounds(List<DataPoint> points) {
+    var low = points.first.value;
+    var high = points.first.value;
+    for (final point in points) {
+      if (point.value < low) low = point.value;
+      if (point.value > high) high = point.value;
+    }
+
+    final span = high - low;
+    // A flat series has no span to scale the padding from — fall back to the
+    // value itself so the line sits mid-plot instead of on a zero-height axis.
+    final pad = span > 0
+        ? span * 0.12
+        : high.abs() > 0
+            ? high.abs() * 0.1
+            : 1.0;
+
+    return (
+      // Counts and durations are never negative; don't invent an axis that says
+      // they could be.
+      min: low >= 0 && low - pad < 0 ? 0 : low - pad,
+      max: high + pad,
+    );
+  }
 }
 
 class _BarChart extends StatelessWidget {
