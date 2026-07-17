@@ -12,6 +12,7 @@ import '../features/client/client_dashboard_page.dart';
 import '../features/client/client_more_page.dart';
 import '../features/client/client_programs_page.dart';
 import '../features/client/client_progress_page.dart';
+import '../features/client/client_settings_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/client/client_trainer_page.dart';
 import '../features/placeholder_page.dart';
@@ -247,10 +248,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'profile',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Settings',
-                      phase: 'Phase 5',
-                    ),
+                    builder: (context, state) => const ClientSettingsPage(),
                   ),
                   GoRoute(
                     path: 'trainer',
