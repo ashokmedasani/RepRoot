@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// CoachFlow design tokens, ported 1:1 from mobile/src/theme/variables.scss so the
-/// Flutter app matches the web + Ionic brand exactly.
+/// CoachFlow design tokens. Colors are ported 1:1 from
+/// mobile/src/theme/variables.scss so the Flutter app matches the web + Ionic
+/// brand exactly — do not change them here.
 ///
-/// Sizing is deliberately tighter than the Ionic app: per user feedback the old
-/// mobile UI read too large. Controls here are a step down (primary button 46px
-/// vs Ionic's ~52px large button) while staying above the 44px touch-target floor.
+/// Sizing is deliberately much tighter than the Ionic app, in two passes:
+///   1. an initial step down (button 52 -> 46) because the Ionic UI read large;
+///   2. a second, requested pass making everything noticeably smaller
+///      (button 46 -> 42, body 14.5 -> 13.5, screen padding 16 -> 12).
+/// Visible sizes shrink; invisible tap targets stay at 44px — see
+/// AppSize.touchTarget.
 class AppColors {
   const AppColors._();
 
@@ -46,13 +50,13 @@ class AppSpacing {
   const AppSpacing._();
 
   static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double screen = 16;
-  static const double card = 14;
-  static const double lg = 20;
-  static const double xl = 24;
-  static const double xxl = 32;
+  static const double sm = 6;
+  static const double md = 10;
+  static const double screen = 12;
+  static const double card = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 28;
 }
 
 /// Radii — variables.scss --app-radius-*, converted from rem at 16px root.
@@ -74,13 +78,17 @@ class AppRadius {
 class AppSize {
   const AppSize._();
 
-  static const double buttonHeight = 46; // Ionic large was ~52
-  static const double buttonHeightSm = 38;
-  static const double fieldHeight = 48;
-  static const double iconRow = 20;
-  static const double iconButton = 22;
-  static const double iconNav = 24;
-  static const double rowHeight = 58;
+  static const double buttonHeight = 42; // Ionic large was ~52; first pass 46
+  static const double buttonHeightSm = 34;
+  static const double fieldHeight = 44;
+  static const double iconRow = 18;
+  static const double iconButton = 20;
+  static const double iconNav = 22;
+  static const double rowHeight = 52;
+
+  /// The one size that does NOT shrink. Icon glyphs get smaller, but their
+  /// invisible hit area stays 44px — below that, taps start missing. Costs
+  /// nothing visually since the padding is transparent.
   static const double touchTarget = 44;
 }
 

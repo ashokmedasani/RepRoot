@@ -1,13 +1,16 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_tokens.dart';
 
 /// Material 3 themes built from the CoachFlow tokens.
 ///
-/// Type scale is tighter than the Ionic app by design (see AppColors docs):
-/// display 24 / title 17 / body 14.5 / label 12.5 / caption 11, in Manrope.
+/// Font: Roboto, Android's system font. Chosen over the web/Ionic brand font
+/// (Manrope) so the app feels native on Android and needs no font download —
+/// this is a deliberate divergence from the other two apps.
+///
+/// Type scale is much tighter than the Ionic app by design (see AppSize docs):
+/// display 22 / title 16 / body 13.5 / label 11.5 / caption 10.5.
 class AppTheme {
   const AppTheme._();
 
@@ -69,7 +72,7 @@ class AppTheme {
     required ColorScheme scheme,
     required Color scaffoldBg,
   }) {
-    final textTheme = _textTheme(scheme.onSurface, tokens.muted);
+    final textTheme = _textTheme(scheme.onSurface, tokens.muted, brightness);
 
     return ThemeData(
       useMaterial3: true,
@@ -160,7 +163,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         indicatorColor: tokens.primarySoft,
         elevation: 0,
-        height: 62,
+        height: 56,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
@@ -254,27 +257,36 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(Color onSurface, Color muted) {
-    final base = GoogleFonts.manropeTextTheme();
+  static TextTheme _textTheme(Color onSurface, Color muted, Brightness brightness) {
+    // Roboto comes from Typography's Mountain View faces — Android's system
+    // font, so nothing is downloaded at runtime.
+    final base = brightness == Brightness.dark
+        ? Typography.material2021().white
+        : Typography.material2021().black;
+
     return base
         .copyWith(
-          // display 24 — page hero / brand
-          displaySmall: base.displaySmall?.copyWith(fontSize: 24, fontWeight: FontWeight.w800, height: 1.2),
-          headlineSmall: base.headlineSmall?.copyWith(fontSize: 20, fontWeight: FontWeight.w800, height: 1.25),
-          // title 17 — app bar, card headers
-          titleLarge: base.titleLarge?.copyWith(fontSize: 17, fontWeight: FontWeight.w800, height: 1.3),
-          titleMedium: base.titleMedium?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700, height: 1.3),
-          titleSmall: base.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w700, height: 1.3),
-          // body 14.5
-          bodyLarge: base.bodyLarge?.copyWith(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.4),
-          bodyMedium: base.bodyMedium?.copyWith(fontSize: 14.5, fontWeight: FontWeight.w500, height: 1.45),
-          // caption 11
-          bodySmall: base.bodySmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600, height: 1.4, color: muted),
-          // label 12.5
-          labelLarge: base.labelLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w700, height: 1.2),
-          labelMedium: base.labelMedium?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.2),
-          labelSmall: base.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600, height: 1.2),
+          // display 22 — page hero / brand
+          displaySmall: base.displaySmall?.copyWith(fontSize: 22, fontWeight: FontWeight.w800, height: 1.2),
+          headlineSmall: base.headlineSmall?.copyWith(fontSize: 18, fontWeight: FontWeight.w800, height: 1.25),
+          // title 16 — app bar, card headers
+          titleLarge: base.titleLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w700, height: 1.3),
+          titleMedium: base.titleMedium?.copyWith(fontSize: 14.5, fontWeight: FontWeight.w700, height: 1.3),
+          titleSmall: base.titleSmall?.copyWith(fontSize: 13, fontWeight: FontWeight.w700, height: 1.3),
+          // body 13.5
+          bodyLarge: base.bodyLarge?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w500, height: 1.4),
+          bodyMedium: base.bodyMedium?.copyWith(fontSize: 13.5, fontWeight: FontWeight.w400, height: 1.45),
+          // caption 10.5
+          bodySmall: base.bodySmall?.copyWith(fontSize: 10.5, fontWeight: FontWeight.w500, height: 1.4, color: muted),
+          // label 11.5
+          labelLarge: base.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.w600, height: 1.2),
+          labelMedium: base.labelMedium?.copyWith(fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.2),
+          labelSmall: base.labelSmall?.copyWith(fontSize: 10.5, fontWeight: FontWeight.w500, height: 1.2),
         )
-        .apply(bodyColor: onSurface, displayColor: onSurface);
+        .apply(
+          fontFamily: 'Roboto',
+          bodyColor: onSurface,
+          displayColor: onSurface,
+        );
   }
 }

@@ -183,9 +183,13 @@ class KpiGrid extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: AppSpacing.md,
-      mainAxisSpacing: AppSpacing.md,
-      childAspectRatio: 1.65,
+      crossAxisSpacing: AppSpacing.sm,
+      mainAxisSpacing: AppSpacing.sm,
+      // Tuned to the tightened type scale: at 1.65 the tiles kept the height
+      // they needed for the old larger text and sat half empty. 2.15 was too
+      // far — tiles with a caption line (label + value + caption) overflowed by
+      // ~4px. 1.95 fits the tallest variant with a little slack.
+      childAspectRatio: 1.95,
       children: children,
     );
   }
