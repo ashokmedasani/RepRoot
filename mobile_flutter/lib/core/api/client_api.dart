@@ -17,6 +17,7 @@ class ClientMeResponse {
     required this.group,
     required this.registrationFields,
     required this.sharedAdditionalInfo,
+    this.trainerProfile,
   });
 
   final ClientAccessRecord client;
@@ -24,13 +25,20 @@ class ClientMeResponse {
   final List<DynamicField> registrationFields;
   final List<AdditionalInfoItem> sharedAdditionalInfo;
 
+  /// Null when the trainer has made nothing visible.
+  final ClientTrainerProfile? trainerProfile;
+
   factory ClientMeResponse.fromJson(Map<String, dynamic> json) {
     final group = json['group'];
+    final trainer = json['trainer_profile'];
     return ClientMeResponse(
       client: ClientAccessRecord.fromJson(
         json['client'] as Map<String, dynamic>? ?? {},
       ),
       group: group is Map<String, dynamic> ? TrainerGroup.fromJson(group) : null,
+      trainerProfile: trainer is Map<String, dynamic>
+          ? ClientTrainerProfile.fromJson(trainer)
+          : null,
       registrationFields: (json['registration_fields'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(DynamicField.fromJson)

@@ -197,6 +197,140 @@ class ClientLoginResponse {
   }
 }
 
+/// The trainer as the client sees them.
+///
+/// The backend only fills the sections the trainer set visible (see the
+/// visibility toggles on the trainer profile), so any of these may be absent —
+/// that is intended, not missing data.
+class ClientTrainerProfile {
+  const ClientTrainerProfile({
+    required this.trainerName,
+    required this.profilePhotoUrl,
+    required this.professionalHeadline,
+    required this.location,
+    required this.aboutMe,
+    required this.trainingStyle,
+    this.professionalSummary,
+    this.certification,
+    required this.images,
+    required this.links,
+  });
+
+  final String trainerName;
+  final String profilePhotoUrl;
+  final String professionalHeadline;
+  final String location;
+  final String aboutMe;
+  final String trainingStyle;
+  final TrainerProfessionalSummary? professionalSummary;
+  final TrainerCertification? certification;
+  final List<TrainerProfileImageRef> images;
+  final List<TrainerProfileLinkRef> links;
+
+  factory ClientTrainerProfile.fromJson(Map<String, dynamic> json) {
+    final summary = json['professional_summary'];
+    final certification = json['certification'];
+    return ClientTrainerProfile(
+      trainerName: json['trainer_name'] as String? ?? '',
+      profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
+      professionalHeadline: json['professional_headline'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+      aboutMe: json['about_me'] as String? ?? '',
+      trainingStyle: json['training_style'] as String? ?? '',
+      professionalSummary: summary is Map<String, dynamic>
+          ? TrainerProfessionalSummary.fromJson(summary)
+          : null,
+      certification: certification is Map<String, dynamic>
+          ? TrainerCertification.fromJson(certification)
+          : null,
+      images: (json['images'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrainerProfileImageRef.fromJson)
+          .toList(),
+      links: (json['links'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrainerProfileLinkRef.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class TrainerProfessionalSummary {
+  const TrainerProfessionalSummary({
+    required this.trainerType,
+    required this.yearsExperience,
+    required this.specializations,
+    required this.languagesKnown,
+  });
+
+  final String trainerType;
+  final int? yearsExperience;
+  final String specializations;
+  final String languagesKnown;
+
+  factory TrainerProfessionalSummary.fromJson(Map<String, dynamic> json) =>
+      TrainerProfessionalSummary(
+        trainerType: json['trainer_type'] as String? ?? '',
+        yearsExperience: (json['years_experience'] as num?)?.toInt(),
+        specializations: json['specializations'] as String? ?? '',
+        languagesKnown: json['languages_known'] as String? ?? '',
+      );
+}
+
+class TrainerCertification {
+  const TrainerCertification({
+    required this.name,
+    required this.issuedBy,
+    required this.year,
+    required this.fileUrl,
+  });
+
+  final String name;
+  final String issuedBy;
+  final int? year;
+  final String fileUrl;
+
+  factory TrainerCertification.fromJson(Map<String, dynamic> json) =>
+      TrainerCertification(
+        name: json['name'] as String? ?? '',
+        issuedBy: json['issued_by'] as String? ?? '',
+        year: (json['year'] as num?)?.toInt(),
+        fileUrl: json['file_url'] as String? ?? '',
+      );
+}
+
+class TrainerProfileImageRef {
+  const TrainerProfileImageRef({
+    required this.category,
+    required this.title,
+    required this.url,
+  });
+
+  final String category;
+  final String title;
+  final String url;
+
+  factory TrainerProfileImageRef.fromJson(Map<String, dynamic> json) =>
+      TrainerProfileImageRef(
+        category: json['category'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        url: json['url'] as String? ?? '',
+      );
+}
+
+class TrainerProfileLinkRef {
+  const TrainerProfileLinkRef({required this.title, required this.url});
+
+  final String title;
+  final String url;
+
+  factory TrainerProfileLinkRef.fromJson(Map<String, dynamic> json) =>
+      TrainerProfileLinkRef(
+        title: json['title'] as String? ?? '',
+        url: json['url'] as String? ?? '',
+      );
+}
+
 class ClientDashboardSummary {
   const ClientDashboardSummary({
     required this.totalEntries,

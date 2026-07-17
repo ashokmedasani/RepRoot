@@ -7,10 +7,13 @@ import '../features/auth/trainer_login_page.dart';
 import '../features/auth/trainer_profile_setup_page.dart';
 import '../features/auth/trainer_signup_page.dart';
 import '../features/client/client_change_password_page.dart';
+import '../features/client/client_chat_page.dart';
 import '../features/client/client_dashboard_page.dart';
+import '../features/client/client_more_page.dart';
 import '../features/client/client_programs_page.dart';
 import '../features/client/client_progress_page.dart';
 import '../features/client/client_tabs_shell.dart';
+import '../features/client/client_trainer_page.dart';
 import '../features/placeholder_page.dart';
 import '../features/trainer/trainer_client_create_page.dart';
 import '../features/trainer/trainer_client_detail_page.dart';
@@ -60,6 +63,12 @@ class Routes {
   static const clientPrograms = '/client/tabs/programs';
   static const clientProgress = '/client/tabs/progress';
   static const clientMore = '/client/tabs/more';
+
+  // Sub-pages that stack inside the client More tab.
+  static const clientSettings = '/client/tabs/more/profile';
+  static const clientTrainer = '/client/tabs/more/trainer';
+  static const clientChat = '/client/tabs/more/chat';
+  static const clientSupport = '/client/tabs/more/support';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -234,10 +243,31 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: Routes.clientMore,
-                builder: (context, state) => const PlaceholderPage(
-                  title: 'More',
-                  phase: 'Phase 5',
-                ),
+                builder: (context, state) => const ClientMorePage(),
+                routes: [
+                  GoRoute(
+                    path: 'profile',
+                    builder: (context, state) => const PlaceholderPage(
+                      title: 'Settings',
+                      phase: 'Phase 5',
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'trainer',
+                    builder: (context, state) => const ClientTrainerPage(),
+                  ),
+                  GoRoute(
+                    path: 'chat',
+                    builder: (context, state) => const ClientChatPage(),
+                  ),
+                  GoRoute(
+                    path: 'support',
+                    builder: (context, state) => const PlaceholderPage(
+                      title: 'Help & Support',
+                      phase: 'Phase 6',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
