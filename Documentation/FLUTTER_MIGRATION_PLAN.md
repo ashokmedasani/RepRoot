@@ -1,5 +1,14 @@
 # Flutter Migration Plan — Phase 1 Audit & Roadmap (2026-07-15)
 
+> **Status: all six phases complete (2026-07-16).** Kept as the original audit and
+> plan; it is not edited to match what shipped, so the two can be compared. Where
+> the audit turned out to be wrong, a dated correction is inlined rather than the
+> text being quietly fixed. For what actually shipped and how each claim was
+> verified, see **[FLUTTER_PARITY_REPORT.md](FLUTTER_PARITY_REPORT.md)**.
+>
+> Two decisions in here changed during the work: the font is **Roboto**, not Manrope
+> (`google_fonts` was dropped), and the app id is **`com.coachflow.flutter`**.
+
 ## Verdict
 
 The existing mobile app is **NOT Flutter**. Migration applies.
@@ -56,8 +65,17 @@ All request/response field names mirror the web frontend exactly.
 ### Authentication flow
 Role chooser → login (trainer: identifier+password, OTP-verified signup; client:
 trainer code+username+password with trainer directory search) → token stored →
-tab shell. Client first login forces password change (token rotates; new token stored).
+tab shell.
 Trainer first login forces profile setup (name, trainer code, gender, birth, location).
+
+> **Correction (2026-07-16).** This audit originally said the client's first login
+> forces a password change. It does not — that is the **web** portal's behaviour.
+> The Ionic app reads `must_change_password` but never acts on it: a client with the
+> flag set lands straight on the dashboard, and the change-password page is only
+> reachable from Settings. Verified against the running app, not read off the code.
+> The Flutter port matches the Ionic behaviour (the flag is carried and the page
+> exists, but first login is not gated), so the two mobile apps stay identical.
+> Whether mobile *should* gate it like the web does is a product decision, still open.
 
 ### Reusable components worth carrying over (as specs/logic)
 - **graph-engine.ts** — pure functions (no framework deps): decides line/bar/hbar/pie/
