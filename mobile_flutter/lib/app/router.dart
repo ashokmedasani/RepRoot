@@ -14,6 +14,7 @@ import '../features/trainer/trainer_client_template_page.dart';
 import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
 import '../features/trainer/trainer_forms_groups_page.dart';
+import '../features/trainer/trainer_group_detail_page.dart';
 import '../features/trainer/trainer_manage_page.dart';
 import '../features/trainer/trainer_more_page.dart';
 import '../features/trainer/trainer_profile_page.dart';
@@ -142,9 +143,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'groups/:groupId',
-                    builder: (context, state) => PlaceholderPage(
-                      title: 'Group ${state.pathParameters['groupId']}',
-                      phase: 'Phase 4',
+                    builder: (context, state) => TrainerGroupDetailPage(
+                      groupId:
+                          int.tryParse(state.pathParameters['groupId'] ?? '') ?? 0,
                     ),
                   ),
                   GoRoute(
