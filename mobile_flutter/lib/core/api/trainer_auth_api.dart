@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../session/session_store.dart';
 import 'api_client.dart';
+import 'models/support_models.dart';
 import 'models/trainer_models.dart';
 
 /// Trainer auth + profile + account.
@@ -185,6 +186,71 @@ class TrainerAuthApi {
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  // ----- support -----
+
+  Future<SupportListResponse> getSupportIncidents() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/trainer/support/incidents/',
+        options: _auth,
+      );
+      return SupportListResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<SupportIncident> createSupportIncident({
+    required String category,
+    required String subject,
+    required String description,
+    String pageFeature = 'Mobile settings',
+    String appVersion = 'android',
+    String? screenshotPath,
+    String? screenshotName,
+  }) {
+    return runApi(() async {
+      final map = <String, dynamic>{
+        'category': category,
+        'subject': subject,
+        'description': description,
+        'page_feature': pageFeature,
+        'platform': 'android',
+        'app_version': appVersion,
+      };
+      if (screenshotPath != null && screenshotPath.isNotEmpty) {
+        map['screenshot'] = await MultipartFile.fromFile(
+          screenshotPath,
+          filename: screenshotName,
+        );
+      }
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/trainer/support/incidents/',
+        data: FormData.fromMap(map),
+        options: _auth,
+      );
+      return SupportIncident.fromJson(
+        res.data?['incident'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  /// [action] is 'follow_up' or 'reopen'.
+  Future<SupportIncident> actOnSupportIncident(
+    String incidentId,
+    String action, {
+    String body = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/trainer/support/incidents/${Uri.encodeComponent(incidentId)}/',
+        data: {'action': action, 'body': body},
+        options: _auth,
+      );
+      return SupportIncident.fromJson(
+        res.data?['incident'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 

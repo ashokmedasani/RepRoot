@@ -8,6 +8,7 @@ import 'api_client.dart';
 import 'chat_api.dart';
 import 'models/client_models.dart';
 import 'models/forms_groups_models.dart';
+import 'models/support_models.dart';
 import 'models/template_models.dart';
 
 /// The client's own view of their account, group, and trainer.
@@ -348,6 +349,71 @@ class ClientApi {
       );
       return ClientAccessRecord.fromJson(
         res.data?['client'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  // ----- support -----
+
+  Future<SupportListResponse> getSupportIncidents() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/support/incidents/',
+        options: _auth,
+      );
+      return SupportListResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<SupportIncident> createSupportIncident({
+    required String category,
+    required String subject,
+    required String description,
+    String pageFeature = 'Mobile settings',
+    String appVersion = 'android',
+    String? screenshotPath,
+    String? screenshotName,
+  }) {
+    return runApi(() async {
+      final map = <String, dynamic>{
+        'category': category,
+        'subject': subject,
+        'description': description,
+        'page_feature': pageFeature,
+        'platform': 'android',
+        'app_version': appVersion,
+      };
+      if (screenshotPath != null && screenshotPath.isNotEmpty) {
+        map['screenshot'] = await MultipartFile.fromFile(
+          screenshotPath,
+          filename: screenshotName,
+        );
+      }
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/support/incidents/',
+        data: FormData.fromMap(map),
+        options: _auth,
+      );
+      return SupportIncident.fromJson(
+        res.data?['incident'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  /// [action] is 'follow_up' or 'reopen'.
+  Future<SupportIncident> actOnSupportIncident(
+    String incidentId,
+    String action, {
+    String body = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/support/incidents/${Uri.encodeComponent(incidentId)}/',
+        data: {'action': action, 'body': body},
+        options: _auth,
+      );
+      return SupportIncident.fromJson(
+        res.data?['incident'] as Map<String, dynamic>? ?? {},
       );
     });
   }

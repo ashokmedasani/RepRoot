@@ -15,7 +15,7 @@ import '../features/client/client_progress_page.dart';
 import '../features/client/client_settings_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/client/client_trainer_page.dart';
-import '../features/placeholder_page.dart';
+import '../features/support/support_incidents_page.dart';
 import '../features/trainer/trainer_client_create_page.dart';
 import '../features/trainer/trainer_client_detail_page.dart';
 import '../features/trainer/trainer_client_template_page.dart';
@@ -199,9 +199,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'support',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Help & Support',
-                      phase: 'Phase 6',
+                    builder: (context, state) => const SupportIncidentsPage(
+                      role: SupportRole.trainer,
                     ),
                   ),
                 ],
@@ -260,9 +259,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'support',
-                    builder: (context, state) => const PlaceholderPage(
-                      title: 'Help & Support',
-                      phase: 'Phase 6',
+                    builder: (context, state) => const SupportIncidentsPage(
+                      role: SupportRole.client,
                     ),
                   ),
                 ],
