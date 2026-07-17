@@ -10,6 +10,7 @@ import '../features/client/client_tabs_shell.dart';
 import '../features/placeholder_page.dart';
 import '../features/trainer/trainer_client_create_page.dart';
 import '../features/trainer/trainer_client_detail_page.dart';
+import '../features/trainer/trainer_client_template_page.dart';
 import '../features/trainer/trainer_clients_page.dart';
 import '../features/trainer/trainer_dashboard_page.dart';
 import '../features/trainer/trainer_forms_groups_page.dart';
@@ -113,9 +114,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                     routes: [
                       GoRoute(
                         path: 'templates/:assignmentId',
-                        builder: (context, state) => PlaceholderPage(
-                          title: 'Template analytics',
-                          phase: 'Phase 4',
+                        builder: (context, state) => TrainerClientTemplatePage(
+                          clientId:
+                              int.tryParse(state.pathParameters['clientId'] ?? '') ?? 0,
+                          assignmentId: int.tryParse(
+                                  state.pathParameters['assignmentId'] ?? '') ??
+                              0,
                         ),
                       ),
                     ],

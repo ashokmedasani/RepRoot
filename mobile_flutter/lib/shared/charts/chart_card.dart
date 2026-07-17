@@ -54,7 +54,9 @@ class _Header extends StatelessWidget {
     final meta = spec.meta;
     final subtitle = [
       if (meta?.subtitle.isNotEmpty ?? false) meta!.subtitle,
-      if (spec.unit.isNotEmpty) spec.unit,
+      // A summary card already prints the unit next to its value, and the unit
+      // is usually in the title too ("Body weight (lb)") — three times is noise.
+      if (spec.unit.isNotEmpty && spec.kind != ChartKind.summary) spec.unit,
       if (meta?.average != null) 'avg ${_trim(meta!.average!)}',
     ].join(' · ');
 
@@ -134,6 +136,22 @@ String _trim(double value) {
     return value.toInt().toString();
   }
   return value.toStringAsFixed(1);
+}
+
+/// fl_chart labels the axis max *and* every interval tick, so the max label
+/// collides with the tick just below it (31.9 drawn over 30). Drop the max
+/// label; the top gridline reads fine without it.
+Widget Function(double, TitleMeta) _leftTitle(
+  BuildContext context,
+  AppTokens tokens,
+) {
+  return (value, meta) {
+    if (value == meta.max) return const SizedBox.shrink();
+    return Text(
+      _trim(value),
+      style: context.text.labelSmall?.copyWith(color: tokens.muted),
+    );
+  };
 }
 
 class _Summary extends StatelessWidget {
@@ -254,10 +272,7 @@ class _LineChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 34,
-              getTitlesWidget: (value, meta) => Text(
-                _trim(value),
-                style: context.text.labelSmall?.copyWith(color: tokens.muted),
-              ),
+              getTitlesWidget: _leftTitle(context, tokens),
             ),
           ),
           bottomTitles: AxisTitles(
@@ -344,10 +359,7 @@ class _BarChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 34,
-              getTitlesWidget: (value, meta) => Text(
-                _trim(value),
-                style: context.text.labelSmall?.copyWith(color: tokens.muted),
-              ),
+              getTitlesWidget: _leftTitle(context, tokens),
             ),
           ),
           bottomTitles: AxisTitles(
