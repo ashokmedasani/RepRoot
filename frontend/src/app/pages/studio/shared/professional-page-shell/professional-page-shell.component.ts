@@ -2,29 +2,29 @@ import { DecimalPipe } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { TrainerAuthApiService } from '../../core/api/trainer-auth-api.service';
-import { ChatApiService } from '../../core/api/chat-api.service';
+import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { ChatApiService } from '@core/api/chat-api.service';
 
-type TrainerSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'references' | 'settings';
+type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'references' | 'settings';
 
 @Component({
-  selector: 'app-trainer-page-shell',
+  selector: 'app-professional-page-shell',
   standalone: true,
   imports: [DecimalPipe, RouterLink],
-  templateUrl: './trainer-page-shell.component.html',
-  styleUrl: './trainer-page-shell.component.scss'
+  templateUrl: './professional-page-shell.component.html',
+  styleUrl: './professional-page-shell.component.scss'
 })
-export class TrainerPageShellComponent implements OnInit, OnDestroy {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly chatApi = inject(ChatApiService);
   private readonly router = inject(Router);
 
   @Input({ required: true }) title = '';
   @Input() eyebrow = '';
   @Input() subtitle = '';
-  @Input() activeSection: TrainerSection = 'profile';
+  @Input() activeSection: ProfessionalSection = 'profile';
   @Input() maxWidth = '80rem';
-  @Input() titleId = 'trainer-page-title';
+  @Input() titleId = 'professional-page-title';
 
   isSigningOut = false;
   dataUsagePercent = 0;
@@ -35,10 +35,10 @@ export class TrainerPageShellComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadUnreadMessages();
     this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
-    this.trainerAuthApi.getDataUsage().subscribe({
+    this.professionalAuthApi.getDataUsage().subscribe({
       next: (usage) => {
         this.dataUsagePercent = Math.max(0, Math.min(100, usage.usage_percent));
-        this.isUnlimitedStorage = usage.plan_code === 'premium';
+        this.isUnlimitedStorage = usage.plan_code === 'premium_unlimited' || usage.plan_code === 'premium';
       },
       error: () => {
         this.dataUsagePercent = 0;
@@ -58,7 +58,7 @@ export class TrainerPageShellComponent implements OnInit, OnDestroy {
   }
 
   private loadUnreadMessages(): void {
-    this.chatApi.getTrainerUnreadCounts().subscribe({
+    this.chatApi.getProfessionalUnreadCounts().subscribe({
       next: (summary) => (this.unreadMessages = summary.unread_count),
       error: () => (this.unreadMessages = 0)
     });
@@ -66,16 +66,16 @@ export class TrainerPageShellComponent implements OnInit, OnDestroy {
 
   signOut(): void {
     this.isSigningOut = true;
-    this.trainerAuthApi.logout().subscribe({
+    this.professionalAuthApi.logout().subscribe({
       next: () => this.clearAndRedirect(),
       error: () => this.clearAndRedirect()
     });
   }
 
   private clearAndRedirect(): void {
-    window.localStorage.removeItem('trainer-auth-token');
-    window.localStorage.removeItem('trainer-account-id');
-    window.localStorage.removeItem('trainer-account-username');
+    window.localStorage.removeItem('professional-auth-token');
+    window.localStorage.removeItem('professional-account-id');
+    window.localStorage.removeItem('professional-account-username');
     void this.router.navigate(['/']);
   }
 }

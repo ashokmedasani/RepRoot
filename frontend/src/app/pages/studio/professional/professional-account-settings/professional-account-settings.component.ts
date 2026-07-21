@@ -1,22 +1,29 @@
+import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
-  TrainerAuthApiService,
-  TrainerDataUsageResponse,
-  TrainerDataUsageSection
-} from '../../../core/api/trainer-auth-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { TrainerProfileFormComponent } from '../../../shared/trainer-profile-form/trainer-profile-form.component';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
-import { ThemeSwitcherComponent } from '../../../shared/theme-switcher/theme-switcher.component';
-import { SupportIncidentsComponent } from '../../../shared/support-incidents/support-incidents.component';
+  ProfessionalAuthApiService,
+  ProfessionalBillingStatus,
+  ProfessionalDataUsageResponse,
+  ProfessionalDataUsageSection,
+  ProfessionalPlanCode,
+  ProfessionalUsageLabel
+} from '@core/api/professional-auth-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { ProfessionalProfileFormComponent } from '@studio-shared/professional-profile-form/professional-profile-form.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { ThemeSwitcherComponent } from '@shared/theme-switcher/theme-switcher.component';
+import { SupportIncidentsComponent } from '@studio-shared/support-incidents/support-incidents.component';
+import { ProfessionalPaymentSettingsComponent } from '../professional-payment-settings/professional-payment-settings.component';
 
 type SettingsSection =
   | 'my-account'
   | 'security'
+  | 'billing'
+  | 'payments'
   | 'notifications'
   | 'appearance'
   | 'storage'
@@ -32,32 +39,37 @@ interface NotificationPrefs {
 }
 
 @Component({
-  selector: 'app-trainer-account-settings',
+  selector: 'app-professional-account-settings',
   standalone: true,
   imports: [
+    DatePipe,
     FormsModule,
     RouterLink,
-    TrainerPageShellComponent,
-    TrainerProfileFormComponent,
+    ProfessionalPageShellComponent,
+    ProfessionalProfileFormComponent,
     PasswordInputComponent,
     ThemeSwitcherComponent,
-    SupportIncidentsComponent
+    SupportIncidentsComponent,
+    ProfessionalPaymentSettingsComponent
   ],
-  templateUrl: './trainer-account-settings.component.html',
-  styleUrl: './trainer-account-settings.component.scss'
+  templateUrl: './professional-account-settings.component.html',
+  styleUrl: './professional-account-settings.component.scss'
 })
-export class TrainerAccountSettingsComponent implements OnInit {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalAccountSettingsComponent implements OnInit {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  private static readonly NOTIFICATION_KEY = 'trainer-notification-prefs';
+  private static readonly NOTIFICATION_KEY = 'professional-notification-prefs';
 
   readonly appVersion = '1.0.0';
-  readonly supportEmail = 'support@coachflow.app';
+  readonly supportEmail = 'support@rep-root.com';
 
   readonly menu: { id: SettingsSection; label: string }[] = [
     { id: 'my-account', label: 'My Account' },
     { id: 'security', label: 'Security' },
+    { id: 'billing', label: 'Plan & Billing' },
+    { id: 'payments', label: 'Payment Settings' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'appearance', label: 'Appearance' },
     { id: 'storage', label: 'Data Usage' },
@@ -71,16 +83,23 @@ export class TrainerAccountSettingsComponent implements OnInit {
   accountMessage = '';
   accountMessageType: 'success' | 'error' = 'success';
 
-  trainerCode = '';
+  professionalCode = '';
   codeDraft = '';
   isSavingCode = false;
   codeMessage = '';
   codeMessageType: 'success' | 'error' = 'success';
-  dataUsage?: TrainerDataUsageResponse;
+  dataUsage?: ProfessionalDataUsageResponse;
   dataUsageError = '';
 
-  readonly trainerUsageLabels: Record<string, string> = {
-    trainer_profile: 'Trainer profile',
+  billingStatus?: ProfessionalBillingStatus;
+  billingError = '';
+  isStartingCheckout = false;
+  isOpeningPortal = false;
+  billingActionMessage = '';
+  billingActionMessageType: 'success' | 'error' = 'success';
+
+  readonly professionalUsageLabels: Record<string, string> = {
+    professional_profile: 'Professional profile',
     forms_groups: 'Forms & groups',
     clients: 'Client profiles',
     schedules_progress: 'Schedules & progress',
@@ -100,15 +119,15 @@ export class TrainerAccountSettingsComponent implements OnInit {
   };
 
   readonly guideItems = [
-    { title: 'Dashboard', route: '/trainer/dashboard', detail: 'Review business KPIs, client activity, schedules, profile edit requests, account deletion requests, and recent work that needs attention.' },
-    { title: 'Forms & Groups', route: '/trainer/forms-groups', detail: 'Manage the public lead form, review incoming requests, create groups, and see capacity for your current plan.' },
-    { title: 'Client Creation Form', route: '/trainer/forms-groups', detail: 'Each group has its own registration form. Customize intake questions, share its public link, and convert completed registrations into client accounts.' },
-    { title: 'Templates', route: '/trainer/templates', detail: 'Create reusable tracking templates, choose fields and cadence, then assign them to any client without losing historical entries.' },
-    { title: 'Clients', route: '/trainer/clients', detail: 'Search all clients, add clients manually, open a profile, assign templates, schedule follow-ups, review entries, and record progress.' },
-    { title: 'References', route: '/trainer/references', detail: 'Organize PDFs, images, and YouTube resources by category. Share selected references with each client assignment.' },
-    { title: 'Profile', route: '/trainer/profile', detail: 'Maintain the professional information clients can see, upload portfolio media, and control the visibility of each profile section.' },
-    { title: 'Settings', route: '/trainer/account-settings', detail: 'Manage your account, security, trainer code, notifications, theme, plan storage, support links, and legal information.' },
-    { title: 'Client Portal', route: '/client/login', detail: 'Clients use your trainer code and their credentials to complete templates, review progress, message you, maintain settings, and submit approval requests.' }
+    { title: 'Dashboard', route: '/professional/dashboard', detail: 'Review business KPIs, client activity, schedules, profile edit requests, account deletion requests, and recent work that needs attention.' },
+    { title: 'Forms & Groups', route: '/professional/forms-groups', detail: 'Manage the public lead form, review incoming requests, create groups, and see capacity for your current plan.' },
+    { title: 'Client Creation Form', route: '/professional/forms-groups', detail: 'Each group has its own registration form. Customize intake questions, share its public link, and convert completed registrations into client accounts.' },
+    { title: 'Templates', route: '/professional/templates', detail: 'Create reusable tracking templates, choose fields and cadence, then assign them to any client without losing historical entries.' },
+    { title: 'Clients', route: '/professional/clients', detail: 'Search all clients, add clients manually, open a profile, assign templates, schedule follow-ups, review entries, and record progress.' },
+    { title: 'References', route: '/professional/references', detail: 'Organize PDFs, images, and YouTube resources by category. Share selected references with each client assignment.' },
+    { title: 'Profile', route: '/professional/profile', detail: 'Maintain the professional information clients can see, upload portfolio media, and control the visibility of each profile section.' },
+    { title: 'Settings', route: '/professional/account-settings', detail: 'Manage your account, security, professional code, notifications, theme, plan storage, support links, and legal information.' },
+    { title: 'Client Portal', route: '/client/login', detail: 'Clients use your professional code and their credentials to complete templates, review progress, message you, maintain settings, and submit approval requests.' }
   ];
 
   readonly passwordForm = {
@@ -126,22 +145,72 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadNotificationPrefs();
-    this.trainerAuthApi.getProfile().subscribe({
+    this.professionalAuthApi.getProfile().subscribe({
       next: (profile) => {
-        this.trainerCode = profile.trainer_id || '';
-        this.codeDraft = this.trainerCode;
+        this.professionalCode = profile.professional_id || '';
+        this.codeDraft = this.professionalCode;
       }
     });
-    this.trainerAuthApi.getDataUsage().subscribe({
+    this.professionalAuthApi.getDataUsage().subscribe({
       next: (usage) => (this.dataUsage = usage),
       error: () => (this.dataUsageError = 'Storage usage is temporarily unavailable.')
+    });
+    this.loadBillingStatus();
+
+    const billingParam = this.route.snapshot.queryParamMap.get('billing');
+    if (billingParam === 'success') {
+      this.activeSection = 'billing';
+      this.billingActionMessageType = 'success';
+      this.billingActionMessage = 'Payment received — this can take a few seconds to reflect below while Stripe confirms it.';
+    } else if (billingParam === 'cancelled') {
+      this.activeSection = 'billing';
+      this.billingActionMessageType = 'error';
+      this.billingActionMessage = 'Checkout was cancelled — no charge was made.';
+    }
+  }
+
+  private loadBillingStatus(): void {
+    this.billingError = '';
+    this.professionalAuthApi.getBillingStatus().subscribe({
+      next: (status) => (this.billingStatus = status),
+      error: () => (this.billingError = 'Plan and billing details are temporarily unavailable.')
+    });
+  }
+
+  upgradeToPremium(): void {
+    this.billingActionMessage = '';
+    this.isStartingCheckout = true;
+    this.professionalAuthApi.createBillingCheckout().subscribe({
+      next: (response) => {
+        window.location.href = response.checkout_url;
+      },
+      error: (error: unknown) => {
+        this.billingActionMessageType = 'error';
+        this.billingActionMessage = this.formatApiError(error, 'Could not start checkout.');
+        this.isStartingCheckout = false;
+      }
+    });
+  }
+
+  openBillingPortal(): void {
+    this.billingActionMessage = '';
+    this.isOpeningPortal = true;
+    this.professionalAuthApi.createBillingPortal().subscribe({
+      next: (response) => {
+        window.location.href = response.portal_url;
+      },
+      error: (error: unknown) => {
+        this.billingActionMessageType = 'error';
+        this.billingActionMessage = this.formatApiError(error, 'Could not open the billing portal.');
+        this.isOpeningPortal = false;
+      }
     });
   }
 
   usageRows(
-    sections: Record<string, TrainerDataUsageSection> | undefined,
+    sections: Record<string, ProfessionalDataUsageSection> | undefined,
     labels: Record<string, string>
-  ): { key: string; label: string; usage: TrainerDataUsageSection }[] {
+  ): { key: string; label: string; usage: ProfessionalDataUsageSection }[] {
     return Object.entries(sections || {}).map(([key, usage]) => ({
       key,
       label: labels[key] || key.replaceAll('_', ' '),
@@ -149,9 +218,34 @@ export class TrainerAccountSettingsComponent implements OnInit {
     }));
   }
 
-  usagePercent(bytes: number, quotaBytes: number): number {
-    if (!quotaBytes || bytes <= 0) return 0;
-    return Math.min(100, Math.round((bytes / quotaBytes) * 10000) / 100);
+  private readonly usageLabelCopy: Record<ProfessionalUsageLabel, string> = {
+    plenty_of_room: 'Plenty of room to grow',
+    comfortable: 'Comfortable usage',
+    filling_up: 'Filling up — worth a look',
+    almost_full: 'Almost full',
+    over_capacity: 'Over your plan’s capacity'
+  };
+
+  usageLabelText(label: ProfessionalUsageLabel | undefined): string {
+    return label ? this.usageLabelCopy[label] || '' : '';
+  }
+
+  /** Paid tiers that have already maxed out what an upgrade buys — Premium Unlimited plus the legacy Premium tier. */
+  isTopTier(code: ProfessionalPlanCode | undefined): boolean {
+    return code === 'premium_unlimited' || code === 'premium';
+  }
+
+  gracePeriodDaysLeft(endsAt: string | null): number {
+    if (!endsAt) return 0;
+    const diffMs = new Date(endsAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+  }
+
+  lockReasonText(reason: string): string {
+    if (reason === 'overage_grace_expired' || reason === 'overage') {
+      return 'your storage usage went over your plan’s limit and the grace period ended';
+    }
+    return reason ? reason.replaceAll('_', ' ') : 'an account issue';
   }
 
   /** mailto link for the Support section, pre-filled per intent. */
@@ -165,7 +259,7 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
   private loadNotificationPrefs(): void {
     try {
-      const raw = window.localStorage.getItem(TrainerAccountSettingsComponent.NOTIFICATION_KEY);
+      const raw = window.localStorage.getItem(ProfessionalAccountSettingsComponent.NOTIFICATION_KEY);
       if (raw) {
         this.notifications = { ...this.notifications, ...JSON.parse(raw) };
       }
@@ -177,33 +271,33 @@ export class TrainerAccountSettingsComponent implements OnInit {
   toggleNotification(key: keyof NotificationPrefs): void {
     this.notifications = { ...this.notifications, [key]: !this.notifications[key] };
     window.localStorage.setItem(
-      TrainerAccountSettingsComponent.NOTIFICATION_KEY,
+      ProfessionalAccountSettingsComponent.NOTIFICATION_KEY,
       JSON.stringify(this.notifications)
     );
   }
 
-  saveTrainerCode(): void {
+  saveProfessionalCode(): void {
     const code = this.codeDraft.trim();
 
     if (!code) {
       this.codeMessageType = 'error';
-      this.codeMessage = 'Trainer code is required.';
+      this.codeMessage = 'Professional code is required.';
       return;
     }
 
     this.isSavingCode = true;
     this.codeMessage = '';
-    this.trainerAuthApi.updateTrainerCode(code).subscribe({
+    this.professionalAuthApi.updateProfessionalCode(code).subscribe({
       next: (response) => {
-        this.trainerCode = response.trainer_code;
-        this.codeDraft = response.trainer_code;
+        this.professionalCode = response.professional_code;
+        this.codeDraft = response.professional_code;
         this.codeMessageType = 'success';
         this.codeMessage = response.message;
         this.isSavingCode = false;
       },
       error: (error: unknown) => {
         this.codeMessageType = 'error';
-        this.codeMessage = this.formatApiError(error, 'Trainer code could not be saved.');
+        this.codeMessage = this.formatApiError(error, 'Professional code could not be saved.');
         this.isSavingCode = false;
       }
     });
@@ -229,11 +323,11 @@ export class TrainerAccountSettingsComponent implements OnInit {
 
     this.isChangingPassword = true;
 
-    this.trainerAuthApi.changePassword(currentPassword, password, confirmPassword).subscribe({
+    this.professionalAuthApi.changePassword(currentPassword, password, confirmPassword).subscribe({
       next: (response) => {
-        this.clearTrainerSession();
-        window.sessionStorage.setItem('trainer-login-notice', response.message);
-        void this.router.navigate(['/trainer/login']);
+        this.clearProfessionalSession();
+        window.sessionStorage.setItem('professional-login-notice', response.message);
+        void this.router.navigate(['/professional/login']);
       },
       error: (error: unknown) => {
         this.accountMessageType = 'error';
@@ -243,10 +337,10 @@ export class TrainerAccountSettingsComponent implements OnInit {
     });
   }
 
-  private clearTrainerSession(): void {
-    window.localStorage.removeItem('trainer-auth-token');
-    window.localStorage.removeItem('trainer-account-id');
-    window.localStorage.removeItem('trainer-account-username');
+  private clearProfessionalSession(): void {
+    window.localStorage.removeItem('professional-auth-token');
+    window.localStorage.removeItem('professional-account-id');
+    window.localStorage.removeItem('professional-account-username');
   }
 
   private formatApiError(error: unknown, fallbackMessage: string): string {

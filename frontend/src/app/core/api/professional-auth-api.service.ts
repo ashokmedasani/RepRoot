@@ -14,6 +14,7 @@ export interface UsernameAvailabilityResponse {
   username: string;
   available: boolean;
   message: string;
+  suggestions: string[];
 }
 
 export interface EmailAvailabilityResponse {
@@ -45,7 +46,7 @@ export interface MessageResponse {
   message: string;
 }
 
-export interface TrainerAccount {
+export interface ProfessionalAccount {
   id: number;
   email: string;
   username: string;
@@ -57,13 +58,13 @@ export interface TrainerAccount {
   profile_setup_completed: boolean;
 }
 
-export interface TrainerAuthResponse {
+export interface ProfessionalAuthResponse {
   token: string;
-  trainer: TrainerAccount;
+  professional: ProfessionalAccount;
   message: string;
 }
 
-export interface TrainerSignupPayload {
+export interface ProfessionalSignupPayload {
   email: string;
   username: string;
   password: string;
@@ -71,28 +72,39 @@ export interface TrainerSignupPayload {
   email_verification_token: string;
 }
 
-export interface TrainerProfileStatusResponse {
+export interface ProfessionalProfileStatusResponse {
   profile_setup_completed: boolean;
 }
 
-export interface TrainerDataUsageResponse {
-  plan_code: 'starter' | 'premium';
+export type ProfessionalPlanCode = 'starter_free' | 'pro' | 'premium_unlimited' | 'starter' | 'premium';
+
+export type ProfessionalUsageLabel = 'plenty_of_room' | 'comfortable' | 'filling_up' | 'almost_full' | 'over_capacity';
+
+// Percentage-only by design: the backend never returns raw byte counts to the
+// professional-facing API (see backend/accounts/data_usage.py), only
+// usage_percent + usage_label and per-section percent_of_quota.
+export interface ProfessionalDataUsageResponse {
+  plan_code: ProfessionalPlanCode;
   plan_name: string;
   plan_limits: Record<string, number | null>;
-  total_bytes: number;
-  database_bytes: number;
-  file_bytes: number;
-  quota_bytes: number;
   usage_percent: number;
+  usage_label: ProfessionalUsageLabel;
   record_count: number;
-  sections: Record<string, TrainerDataUsageSection>;
-  featured_client: TrainerClientDataUsage | null;
+  sections: Record<string, ProfessionalDataUsageSection>;
+  featured_client: ProfessionalClientDataUsage | null;
+  warning_threshold_percent: number;
+  danger_threshold_percent: number;
+  is_warning: boolean;
+  is_danger: boolean;
+  is_over_quota: boolean;
+  is_locked: boolean;
+  lock_reason: string;
+  grace_period_ends_at: string | null;
+  locked_at: string | null;
 }
 
-export interface TrainerDataUsageSection {
-  database_bytes: number;
-  file_bytes: number;
-  total_bytes: number;
+export interface ProfessionalDataUsageSection {
+  percent_of_quota: number;
   record_count: number;
 }
 
@@ -107,7 +119,7 @@ export interface SupportIncidentMessage {
 export interface SupportIncident {
   id: number;
   incident_id: string;
-  reporter_role: 'trainer' | 'client';
+  reporter_role: 'professional' | 'client';
   reporter_name: string;
   reporter_email: string;
   category: string;
@@ -134,26 +146,35 @@ export interface SupportIncidentListResponse {
   active_limit: number;
 }
 
-export interface TrainerClientDataUsage {
+export interface ProfessionalBillingStatus {
+  plan: {
+    code: ProfessionalPlanCode;
+    name: string;
+    [limit: string]: number | string | null;
+  };
+  plan_renews_at: string | null;
+  has_billing_account: boolean;
+  billing_configured: boolean;
+}
+
+export interface ProfessionalClientDataUsage {
   id: number;
   reference_id: string;
   username: string;
   name: string;
-  total_bytes: number;
-  database_bytes: number;
-  file_bytes: number;
+  percent_of_quota: number;
   record_count: number;
-  sections: Record<string, TrainerDataUsageSection>;
+  sections: Record<string, ProfessionalDataUsageSection>;
 }
 
-export interface TrainerProfile {
+export interface ProfessionalProfile {
   email: string;
   username: string;
   first_name: string;
   middle_name: string;
   last_name: string;
-  trainer_id: string | null;
-  trainer_code: string | null;
+  professional_id: string | null;
+  professional_code: string | null;
   profile_setup_completed: boolean;
   profile_photo_url: string;
   phone: string;
@@ -164,7 +185,7 @@ export interface TrainerProfile {
   state: string;
   professional_headline: string;
   about_me: string;
-  trainer_type: string;
+  professional_type: string;
   years_experience: number | null;
   specializations: string;
   training_style: string;
@@ -179,23 +200,23 @@ export interface TrainerProfile {
   instagram_url: string;
   youtube_url: string;
   website_url: string;
-  profile_images: TrainerProfileImage[];
-  profile_links: TrainerProfileLink[];
-  profile_visibility: TrainerProfileVisibility;
+  profile_images: ProfessionalProfileImage[];
+  profile_links: ProfessionalProfileLink[];
+  profile_visibility: ProfessionalProfileVisibility;
 }
 
-export interface TrainerProfileImage {
+export interface ProfessionalProfileImage {
   category: string;
   title: string;
   url: string;
 }
 
-export interface TrainerProfileLink {
+export interface ProfessionalProfileLink {
   title: string;
   url: string;
 }
 
-export interface TrainerProfileVisibility {
+export interface ProfessionalProfileVisibility {
   professional_headline: boolean;
   about: boolean;
   professional_summary: boolean;
@@ -208,69 +229,69 @@ export interface TrainerProfileVisibility {
   links: boolean;
 }
 
-export interface TrainerProfileSaveResponse {
-  profile: TrainerProfile;
+export interface ProfessionalProfileSaveResponse {
+  profile: ProfessionalProfile;
   message: string;
 }
 
 @Injectable({ providedIn: 'root' })
-export class TrainerAuthApiService {
+export class ProfessionalAuthApiService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
-  private dataUsageRequest$?: Observable<TrainerDataUsageResponse>;
+  private dataUsageRequest$?: Observable<ProfessionalDataUsageResponse>;
 
   constructor(private readonly http: HttpClient) {}
 
   checkUsername(username: string): Observable<UsernameAvailabilityResponse> {
-    return this.http.post<UsernameAvailabilityResponse>(`${this.apiBaseUrl}/trainer/check-username/`, { username });
+    return this.http.post<UsernameAvailabilityResponse>(`${this.apiBaseUrl}/professional/check-username/`, { username });
   }
 
   checkEmail(email: string): Observable<EmailAvailabilityResponse> {
-    return this.http.post<EmailAvailabilityResponse>(`${this.apiBaseUrl}/trainer/check-email/`, { email });
+    return this.http.post<EmailAvailabilityResponse>(`${this.apiBaseUrl}/professional/check-email/`, { email });
   }
 
-  checkTrainerCode(trainerCode: string): Observable<{ available: boolean; message: string }> {
-    return this.http.post<{ available: boolean; message: string }>(`${this.apiBaseUrl}/trainer/check-trainer-code/`, {
-      trainer_code: trainerCode
+  checkProfessionalCode(professionalCode: string): Observable<{ available: boolean; message: string }> {
+    return this.http.post<{ available: boolean; message: string }>(`${this.apiBaseUrl}/professional/check-professional-code/`, {
+      professional_code: professionalCode
     });
   }
 
-  updateTrainerCode(trainerCode: string): Observable<{ trainer_code: string; message: string }> {
-    return this.http.put<{ trainer_code: string; message: string }>(
-      `${this.apiBaseUrl}/trainer/account/trainer-code/`,
-      { trainer_code: trainerCode },
+  updateProfessionalCode(professionalCode: string): Observable<{ professional_code: string; message: string }> {
+    return this.http.put<{ professional_code: string; message: string }>(
+      `${this.apiBaseUrl}/professional/account/professional-code/`,
+      { professional_code: professionalCode },
       { headers: this.getAuthHeaders() }
     );
   }
 
   updateProfileVisibility(
-    visibility: TrainerProfileVisibility
-  ): Observable<{ profile_visibility: TrainerProfileVisibility; message: string }> {
-    return this.http.put<{ profile_visibility: TrainerProfileVisibility; message: string }>(
-      `${this.apiBaseUrl}/trainer/profile/visibility/`,
+    visibility: ProfessionalProfileVisibility
+  ): Observable<{ profile_visibility: ProfessionalProfileVisibility; message: string }> {
+    return this.http.put<{ profile_visibility: ProfessionalProfileVisibility; message: string }>(
+      `${this.apiBaseUrl}/professional/profile/visibility/`,
       { visibility },
       { headers: this.getAuthHeaders() }
     );
   }
 
   requestEmailOtp(email: string): Observable<EmailOtpRequestResponse> {
-    return this.http.post<EmailOtpRequestResponse>(`${this.apiBaseUrl}/trainer/request-email-otp/`, { email });
+    return this.http.post<EmailOtpRequestResponse>(`${this.apiBaseUrl}/professional/request-email-otp/`, { email });
   }
 
   verifyEmailOtp(email: string, otp: string): Observable<EmailOtpVerifyResponse> {
-    return this.http.post<EmailOtpVerifyResponse>(`${this.apiBaseUrl}/trainer/verify-email-otp/`, { email, otp });
+    return this.http.post<EmailOtpVerifyResponse>(`${this.apiBaseUrl}/professional/verify-email-otp/`, { email, otp });
   }
 
-  signup(payload: TrainerSignupPayload): Observable<TrainerAuthResponse> {
-    return this.http.post<TrainerAuthResponse>(`${this.apiBaseUrl}/trainer/signup/`, payload);
+  signup(payload: ProfessionalSignupPayload): Observable<ProfessionalAuthResponse> {
+    return this.http.post<ProfessionalAuthResponse>(`${this.apiBaseUrl}/professional/signup/`, payload);
   }
 
-  login(identifier: string, password: string): Observable<TrainerAuthResponse> {
-    return this.http.post<TrainerAuthResponse>(`${this.apiBaseUrl}/trainer/login/`, { identifier, password });
+  login(identifier: string, password: string): Observable<ProfessionalAuthResponse> {
+    return this.http.post<ProfessionalAuthResponse>(`${this.apiBaseUrl}/professional/login/`, { identifier, password });
   }
 
   logout(): Observable<MessageResponse> {
     return this.http.post<MessageResponse>(
-      `${this.apiBaseUrl}/trainer/logout/`,
+      `${this.apiBaseUrl}/professional/logout/`,
       {},
       {
         headers: this.getAuthHeaders()
@@ -279,14 +300,14 @@ export class TrainerAuthApiService {
   }
 
   deleteAccount(): Observable<MessageResponse> {
-    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/trainer/account/`, {
+    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/professional/account/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   changePassword(currentPassword: string, password: string, confirmPassword: string): Observable<MessageResponse> {
     return this.http.post<MessageResponse>(
-      `${this.apiBaseUrl}/trainer/account/change-password/`,
+      `${this.apiBaseUrl}/professional/account/change-password/`,
       {
         current_password: currentPassword,
         password,
@@ -298,15 +319,15 @@ export class TrainerAuthApiService {
     );
   }
 
-  getProfileStatus(): Observable<TrainerProfileStatusResponse> {
-    return this.http.get<TrainerProfileStatusResponse>(`${this.apiBaseUrl}/trainer/profile/status/`, {
+  getProfileStatus(): Observable<ProfessionalProfileStatusResponse> {
+    return this.http.get<ProfessionalProfileStatusResponse>(`${this.apiBaseUrl}/professional/profile/status/`, {
       headers: this.getAuthHeaders()
     });
   }
 
-  getDataUsage(): Observable<TrainerDataUsageResponse> {
+  getDataUsage(): Observable<ProfessionalDataUsageResponse> {
     if (!this.dataUsageRequest$) {
-      this.dataUsageRequest$ = this.http.get<TrainerDataUsageResponse>(`${this.apiBaseUrl}/trainer/data-usage/`, {
+      this.dataUsageRequest$ = this.http.get<ProfessionalDataUsageResponse>(`${this.apiBaseUrl}/professional/data-usage/`, {
         headers: this.getAuthHeaders()
       }).pipe(shareReplay({ bufferSize: 1, refCount: false }));
     }
@@ -314,8 +335,30 @@ export class TrainerAuthApiService {
     return this.dataUsageRequest$;
   }
 
+  getBillingStatus(): Observable<ProfessionalBillingStatus> {
+    return this.http.get<ProfessionalBillingStatus>(`${this.apiBaseUrl}/professional/billing/status/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  createBillingCheckout(): Observable<{ checkout_url: string }> {
+    return this.http.post<{ checkout_url: string }>(
+      `${this.apiBaseUrl}/professional/billing/checkout/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  createBillingPortal(): Observable<{ portal_url: string }> {
+    return this.http.post<{ portal_url: string }>(
+      `${this.apiBaseUrl}/professional/billing/portal/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
   getSupportIncidents(): Observable<SupportIncidentListResponse> {
-    return this.http.get<SupportIncidentListResponse>(`${this.apiBaseUrl}/trainer/support/incidents/`, {
+    return this.http.get<SupportIncidentListResponse>(`${this.apiBaseUrl}/professional/support/incidents/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -335,37 +378,37 @@ export class TrainerAuthApiService {
       if (value instanceof File) form.append(key, value);
       else if (value !== null && value !== undefined) form.append(key, String(value));
     });
-    return this.http.post<{ incident: SupportIncident; message: string }>(`${this.apiBaseUrl}/trainer/support/incidents/`, form, {
+    return this.http.post<{ incident: SupportIncident; message: string }>(`${this.apiBaseUrl}/professional/support/incidents/`, form, {
       headers: this.getAuthHeaders()
     });
   }
 
   actOnSupportIncident(incidentId: string, action: 'follow_up' | 'reopen', body = ''): Observable<{ incident: SupportIncident; message: string }> {
     return this.http.post<{ incident: SupportIncident; message: string }>(
-      `${this.apiBaseUrl}/trainer/support/incidents/${encodeURIComponent(incidentId)}/`,
+      `${this.apiBaseUrl}/professional/support/incidents/${encodeURIComponent(incidentId)}/`,
       { action, body },
       { headers: this.getAuthHeaders() }
     );
   }
 
-  getProfile(): Observable<TrainerProfile> {
-    return this.http.get<TrainerProfile>(`${this.apiBaseUrl}/trainer/profile/`, {
+  getProfile(): Observable<ProfessionalProfile> {
+    return this.http.get<ProfessionalProfile>(`${this.apiBaseUrl}/professional/profile/`, {
       headers: this.getAuthHeaders()
     });
   }
 
-  saveProfile(profileData: FormData): Observable<TrainerProfileSaveResponse> {
-    return this.http.post<TrainerProfileSaveResponse>(`${this.apiBaseUrl}/trainer/profile/`, profileData, {
+  saveProfile(profileData: FormData): Observable<ProfessionalProfileSaveResponse> {
+    return this.http.post<ProfessionalProfileSaveResponse>(`${this.apiBaseUrl}/professional/profile/`, profileData, {
       headers: this.getAuthHeaders()
     });
   }
 
   requestPasswordResetOtp(email: string): Observable<EmailOtpRequestResponse> {
-    return this.http.post<EmailOtpRequestResponse>(`${this.apiBaseUrl}/trainer/password-reset/request-otp/`, { email });
+    return this.http.post<EmailOtpRequestResponse>(`${this.apiBaseUrl}/professional/password-reset/request-otp/`, { email });
   }
 
   verifyPasswordResetOtp(email: string, otp: string): Observable<PasswordResetOtpVerifyResponse> {
-    return this.http.post<PasswordResetOtpVerifyResponse>(`${this.apiBaseUrl}/trainer/password-reset/verify-otp/`, {
+    return this.http.post<PasswordResetOtpVerifyResponse>(`${this.apiBaseUrl}/professional/password-reset/verify-otp/`, {
       email,
       otp
     });
@@ -377,7 +420,7 @@ export class TrainerAuthApiService {
     password: string,
     confirmPassword: string
   ): Observable<MessageResponse> {
-    return this.http.post<MessageResponse>(`${this.apiBaseUrl}/trainer/password-reset/confirm/`, {
+    return this.http.post<MessageResponse>(`${this.apiBaseUrl}/professional/password-reset/confirm/`, {
       email,
       reset_token: resetToken,
       password,
@@ -386,7 +429,7 @@ export class TrainerAuthApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('trainer-auth-token') || '';
+    const token = window.localStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 

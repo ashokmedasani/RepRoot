@@ -1,7 +1,7 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Settings"
-  eyebrow="Trainer settings"
-  subtitle="Manage your profile, security, trainer code, and account preferences."
+  eyebrow="Professional settings"
+  subtitle="Manage your profile, security, professional code, and account preferences."
   activeSection="settings"
   titleId="account-settings-title"
 >
@@ -28,7 +28,7 @@
               <h2 id="my-account-title">My Account</h2>
               <p class="section-note">Update your personal and professional details. These power your public Profile page.</p>
             </div>
-            <app-trainer-profile-form />
+            <app-professional-profile-form />
           </section>
 
         </div>
@@ -37,19 +37,19 @@
       <!-- 2. Security -->
       @if (activeSection === 'security') {
         <div class="account-content">
-          <section class="account-section" aria-labelledby="trainer-code-title">
+          <section class="account-section" aria-labelledby="professional-code-title">
             <div>
-              <h2 id="trainer-code-title">Trainer Code</h2>
-              <p class="section-note">Clients may use this code during login or trainer lookup. Changes must remain unique.</p>
+              <h2 id="professional-code-title">Professional Code</h2>
+              <p class="section-note">Clients may use this code during login or professional lookup. Changes must remain unique.</p>
             </div>
             <div class="current-code-display">
-              <span>Current trainer code</span>
-              <strong>{{ trainerCode || 'Not set' }}</strong>
+              <span>Current professional code</span>
+              <strong>{{ professionalCode || 'Not set' }}</strong>
             </div>
-            <form class="code-form" (ngSubmit)="saveTrainerCode()">
+            <form class="code-form" (ngSubmit)="saveProfessionalCode()">
               <label>
-                <span class="field-label">Change trainer code</span>
-                <input type="text" name="trainerCode" [(ngModel)]="codeDraft" placeholder="e.g. FITJOHN" autocomplete="off">
+                <span class="field-label">Change professional code</span>
+                <input type="text" name="professionalCode" [(ngModel)]="codeDraft" placeholder="e.g. FITJOHN" autocomplete="off">
               </label>
               <button type="submit" class="primary-action" [disabled]="isSavingCode">
                 {{ isSavingCode ? 'Saving...' : 'Validate & Save Code' }}
@@ -86,9 +86,90 @@
 
           <section class="account-section danger-section" aria-labelledby="delete-account-title">
             <div>
-              <h2 id="delete-account-title">Delete Trainer Account</h2>
-              <p class="danger-note">To delete your trainer account, please contact Support.</p>
+              <h2 id="delete-account-title">Delete Professional Account</h2>
+              <p class="danger-note">To delete your professional account, please contact Support.</p>
             </div>
+          </section>
+        </div>
+      }
+
+      <!-- 2b. Plan & Billing -->
+      @if (activeSection === 'billing') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="billing-title">
+            <div>
+              <h2 id="billing-title">Plan & Billing</h2>
+              <p class="section-note">Starter Free costs nothing. Pro and Premium Unlimited raise every capacity limit as your business grows.</p>
+            </div>
+
+            @if (billingError) {
+              <p class="message error-message">{{ billingError }}</p>
+            } @else if (billingStatus; as billing) {
+              <div class="plan-summary">
+                <div class="plan-summary-header">
+                  <span class="plan-badge" [class.premium]="isTopTier(billing.plan.code)">{{ billing.plan.name }}</span>
+                  @if (isTopTier(billing.plan.code) && billing.plan_renews_at) {
+                    <span class="plan-renews">Renews {{ billing.plan_renews_at | date: 'mediumDate' }}</span>
+                  }
+                </div>
+
+                <div class="storage-summary">
+                  <div>
+                    <span>Lead forms</span>
+                    <strong>{{ billing.plan['lead_forms'] }}</strong>
+                  </div>
+                  <div>
+                    <span>Groups</span>
+                    <strong>{{ billing.plan['groups'] }}</strong>
+                  </div>
+                  <div>
+                    <span>Clients</span>
+                    <strong>{{ billing.plan['clients'] }}</strong>
+                  </div>
+                  <div>
+                    <span>Templates</span>
+                    <strong>{{ billing.plan['templates'] }}</strong>
+                  </div>
+                  <div>
+                    <span>References</span>
+                    <strong>{{ billing.plan['references'] }}</strong>
+                  </div>
+                  <div>
+                    <span>Categories</span>
+                    <strong>{{ billing.plan['categories'] }}</strong>
+                  </div>
+                </div>
+
+                @if (billing.has_billing_account) {
+                  <button type="button" class="primary-action" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
+                    {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
+                  </button>
+                } @else if (billing.billing_configured && !isTopTier(billing.plan.code)) {
+                  <button type="button" class="primary-action" [disabled]="isStartingCheckout" (click)="upgradeToPremium()">
+                    {{ isStartingCheckout ? 'Starting checkout...' : 'Upgrade plan' }}
+                  </button>
+                } @else if (!billing.billing_configured) {
+                  <p class="section-note">Upgrades aren't open yet — check back soon.</p>
+                }
+
+                @if (billingActionMessage) {
+                  <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
+                }
+              </div>
+            }
+          </section>
+        </div>
+      }
+
+      <!-- 2c. Payment Settings (Client Payments) -->
+      @if (activeSection === 'payments') {
+        <div class="account-content">
+          <section class="account-section" aria-labelledby="payment-settings-title">
+            <div>
+              <h2 id="payment-settings-title">Payment Settings</h2>
+              <p class="section-note">How you collect payments from your clients. Separate from your RepRoot plan.</p>
+            </div>
+            <app-payment-settings />
           </section>
         </div>
       }
@@ -154,49 +235,60 @@
           <section class="account-section" aria-labelledby="storage-title">
             <div>
               <h2 id="storage-title">Data Usage</h2>
-              <p class="section-note">Estimated UTF-8 database content and uploaded files, grouped by the section that owns them.</p>
+              <p class="section-note">How full your plan is, by the section that's using it. Shown as a percentage of your plan — not a raw file size.</p>
             </div>
 
             @if (dataUsage; as usage) {
+              @if (usage.is_locked) {
+                <div class="account-banner banner-locked">
+                  <strong>🔒 Account locked</strong>
+                  <p>Your account is locked because {{ lockReasonText(usage.lock_reason) }}. Upgrade your plan or free up space, then contact support to unlock.</p>
+                </div>
+              } @else if (usage.grace_period_ends_at) {
+                <div class="account-banner banner-warning">
+                  <strong>Grace period: {{ gracePeriodDaysLeft(usage.grace_period_ends_at) }} day(s) left</strong>
+                  <p>Your account was downgraded and premium features are locked. Upgrade or reduce your data before the grace period ends to avoid a full account freeze.</p>
+                </div>
+              } @else if (usage.is_danger) {
+                <div class="account-banner banner-danger">
+                  <strong>Storage almost full</strong>
+                  <p>You're at {{ usage.usage_percent }}% of your plan. Upgrade or remove unused data soon to avoid losing access to premium features.</p>
+                </div>
+              } @else if (usage.is_warning) {
+                <div class="account-banner banner-warning">
+                  <strong>Storage filling up</strong>
+                  <p>You're at {{ usage.usage_percent }}% of your plan. Consider upgrading before you reach your limit.</p>
+                </div>
+              }
+
               <div class="storage-summary">
-                <div>
-                  <span>Total stored</span>
-                  <strong>{{ usage.usage_percent }}%</strong>
-                  <small>{{ usage.record_count }} stored records</small>
-                </div>
-                <div>
-                  <span>Database</span>
-                  <strong>{{ usagePercent(usage.database_bytes, usage.total_bytes) }}%</strong>
-                  <small>Structured profiles and activity</small>
-                </div>
-                <div>
-                  <span>Uploaded files</span>
-                  <strong>{{ usagePercent(usage.file_bytes, usage.total_bytes) }}%</strong>
-                  <small>Photos, documents, and references</small>
-                </div>
                 <div>
                   <span>{{ usage.plan_name }} plan usage</span>
                   <strong>{{ usage.usage_percent }}%</strong>
-                  <small>{{ usage.plan_code === 'premium' ? 'Unlimited Storage' : 'Percentage of your plan' }}</small>
+                  <small>{{ usageLabelText(usage.usage_label) }}</small>
+                </div>
+                <div>
+                  <span>Stored records</span>
+                  <strong>{{ usage.record_count }}</strong>
+                  <small>Across every section below</small>
                 </div>
               </div>
 
-              <div class="storage-meter" role="meter" aria-label="Trainer storage used" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="usage.usage_percent">
+              <div class="storage-meter" role="meter" aria-label="Professional storage used" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="usage.usage_percent">
                 <span [style.width.%]="usage.usage_percent"></span>
               </div>
 
               <div class="usage-table-wrap">
                 <table class="usage-table">
                   <thead>
-                    <tr><th>Section</th><th>Records</th><th>Share of usage</th><th>Of plan</th></tr>
+                    <tr><th>Section</th><th>Records</th><th>Of plan</th></tr>
                   </thead>
                   <tbody>
-                    @for (row of usageRows(usage.sections, trainerUsageLabels); track row.key) {
+                    @for (row of usageRows(usage.sections, professionalUsageLabels); track row.key) {
                       <tr>
                         <td><strong>{{ row.label }}</strong></td>
                         <td>{{ row.usage.record_count }}</td>
-                        <td>{{ usagePercent(row.usage.database_bytes, row.usage.total_bytes) }}% database · {{ usagePercent(row.usage.file_bytes, row.usage.total_bytes) }}% files</td>
-                        <td><strong>{{ usage.plan_code === 'premium' ? usagePercent(row.usage.total_bytes, usage.total_bytes) : usagePercent(row.usage.total_bytes, usage.quota_bytes) }}%</strong></td>
+                        <td><strong>{{ row.usage.percent_of_quota }}%</strong></td>
                       </tr>
                     }
                   </tbody>
@@ -210,15 +302,15 @@
                     <h3 id="featured-client-storage-title">{{ client.name }}</h3>
                     <p>{{ '@' + client.username }} · {{ client.reference_id }} · {{ client.record_count }} records</p>
                   </div>
-                  <strong class="featured-total">{{ usage.plan_code === 'premium' ? usagePercent(client.total_bytes, usage.total_bytes) : usagePercent(client.total_bytes, usage.quota_bytes) }}%</strong>
-                  <small>{{ usage.plan_code === 'premium' ? 'of current stored data' : 'of trainer plan storage' }}</small>
+                  <strong class="featured-total">{{ client.percent_of_quota }}%</strong>
+                  <small>of your plan's storage</small>
 
                   <div class="client-usage-grid">
                     @for (row of usageRows(client.sections, clientUsageLabels); track row.key) {
                       <article>
                         <span>{{ row.label }}</span>
-                        <strong>{{ usage.plan_code === 'premium' ? usagePercent(row.usage.total_bytes, client.total_bytes) : usagePercent(row.usage.total_bytes, usage.quota_bytes) }}%</strong>
-                        <small>{{ row.usage.record_count }} records · data share</small>
+                        <strong>{{ row.usage.percent_of_quota }}%</strong>
+                        <small>{{ row.usage.record_count }} records</small>
                       </article>
                     }
                   </div>
@@ -239,7 +331,7 @@
           <section class="account-section" aria-labelledby="application-guide-title">
             <div>
               <h2 id="application-guide-title">Application Guide</h2>
-              <p class="section-note">A practical map of every trainer workspace and how information moves through CoachFlow.</p>
+              <p class="section-note">A practical map of every professional workspace and how information moves through RepRoot.</p>
             </div>
             <div class="guide-list">
               @for (item of guideItems; track item.title) {
@@ -260,7 +352,7 @@
       <!-- 6. Support -->
       @if (activeSection === 'support') {
         <div class="account-content">
-          <app-support-incidents role="trainer" pageFeature="Trainer settings" />
+          <app-support-incidents role="professional" pageFeature="Professional settings" />
         </div>
       }
 
@@ -270,7 +362,7 @@
           <section class="account-section" aria-labelledby="about-title">
             <div>
               <h2 id="about-title">About</h2>
-              <p class="section-note">CoachFlow — your trainer &amp; client workspace.</p>
+              <p class="section-note">RepRoot — your professional &amp; client workspace.</p>
             </div>
             <ul class="info-list">
               <li>
@@ -300,4 +392,4 @@
       <p class="message" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
     }
   </div>
-</app-trainer-page-shell>
+</app-professional-page-shell>
