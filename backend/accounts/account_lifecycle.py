@@ -68,7 +68,7 @@ def check_and_lock_overages():
 
     for profile in profiles_to_lock:
         # Check if actually over quota
-        usage = calculate_professional_data_usage(profile)
+        usage = calculate_professional_data_usage(profile.user)
         if usage.get('is_over_quota'):
             profile.is_locked = True
             profile.locked_at = now
@@ -117,7 +117,7 @@ def send_overage_notifications():
     )
 
     for profile in profiles_in_grace:
-        usage = calculate_professional_data_usage(profile)
+        usage = calculate_professional_data_usage(profile.user)
         if usage.get('is_over_quota'):
             # Send overage notification (max once per day)
             last_sent = profile.last_overage_notification_sent_at

@@ -4,6 +4,7 @@ from accounts.account_lifecycle import (
     check_and_delete_data,
     send_overage_notifications,
 )
+from accounts.data_retention import purge_expired_client_data
 
 
 class Command(BaseCommand):
@@ -32,5 +33,12 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('[OK] Data deletion check complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Data deletion check failed: {e}'))
+
+        try:
+            self.stdout.write('Purging client chat/activity data past plan retention window...')
+            purge_expired_client_data()
+            self.stdout.write(self.style.SUCCESS('[OK] Data retention purge complete'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'[FAILED] Data retention purge failed: {e}'))
 
         self.stdout.write(self.style.SUCCESS('All account lifecycle checks complete'))

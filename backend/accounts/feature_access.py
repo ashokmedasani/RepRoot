@@ -46,7 +46,7 @@ def get_feature_access_status(professional_profile):
         'is_over_quota': bool,
     }
     """
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     is_locked = professional_profile.is_locked
     is_over_quota = usage.get('is_over_quota', False)
 
@@ -67,7 +67,7 @@ def can_manage_templates(professional_profile) -> bool:
     """Check if professional can create/edit templates."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 
@@ -75,7 +75,7 @@ def can_manage_forms(professional_profile) -> bool:
     """Check if professional can manage lead forms and client registration."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 
@@ -83,7 +83,7 @@ def can_add_clients(professional_profile) -> bool:
     """Check if professional can add new clients."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 
@@ -91,7 +91,7 @@ def can_edit_client(professional_profile) -> bool:
     """Check if professional can edit existing client profiles."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 
@@ -99,7 +99,7 @@ def can_manage_references(professional_profile) -> bool:
     """Check if professional can upload/manage references."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 
@@ -107,7 +107,7 @@ def can_use_chat(professional_profile) -> bool:
     """Check if professional can send messages in chat."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile)
+    usage = calculate_professional_data_usage(professional_profile.user)
     return not usage.get('is_over_quota', False)
 
 

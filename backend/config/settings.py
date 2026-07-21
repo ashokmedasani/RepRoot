@@ -240,18 +240,33 @@ REST_FRAMEWORK = {
 # explicitly changes their ProfessionalProfile.plan_tier.
 REPROOT_DEFAULT_PLAN = os.environ.get('REPROOT_DEFAULT_PLAN', 'starter_free').strip().lower()
 
+# Storage quotas are still being tuned against real usage data, so the
+# Starter Free byte limit stays a single env-configurable knob; Pro and
+# Premium Unlimited are derived as multiples of it (5x, 50x respectively —
+# i.e. Premium Unlimited is also 10x Pro) unless explicitly overridden.
+REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES = int(
+  os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(30 * 1024 * 1024))
+)
+REPROOT_PRO_STORAGE_LIMIT_BYTES = int(
+  os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES * 5))
+)
+REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES = int(
+  os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(REPROOT_PRO_STORAGE_LIMIT_BYTES * 10))
+)
+
 # 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
 REPROOT_PLAN_TIERS = {
   'starter_free': {
     'name': 'Starter Free',
     'lead_forms': int(os.environ.get('REPROOT_STARTER_FREE_LEAD_FORM_LIMIT', '1')),
     'groups': int(os.environ.get('REPROOT_STARTER_FREE_GROUP_LIMIT', '3')),
-    'clients': int(os.environ.get('REPROOT_STARTER_FREE_CLIENT_LIMIT', '50')),
-    'templates': int(os.environ.get('REPROOT_STARTER_FREE_TEMPLATE_LIMIT', '3')),
-    'references': int(os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT', '25')),
+    'clients': int(os.environ.get('REPROOT_STARTER_FREE_CLIENT_LIMIT', '999')),
+    'templates': int(os.environ.get('REPROOT_STARTER_FREE_TEMPLATE_LIMIT', '5')),
+    'references': int(os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT', '30')),
     'categories': int(os.environ.get('REPROOT_STARTER_FREE_CATEGORY_LIMIT', '5')),
     'subcategories_per_category': int(os.environ.get('REPROOT_STARTER_FREE_SUBCATEGORY_LIMIT', '3')),
-    'professional_storage_bytes': int(os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(30 * 1024 * 1024))),
+    'professional_storage_bytes': REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES,
+    'client_data_retention_days': int(os.environ.get('REPROOT_STARTER_FREE_DATA_RETENTION_DAYS', '60')),
   },
   'pro': {
     'name': 'Pro',
@@ -262,7 +277,8 @@ REPROOT_PLAN_TIERS = {
     'references': int(os.environ.get('REPROOT_PRO_REFERENCE_LIMIT', '100')),
     'categories': int(os.environ.get('REPROOT_PRO_CATEGORY_LIMIT', '20')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PRO_SUBCATEGORY_LIMIT', '10')),
-    'professional_storage_bytes': int(os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(90 * 1024 * 1024))),
+    'professional_storage_bytes': REPROOT_PRO_STORAGE_LIMIT_BYTES,
+    'client_data_retention_days': int(os.environ.get('REPROOT_PRO_DATA_RETENTION_DAYS', '60')),
   },
   'premium_unlimited': {
     'name': 'Premium Unlimited',
@@ -273,7 +289,8 @@ REPROOT_PLAN_TIERS = {
     'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '1000')),
     'categories': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CATEGORY_LIMIT', '50')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_SUBCATEGORY_LIMIT', '20')),
-    'professional_storage_bytes': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(2**31 - 1))),
+    'professional_storage_bytes': REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES,
+    'client_data_retention_days': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_DATA_RETENTION_DAYS', '180')),
   },
   # Legacy tiers (for backward compatibility during migration)
   'starter': {
@@ -281,12 +298,14 @@ REPROOT_PLAN_TIERS = {
     'lead_forms': 1, 'groups': 5, 'clients': 100, 'templates': 5,
     'references': 100, 'categories': 10, 'subcategories_per_category': 5,
     'professional_storage_bytes': 50 * 1024 * 1024,
+    'client_data_retention_days': 60,
   },
   'premium': {
     'name': 'Premium (Legacy)',
     'lead_forms': 3, 'groups': 25, 'clients': 1000, 'templates': 50,
     'references': 1000, 'categories': 50, 'subcategories_per_category': 20,
     'professional_storage_bytes': 1024 * 1024 * 1024,
+    'client_data_retention_days': 180,
   },
 }
 
