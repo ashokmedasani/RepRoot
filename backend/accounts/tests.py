@@ -10,15 +10,22 @@ from .models import (
   ChatMessage,
   ClientAccess,
   ClientDetailChangeRequest,
+  ClientPaymentMethodAccess,
   ClientRegistrationForm,
   ClientReminder,
+  ManualPaymentProfile,
+  PaymentAuditLog,
+  PaymentProof,
+  PaymentRecord,
+  PaymentRequest,
+  ProfessionalPaymentSettings,
   ReferenceCategory,
   SupportIncident,
   SupportIncidentMessage,
   TemplateAssignment,
   TrackingTemplate,
-  TrainerGroup,
-  TrainerProfile,
+  ProfessionalGroup,
+  ProfessionalProfile,
   UNIVERSAL_CORE_FIELDS,
 )
 
@@ -27,18 +34,18 @@ from .models import (
 class WorkflowRefinementTests(APITestCase):
   def setUp(self):
     self.user = get_user_model().objects.create_user(
-      username='trainer-one',
-      email='trainer@example.com',
-      password='Trainer!123',
+      username='professional-one',
+      email='professional@example.com',
+      password='Professional!123',
       first_name='Taylor',
       last_name='Coach',
     )
-    self.profile = TrainerProfile.objects.create(
+    self.profile = ProfessionalProfile.objects.create(
       user=self.user,
-      trainer_id='coach-taylor',
+      professional_id='coach-taylor',
       profile_setup_completed=True,
     )
-    self.group = TrainerGroup.objects.create(trainer=self.user, name='Strength Group')
+    self.group = ProfessionalGroup.objects.create(professional=self.user, name='Strength Group')
     self.registration_form = ClientRegistrationForm.objects.create(
       group=self.group,
       fields=[field.copy() for field in UNIVERSAL_CORE_FIELDS],
@@ -62,13 +69,13 @@ class WorkflowRefinementTests(APITestCase):
     return payload
 
   def test_profile_status_preserves_completed_and_incomplete_states(self):
-    response = self.client.get('/api/accounts/trainer/profile/status/')
+    response = self.client.get('/api/accounts/professional/profile/status/')
     self.assertEqual(response.status_code, 200)
     self.assertTrue(response.data['profile_setup_completed'])
 
     self.profile.profile_setup_completed = False
     self.profile.save(update_fields=['profile_setup_completed'])
-    response = self.client.get('/api/accounts/trainer/profile/status/')
+    response = self.client.get('/api/accounts/professional/profile/status/')
     self.assertFalse(response.data['profile_setup_completed'])
 
   def test_support_incidents_enforce_active_limit_and_preserve_conversation(self):
@@ -83,11 +90,11 @@ class WorkflowRefinementTests(APITestCase):
     }
     created = []
     for index in range(3):
-      response = self.client.post('/api/accounts/trainer/support/incidents/', {**payload, 'subject': f'{payload["subject"]} {index}'}, format='json')
+      response = self.client.post('/api/accounts/professional/support/incidents/', {**payload, 'subject': f'{payload["subject"]} {index}'}, format='json')
       self.assertEqual(response.status_code, 201, response.data)
       created.append(response.data['incident']['incident_id'])
 
-    limited = self.client.post('/api/accounts/trainer/support/incidents/', payload, format='json')
+    limited = self.client.post('/api/accounts/professional/support/incidents/', payload, format='json')
     self.assertEqual(limited.status_code, 400)
     self.assertIn('maximum of three', limited.data['message'])
 
@@ -95,7 +102,7 @@ class WorkflowRefinementTests(APITestCase):
     incident.status = SupportIncident.STATUS_WAITING
     incident.save(update_fields=['status', 'updated_at'])
     follow_up = self.client.post(
-      f'/api/accounts/trainer/support/incidents/{incident.incident_id}/',
+      f'/api/accounts/professional/support/incidents/{incident.incident_id}/',
       {'action': 'follow_up', 'body': 'I can reproduce this every time.'},
       format='json',
     )
@@ -106,17 +113,17 @@ class WorkflowRefinementTests(APITestCase):
     incident.status = SupportIncident.STATUS_RESOLVED
     incident.save(update_fields=['status', 'updated_at'])
     reopened = self.client.post(
-      f'/api/accounts/trainer/support/incidents/{incident.incident_id}/',
+      f'/api/accounts/professional/support/incidents/{incident.incident_id}/',
       {'action': 'reopen'},
       format='json',
     )
     self.assertEqual(reopened.status_code, 200, reopened.data)
     self.assertEqual(reopened.data['incident']['status'], SupportIncident.STATUS_REOPENED)
 
-  def test_trainer_data_usage_counts_owned_client_content(self):
+  def test_professional_data_usage_counts_owned_client_content(self):
     photo = 'data:image/png;base64,' + ('A' * 2048)
     ClientAccess.objects.create(
-      trainer=self.user,
+      professional=self.user,
       group=self.group,
       first_name='Usage',
       last_name='Client',
@@ -127,22 +134,25 @@ class WorkflowRefinementTests(APITestCase):
       registration_answers={'goal': 'Strength'},
     )
 
-    response = self.client.get('/api/accounts/trainer/data-usage/')
+    response = self.client.get('/api/accounts/professional/data-usage/')
 
     self.assertEqual(response.status_code, 200, response.data)
-    self.assertGreater(response.data['database_bytes'], len(photo))
-    self.assertEqual(response.data['total_bytes'], response.data['database_bytes'] + response.data['file_bytes'])
-    self.assertEqual(response.data['quota_bytes'], 50 * 1024 * 1024)
-    self.assertEqual(response.data['plan_name'], 'Starter')
+    # The professional-facing usage response is percentage-only — no raw byte
+    # counts are exposed, so assertions below check percent/record_count shape.
+    self.assertNotIn('total_bytes', response.data)
+    self.assertNotIn('database_bytes', response.data)
+    self.assertNotIn('quota_bytes', response.data)
+    self.assertEqual(response.data['plan_name'], 'Starter Free')
     self.assertGreaterEqual(response.data['usage_percent'], 0)
-    self.assertIn('trainer_profile', response.data['sections'])
+    self.assertIn('usage_label', response.data)
+    self.assertIn('professional_profile', response.data['sections'])
     self.assertIn('clients', response.data['sections'])
     self.assertEqual(response.data['sections']['clients']['record_count'], 1)
     self.assertEqual(response.data['featured_client']['username'], 'usage-client')
-    self.assertGreater(response.data['featured_client']['sections']['profile_intake']['total_bytes'], len(photo))
+    self.assertGreater(response.data['featured_client']['percent_of_quota'], 0)
 
   def test_manual_client_gets_reference_credentials_and_first_login_change(self):
-    response = self.client.post('/api/accounts/trainer/forms-groups/clients/manual/', self.manual_payload(), format='json')
+    response = self.client.post('/api/accounts/professional/forms-groups/clients/manual/', self.manual_payload(), format='json')
     self.assertEqual(response.status_code, 201, response.data)
     client_access = ClientAccess.objects.get(pk=response.data['client_access']['id'])
     self.assertEqual(client_access.onboarding_method, ClientAccess.ONBOARDING_MANUAL)
@@ -155,7 +165,7 @@ class WorkflowRefinementTests(APITestCase):
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
-      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      {'professional_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
       format='json',
     )
     self.assertEqual(login.status_code, 200, login.data)
@@ -172,7 +182,7 @@ class WorkflowRefinementTests(APITestCase):
     reference_id = public_response.data['reference_id']
 
     self.client.force_authenticate(self.user)
-    group_response = self.client.get(f'/api/accounts/trainer/forms-groups/groups/{self.group.id}/clients/')
+    group_response = self.client.get(f'/api/accounts/professional/forms-groups/groups/{self.group.id}/clients/')
     submission = group_response.data['registration_submissions'][0]
     self.assertEqual(submission['reference_id'], reference_id)
 
@@ -181,14 +191,14 @@ class WorkflowRefinementTests(APITestCase):
       registration_answers={'first_name': 'ignored', 'last_name': 'ignored', 'email': 'ignored@example.com'},
       registration_submission_id=submission['id'],
     )
-    converted = self.client.post('/api/accounts/trainer/forms-groups/clients/manual/', payload, format='json')
+    converted = self.client.post('/api/accounts/professional/forms-groups/clients/manual/', payload, format='json')
     self.assertEqual(converted.status_code, 201, converted.data)
     self.assertEqual(converted.data['client_access']['onboarding_method'], ClientAccess.ONBOARDING_GROUP_REGISTRATION)
     self.assertEqual(converted.data['client_access']['reference_id'], reference_id)
 
   def test_schedule_summary_includes_required_pending_and_completed_kpis(self):
     response = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(send_credentials=False),
       format='json',
     )
@@ -198,28 +208,28 @@ class WorkflowRefinementTests(APITestCase):
     due_soon_at = now + timedelta(hours=2)
     next_week_at = now + timedelta(days=6)
     ClientReminder.objects.create(
-      trainer=self.user,
+      professional=self.user,
       client=client_access,
       title='Overdue check-in',
       date=overdue_at.date(),
       time=overdue_at.time(),
     )
     ClientReminder.objects.create(
-      trainer=self.user,
+      professional=self.user,
       client=client_access,
       title='Today check-in',
       date=due_soon_at.date(),
       time=due_soon_at.time(),
     )
     ClientReminder.objects.create(
-      trainer=self.user,
+      professional=self.user,
       client=client_access,
       title='Next week',
       date=next_week_at.date(),
       time=next_week_at.time(),
     )
     ClientReminder.objects.create(
-      trainer=self.user,
+      professional=self.user,
       client=client_access,
       title='Completed',
       date=now.date(),
@@ -231,7 +241,7 @@ class WorkflowRefinementTests(APITestCase):
       client_note='My goal has changed.',
     )
 
-    summary_response = self.client.get('/api/accounts/trainer/reminders/upcoming/')
+    summary_response = self.client.get('/api/accounts/professional/reminders/upcoming/')
     summary = summary_response.data['summary']
     self.assertEqual(summary['total_pending'], 3)
     self.assertEqual(summary['overdue'], 1)
@@ -250,7 +260,7 @@ class WorkflowRefinementTests(APITestCase):
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
-      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      {'professional_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
       format='json',
     )
     dashboard = self.client.get(
@@ -263,11 +273,11 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(dashboard.data['summary']['due_7_days'], 2)
     self.assertEqual(dashboard.data['schedules'][0]['title'], 'Overdue check-in')
 
-  @override_settings(COACHFLOW_PLAN_LIMITS={'references': 1, 'categories': 10, 'subcategories_per_category': 5})
+  @override_settings(REPROOT_PLAN_LIMITS={'references': 1, 'categories': 10, 'subcategories_per_category': 5})
   def test_reference_limit_is_reported_and_enforced(self):
-    category = ReferenceCategory.objects.create(trainer=self.user, name='Exercises', subcategories=['Back'])
+    category = ReferenceCategory.objects.create(professional=self.user, name='Exercises', subcategories=['Back'])
     first = self.client.post(
-      '/api/accounts/trainer/references/',
+      '/api/accounts/professional/references/',
       {
         'category': category.id,
         'subcategory': 'Back',
@@ -280,10 +290,10 @@ class WorkflowRefinementTests(APITestCase):
       format='multipart',
     )
     self.assertEqual(first.status_code, 201, first.data)
-    listing = self.client.get('/api/accounts/trainer/references/')
+    listing = self.client.get('/api/accounts/professional/references/')
     self.assertEqual(listing.data['usage'], {'used': 1, 'limit': 1})
     second = self.client.post(
-      '/api/accounts/trainer/references/',
+      '/api/accounts/professional/references/',
       {
         'category': category.id,
         'subcategory': 'Back',
@@ -298,9 +308,9 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(second.status_code, 400)
     self.assertEqual(second.data['message'], 'You have reached the Version 1 reference limit.')
 
-  def test_client_deletion_request_reaches_trainer_and_deactivates_on_approval(self):
+  def test_client_deletion_request_reaches_professional_and_deactivates_on_approval(self):
     created = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(send_credentials=False),
       format='json',
     )
@@ -309,7 +319,7 @@ class WorkflowRefinementTests(APITestCase):
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
-      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      {'professional_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
       format='json',
     )
     token = login.data['token']
@@ -323,10 +333,10 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(requested.data['deletion_request']['request_type'], 'account_deletion')
 
     self.client.force_authenticate(self.user)
-    queue = self.client.get('/api/accounts/trainer/reminders/upcoming/')
+    queue = self.client.get('/api/accounts/professional/reminders/upcoming/')
     action = next(item for item in queue.data['profile_edits'] if item['request_type'] == 'account_deletion')
     approved = self.client.post(
-      f'/api/accounts/trainer/forms-groups/clients/{client_access.id}/change-requests/{action["id"]}/',
+      f'/api/accounts/professional/forms-groups/clients/{client_access.id}/change-requests/{action["id"]}/',
       {'action': 'approve'},
       format='json',
     )
@@ -336,7 +346,7 @@ class WorkflowRefinementTests(APITestCase):
 
   def test_legacy_additional_information_is_normalized_and_removable(self):
     created = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(send_credentials=False),
       format='json',
     )
@@ -347,13 +357,13 @@ class WorkflowRefinementTests(APITestCase):
     ]
     client_access.save(update_fields=['additional_info'])
 
-    detail = self.client.get(f'/api/accounts/trainer/forms-groups/clients/{client_access.id}/')
+    detail = self.client.get(f'/api/accounts/professional/forms-groups/clients/{client_access.id}/')
     items = detail.data['client']['additional_info']
     self.assertEqual([item['title'] for item in items], ['Emergency Contact', 'Training Days'])
     self.assertTrue(all(item['id'] for item in items))
 
     updated = self.client.put(
-      f'/api/accounts/trainer/forms-groups/clients/{client_access.id}/additional-info/',
+      f'/api/accounts/professional/forms-groups/clients/{client_access.id}/additional-info/',
       {'additional_info': [items[1]]},
       format='json',
     )
@@ -376,7 +386,7 @@ class WorkflowRefinementTests(APITestCase):
       'links': True,
     }
     response = self.client.put(
-      '/api/accounts/trainer/profile/visibility/',
+      '/api/accounts/professional/profile/visibility/',
       {'visibility': visibility},
       format='json',
     )
@@ -388,7 +398,7 @@ class WorkflowRefinementTests(APITestCase):
 
   def test_client_logout_revokes_the_current_token(self):
     created = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(send_credentials=False),
       format='json',
     )
@@ -396,7 +406,7 @@ class WorkflowRefinementTests(APITestCase):
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
-      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      {'professional_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
       format='json',
     )
     token = login.data['token']
@@ -408,7 +418,7 @@ class WorkflowRefinementTests(APITestCase):
 
   def test_chat_unread_counts_clear_only_when_recipient_opens_chat(self):
     created = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(send_credentials=False),
       format='json',
     )
@@ -416,29 +426,29 @@ class WorkflowRefinementTests(APITestCase):
     client_access = ClientAccess.objects.get(pk=created.data['client_access']['id'])
 
     ChatMessage.objects.create(
-      trainer=self.user,
+      professional=self.user,
       client=client_access,
       sender=ChatMessage.SENDER_CLIENT,
       text='Can you review my workout?',
     )
-    trainer_unread = self.client.get('/api/accounts/trainer/chat/unread/')
-    self.assertEqual(trainer_unread.status_code, 200, trainer_unread.data)
-    self.assertEqual(trainer_unread.data['unread_count'], 1)
-    self.assertEqual(trainer_unread.data['by_client'][str(client_access.id)], 1)
+    professional_unread = self.client.get('/api/accounts/professional/chat/unread/')
+    self.assertEqual(professional_unread.status_code, 200, professional_unread.data)
+    self.assertEqual(professional_unread.data['unread_count'], 1)
+    self.assertEqual(professional_unread.data['by_client'][str(client_access.id)], 1)
 
-    opened_by_trainer = self.client.get(f'/api/accounts/trainer/clients/{client_access.id}/chat/')
-    self.assertEqual(opened_by_trainer.status_code, 200, opened_by_trainer.data)
-    self.assertEqual(self.client.get('/api/accounts/trainer/chat/unread/').data['unread_count'], 0)
+    opened_by_professional = self.client.get(f'/api/accounts/professional/clients/{client_access.id}/chat/')
+    self.assertEqual(opened_by_professional.status_code, 200, opened_by_professional.data)
+    self.assertEqual(self.client.get('/api/accounts/professional/chat/unread/').data['unread_count'], 0)
 
     self.client.post(
-      f'/api/accounts/trainer/clients/{client_access.id}/chat/',
+      f'/api/accounts/professional/clients/{client_access.id}/chat/',
       {'text': 'I reviewed it and left feedback.'},
       format='json',
     )
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
-      {'trainer_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
+      {'professional_id': 'coach-taylor', 'username': 'rahul.kumar', 'password': 'Temp!Pass7'},
       format='json',
     )
     authorization = f'ClientToken {login.data["token"]}'
@@ -460,7 +470,7 @@ class WorkflowRefinementTests(APITestCase):
     delete would silently strip an actively-used tracker from every client.
     """
     created = self.client.post(
-      '/api/accounts/trainer/templates/',
+      '/api/accounts/professional/templates/',
       {
         'name': 'Daily Habits',
         'purpose': 'Track habits',
@@ -474,7 +484,7 @@ class WorkflowRefinementTests(APITestCase):
     template_id = created.data['template']['id']
 
     made_client = self.client.post(
-      '/api/accounts/trainer/forms-groups/clients/manual/',
+      '/api/accounts/professional/forms-groups/clients/manual/',
       self.manual_payload(),
       format='json',
     )
@@ -482,7 +492,7 @@ class WorkflowRefinementTests(APITestCase):
     client_id = made_client.data['client_access']['id']
 
     assigned = self.client.post(
-      f'/api/accounts/trainer/forms-groups/clients/{client_id}/assignments/',
+      f'/api/accounts/professional/forms-groups/clients/{client_id}/assignments/',
       {'template_id': template_id, 'reference_ids': []},
       format='json',
     )
@@ -490,7 +500,7 @@ class WorkflowRefinementTests(APITestCase):
     assignment_id = assigned.data['assignment']['id']
 
     # Assigned: the delete must be refused and the template must survive.
-    refused = self.client.delete(f'/api/accounts/trainer/templates/{template_id}/')
+    refused = self.client.delete(f'/api/accounts/professional/templates/{template_id}/')
     self.assertEqual(refused.status_code, 400, refused.data)
     self.assertEqual(refused.data['assigned_count'], 1)
     self.assertIn('Remove it from every client', refused.data['message'])
@@ -499,10 +509,405 @@ class WorkflowRefinementTests(APITestCase):
 
     # Unassigned: the delete now goes through.
     unassigned = self.client.delete(
-      f'/api/accounts/trainer/forms-groups/clients/{client_id}/assignments/{assignment_id}/'
+      f'/api/accounts/professional/forms-groups/clients/{client_id}/assignments/{assignment_id}/'
     )
     self.assertEqual(unassigned.status_code, 200, unassigned.data)
 
-    deleted = self.client.delete(f'/api/accounts/trainer/templates/{template_id}/')
+    deleted = self.client.delete(f'/api/accounts/professional/templates/{template_id}/')
     self.assertEqual(deleted.status_code, 200, deleted.data)
     self.assertFalse(TrackingTemplate.objects.filter(id=template_id).exists())
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class ClientPaymentsWorkflowTests(APITestCase):
+  """Client Payments — money professionals collect from their own clients.
+  Separate from RepRoot Studio Billing; see accounts/views_payments.py."""
+
+  def setUp(self):
+    self.user = get_user_model().objects.create_user(
+      username='pay-professional',
+      email='pay-professional@example.com',
+      password='Professional!123',
+      first_name='Maya',
+      last_name='Santos',
+    )
+    ProfessionalProfile.objects.create(user=self.user, professional_id='coach-maya-pay', profile_setup_completed=True)
+    self.group = ProfessionalGroup.objects.create(professional=self.user, name='Pay Group')
+    ClientRegistrationForm.objects.create(group=self.group, fields=[field.copy() for field in UNIVERSAL_CORE_FIELDS])
+    self.client.force_authenticate(self.user)
+
+    created = self.client.post(
+      '/api/accounts/professional/forms-groups/clients/manual/',
+      {
+        'group_id': self.group.id,
+        'username': 'pay.client',
+        'password': 'Temp!Pass7',
+        'confirm_password': 'Temp!Pass7',
+        'registration_answers': {'first_name': 'Alex', 'last_name': 'Rivera', 'email': 'alex@example.com'},
+        'send_credentials': False,
+      },
+      format='json',
+    )
+    self.assertEqual(created.status_code, 201, created.data)
+    self.client_access_id = created.data['client_access']['id']
+
+    login = self.client.post(
+      '/api/accounts/client/login/',
+      {'professional_id': 'coach-maya-pay', 'username': 'pay.client', 'password': 'Temp!Pass7'},
+      format='json',
+    )
+    self.assertEqual(login.status_code, 200, login.data)
+    self.client_auth_header = 'ClientToken ' + login.data['token']
+    self.client.force_authenticate(self.user)
+
+  def create_method(self, **overrides):
+    payload = {
+      'name': 'Personal UPI',
+      'category': 'upi',
+      'display_label': 'Maya UPI',
+      'supported_currencies': ['USD'],
+      'client_visible_fields': {'upi_id': 'maya@ybl'},
+      'private_fields': {'linked_bank': 'Test Bank'},
+      'internal_notes': 'internal only, never sent to client',
+      'client_instructions': 'Pay via UPI',
+    }
+    payload.update(overrides)
+    response = self.client.post('/api/accounts/professional/payments/methods/', payload, format='json')
+    self.assertEqual(response.status_code, 201, response.data)
+    return response.data['method']['id']
+
+  def share_method(self, method_id):
+    response = self.client.put(
+      '/api/accounts/professional/payments/clients/' + str(self.client_access_id) + '/methods/',
+      {'method_ids': [method_id]},
+      format='json',
+    )
+    self.assertEqual(response.status_code, 200, response.data)
+
+  def create_request(self, method_id, **overrides):
+    payload = {
+      'title': 'July Coaching Fee',
+      'requested_amount': '200.00',
+      'requested_currency': 'USD',
+      'payment_type': 'manual',
+      'allowed_method_ids': [method_id],
+    }
+    payload.update(overrides)
+    response = self.client.post(
+      '/api/accounts/professional/payments/clients/' + str(self.client_access_id) + '/requests/', payload, format='json'
+    )
+    self.assertEqual(response.status_code, 201, response.data)
+    return response.data['request']['request_id']
+
+  # --- Manual payment methods -------------------------------------------
+
+  def test_manual_method_cap_is_five_active(self):
+    for index in range(5):
+      self.create_method(display_label='Method ' + str(index), name='internal ' + str(index))
+    sixth = self.client.post(
+      '/api/accounts/professional/payments/methods/',
+      {'name': 'Sixth', 'category': 'cash', 'display_label': 'Cash', 'client_visible_fields': {}},
+      format='json',
+    )
+    self.assertEqual(sixth.status_code, 400)
+    self.assertIn('limit', sixth.data['message'].lower())
+
+  def test_category_required_client_fields_are_enforced(self):
+    response = self.client.post(
+      '/api/accounts/professional/payments/methods/',
+      {'name': 'Bad Zelle', 'category': 'zelle', 'display_label': 'US Zelle', 'client_visible_fields': {}},
+      format='json',
+    )
+    self.assertEqual(response.status_code, 400)
+    self.assertIn('client_visible_fields', response.data)
+
+  def test_client_facing_preview_never_leaks_private_fields(self):
+    method_id = self.create_method()
+    preview = self.client.get('/api/accounts/professional/payments/methods/' + str(method_id) + '/preview/')
+    self.assertEqual(preview.status_code, 200, preview.data)
+    preview_body = preview.data['preview']
+    self.assertNotIn('private_fields', preview_body)
+    self.assertNotIn('internal_notes', preview_body)
+    self.assertNotIn('name', preview_body)
+    self.assertEqual(preview_body['client_visible_fields'], {'upi_id': 'maya@ybl'})
+
+  def test_unshared_method_is_rejected_on_request_creation(self):
+    method_id = self.create_method()
+    response = self.client.post(
+      '/api/accounts/professional/payments/clients/' + str(self.client_access_id) + '/requests/',
+      {
+        'title': 'Should fail',
+        'requested_amount': '50.00',
+        'requested_currency': 'USD',
+        'payment_type': 'manual',
+        'allowed_method_ids': [method_id],
+      },
+      format='json',
+    )
+    self.assertEqual(response.status_code, 400)
+    self.assertIn('shared', response.data['message'])
+
+  # --- Requests / proof / verification -----------------------------------
+
+  def test_client_view_flips_status_to_viewed_and_notifies_professional(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_SENT)
+
+    self.client.force_authenticate(user=None)
+    detail = self.client.get(
+      '/api/accounts/client/payments/requests/' + request_id + '/', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(detail.status_code, 200, detail.data)
+    self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_VIEWED)
+
+  def test_proof_requires_reference_or_file(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.client.force_authenticate(user=None)
+    response = self.client.post(
+      '/api/accounts/client/payments/requests/' + request_id + '/proof/',
+      {
+        'reported_amount': '200.00',
+        'reported_currency': 'USD',
+        'reported_payment_date': timezone.now().date().isoformat(),
+        'payment_method': method_id,
+        'confirmed_accurate': True,
+      },
+      format='json',
+      HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    self.assertEqual(response.status_code, 400)
+
+  def test_full_verification_flow_creates_completed_record_and_writes_audit_log(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.client.force_authenticate(user=None)
+    proof = self.client.post(
+      '/api/accounts/client/payments/requests/' + request_id + '/proof/',
+      {
+        'transaction_reference': 'UPI-TEST-1',
+        'reported_amount': '200.00',
+        'reported_currency': 'USD',
+        'reported_payment_date': timezone.now().date().isoformat(),
+        'payment_method': method_id,
+        'confirmed_accurate': True,
+      },
+      format='json',
+      HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    self.assertEqual(proof.status_code, 201, proof.data)
+    proof_id = proof.data['proof']['id']
+    self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_PROOF_SUBMITTED)
+
+    self.client.force_authenticate(self.user)
+    verified = self.client.post(
+      '/api/accounts/professional/payments/proofs/' + str(proof_id) + '/verify/',
+      {
+        'outcome': 'completed',
+        'original_amount': '200.00',
+        'original_currency': 'USD',
+        'reporting_amount': '16750.00',
+        'reporting_currency': 'INR',
+        'received_date': timezone.now().date().isoformat(),
+        'verification_note': 'Confirmed in app',
+      },
+      format='json',
+    )
+    self.assertEqual(verified.status_code, 201, verified.data)
+
+    payment_request = PaymentRequest.objects.get(request_id=request_id)
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
+    record = PaymentRecord.objects.get(payment_request=payment_request)
+    self.assertEqual(record.status, PaymentRecord.STATUS_COMPLETED)
+    self.assertEqual(str(record.reporting_amount), '16750.00')
+    self.assertTrue(PaymentAuditLog.objects.filter(action='payment_verified', payment_record=record).exists())
+
+  def test_reject_proof_requires_reason_and_client_can_resubmit(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.client.force_authenticate(user=None)
+    proof = self.client.post(
+      '/api/accounts/client/payments/requests/' + request_id + '/proof/',
+      {
+        'transaction_reference': 'BAD-REF',
+        'reported_amount': '200.00',
+        'reported_currency': 'USD',
+        'reported_payment_date': timezone.now().date().isoformat(),
+        'payment_method': method_id,
+        'confirmed_accurate': True,
+      },
+      format='json',
+      HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    proof_id = proof.data['proof']['id']
+
+    self.client.force_authenticate(self.user)
+    rejected = self.client.post(
+      '/api/accounts/professional/payments/proofs/' + str(proof_id) + '/reject/',
+      {'reason': 'Reference does not match'},
+      format='json',
+    )
+    self.assertEqual(rejected.status_code, 200, rejected.data)
+    self.assertEqual(PaymentProof.objects.get(id=proof_id).status, PaymentProof.STATUS_REJECTED)
+
+  # --- Partial payments / reporting-currency immutability -----------------
+
+  def test_same_currency_installments_auto_complete_request(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+    payment_request = PaymentRequest.objects.get(request_id=request_id)
+
+    for _ in range(2):
+      response = self.client.post(
+        '/api/accounts/professional/payments/records/',
+        {
+          'client': self.client_access_id,
+          'payment_request_id': request_id,
+          'original_amount': '100.00',
+          'original_currency': 'USD',
+          'reporting_amount': '8300.00',
+          'reporting_currency': 'INR',
+          'received_date': timezone.now().date().isoformat(),
+          'status': 'partially_paid',
+        },
+        format='json',
+      )
+      self.assertEqual(response.status_code, 201, response.data)
+
+    payment_request.refresh_from_db()
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
+
+  def test_mixed_currency_installments_do_not_auto_complete(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+    payment_request = PaymentRequest.objects.get(request_id=request_id)
+
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'payment_request_id': request_id,
+        'original_amount': '100.00',
+        'original_currency': 'USD',
+        'reporting_amount': '8300.00',
+        'reporting_currency': 'INR',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'partially_paid',
+      },
+      format='json',
+    )
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'payment_request_id': request_id,
+        'original_amount': '8300.00',
+        'original_currency': 'INR',
+        'reporting_amount': '8300.00',
+        'reporting_currency': 'INR',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'partially_paid',
+      },
+      format='json',
+    )
+
+    payment_request.refresh_from_db()
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_PARTIALLY_PAID)
+
+  def test_reporting_currency_change_does_not_rewrite_historical_records(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'payment_request_id': request_id,
+        'original_amount': '200.00',
+        'original_currency': 'USD',
+        'reporting_amount': '16750.00',
+        'reporting_currency': 'INR',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'completed',
+      },
+      format='json',
+    )
+    record = PaymentRecord.objects.get(payment_request__request_id=request_id)
+
+    settings_response = self.client.put(
+      '/api/accounts/professional/payments/settings/', {'reporting_currency': 'USD'}, format='json'
+    )
+    self.assertEqual(settings_response.status_code, 200, settings_response.data)
+
+    record.refresh_from_db()
+    self.assertEqual(record.reporting_currency, 'INR')
+    self.assertEqual(str(record.reporting_amount), '16750.00')
+
+  # --- Privacy / permission boundaries -------------------------------------
+
+  def test_client_cannot_see_private_visibility_record(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'original_amount': '500.00',
+        'original_currency': 'USD',
+        'reporting_amount': '500.00',
+        'reporting_currency': 'USD',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'completed',
+        'client_visibility': 'private',
+        'internal_note': 'not for client eyes',
+      },
+      format='json',
+    )
+
+    self.client.force_authenticate(user=None)
+    records = self.client.get('/api/accounts/client/payments/records/', HTTP_AUTHORIZATION=self.client_auth_header)
+    self.assertEqual(records.status_code, 200, records.data)
+    self.assertEqual(records.data['records'], [])
+
+  def test_payment_audit_log_is_immutable(self):
+    log = PaymentAuditLog.objects.create(professional=self.user, action='method_created', changed_by='tester')
+    log.new_values = {'changed': True}
+    with self.assertRaises(ValueError):
+      log.save()
+
+  def test_confirmation_document_returns_expected_fields(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'original_amount': '75.00',
+        'original_currency': 'USD',
+        'reporting_amount': '75.00',
+        'reporting_currency': 'USD',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'completed',
+        'client_note': 'Thanks!',
+      },
+      format='json',
+    )
+    record = PaymentRecord.objects.get(professional=self.user)
+    response = self.client.get('/api/accounts/professional/payments/records/' + record.payment_record_id + '/confirmation/')
+    self.assertEqual(response.status_code, 200, response.data)
+    confirmation = response.data['confirmation']
+    self.assertEqual(confirmation['professional_note'], 'Thanks!')
+    self.assertEqual(confirmation['amount_recorded'], '75.00')
+    self.assertEqual(confirmation['status'], 'completed')

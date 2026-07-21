@@ -698,7 +698,8 @@ class ChatMessage(models.Model):
   professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_messages')
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='chat_messages')
   sender = models.CharField(max_length=20, choices=SENDER_CHOICES)
-  text = models.TextField()
+  text = models.TextField(blank=True)
+  image = models.FileField(upload_to='client-chat/images/%Y/%m/', blank=True)
   is_read = models.BooleanField(default=False)
   created_at = models.DateTimeField(auto_now_add=True)
 

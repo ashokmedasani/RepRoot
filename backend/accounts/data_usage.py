@@ -60,7 +60,38 @@ def _section_usage(*, values=(), querysets=(), files=()) -> dict[str, int]:
   }
 
 
-def _client_usage(client) -> dict:
+# Professionals only ever see a percentage of their plan, never a raw byte
+# count — these are the only two things allowed to translate storage bytes
+# into something byte-free for the API response.
+def _percent_of_quota(byte_count: int, quota_bytes: int) -> float:
+  return round((byte_count / quota_bytes) * 100, 2)
+
+
+def _sanitize_sections(sections: dict, quota_bytes: int) -> dict:
+  return {
+    name: {
+      'percent_of_quota': min(100, _percent_of_quota(section['total_bytes'], quota_bytes)),
+      'record_count': section['record_count'],
+    }
+    for name, section in sections.items()
+  }
+
+
+def _usage_status_label(usage_percent: float) -> str:
+  """A human, non-numeric read on the percentage — the percent itself still
+  ships in the response, this is just friendlier phrasing to hang it on."""
+  if usage_percent > 100:
+    return 'over_capacity'
+  if usage_percent >= settings.REPROOT_DATA_USAGE_DANGER_PERCENT:
+    return 'almost_full'
+  if usage_percent >= settings.REPROOT_DATA_USAGE_WARNING_PERCENT:
+    return 'filling_up'
+  if usage_percent >= 40:
+    return 'comfortable'
+  return 'plenty_of_room'
+
+
+def _client_usage(client, quota_bytes: int) -> dict:
   lead_values = []
   if client.lead_submission_id:
     lead = LeadSubmission.objects.filter(pk=client.lead_submission_id).values().first()
@@ -79,7 +110,13 @@ def _client_usage(client) -> dict:
     'tracking_history': _section_usage(querysets=[TrackingEntry.objects.filter(client=client)]),
     'progress': _section_usage(querysets=[ProgressEntry.objects.filter(client=client)]),
     'schedules': _section_usage(querysets=[ClientReminder.objects.filter(client=client)]),
-    'messages': _section_usage(querysets=[ChatMessage.objects.filter(client=client)]),
+    'messages': _section_usage(
+      querysets=[ChatMessage.objects.filter(client=client)],
+      files=[
+        message.image
+        for message in ChatMessage.objects.filter(client=client).exclude(image='').only('image')
+      ],
+    ),
     'account_activity': _section_usage(
       querysets=[
         ClientDetailChangeRequest.objects.filter(client=client),
@@ -87,22 +124,21 @@ def _client_usage(client) -> dict:
       ]
     ),
   }
+  total_bytes = sum(section['total_bytes'] for section in sections.values())
   return {
     'id': client.pk,
     'reference_id': client.reference_id,
     'username': client.username,
     'name': f'{client.first_name} {client.last_name}'.strip(),
-    'total_bytes': sum(section['total_bytes'] for section in sections.values()),
-    'database_bytes': sum(section['database_bytes'] for section in sections.values()),
-    'file_bytes': sum(section['file_bytes'] for section in sections.values()),
+    'percent_of_quota': min(100, _percent_of_quota(total_bytes, quota_bytes)),
     'record_count': sum(section['record_count'] for section in sections.values()),
-    'sections': sections,
+    'sections': _sanitize_sections(sections, quota_bytes),
   }
 
 
 def calculate_professional_data_usage(professional) -> dict:
   """Estimate professional-owned storage, broken down by product section and client."""
-  cache_key = f'professional-data-usage:v4:{professional.pk}'
+  cache_key = f'professional-data-usage:v5:{professional.pk}'
   cached = cache.get(cache_key)
   if cached is not None:
     return cached
@@ -165,7 +201,13 @@ def calculate_professional_data_usage(professional) -> dict:
         TrackingEntry.objects.filter(client__professional=professional),
       ]
     ),
-    'messages': _section_usage(querysets=[ChatMessage.objects.filter(professional=professional)]),
+    'messages': _section_usage(
+      querysets=[ChatMessage.objects.filter(professional=professional)],
+      files=[
+        message.image
+        for message in ChatMessage.objects.filter(professional=professional).exclude(image='').only('image')
+      ],
+    ),
   }
 
   database_bytes = sum(section['database_bytes'] for section in sections.values())
@@ -189,7 +231,12 @@ def calculate_professional_data_usage(professional) -> dict:
     .first()
   )
 
-  usage_percent = min(100, round((total_bytes / quota_bytes) * 100, 2))
+  # Uncapped: over-100 values are what drive is_over_quota / account-lock logic
+  # below, so this must never be clamped. Anything shown to the professional
+  # goes through _usage_status_label()/usage_display_percent instead, which is
+  # visually capped at 100 — percentage only, never raw byte counts.
+  usage_percent = round((total_bytes / quota_bytes) * 100, 2)
+  usage_display_percent = min(100, usage_percent)
   warning_threshold = settings.REPROOT_DATA_USAGE_WARNING_PERCENT
   danger_threshold = settings.REPROOT_DATA_USAGE_DANGER_PERCENT
 
@@ -200,18 +247,22 @@ def calculate_professional_data_usage(professional) -> dict:
   grace_period_ends_at = profile.grace_period_ends_at if profile else None
   locked_at = profile.locked_at if profile else None
 
+  # 'professional_storage_bytes' is the one plan_limits entry that's a raw data
+  # amount rather than a feature count (clients, templates, forms, ...) — those
+  # stay numeric, storage stays percentage-only.
+  plan_limits = {
+    key: value for key, value in plan.items() if key not in ('code', 'name', 'professional_storage_bytes')
+  }
+
   result = {
     'plan_code': plan['code'],
     'plan_name': plan['name'],
-    'plan_limits': {key: value for key, value in plan.items() if key not in ('code', 'name')},
-    'total_bytes': total_bytes,
-    'database_bytes': database_bytes,
-    'file_bytes': file_bytes,
-    'quota_bytes': quota_bytes,
-    'usage_percent': usage_percent,
+    'plan_limits': plan_limits,
+    'usage_percent': usage_display_percent,
+    'usage_label': _usage_status_label(usage_percent),
     'record_count': sum(section['record_count'] for section in sections.values()),
-    'sections': sections,
-    'featured_client': _client_usage(featured_client) if featured_client else None,
+    'sections': _sanitize_sections(sections, quota_bytes),
+    'featured_client': _client_usage(featured_client, quota_bytes) if featured_client else None,
 
     # NEW: Warning & account lifecycle fields
     'warning_threshold_percent': warning_threshold,
