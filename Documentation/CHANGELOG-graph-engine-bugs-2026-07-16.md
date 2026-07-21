@@ -1,12 +1,14 @@
 # Two chart bugs found in the existing apps (2026-07-16)
 
-Found while porting `graph-engine.ts` to Dart for the Flutter migration. Both are
+Found while porting `graph-engine.ts` to Dart for the Flutter migration. Both were
 **present in the live web portal and the live Ionic mobile app**, and both were
 confirmed empirically by compiling the real TypeScript with `tsc` and running it
 under node — not by reading the code.
 
-Both are **fixed in the Flutter port only**. The web and Ionic apps are
-**unchanged**; fixing them there is a separate decision (see below).
+**Update (2026-07-18): fixed in the web portal.** `frontend/src/app/shared/analytics/
+graph-engine.ts` now matches the Flutter port's behavior — see "Status of the
+existing apps" below. Ionic (`mobile/`) is retired and was left unchanged on
+purpose; it is not part of ongoing development.
 
 Reproduction harness: `mobile_flutter/tools/tsfix/` (generates
 `mobile_flutter/test/fixtures/graph_engine_ts.json` from the real source).
@@ -91,36 +93,23 @@ midnight, which is what the data means.
 
 ## Status of the existing apps
 
-Not fixed. Both files still carry the bugs:
+- `frontend/src/app/shared/analytics/graph-engine.ts` — **fixed 2026-07-18.**
+  `numericValue` returns `NaN` for a blank answer instead of `0`; a new
+  `parseLocalDate` helper (used by both `withinRange` and `shortDate`) parses
+  `YYYY-MM-DD` as local midnight instead of letting `new Date(iso)` read it as
+  UTC. Verified by running the exact reproduction from this changelog
+  (`new Date('2026-07-15').getDate()` still reproduces `14` on a UTC-4
+  machine; the new `shortDate('2026-07-15')` correctly returns `7/15`), and by
+  a clean `ng build`. Diff is exactly the two-line change anticipated below,
+  applied for real rather than left as a suggestion.
+- `mobile/src/app/shared/analytics/graph-engine.ts` — **not fixed, and not
+  going to be.** Ionic (`mobile/`) is retired; ongoing development target is
+  Flutter (`mobile_flutter/`) and the web portal only.
 
-- `frontend/src/app/shared/analytics/graph-engine.ts`
-- `mobile/src/app/shared/analytics/graph-engine.ts`
-
-The two copies have **identical** `numericValue` and `shortDate`; they differ only
+The two copies had **identical** `numericValue` and `shortDate`; they differed only
 in chart-type selection (mobile added the bar/line and pie/hbar switches plus
 `meta.subtitle`).
 
-If they are fixed later, it is roughly a two-line change per file:
-
-```ts
-function numericValue(raw: unknown): number {
-  const text = String(raw ?? '').trim();
-  return text === '' ? NaN : Number(text);
-}
-
-function shortDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return iso;
-  return `${m}/${d}`;
-}
-```
-
-`withinRange` needs the same date-parsing treatment to be consistent.
-
-**Consequence of not fixing them:** the Flutter charts and the web/Ionic charts
-will legitimately disagree — Flutter correct, the others not. Anyone comparing
-the two during Phase 4/5 parity checks should expect this and should not "fix"
-Flutter to match. The parity target set in `FLUTTER_MIGRATION_PLAN.md` is data
-correctness, not identical rendering.
-
-Deciding whether to fix web + Ionic was deferred deliberately (2026-07-16).
+**Consequence:** Flutter and the web portal now agree (both correct). The
+retired Ionic app still carries both bugs — expected and not a regression,
+since it is no longer maintained.

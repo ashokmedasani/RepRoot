@@ -12,7 +12,7 @@ import '../../shared/charts/analytics_types.dart';
 import '../../shared/charts/chart_card.dart';
 import '../../shared/charts/graph_engine.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../trainer/trainer_format.dart';
+import '../professional/professional_format.dart';
 
 /// Client dashboard — greeting, consistency KPIs, stat cards, and what's due.
 /// Replica of mobile/src/app/pages/client/dashboard/client-dashboard.page.ts.
@@ -159,37 +159,40 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
       body: PagePad(
         onRefresh: _load,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_greeting, style: context.text.bodySmall),
-                    const SizedBox(height: 2),
-                    Text(
-                      _me?.client.displayName.isNotEmpty ?? false
-                          ? _me!.client.displayName
-                          : 'Welcome',
-                      style: context.text.displaySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (_me?.client.trainerName.isNotEmpty ?? false)
+          AppCard(
+            color: tokens.primarySoft,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_greeting, style: context.text.bodySmall),
+                      const SizedBox(height: 2),
                       Text(
-                        'Coached by ${_me!.client.trainerName}',
-                        style: context.text.bodySmall,
+                        _me?.client.displayName.isNotEmpty ?? false
+                            ? _me!.client.displayName
+                            : 'Welcome',
+                        style: context.text.displaySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                      if (_me?.client.professionalName.isNotEmpty ?? false)
+                        Text(
+                          'Coached by ${_me!.client.professionalName}',
+                          style: context.text.bodySmall,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              AppAvatar(
-                initials: _initials,
-                imageUrl: Env.mediaUrl(_me?.client.photo ?? ''),
-                size: 46,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.md),
+                AppAvatar(
+                  initials: _initials,
+                  imageUrl: Env.mediaUrl(_me?.client.photo ?? ''),
+                  size: 46,
+                ),
+              ],
+            ),
           ),
 
           if (_message.isNotEmpty) ...[
@@ -223,6 +226,7 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
               KpiTile(
                 label: 'Streak',
                 icon: Icons.local_fire_department_outlined,
+                iconColor: tokens.accent,
                 value: '${summary?.currentStreak ?? 0}',
                 caption: 'days in a row',
                 valueColor: (summary?.currentStreak ?? 0) > 0 ? tokens.accent : null,
@@ -230,18 +234,21 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
               KpiTile(
                 label: 'Consistency',
                 icon: Icons.percent_outlined,
+                iconColor: context.colors.primary,
                 value: '${summary?.consistencyPercent ?? 0}%',
                 caption: 'last 30 days',
               ),
               KpiTile(
                 label: 'Entries',
                 icon: Icons.edit_note_outlined,
+                iconColor: tokens.success,
                 value: '${summary?.totalEntries ?? 0}',
                 caption: '${summary?.entriesThisWeek ?? 0} this week',
               ),
               KpiTile(
                 label: 'Active days',
                 icon: Icons.calendar_today_outlined,
+                iconColor: tokens.primaryStrong,
                 value: '${summary?.activeDaysLast30 ?? 0}',
                 caption: 'of last 30',
               ),
@@ -249,7 +256,11 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
           ),
 
           if (_statCards.isNotEmpty) ...[
-            const SectionHeader(title: 'Your numbers'),
+            SectionHeader(
+              title: 'Your progress',
+              actionLabel: 'See all',
+              onAction: () => context.go(Routes.clientPrograms),
+            ),
             for (final card in _statCards)
               ChartCard(spec: card, shareContext: 'My progress'),
           ],
@@ -278,13 +289,21 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
 
           const SectionHeader(title: 'Your templates'),
           if (_templates.isEmpty)
-            const EmptyState(message: 'Your trainer has not assigned any yet.')
+            const EmptyState(message: 'Your professional has not assigned any yet.')
           else
             for (final template in _templates.take(4))
               RowItem(
                 title: template.name,
                 subtitle:
                     '${TemplateCadence.label(template.cadence)} · ${template.fields.length} fields',
+                leading: Container(
+                  width: 5,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: parseAccentColor(template.accent),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
                 onTap: () => context.go(Routes.clientPrograms),
               ),
         ],

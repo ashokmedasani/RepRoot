@@ -8,26 +8,26 @@ import {
   ClientAccessRecord,
   FormsGroupsApiService,
   ProgressEntry
-} from '../../../core/api/forms-groups-api.service';
+} from '@core/api/forms-groups-api.service';
 import {
   ReferenceCategoryRecord,
   ReferencesApiService,
-  TrainerReferenceRecord
-} from '../../../core/api/references-api.service';
+  ProfessionalReferenceRecord
+} from '@core/api/references-api.service';
 import {
   TemplateAssignmentRecord,
   TemplateField,
   TemplatesApiService,
   TrackingEntryRecord,
   TrackingTemplateRecord
-} from '../../../core/api/templates-api.service';
-import { ChartSpec, DateRange } from '../../../shared/analytics/analytics.types';
-import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
-import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../shared/analytics/graph-engine';
-import { exportCsv, exportExcel, exportPdf, toTable } from '../../../shared/analytics/export.util';
-import { ReferencesAccordionComponent } from '../../../shared/references-accordion/references-accordion.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+} from '@core/api/templates-api.service';
+import { ChartSpec, DateRange } from '@studio-shared/analytics/analytics.types';
+import { ChartRendererComponent } from '@studio-shared/analytics/chart-renderer.component';
+import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '@studio-shared/analytics/graph-engine';
+import { exportCsv, exportExcel, exportPdf, toTable } from '@studio-shared/analytics/export.util';
+import { ReferencesAccordionComponent } from '@studio-shared/references-accordion/references-accordion.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 type DetailTab = 'overview' | 'references' | 'entries' | 'progress';
 
@@ -38,13 +38,13 @@ interface EntryAnswerDraft {
 }
 
 @Component({
-  selector: 'app-trainer-client-template',
+  selector: 'app-professional-client-template',
   standalone: true,
-  imports: [ChartRendererComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-client-template.component.html',
-  styleUrl: './trainer-client-template.component.scss'
+  imports: [ChartRendererComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-client-template.component.html',
+  styleUrl: './professional-client-template.component.scss'
 })
-export class TrainerClientTemplateComponent implements OnInit {
+export class ProfessionalClientTemplateComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly location = inject(Location);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
@@ -63,7 +63,7 @@ export class TrainerClientTemplateComponent implements OnInit {
   detailTab: DetailTab = 'overview';
 
   referenceCategories: ReferenceCategoryRecord[] = [];
-  referenceLibrary: TrainerReferenceRecord[] = [];
+  referenceLibrary: ProfessionalReferenceRecord[] = [];
   isShareDialogOpen = false;
   shareSelectedIds = new Set<number>();
   referenceSearch = '';
@@ -228,7 +228,7 @@ export class TrainerClientTemplateComponent implements OnInit {
     }
   }
 
-  // ----- progress records (trainer-written) -----
+  // ----- progress records (professional-written) -----
 
   progressEntries: ProgressEntry[] = [];
   isProgressFormOpen = false;
@@ -361,7 +361,7 @@ export class TrainerClientTemplateComponent implements OnInit {
     this.shareSelectedIds = new Set<number>();
   }
 
-  toggleSharedReference(reference: TrainerReferenceRecord): void {
+  toggleSharedReference(reference: ProfessionalReferenceRecord): void {
     if (this.shareSelectedIds.has(reference.id)) {
       this.shareSelectedIds.delete(reference.id);
     } else {
@@ -369,11 +369,11 @@ export class TrainerClientTemplateComponent implements OnInit {
     }
   }
 
-  isSharedReference(reference: TrainerReferenceRecord): boolean {
+  isSharedReference(reference: ProfessionalReferenceRecord): boolean {
     return this.shareSelectedIds.has(reference.id);
   }
 
-  get filteredReferenceLibrary(): TrainerReferenceRecord[] {
+  get filteredReferenceLibrary(): ProfessionalReferenceRecord[] {
     const search = this.referenceSearch.trim().toLowerCase();
 
     if (!search) {
@@ -388,7 +388,7 @@ export class TrainerClientTemplateComponent implements OnInit {
     );
   }
 
-  referencesForCategory(category: ReferenceCategoryRecord): TrainerReferenceRecord[] {
+  referencesForCategory(category: ReferenceCategoryRecord): ProfessionalReferenceRecord[] {
     return this.filteredReferenceLibrary.filter((reference) => reference.category === category.id);
   }
 

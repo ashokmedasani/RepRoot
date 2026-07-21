@@ -5,14 +5,14 @@ import { FormsModule } from '@angular/forms';
 import {
   ClientApiService,
   ClientSupportIncident
-} from '../../core/api/client-api.service';
+} from '@core/api/client-api.service';
 import {
   SupportIncident,
-  TrainerAuthApiService
-} from '../../core/api/trainer-auth-api.service';
-import { formatApiError } from '../utils/ui-helpers';
+  ProfessionalAuthApiService
+} from '@core/api/professional-auth-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
-type ReporterRole = 'trainer' | 'client';
+type ReporterRole = 'professional' | 'client';
 type Incident = SupportIncident | ClientSupportIncident;
 
 @Component({
@@ -23,10 +23,10 @@ type Incident = SupportIncident | ClientSupportIncident;
   styleUrl: './support-incidents.component.scss'
 })
 export class SupportIncidentsComponent implements OnInit {
-  private readonly trainerApi = inject(TrainerAuthApiService);
+  private readonly professionalApi = inject(ProfessionalAuthApiService);
   private readonly clientApi = inject(ClientApiService);
 
-  @Input() role: ReporterRole = 'trainer';
+  @Input() role: ReporterRole = 'professional';
   @Input() pageFeature = 'Settings';
 
   incidents: Incident[] = [];
@@ -103,8 +103,8 @@ export class SupportIncidentsComponent implements OnInit {
       platform: 'web' as const,
       app_version: 'web'
     };
-    const request = this.role === 'trainer'
-      ? this.trainerApi.createSupportIncident({ ...payload, screenshot: this.screenshot })
+    const request = this.role === 'professional'
+      ? this.professionalApi.createSupportIncident({ ...payload, screenshot: this.screenshot })
       : this.clientApi.createSupportIncident({ ...payload, screenshot: this.screenshot });
 
     request.subscribe({
@@ -130,8 +130,8 @@ export class SupportIncidentsComponent implements OnInit {
 
   sendFollowUp(): void {
     if (!this.followUpIncident || !this.followUpBody.trim()) return;
-    const request = this.role === 'trainer'
-      ? this.trainerApi.actOnSupportIncident(this.followUpIncident.incident_id, 'follow_up', this.followUpBody.trim())
+    const request = this.role === 'professional'
+      ? this.professionalApi.actOnSupportIncident(this.followUpIncident.incident_id, 'follow_up', this.followUpBody.trim())
       : this.clientApi.actOnSupportIncident(this.followUpIncident.incident_id, 'follow_up', this.followUpBody.trim());
     request.subscribe({
       next: (response) => {
@@ -148,8 +148,8 @@ export class SupportIncidentsComponent implements OnInit {
   }
 
   reopen(incident: Incident): void {
-    const request = this.role === 'trainer'
-      ? this.trainerApi.actOnSupportIncident(incident.incident_id, 'reopen')
+    const request = this.role === 'professional'
+      ? this.professionalApi.actOnSupportIncident(incident.incident_id, 'reopen')
       : this.clientApi.actOnSupportIncident(incident.incident_id, 'reopen');
     request.subscribe({
       next: (response) => {
@@ -166,8 +166,8 @@ export class SupportIncidentsComponent implements OnInit {
 
   private load(): void {
     this.isLoading = true;
-    const request = this.role === 'trainer'
-      ? this.trainerApi.getSupportIncidents()
+    const request = this.role === 'professional'
+      ? this.professionalApi.getSupportIncidents()
       : this.clientApi.getSupportIncidents();
     request.subscribe({
       next: (response) => {

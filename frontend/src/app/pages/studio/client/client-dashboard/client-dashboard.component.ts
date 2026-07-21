@@ -3,15 +3,15 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
-import { ClientApiService, ClientDashboardResponse } from '../../../core/api/client-api.service';
-import { ClientReminder } from '../../../core/api/forms-groups-api.service';
-import { TrackingEntryRecord, TrackingTemplateRecord } from '../../../core/api/templates-api.service';
-import { ChartSpec } from '../../../shared/analytics/analytics.types';
-import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
-import { buildFieldCharts } from '../../../shared/analytics/graph-engine';
-import { ClientPageShellComponent } from '../../../shared/client-page-shell/client-page-shell.component';
-import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ClientApiService, ClientDashboardResponse } from '@core/api/client-api.service';
+import { ClientReminder } from '@core/api/forms-groups-api.service';
+import { TrackingEntryRecord, TrackingTemplateRecord } from '@core/api/templates-api.service';
+import { ChartSpec } from '@studio-shared/analytics/analytics.types';
+import { ChartRendererComponent } from '@studio-shared/analytics/chart-renderer.component';
+import { buildFieldCharts } from '@studio-shared/analytics/graph-engine';
+import { ClientPageShellComponent } from '@studio-shared/client-page-shell/client-page-shell.component';
+import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 interface TemplateGraphGroup {
   template: TrackingTemplateRecord;

@@ -11,7 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme/app_tokens.dart';
 
-/// Exports a chart as a branded PNG — the chart composited under a CoachFlow
+/// Exports a chart as a branded PNG — the chart composited under a RepRoot
 /// Studio header (logo mark + wordmark + chart title) and a footer strip — and
 /// hands it to the Android share sheet.
 ///
@@ -85,20 +85,20 @@ class BrandedShare {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'image/png')],
-        title: '$title — CoachFlow Studio',
+        title: '$title — RepRoot Studio',
         text: subtitle.isEmpty ? title : '$title · $subtitle',
       ),
     );
     return true;
   }
 
-  /// `Body weight (lb)` -> `coachflow-body-weight-lb.png`
+  /// `Body weight (lb)` -> `reproot-body-weight-lb.png`
   static String _fileName(String title) {
     final slug = title
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
-    return 'coachflow-${slug.isEmpty ? 'chart' : slug}.png';
+    return 'reproot-${slug.isEmpty ? 'chart' : slug}.png';
   }
 
   static Future<ui.Image> _compose(
@@ -137,13 +137,13 @@ class BrandedShare {
     const brandX = _pad + _markSize + 12;
     _drawText(
       canvas,
-      'CoachFlow Studio',
+      'RepRoot Studio',
       const Offset(brandX, _pad + 2),
       TextStyle(color: text, fontSize: 15, fontWeight: FontWeight.w800),
     );
     _drawText(
       canvas,
-      'Trainer & Client Management Platform',
+      'Professional & Client Management Platform',
       const Offset(brandX, _pad + 22),
       TextStyle(color: muted, fontSize: 10, fontWeight: FontWeight.w600),
     );
@@ -194,7 +194,7 @@ class BrandedShare {
 
     _drawText(
       canvas,
-      'Generated ${DateFormat.yMd().format(DateTime.now())} · coachflow.studio',
+      'Generated ${DateFormat.yMd().format(DateTime.now())} · rep-root.com',
       Offset(_pad, height - 22),
       TextStyle(color: muted, fontSize: 9, fontWeight: FontWeight.w600),
     );
@@ -210,7 +210,7 @@ class BrandedShare {
     }
   }
 
-  /// The CoachFlow brand mark: rounded square with a dumbbell knocked out of
+  /// The RepRoot brand mark: rounded square with a dumbbell knocked out of
   /// it. Stroke coordinates are the 24-unit grid from the web/Ionic brand glyph
   /// so all three apps share one logo.
   static void _drawMark(Canvas canvas, Offset origin, Color primary) {

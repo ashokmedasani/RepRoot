@@ -16,24 +16,24 @@ import '../../core/api/templates_api.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 enum DetailTab { info, overview, tracking, chat, actions }
 
 /// Client detail — Info / Overview / Tracking / Chat / Actions.
-/// Replica of mobile/src/app/pages/trainer/client-detail/client-detail.page.ts.
-class TrainerClientDetailPage extends ConsumerStatefulWidget {
-  const TrainerClientDetailPage({super.key, required this.clientId});
+/// Replica of mobile/src/app/pages/professional/client-detail/client-detail.page.ts.
+class ProfessionalClientDetailPage extends ConsumerStatefulWidget {
+  const ProfessionalClientDetailPage({super.key, required this.clientId});
 
   final int clientId;
 
   @override
-  ConsumerState<TrainerClientDetailPage> createState() =>
-      _TrainerClientDetailPageState();
+  ConsumerState<ProfessionalClientDetailPage> createState() =>
+      _ProfessionalClientDetailPageState();
 }
 
-class _TrainerClientDetailPageState
-    extends ConsumerState<TrainerClientDetailPage> {
+class _ProfessionalClientDetailPageState
+    extends ConsumerState<ProfessionalClientDetailPage> {
   DetailTab _tab = DetailTab.info;
 
   ClientAccessDetailResponse? _detail;
@@ -138,7 +138,7 @@ class _TrainerClientDetailPageState
             _detail = detail;
             _client = detail.client;
             _registrationFields = detail.registrationFields;
-            _notes.text = detail.trainerNotes;
+            _notes.text = detail.professionalNotes;
           });
         } catch (_) {
           if (mounted) setState(() => _message = 'Could not load this client.');
@@ -188,7 +188,7 @@ class _TrainerClientDetailPageState
       final lastId = _chatMessages.isNotEmpty ? _chatMessages.last.id : null;
       final messages = await ref
           .read(chatApiProvider)
-          .getTrainerMessages(widget.clientId, afterId: lastId);
+          .getProfessionalMessages(widget.clientId, afterId: lastId);
       if (!mounted || messages.isEmpty) return;
       setState(() => _chatMessages = [..._chatMessages, ...messages]);
       _scrollChatToEnd();
@@ -197,7 +197,7 @@ class _TrainerClientDetailPageState
 
   Future<void> _loadUnread() async {
     try {
-      final summary = await ref.read(chatApiProvider).getTrainerUnreadCounts();
+      final summary = await ref.read(chatApiProvider).getProfessionalUnreadCounts();
       if (mounted) {
         setState(() => _chatUnreadCount = summary.forClient(widget.clientId));
       }
@@ -228,7 +228,7 @@ class _TrainerClientDetailPageState
     try {
       await ref
           .read(formsGroupsApiProvider)
-          .saveTrainerNotes(widget.clientId, _notes.text);
+          .saveProfessionalNotes(widget.clientId, _notes.text);
       _toast('Notes saved.');
     } catch (_) {
       _toast('Could not save notes.');
@@ -303,7 +303,7 @@ class _TrainerClientDetailPageState
     _chatDraft.clear();
     try {
       final sent =
-          await ref.read(chatApiProvider).sendTrainerMessage(widget.clientId, text);
+          await ref.read(chatApiProvider).sendProfessionalMessage(widget.clientId, text);
       if (!mounted) return;
       setState(() => _chatMessages = [..._chatMessages, sent]);
       _scrollChatToEnd();
@@ -346,7 +346,7 @@ class _TrainerClientDetailPageState
             title: _reminderTitle.text.trim(),
             date: _isoDate(date),
             time: _reminderTime == null ? null : _isoTime(_reminderTime!),
-            notifyTrainer: true,
+            notifyProfessional: true,
           );
       if (!mounted) return;
       setState(() {
@@ -401,7 +401,7 @@ class _TrainerClientDetailPageState
   }
 
   Future<void> _resetPassword() async {
-    // Option A: the trainer defines the temporary password, prefilled with a
+    // Option A: the professional defines the temporary password, prefilled with a
     // suggestion — same as manual creation.
     final controller = TextEditingController(text: _generateTemporaryPassword());
     final confirmed = await showDialog<bool>(
@@ -482,7 +482,7 @@ class _TrainerClientDetailPageState
     if (!confirmed) return;
     try {
       await ref.read(formsGroupsApiProvider).deleteClient(widget.clientId);
-      if (mounted) context.go(Routes.trainerClients);
+      if (mounted) context.go(Routes.professionalClients);
     } catch (_) {
       _toast('Could not delete the client.');
     }
@@ -526,7 +526,7 @@ class _TrainerClientDetailPageState
         title: Text(client?.displayName.isNotEmpty ?? false
             ? client!.displayName
             : 'Client'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerClients)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalClients)),
       ),
       body: _loading
           ? const PagePad(
@@ -692,7 +692,7 @@ class _TrainerClientDetailPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Trainer notes', style: context.text.titleSmall),
+              Text('Professional notes', style: context.text.titleSmall),
               Text(
                 'Private to you.',
                 style: context.text.bodySmall,
@@ -917,7 +917,7 @@ class _TrainerClientDetailPageState
                 tooltip: 'Remove',
               ),
               onTap: () => context.go(
-                '${Routes.trainerClients}/${widget.clientId}/templates/${assignment.id}',
+                '${Routes.professionalClients}/${widget.clientId}/templates/${assignment.id}',
               ),
             ),
       ],
@@ -1194,7 +1194,7 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final mine = message.isTrainer;
+    final mine = message.isProfessional;
 
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,

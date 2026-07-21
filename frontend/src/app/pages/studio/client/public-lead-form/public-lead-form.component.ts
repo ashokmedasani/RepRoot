@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Country, State } from 'country-state-city';
 
-import { DynamicField, FormsGroupsApiService, PublicLeadForm } from '../../../core/api/forms-groups-api.service';
+import { DynamicField, FormsGroupsApiService, PublicLeadForm } from '@core/api/forms-groups-api.service';
 
 interface CountryDialCode {
   isoCode: string;

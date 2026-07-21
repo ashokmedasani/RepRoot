@@ -6,23 +6,23 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/models/trainer_models.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/models/professional_models.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 
-/// Trainer profile — view/edit the full profile and the Private/Public
+/// Professional profile — view/edit the full profile and the Private/Public
 /// visibility of each section.
-/// Replica of mobile/src/app/pages/trainer/profile/trainer-profile.page.ts.
-class TrainerProfilePage extends ConsumerStatefulWidget {
-  const TrainerProfilePage({super.key});
+/// Replica of mobile/src/app/pages/professional/profile/professional-profile.page.ts.
+class ProfessionalProfilePage extends ConsumerStatefulWidget {
+  const ProfessionalProfilePage({super.key});
 
   @override
-  ConsumerState<TrainerProfilePage> createState() => _TrainerProfilePageState();
+  ConsumerState<ProfessionalProfilePage> createState() => _ProfessionalProfilePageState();
 }
 
-/// The six Private/Public sections the web trainer profile exposes.
+/// The six Private/Public sections the web professional profile exposes.
 /// The keys are the backend's, and `certification` is singular on purpose —
 /// sending `certifications` silently does nothing.
 const _visibilitySections = <({String key, String label})>[
@@ -39,8 +39,8 @@ const _months = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
-  TrainerProfile? _profile;
+class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePage> {
+  ProfessionalProfile? _profile;
   Map<String, bool> _visibility = {};
   bool _isEditing = false;
   bool _isSaving = false;
@@ -53,13 +53,13 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
   final _firstName = TextEditingController();
   final _middleName = TextEditingController();
   final _lastName = TextEditingController();
-  final _trainerCode = TextEditingController();
+  final _professionalCode = TextEditingController();
   final _phone = TextEditingController();
   final _country = TextEditingController();
   final _state = TextEditingController();
   final _headline = TextEditingController();
   final _aboutMe = TextEditingController();
-  final _trainerType = TextEditingController();
+  final _professionalType = TextEditingController();
   final _specializations = TextEditingController();
   final _trainingStyle = TextEditingController();
   final _languages = TextEditingController();
@@ -85,8 +85,8 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
   @override
   void dispose() {
     for (final c in [
-      _firstName, _middleName, _lastName, _trainerCode, _phone, _country,
-      _state, _headline, _aboutMe, _trainerType, _specializations,
+      _firstName, _middleName, _lastName, _professionalCode, _phone, _country,
+      _state, _headline, _aboutMe, _professionalType, _specializations,
       _trainingStyle, _languages, _yearsExperience, _certName, _certIssuedBy,
       _certYear, _instagram, _youtube, _website,
     ]) {
@@ -111,7 +111,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
 
   Future<void> _load() async {
     try {
-      final profile = await ref.read(trainerAuthApiProvider).getProfile();
+      final profile = await ref.read(professionalAuthApiProvider).getProfile();
       if (!mounted) return;
       setState(() {
         _profile = profile;
@@ -129,17 +129,17 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
     }
   }
 
-  void _fillControllers(TrainerProfile p) {
+  void _fillControllers(ProfessionalProfile p) {
     _firstName.text = p.firstName;
     _middleName.text = p.middleName;
     _lastName.text = p.lastName;
-    _trainerCode.text = p.trainerId.isNotEmpty ? p.trainerId : p.trainerCode;
+    _professionalCode.text = p.professionalId.isNotEmpty ? p.professionalId : p.professionalCode;
     _phone.text = p.phone;
     _country.text = p.country;
     _state.text = p.state;
     _headline.text = p.professionalHeadline;
     _aboutMe.text = p.aboutMe;
-    _trainerType.text = p.trainerType;
+    _professionalType.text = p.professionalType;
     _specializations.text = p.specializations;
     _trainingStyle.text = p.trainingStyle;
     _languages.text = p.languagesKnown;
@@ -182,7 +182,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
     final missing = <String>[
       if (_firstName.text.trim().isEmpty) 'first name',
       if (_lastName.text.trim().isEmpty) 'last name',
-      if (_trainerCode.text.trim().isEmpty) 'trainer code',
+      if (_professionalCode.text.trim().isEmpty) 'professional code',
       if (_gender.isEmpty) 'gender',
       if (_birthMonth == null) 'birth month',
       if (_birthYear == null) 'birth year',
@@ -197,7 +197,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
     setState(() => _isSaving = true);
 
     final map = <String, dynamic>{
-      'trainer_id': _trainerCode.text.trim(),
+      'professional_id': _professionalCode.text.trim(),
       'first_name': _firstName.text.trim(),
       'middle_name': _middleName.text.trim(),
       'last_name': _lastName.text.trim(),
@@ -207,7 +207,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
       'state': _state.text.trim(),
       'professional_headline': _headline.text.trim(),
       'about_me': _aboutMe.text.trim(),
-      'trainer_type': _trainerType.text.trim(),
+      'professional_type': _professionalType.text.trim(),
       'specializations': _specializations.text.trim(),
       'training_style': _trainingStyle.text.trim(),
       'languages_known': _languages.text.trim(),
@@ -237,7 +237,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
 
     try {
       final saved = await ref
-          .read(trainerAuthApiProvider)
+          .read(professionalAuthApiProvider)
           .saveProfile(FormData.fromMap(map));
       if (!mounted) return;
       setState(() {
@@ -265,7 +265,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
     setState(() => _visibility = {..._visibility, key: value});
     try {
       final updated = await ref
-          .read(trainerAuthApiProvider)
+          .read(professionalAuthApiProvider)
           .updateProfileVisibility(_visibility);
       if (mounted) setState(() => _visibility = updated);
     } catch (_) {
@@ -279,7 +279,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Trainer Profile')),
+        appBar: AppBar(title: const Text('Professional Profile')),
         body: const PagePad(
           children: [SkeletonBox(height: 110), SkeletonBox(height: 200)],
         ),
@@ -288,8 +288,8 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trainer Profile'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerMore)),
+        title: const Text('Professional Profile'),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalMore)),
         actions: [
           if (!_isEditing)
             IconButton(
@@ -349,13 +349,13 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
                     const SizedBox(height: 2),
                     Text(
                       p.professionalHeadline.isEmpty
-                          ? 'Personal Trainer'
+                          ? 'Personal Professional'
                           : p.professionalHeadline,
                       style: context.text.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     StatusPill(
-                      label: 'Code: ${p.trainerId.isNotEmpty ? p.trainerId : p.trainerCode}',
+                      label: 'Code: ${p.professionalId.isNotEmpty ? p.professionalId : p.professionalCode}',
                       tone: PillTone.info,
                     ),
                   ],
@@ -388,7 +388,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
         AppCard(
           child: Column(
             children: [
-              _kv('Type', p.trainerType),
+              _kv('Type', p.professionalType),
               _kv('Experience', p.yearsExperience != null ? '${p.yearsExperience} years' : ''),
               _kv('Specializations', p.specializations),
               _kv('Languages', p.languagesKnown),
@@ -522,7 +522,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
           _field(_firstName, 'First name', capitalize: true),
           _field(_middleName, 'Middle name (optional)', capitalize: true),
           _field(_lastName, 'Last name', capitalize: true),
-          _field(_trainerCode, 'Trainer code', helper: 'Clients log in with this'),
+          _field(_professionalCode, 'Professional code', helper: 'Clients log in with this'),
           _field(_phone, 'Phone', keyboard: TextInputType.phone),
           DropdownButtonFormField<String>(
             initialValue: _gender.isEmpty ? null : _gender,
@@ -566,7 +566,7 @@ class _TrainerProfilePageState extends ConsumerState<TrainerProfilePage> {
 
         _editSection('Professional', [
           _field(_headline, 'Professional headline'),
-          _field(_trainerType, 'Trainer type'),
+          _field(_professionalType, 'Professional type'),
           _field(_yearsExperience, 'Years of experience',
               keyboard: TextInputType.number),
           _field(_specializations, 'Specializations'),

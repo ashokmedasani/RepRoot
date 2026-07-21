@@ -7,26 +7,30 @@ each plan tier keeps only a trailing window of it:
   - Starter Free / Pro: 60 days
   - Premium Unlimited:  180 days (6 months)
 
+Only file-bearing chat messages (ones with an image) go through the Recycle
+Bin when they expire — plain text messages, tracking entries, progress notes,
+and reminders are deleted outright. They're high-volume, low-value operational
+noise; the Bin is reserved for things actually worth the overhead of
+restorability (see accounts/recycle_bin.py).
+
 This is independent of account lifecycle deletion (account_lifecycle.py),
-which erases everything after a frozen account goes unresolved for 30 days.
-Retention purges run continuously for every active professional regardless
-of lock state.
+which erases everything after a frozen account goes unresolved for 30 days —
+that stays a genuine hard delete; retention here is a rolling window, not
+account abandonment.
 """
 
 from datetime import timedelta
 
-from django.conf import settings
 from django.utils import timezone
 
-from accounts.models import ChatMessage, ClientReminder, ProfessionalProfile, ProgressEntry, TrackingEntry
+from accounts import recycle_bin
+from accounts.models import ChatMessage, ClientReminder, ProfessionalProfile, ProgressEntry, RecycleBinItem, TrackingEntry
 from accounts.plan_limits import professional_plan
 
 
 def purge_expired_client_data():
-  """
-  Daily task: delete chat messages and client activity records older than
-  the professional's plan retention window.
-  """
+  """Daily task: remove chat messages and client activity records older than
+  each professional's plan retention window."""
   now = timezone.now()
 
   for profile in ProfessionalProfile.objects.select_related('user').iterator():
@@ -37,7 +41,11 @@ def purge_expired_client_data():
 
     cutoff = now - timedelta(days=retention_days)
 
-    ChatMessage.objects.filter(professional=professional, created_at__lt=cutoff).delete()
+    stale_messages = ChatMessage.objects.filter(professional=professional, created_at__lt=cutoff)
+    for message in stale_messages.exclude(image=''):
+      recycle_bin.soft_delete_chat_message(message, deleted_by=RecycleBinItem.DELETED_BY_RETENTION_POLICY)
+    stale_messages.filter(image='').delete()
+
     TrackingEntry.objects.filter(client__professional=professional, created_at__lt=cutoff).delete()
     ProgressEntry.objects.filter(professional=professional, created_at__lt=cutoff).delete()
     ClientReminder.objects.filter(professional=professional, date__lt=cutoff.date()).delete()

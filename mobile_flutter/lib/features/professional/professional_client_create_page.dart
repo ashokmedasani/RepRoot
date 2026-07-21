@@ -13,17 +13,17 @@ import '../../shared/widgets/app_widgets.dart';
 
 /// Manual client creation — pick a group, enter identity + username, optionally
 /// email the temporary credentials; shows the generated password on success.
-/// Replica of mobile/src/app/pages/trainer/client-create/client-create.page.ts.
-class TrainerClientCreatePage extends ConsumerStatefulWidget {
-  const TrainerClientCreatePage({super.key});
+/// Replica of mobile/src/app/pages/professional/client-create/client-create.page.ts.
+class ProfessionalClientCreatePage extends ConsumerStatefulWidget {
+  const ProfessionalClientCreatePage({super.key});
 
   @override
-  ConsumerState<TrainerClientCreatePage> createState() =>
-      _TrainerClientCreatePageState();
+  ConsumerState<ProfessionalClientCreatePage> createState() =>
+      _ProfessionalClientCreatePageState();
 }
 
-class _TrainerClientCreatePageState
-    extends ConsumerState<TrainerClientCreatePage> {
+class _ProfessionalClientCreatePageState
+    extends ConsumerState<ProfessionalClientCreatePage> {
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
   final _email = TextEditingController();
@@ -31,7 +31,7 @@ class _TrainerClientCreatePageState
   final _username = TextEditingController();
   final _password = TextEditingController();
 
-  List<TrainerGroup> _groups = [];
+  List<ProfessionalGroup> _groups = [];
   int _groupId = 0;
   bool _sendCredentials = true;
   bool _isSaving = false;
@@ -145,7 +145,7 @@ class _TrainerClientCreatePageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Client'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerClients)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalClients)),
       ),
       body: PagePad(
         children: [
@@ -154,7 +154,7 @@ class _TrainerClientCreatePageState
               username: _createdUsername,
               password: _createdPassword,
               credentialsSent: _credentialsSent,
-              onDone: () => context.go(Routes.trainerClients),
+              onDone: () => context.go(Routes.professionalClients),
             )
           else
             _Form(
@@ -204,7 +204,7 @@ class _Form extends StatelessWidget {
     required this.onSave,
   });
 
-  final List<TrainerGroup> groups;
+  final List<ProfessionalGroup> groups;
   final int groupId;
   final TextEditingController firstName;
   final TextEditingController lastName;

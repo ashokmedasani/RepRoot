@@ -2,24 +2,24 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 
-import { DynamicField, FormsGroupsApiService, TrainerGroup } from '../../../core/api/forms-groups-api.service';
-import { buildUniversalClientFormFields } from '../../../core/forms/universal-client-form';
-import { FormFieldBuilderComponent } from '../../../shared/form-field-builder/form-field-builder.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { DynamicField, FormsGroupsApiService, ProfessionalGroup } from '@core/api/forms-groups-api.service';
+import { buildUniversalClientFormFields } from '@core/forms/universal-client-form';
+import { FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 
 @Component({
-  selector: 'app-trainer-client-form-create',
+  selector: 'app-professional-client-form-create',
   standalone: true,
-  imports: [RouterLink, FormFieldBuilderComponent, TrainerPageShellComponent],
-  templateUrl: './trainer-client-form-create.component.html',
-  styleUrl: './trainer-client-form-create.component.scss'
+  imports: [RouterLink, FormFieldBuilderComponent, ProfessionalPageShellComponent],
+  templateUrl: './professional-client-form-create.component.html',
+  styleUrl: './professional-client-form-create.component.scss'
 })
-export class TrainerClientFormCreateComponent implements OnInit {
+export class ProfessionalClientFormCreateComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  group: TrainerGroup | null = null;
+  group: ProfessionalGroup | null = null;
   customFields: DynamicField[] = [];
   isLoading = true;
   isSaving = false;
@@ -43,7 +43,7 @@ export class TrainerClientFormCreateComponent implements OnInit {
           .filter((field) => !field.is_core)
           .map((field) => ({ ...field }));
 
-        // First-time setup: reuse the custom fields the trainer already built
+        // First-time setup: reuse the custom fields the professional already built
         // on the Lead Form so the same questions never have to be recreated.
         // Groups without a lead-form field set fall back to the universal
         // template so the form is never empty.
@@ -82,7 +82,7 @@ export class TrainerClientFormCreateComponent implements OnInit {
       next: () => {
         this.messageType = 'success';
         this.message = 'Client creation form saved. Forms & Groups setup is complete.';
-        window.setTimeout(() => void this.router.navigate(['/trainer/forms-groups']), 900);
+        window.setTimeout(() => void this.router.navigate(['/professional/forms-groups']), 900);
       },
       error: (error: unknown) => {
         this.messageType = 'error';

@@ -5,19 +5,19 @@ import {
   StandardTemplateRecord,
   TemplatesApiService,
   TrackingTemplateRecord
-} from '../../../core/api/templates-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+} from '@core/api/templates-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
 @Component({
-  selector: 'app-trainer-templates',
+  selector: 'app-professional-templates',
   standalone: true,
-  imports: [RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-templates.component.html',
-  styleUrl: './trainer-templates.component.scss'
+  imports: [RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-templates.component.html',
+  styleUrl: './professional-templates.component.scss'
 })
-export class TrainerTemplatesComponent implements OnInit {
+export class ProfessionalTemplatesComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly changeDetector = inject(ChangeDetectorRef);
@@ -64,7 +64,7 @@ export class TrainerTemplatesComponent implements OnInit {
   }
 
   async deleteTemplate(template: TrackingTemplateRecord): Promise<void> {
-    // A template still assigned to clients cannot be deleted; the trainer must
+    // A template still assigned to clients cannot be deleted; the professional must
     // unassign it from each client first. The backend enforces this too — this
     // check only spares the round trip and explains it up front.
     if (template.assigned_count > 0) {

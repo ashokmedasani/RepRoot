@@ -5,30 +5,30 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/auth_brand.dart';
 
 /// Required first-login step, matching the web portal and the setup mode added
-/// to the Ionic profile page (`/trainer/tabs/more/profile?setup=1`).
+/// to the Ionic profile page (`/professional/tabs/more/profile?setup=1`).
 ///
-/// This gate exists for a reason: a trainer who reaches the dashboard without a
-/// trainer code has clients who can never log in, since the client login form
+/// This gate exists for a reason: a professional who reaches the dashboard without a
+/// professional code has clients who can never log in, since the client login form
 /// requires that code.
-class TrainerProfileSetupPage extends ConsumerStatefulWidget {
-  const TrainerProfileSetupPage({super.key});
+class ProfessionalProfileSetupPage extends ConsumerStatefulWidget {
+  const ProfessionalProfileSetupPage({super.key});
 
   @override
-  ConsumerState<TrainerProfileSetupPage> createState() =>
-      _TrainerProfileSetupPageState();
+  ConsumerState<ProfessionalProfileSetupPage> createState() =>
+      _ProfessionalProfileSetupPageState();
 }
 
-class _TrainerProfileSetupPageState
-    extends ConsumerState<TrainerProfileSetupPage> {
+class _ProfessionalProfileSetupPageState
+    extends ConsumerState<ProfessionalProfileSetupPage> {
   final _firstName = TextEditingController();
   final _middleName = TextEditingController();
   final _lastName = TextEditingController();
-  final _trainerCode = TextEditingController();
+  final _professionalCode = TextEditingController();
   final _country = TextEditingController();
   final _state = TextEditingController();
 
@@ -65,7 +65,7 @@ class _TrainerProfileSetupPageState
     _firstName.dispose();
     _middleName.dispose();
     _lastName.dispose();
-    _trainerCode.dispose();
+    _professionalCode.dispose();
     _country.dispose();
     _state.dispose();
     super.dispose();
@@ -73,14 +73,14 @@ class _TrainerProfileSetupPageState
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await ref.read(trainerAuthApiProvider).getProfile();
+      final profile = await ref.read(professionalAuthApiProvider).getProfile();
       if (!mounted) return;
       setState(() {
         _firstName.text = profile.firstName;
         _middleName.text = profile.middleName;
         _lastName.text = profile.lastName;
-        _trainerCode.text =
-            profile.trainerId.isNotEmpty ? profile.trainerId : profile.trainerCode;
+        _professionalCode.text =
+            profile.professionalId.isNotEmpty ? profile.professionalId : profile.professionalCode;
         _country.text = profile.country;
         _state.text = profile.state;
         _gender = _genders.contains(profile.gender) ? profile.gender : '';
@@ -98,16 +98,16 @@ class _TrainerProfileSetupPageState
   }
 
   Future<void> _checkCode() async {
-    final code = _trainerCode.text.trim();
+    final code = _professionalCode.text.trim();
     if (code.isEmpty) {
       setState(() {
-        _codeMessage = 'Enter a trainer code first.';
+        _codeMessage = 'Enter a professional code first.';
         _codeAvailable = false;
       });
       return;
     }
     try {
-      final available = await ref.read(trainerAuthApiProvider).checkTrainerCode(code);
+      final available = await ref.read(professionalAuthApiProvider).checkProfessionalCode(code);
       if (!mounted) return;
       setState(() {
         _codeAvailable = available;
@@ -128,8 +128,8 @@ class _TrainerProfileSetupPageState
   String _validate() {
     if (_firstName.text.trim().isEmpty) return 'First name is required.';
     if (_lastName.text.trim().isEmpty) return 'Last name is required.';
-    if (_trainerCode.text.trim().isEmpty) {
-      return 'Trainer code is required — your clients use it to sign in.';
+    if (_professionalCode.text.trim().isEmpty) {
+      return 'Professional code is required — your clients use it to sign in.';
     }
     if (_gender.isEmpty) return 'Gender is required.';
     if (_birthMonth == null || _birthYear == null) {
@@ -154,7 +154,7 @@ class _TrainerProfileSetupPageState
 
     // Multipart PUT with the same keys the Ionic profile page sends.
     final form = FormData.fromMap({
-      'trainer_id': _trainerCode.text.trim(),
+      'professional_id': _professionalCode.text.trim(),
       'first_name': _firstName.text.trim(),
       'middle_name': _middleName.text.trim(),
       'last_name': _lastName.text.trim(),
@@ -166,9 +166,9 @@ class _TrainerProfileSetupPageState
     });
 
     try {
-      await ref.read(trainerAuthApiProvider).saveProfile(form);
+      await ref.read(professionalAuthApiProvider).saveProfile(form);
       if (!mounted) return;
-      context.go(Routes.trainerDashboard);
+      context.go(Routes.professionalDashboard);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -234,7 +234,7 @@ class _TrainerProfileSetupPageState
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _trainerCode,
+                          controller: _professionalCode,
                           enabled: !_isSubmitting,
                           autocorrect: false,
                           onChanged: (_) => setState(() {
@@ -242,7 +242,7 @@ class _TrainerProfileSetupPageState
                             _codeAvailable = false;
                           }),
                           decoration: const InputDecoration(
-                            labelText: 'Trainer code',
+                            labelText: 'Professional code',
                             helperText: 'Clients type this to reach you',
                           ),
                         ),

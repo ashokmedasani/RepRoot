@@ -1,12 +1,12 @@
 <main class="public-form-page">
-  <header class="public-topbar"><a routerLink="/">CoachFlow Studio</a></header>
+  <header class="public-topbar"><a routerLink="/">RepRoot Studio</a></header>
   <section class="public-form-shell">
     @if (isLoading) {
       <p class="message">Loading registration form...</p>
     } @else if (form && !referenceId) {
       <form class="public-form" (ngSubmit)="submitForm()">
         <header>
-          <p class="eyebrow">{{ form.trainer_name }} &middot; {{ form.group.name }}</p>
+          <p class="eyebrow">{{ form.professional_name }} &middot; {{ form.group.name }}</p>
           <h1>Client Registration Form</h1>
           <p>You are registering for a known group. This is not a public enquiry or lead form.</p>
         </header>
@@ -37,8 +37,8 @@
     } @else if (referenceId) {
       <section class="success-panel">
         <p class="eyebrow">Registration submitted</p>
-        <h1>Your trainer will review your information.</h1>
-        <p>Your reference ID is <strong>{{ referenceId }}</strong>. Account credentials will be sent after your trainer creates access.</p>
+        <h1>Your professional will review your information.</h1>
+        <p>Your reference ID is <strong>{{ referenceId }}</strong>. Account credentials will be sent after your professional creates access.</p>
       </section>
     }
 

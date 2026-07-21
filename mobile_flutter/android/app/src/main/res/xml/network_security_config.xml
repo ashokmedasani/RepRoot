@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Release builds talk HTTPS only. Sessions carry a trainer/client token in an
+  Release builds talk HTTPS only. Sessions carry a professional/client token in an
   Authorization header on every request, so plaintext HTTP would put that token
   on the wire for anyone on the same network to lift.
 

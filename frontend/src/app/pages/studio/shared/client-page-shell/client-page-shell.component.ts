@@ -2,7 +2,7 @@ import { Component, Input } from '@angular/core';
 
 import { ClientPortalNavComponent } from '../client-portal-nav/client-portal-nav.component';
 
-type ClientSection = 'dashboard' | 'templates' | 'trainer-profile' | 'trainer-chat' | 'settings';
+type ClientSection = 'dashboard' | 'templates' | 'professional-profile' | 'professional-chat' | 'payments' | 'meetings' | 'settings';
 
 @Component({
   selector: 'app-client-page-shell',

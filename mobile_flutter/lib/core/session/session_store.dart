@@ -10,7 +10,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SessionKeys {
   const SessionKeys._();
 
-  static const trainerToken = 'trainer-auth-token';
+  static const professionalToken = 'professional-auth-token';
   static const clientToken = 'client-auth-token';
   static const clientAccess = 'client-access';
 }
@@ -58,18 +58,18 @@ class SessionStore {
     }
   }
 
-  String get trainerToken => read(SessionKeys.trainerToken);
+  String get professionalToken => read(SessionKeys.professionalToken);
   String get clientToken => read(SessionKeys.clientToken);
-  bool get hasTrainerSession => has(SessionKeys.trainerToken);
+  bool get hasProfessionalSession => has(SessionKeys.professionalToken);
   bool get hasClientSession => has(SessionKeys.clientToken);
 
-  Future<void> storeTrainerToken(String token) =>
-      write(SessionKeys.trainerToken, token);
+  Future<void> storeProfessionalToken(String token) =>
+      write(SessionKeys.professionalToken, token);
 
   Future<void> storeClientToken(String token) =>
       write(SessionKeys.clientToken, token);
 
-  Future<void> clearTrainerSession() => clear([SessionKeys.trainerToken]);
+  Future<void> clearProfessionalSession() => clear([SessionKeys.professionalToken]);
 
   Future<void> clearClientSession() =>
       clear([SessionKeys.clientToken, SessionKeys.clientAccess]);

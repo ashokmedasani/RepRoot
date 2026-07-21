@@ -548,6 +548,109 @@ class ClientReminder(models.Model):
     return f'{self.title} for {self.client.username} ({self.date})'
 
 
+class CalComConnection(models.Model):
+  """A professional's own Cal.com account, used to book real video meetings
+  with clients from inside RepRoot (as opposed to ClientReminder, which is
+  just a follow-up note with no video/slot-booking component).
+
+  The professional picks a client + an open slot inside RepRoot; we call
+  Cal.com's API on their behalf with the client's name/email as the
+  attendee, so there's no separate public booking link to send out."""
+
+  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cal_com_connection')
+  api_key = models.CharField(max_length=255, blank=True)
+  cal_username = models.CharField(max_length=150, blank=True)
+  default_event_type_id = models.PositiveIntegerField(null=True, blank=True)
+  default_event_type_slug = models.CharField(max_length=150, blank=True)
+  default_event_type_label = models.CharField(max_length=180, blank=True)
+  default_duration_minutes = models.PositiveIntegerField(default=30)
+  timezone = models.CharField(max_length=64, default='UTC')
+  is_connected = models.BooleanField(default=False, db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'cal_com_connections'
+
+  def __str__(self) -> str:
+    return f'Cal.com connection for {self.professional.username} ({"connected" if self.is_connected else "not connected"})'
+
+
+class ScheduledMeeting(models.Model):
+  """A real, video-enabled meeting between a professional and one client,
+  booked through the professional's own Cal.com account. Distinct from
+  ClientReminder (a simple follow-up note) — both show up together on a
+  client's Schedule tab, but only this one has a join link and lives in
+  Cal.com too."""
+
+  STATUS_SCHEDULED = 'scheduled'
+  STATUS_CANCELLED = 'cancelled'
+  STATUS_COMPLETED = 'completed'
+
+  STATUS_CHOICES = [
+    (STATUS_SCHEDULED, 'Scheduled'),
+    (STATUS_CANCELLED, 'Cancelled'),
+    (STATUS_COMPLETED, 'Completed'),
+  ]
+
+  RESPONSE_PENDING = 'pending'
+  RESPONSE_ACCEPTED = 'accepted'
+  RESPONSE_DECLINED = 'declined'
+
+  RESPONSE_CHOICES = [
+    (RESPONSE_PENDING, 'Pending'),
+    (RESPONSE_ACCEPTED, 'Accepted'),
+    (RESPONSE_DECLINED, 'Declined'),
+  ]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='scheduled_meetings')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='scheduled_meetings')
+  title = models.CharField(max_length=180, default='Meeting')
+  notes = models.TextField(blank=True)
+  start_at = models.DateTimeField(db_index=True)
+  end_at = models.DateTimeField()
+  meeting_url = models.URLField(blank=True)
+  cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
+  status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, db_index=True)
+  cancellation_reason = models.TextField(blank=True)
+  client_response_status = models.CharField(max_length=10, choices=RESPONSE_CHOICES, default=RESPONSE_PENDING)
+  client_responded_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'scheduled_meetings'
+    ordering = ['start_at']
+    indexes = [
+      models.Index(fields=['professional', 'start_at'], name='meeting_prof_start_idx'),
+      models.Index(fields=['client', 'start_at'], name='meeting_client_start_idx'),
+    ]
+
+  def __str__(self) -> str:
+    return f'{self.title} with {self.client.username} at {self.start_at:%Y-%m-%d %H:%M}'
+
+
+class ScheduledMeetingGuest(models.Model):
+  """An additional client invited to a ScheduledMeeting beyond the primary
+  `client` on the meeting itself — supports group/multi-client meetings.
+  Each guest can independently accept or decline the invite."""
+
+  meeting = models.ForeignKey(ScheduledMeeting, on_delete=models.CASCADE, related_name='guests')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='scheduled_meeting_guest_spots')
+  response_status = models.CharField(max_length=10, choices=ScheduledMeeting.RESPONSE_CHOICES, default=ScheduledMeeting.RESPONSE_PENDING)
+  responded_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'scheduled_meeting_guests'
+    constraints = [
+      models.UniqueConstraint(fields=['meeting', 'client'], name='unique_meeting_guest'),
+    ]
+
+  def __str__(self) -> str:
+    return f'{self.client.username} guest on meeting #{self.meeting_id}'
+
+
 class ProgressEntry(models.Model):
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='progress_entries')
   professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='progress_entries')
@@ -785,8 +888,16 @@ class ProfessionalPaymentSettings(models.Model):
   # turn this off, which hides every payments surface. Payments are never forced.
   payment_tracking_enabled = models.BooleanField(default=True)
   reporting_currency = models.CharField(max_length=3, default='USD')
+  # Gates the payments *dashboard/summary* only — manual payment method setup
+  # (Zelle, UPI, etc.) is unrelated and always accessible. Locked by default;
+  # the professional toggles it on whenever they're ready to start tracking,
+  # and can toggle it back off any time. Not a one-way/permanent lock.
+  reporting_currency_locked = models.BooleanField(default=True)
   client_payment_history_enabled = models.BooleanField(default=True)
-  default_payment_visibility = models.CharField(max_length=12, choices=VISIBILITY_CHOICES, default=VISIBILITY_PRIVATE)
+  # Deprecated: payment records are always visible to the client they belong
+  # to now (there's no "private from the client" state — see PRODUCT_RULES).
+  # Field kept only so existing rows don't need a migration; unused.
+  default_payment_visibility = models.CharField(max_length=12, choices=VISIBILITY_CHOICES, default=VISIBILITY_VISIBLE)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -934,6 +1045,7 @@ class PaymentRequest(models.Model):
   STATUS_VIEWED = 'viewed'
   STATUS_PROOF_SUBMITTED = 'proof_submitted'
   STATUS_UNDER_REVIEW = 'under_review'
+  STATUS_ACKNOWLEDGED = 'acknowledged'
   STATUS_COMPLETED = 'completed'
   STATUS_PARTIALLY_PAID = 'partially_paid'
   STATUS_REJECTED = 'rejected'
@@ -946,6 +1058,7 @@ class PaymentRequest(models.Model):
     (STATUS_VIEWED, 'Viewed'),
     (STATUS_PROOF_SUBMITTED, 'Proof Submitted'),
     (STATUS_UNDER_REVIEW, 'Under Review'),
+    (STATUS_ACKNOWLEDGED, 'Acknowledged'),
     (STATUS_COMPLETED, 'Completed'),
     (STATUS_PARTIALLY_PAID, 'Partially Paid'),
     (STATUS_REJECTED, 'Rejected'),
@@ -1111,6 +1224,7 @@ class PaymentAuditLog(models.Model):
     ('proof_submitted', 'Proof submitted'),
     ('proof_rejected', 'Proof rejected'),
     ('info_requested', 'More info requested'),
+    ('payment_acknowledged', 'Payment acknowledged'),
     ('payment_verified', 'Payment verified'),
     ('payment_recorded', 'Payment recorded'),
     ('payment_edited', 'Payment edited'),
@@ -1164,3 +1278,48 @@ class PaymentNotification(models.Model):
 
   def __str__(self) -> str:
     return f'{self.notif_type} ({self.recipient_type})'
+
+
+class RecycleBinItem(models.Model):
+  """
+  Soft-delete shadow table — scoped deliberately narrow. Only things worth the
+  overhead of restorability land here: chat images and references (the
+  storage-heavy, file-bearing content), and whole client accounts (bundled
+  with all their chat/tracking/progress/reminders/assignments, since deleting
+  an entire client is consequential enough to always be fully recoverable).
+  Plain text records (tracking entries, progress notes, reminders, templates)
+  are deleted outright when removed on their own — see accounts/recycle_bin.py.
+  """
+
+  CATEGORY_CHAT_MESSAGE = 'chat_message'
+  CATEGORY_REFERENCE = 'reference'
+  CATEGORY_CLIENT_ACCOUNT = 'client_account'
+
+  CATEGORY_CHOICES = [
+    (CATEGORY_CHAT_MESSAGE, 'Chat message'),
+    (CATEGORY_REFERENCE, 'Reference'),
+    (CATEGORY_CLIENT_ACCOUNT, 'Client account'),
+  ]
+
+  DELETED_BY_PROFESSIONAL = 'professional'
+  DELETED_BY_RETENTION_POLICY = 'retention_policy'
+
+  DELETED_BY_CHOICES = [
+    (DELETED_BY_PROFESSIONAL, 'Professional'),
+    (DELETED_BY_RETENTION_POLICY, 'Retention policy'),
+  ]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recycle_bin_items')
+  category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+  title = models.CharField(max_length=200)
+  payload = models.JSONField(default=dict)
+  deleted_by = models.CharField(max_length=20, choices=DELETED_BY_CHOICES, default=DELETED_BY_PROFESSIONAL)
+  deleted_at = models.DateTimeField(auto_now_add=True, db_index=True)
+  expires_at = models.DateTimeField(db_index=True)
+
+  class Meta:
+    db_table = 'recycle_bin_items'
+    ordering = ['-deleted_at']
+
+  def __str__(self) -> str:
+    return f'{self.category}: {self.title} (deleted {self.deleted_at:%Y-%m-%d})'

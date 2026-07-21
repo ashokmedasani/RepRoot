@@ -1,0 +1,129 @@
+.state-note {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.placeholder-block {
+  border: 1px dashed var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.5rem;
+  background: var(--app-surface-soft);
+}
+
+.placeholder-block p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.request-group {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.request-group:last-child {
+  margin-bottom: 0;
+}
+
+.request-group h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.request-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.request-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.9rem 1.1rem;
+  background: var(--app-surface);
+  text-decoration: none;
+  transition: border-color var(--app-transition-fast), transform var(--app-transition-fast);
+}
+
+.request-card:hover {
+  border-color: var(--app-primary);
+  transform: translateY(-1px);
+}
+
+.request-card.muted {
+  opacity: 0.75;
+}
+
+.request-main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.request-main strong {
+  color: var(--app-text);
+  font-size: 0.94rem;
+}
+
+.request-main small {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+}
+
+.status-pill {
+  flex: 0 0 auto;
+  border-radius: var(--app-radius-pill);
+  padding: 0.25rem 0.6rem;
+  background: color-mix(in srgb, var(--app-primary) 12%, transparent);
+  color: var(--app-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill[data-status='completed'] {
+  background: #e7f6ed;
+  color: #18794e;
+}
+
+.status-pill[data-status='sent'],
+.status-pill[data-status='viewed'],
+.status-pill[data-status='proof_submitted'],
+.status-pill[data-status='under_review'],
+.status-pill[data-status='partially_paid'] {
+  background: #fff5dc;
+  color: #8a5c00;
+}
+
+.status-pill[data-status='rejected'],
+.status-pill[data-status='cancelled'],
+.status-pill[data-status='overdue'] {
+  background: #fff0ef;
+  color: #b42318;
+}
+
+.message {
+  border-radius: var(--app-radius-md);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.error-message {
+  background: #fff0ef;
+  color: #b42318;
+}
+
+@media (max-width: 620px) {
+  .request-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,94 +1,88 @@
-<main class="auth-page">
-  <header class="auth-topbar">
-    <a routerLink="/portal" class="brand">CoachFlow Studio</a>
-    <div class="top-action">
-      <span>Trainer workspace?</span>
-      <a routerLink="/trainer/login">Trainer login</a>
-    </div>
-  </header>
+<app-auth-page-shell
+  actionLabel="Professional workspace?"
+  actionLinkText="Professional login"
+  actionLink="/professional/login"
+  eyebrow="Client Portal"
+  title="Login with your professional-approved access"
+  titleId="client-login-title">
 
-  <section class="auth-card" aria-labelledby="client-login-title">
-    <p class="eyebrow">Client Portal</p>
-    <h1 id="client-login-title">Login with your trainer-approved access</h1>
-
-    <form class="auth-form" (ngSubmit)="verifyClientLogin()">
-      <label>
-        <span class="field-label">
-          Trainer code <span class="required">*</span>
-          <button type="button" class="picker-toggle" (click)="toggleDirectory()">{{ selectedTrainer ? 'Change Trainer' : 'Find Trainer' }}</button>
-        </span>
-        @if (selectedTrainer) {
-          <div class="selected-trainer">
-            <strong>{{ selectedTrainer.trainer_name }}</strong>
-            <span>{{ selectedTrainer.trainer_id }}</span>
-          </div>
-        } @else {
-          <input name="trainerCode" type="text" [(ngModel)]="loginForm.trainerCode" autocomplete="off" placeholder="Enter trainer code or use Find Trainer" required>
-        }
-      </label>
-
-      <label>
-        <span class="field-label">Username <span class="required">*</span></span>
-        <input name="clientUsername" type="text" [(ngModel)]="loginForm.username" autocomplete="username" required>
-      </label>
-
-      <label>
-        <span class="field-label">Password <span class="required">*</span></span>
-        <app-password-input name="clientPassword" [(ngModel)]="loginForm.password" autocomplete="current-password" [required]="true" />
-      </label>
-
-      <button type="submit" class="primary-action" [disabled]="isSubmitting">Continue</button>
-
-      @if (loginMessage) {
-        <p class="form-message">{{ loginMessage }}</p>
+  <form class="auth-form" (ngSubmit)="verifyClientLogin()">
+    <label>
+      <span class="field-label">
+        Professional code <span class="required">*</span>
+        <button type="button" class="picker-toggle" (click)="toggleDirectory()">{{ selectedProfessional ? 'Change Professional' : 'Find Professional' }}</button>
+      </span>
+      @if (selectedProfessional) {
+        <div class="selected-professional">
+          <strong>{{ selectedProfessional.professional_name }}</strong>
+          <span>{{ selectedProfessional.professional_id }}</span>
+        </div>
+      } @else {
+        <input name="professionalCode" type="text" [(ngModel)]="loginForm.professionalCode" autocomplete="off" placeholder="Enter professional code or use Find Professional" required>
       }
+    </label>
 
-      <p class="legal-note">
-        By continuing, you agree to our
-        <a routerLink="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a>
-        and
-        <a routerLink="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
-      </p>
-    </form>
-  </section>
+    <label>
+      <span class="field-label">Username <span class="required">*</span></span>
+      <input name="clientUsername" type="text" [(ngModel)]="loginForm.username" autocomplete="username" required>
+    </label>
 
-  @if (showDirectory) {
-    <div class="trainer-modal-backdrop" (click)="cancelDirectory()">
-      <section class="trainer-modal" role="dialog" aria-modal="true" aria-labelledby="trainer-search-title" (click)="$event.stopPropagation()">
-        <header>
-          <div>
-            <p class="eyebrow">Trainer selection</p>
-            <h2 id="trainer-search-title">Find Trainer</h2>
-            <p>Search by trainer code or trainer name.</p>
-          </div>
-          <button type="button" class="modal-close" (click)="cancelDirectory()" aria-label="Close trainer search">&times;</button>
-        </header>
-        <div class="modal-search-row">
-          <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Trainer code or name" autocomplete="off" (keyup.enter)="searchDirectory()">
-          <button type="button" class="primary-action" (click)="searchDirectory()">Search</button>
+    <label>
+      <span class="field-label">Password <span class="required">*</span></span>
+      <app-password-input name="clientPassword" [(ngModel)]="loginForm.password" autocomplete="current-password" [required]="true" />
+    </label>
+
+    <button type="submit" class="primary-action" [disabled]="isSubmitting">Continue</button>
+
+    @if (loginMessage) {
+      <p class="form-message">{{ loginMessage }}</p>
+    }
+
+    <p class="legal-note">
+      By continuing, you agree to our
+      <a routerLink="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+      and
+      <a routerLink="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+    </p>
+  </form>
+</app-auth-page-shell>
+
+@if (showDirectory) {
+  <div class="professional-modal-backdrop" (click)="cancelDirectory()">
+    <section class="professional-modal" role="dialog" aria-modal="true" aria-labelledby="professional-search-title" (click)="$event.stopPropagation()">
+      <header>
+        <div>
+          <p class="eyebrow">Professional selection</p>
+          <h2 id="professional-search-title">Find Professional</h2>
+          <p>Search by professional code or professional name.</p>
         </div>
-        <div class="picker-list">
-          @if (isLoadingDirectory) {
-            <p class="picker-empty">Loading trainers...</p>
-          } @else {
-            @for (trainer of filteredTrainers; track trainer.trainer_id) {
-              <article class="picker-item" [class.selected]="pendingTrainer?.trainer_id === trainer.trainer_id">
-                <div class="picker-identity">
-                  <strong class="picker-name">{{ trainer.trainer_name }}</strong>
-                  <span class="picker-code"><small>Code</small>{{ trainer.trainer_id }}</span>
-                </div>
-                <button type="button" class="ghost-action" (click)="selectTrainer(trainer)">{{ pendingTrainer?.trainer_id === trainer.trainer_id ? 'Selected' : 'Select' }}</button>
-              </article>
-            } @empty {
-              <p class="picker-empty">No trainers match your search.</p>
-            }
+        <button type="button" class="modal-close" (click)="cancelDirectory()" aria-label="Close professional search">&times;</button>
+      </header>
+      <div class="modal-search-row">
+        <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Professional code or name" autocomplete="off" (keyup.enter)="searchDirectory()">
+        <button type="button" class="primary-action" (click)="searchDirectory()">Search</button>
+      </div>
+      <div class="picker-list">
+        @if (isLoadingDirectory) {
+          <p class="picker-empty">Loading professionals...</p>
+        } @else {
+          @for (professional of filteredProfessionals; track professional.professional_id) {
+            <article class="picker-item" [class.selected]="pendingProfessional?.professional_id === professional.professional_id">
+              <div class="picker-identity">
+                <strong class="picker-name">{{ professional.professional_name }}</strong>
+                <span class="picker-code"><small>Code</small>{{ professional.professional_id }}</span>
+              </div>
+              <button type="button" class="ghost-action" (click)="selectProfessional(professional)">{{ pendingProfessional?.professional_id === professional.professional_id ? 'Selected' : 'Select' }}</button>
+            </article>
+          } @empty {
+            <p class="picker-empty">No professionals match your search.</p>
           }
-        </div>
-        <footer>
-          <button type="button" class="ghost-action" (click)="cancelDirectory()">Cancel</button>
-          <button type="button" class="primary-action" [disabled]="!pendingTrainer" (click)="confirmTrainer()">Confirm Selection</button>
-        </footer>
-      </section>
-    </div>
-  }
-</main>
+        }
+      </div>
+      <footer>
+        <button type="button" class="ghost-action" (click)="cancelDirectory()">Cancel</button>
+        <button type="button" class="primary-action" [disabled]="!pendingProfessional" (click)="confirmProfessional()">Confirm Selection</button>
+      </footer>
+    </section>
+  </div>
+}

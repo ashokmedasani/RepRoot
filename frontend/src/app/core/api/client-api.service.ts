@@ -10,7 +10,7 @@ import {
   LeadSubmission,
   ClientReminder,
   ProgressEntry,
-  TrainerGroup
+  ProfessionalGroup
 } from './forms-groups-api.service';
 import { EntryFilters, TrackingEntryRecord, TrackingTemplateRecord } from './templates-api.service';
 
@@ -28,17 +28,17 @@ export interface ClientLoginResponse {
   message: string;
 }
 
-export interface TrainerDirectoryEntry {
-  trainer_id: string;
-  trainer_name: string;
+export interface ProfessionalDirectoryEntry {
+  professional_id: string;
+  professional_name: string;
 }
 
 export interface ClientMeResponse {
   client: ClientAccessRecord;
-  group: TrainerGroup;
+  group: ProfessionalGroup;
   registration_fields: DynamicField[];
   lead_submission: LeadSubmission | null;
-  trainer_profile: ClientTrainerProfile | null;
+  professional_profile: ClientProfessionalProfile | null;
   shared_additional_info: AdditionalInfoItem[];
 }
 
@@ -60,14 +60,14 @@ export interface ClientDashboardResponse {
   schedules: ClientReminder[];
 }
 
-export interface ClientTrainerProfile {
-  trainer_name: string;
+export interface ClientProfessionalProfile {
+  professional_name: string;
   profile_photo_url: string;
   professional_headline: string;
   location: string;
   about_me: string;
   professional_summary: {
-    trainer_type: string;
+    professional_type: string;
     years_experience: number | null;
     specializations: string;
     languages_known: string;
@@ -102,7 +102,7 @@ export interface ClientSupportIncidentMessage {
 export interface ClientSupportIncident {
   id: number;
   incident_id: string;
-  reporter_role: 'trainer' | 'client';
+  reporter_role: 'professional' | 'client';
   reporter_name: string;
   reporter_email: string;
   category: string;
@@ -135,22 +135,22 @@ export class ClientApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  login(trainerCode: string, username: string, password: string): Observable<ClientLoginResponse> {
+  login(professionalCode: string, username: string, password: string): Observable<ClientLoginResponse> {
     return this.http.post<ClientLoginResponse>(`${this.apiBaseUrl}/client/login/`, {
-      trainer_id: trainerCode,
+      professional_id: professionalCode,
       username,
       password
     });
   }
 
-  getTrainerDirectory(search = ''): Observable<{ trainers: TrainerDirectoryEntry[] }> {
+  getProfessionalDirectory(search = ''): Observable<{ professionals: ProfessionalDirectoryEntry[] }> {
     let params = new HttpParams();
 
     if (search.trim()) {
       params = params.set('search', search.trim());
     }
 
-    return this.http.get<{ trainers: TrainerDirectoryEntry[] }>(`${this.apiBaseUrl}/client/trainer-directory/`, {
+    return this.http.get<{ professionals: ProfessionalDirectoryEntry[] }>(`${this.apiBaseUrl}/client/professional-directory/`, {
       params
     });
   }

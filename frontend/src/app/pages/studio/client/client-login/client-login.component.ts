@@ -2,14 +2,15 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { ClientApiService, TrainerDirectoryEntry } from '../../../core/api/client-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ClientApiService, ProfessionalDirectoryEntry } from '@core/api/client-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-client-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent],
+  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
   templateUrl: './client-login.component.html',
   styleUrl: './client-login.component.scss'
 })
@@ -22,25 +23,25 @@ export class ClientLoginComponent {
   clientName = '';
 
   showDirectory = false;
-  directory: TrainerDirectoryEntry[] = [];
+  directory: ProfessionalDirectoryEntry[] = [];
   directorySearch = '';
   isLoadingDirectory = false;
-  selectedTrainer: TrainerDirectoryEntry | null = null;
-  pendingTrainer: TrainerDirectoryEntry | null = null;
+  selectedProfessional: ProfessionalDirectoryEntry | null = null;
+  pendingProfessional: ProfessionalDirectoryEntry | null = null;
 
   readonly loginForm = {
-    trainerCode: '',
+    professionalCode: '',
     username: '',
     password: ''
   };
 
   toggleDirectory(): void {
     this.showDirectory = true;
-    this.pendingTrainer = this.selectedTrainer;
+    this.pendingProfessional = this.selectedProfessional;
     this.loadDirectory();
   }
 
-  get filteredTrainers(): TrainerDirectoryEntry[] {
+  get filteredProfessionals(): ProfessionalDirectoryEntry[] {
     const term = this.directorySearch.trim().toLowerCase();
 
     if (!term) {
@@ -48,35 +49,35 @@ export class ClientLoginComponent {
     }
 
     return this.directory.filter(
-      (trainer) =>
-        trainer.trainer_name.toLowerCase().includes(term) || trainer.trainer_id.toLowerCase().includes(term)
+      (professional) =>
+        professional.professional_name.toLowerCase().includes(term) || professional.professional_id.toLowerCase().includes(term)
     );
   }
 
-  selectTrainer(trainer: TrainerDirectoryEntry): void {
-    this.pendingTrainer = trainer;
+  selectProfessional(professional: ProfessionalDirectoryEntry): void {
+    this.pendingProfessional = professional;
   }
 
-  confirmTrainer(): void {
-    if (!this.pendingTrainer) {
+  confirmProfessional(): void {
+    if (!this.pendingProfessional) {
       return;
     }
 
-    this.selectedTrainer = this.pendingTrainer;
-    this.loginForm.trainerCode = this.pendingTrainer.trainer_id;
+    this.selectedProfessional = this.pendingProfessional;
+    this.loginForm.professionalCode = this.pendingProfessional.professional_id;
     this.showDirectory = false;
   }
 
   cancelDirectory(): void {
-    this.pendingTrainer = null;
+    this.pendingProfessional = null;
     this.showDirectory = false;
   }
 
   loadDirectory(): void {
     this.isLoadingDirectory = true;
-    this.clientApi.getTrainerDirectory(this.directorySearch).subscribe({
+    this.clientApi.getProfessionalDirectory(this.directorySearch).subscribe({
       next: (response) => {
-        this.directory = response.trainers;
+        this.directory = response.professionals;
         this.isLoadingDirectory = false;
       },
       error: () => {
@@ -91,11 +92,11 @@ export class ClientLoginComponent {
   }
 
   verifyClientLogin(): void {
-    const trainerCode = this.loginForm.trainerCode.trim();
+    const professionalCode = this.loginForm.professionalCode.trim();
     const username = this.loginForm.username.trim().toLowerCase();
 
-    if (!trainerCode || !username || !this.loginForm.password) {
-      this.loginMessage = 'Trainer code, username, and password are all required.';
+    if (!professionalCode || !username || !this.loginForm.password) {
+      this.loginMessage = 'Professional code, username, and password are all required.';
       return;
     }
 
@@ -103,7 +104,7 @@ export class ClientLoginComponent {
     this.clientName = '';
     this.loginMessage = 'Verifying client login...';
 
-    this.clientApi.login(trainerCode, username, this.loginForm.password).subscribe({
+    this.clientApi.login(professionalCode, username, this.loginForm.password).subscribe({
       next: (response) => {
         const client = response.client;
         this.clientName = `${client.first_name} ${client.last_name}`.trim();

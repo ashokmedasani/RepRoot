@@ -20,12 +20,12 @@ class TemplatesApi {
 
   final Dio _dio;
 
-  static final _auth = authOptions(AuthScheme.trainer);
+  static final _auth = authOptions(AuthScheme.professional);
 
   Future<TemplateListResponse> getTemplates() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/templates/',
+        '/professional/templates/',
         options: _auth,
       );
       return TemplateListResponse(
@@ -41,7 +41,7 @@ class TemplatesApi {
   Future<TrackingTemplateRecord> getTemplate(int templateId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/templates/$templateId/',
+        '/professional/templates/$templateId/',
         options: _auth,
       );
       return TrackingTemplateRecord.fromJson(
@@ -53,7 +53,7 @@ class TemplatesApi {
   Future<List<StandardTemplateRecord>> getStandardTemplates() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/templates/standard/',
+        '/professional/templates/standard/',
         options: _auth,
       );
       return (res.data?['standard_templates'] as List<dynamic>? ?? [])
@@ -66,7 +66,7 @@ class TemplatesApi {
   Future<TrackingTemplateRecord> adoptStandardTemplate(String key) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/templates/adopt-standard/',
+        '/professional/templates/adopt-standard/',
         data: {'key': key},
         options: _auth,
       );
@@ -79,7 +79,7 @@ class TemplatesApi {
   Future<TrackingTemplateRecord> createTemplate(TemplatePayload payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/templates/',
+        '/professional/templates/',
         data: payload.toJson(),
         options: _auth,
       );
@@ -95,7 +95,7 @@ class TemplatesApi {
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/templates/$templateId/',
+        '/professional/templates/$templateId/',
         data: payload.toJson(),
         options: _auth,
       );
@@ -108,7 +108,7 @@ class TemplatesApi {
   Future<String> deleteTemplate(int templateId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/templates/$templateId/',
+        '/professional/templates/$templateId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -120,7 +120,7 @@ class TemplatesApi {
   Future<List<TemplateAssignmentRecord>> getAssignments(int clientId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/assignments/',
+        '/professional/forms-groups/clients/$clientId/assignments/',
         options: _auth,
       );
       return (res.data?['assignments'] as List<dynamic>? ?? [])
@@ -137,7 +137,7 @@ class TemplatesApi {
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/assignments/',
+        '/professional/forms-groups/clients/$clientId/assignments/',
         data: {'template_id': templateId, 'reference_ids': referenceIds},
         options: _auth,
       );
@@ -154,7 +154,7 @@ class TemplatesApi {
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/assignments/$assignmentId/',
+        '/professional/forms-groups/clients/$clientId/assignments/$assignmentId/',
         data: {'reference_ids': referenceIds},
         options: _auth,
       );
@@ -167,7 +167,7 @@ class TemplatesApi {
   Future<String> unassignTemplate(int clientId, int assignmentId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/assignments/$assignmentId/',
+        '/professional/forms-groups/clients/$clientId/assignments/$assignmentId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -182,7 +182,7 @@ class TemplatesApi {
   }) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/entries/',
+        '/professional/forms-groups/clients/$clientId/entries/',
         queryParameters: filters.toQuery(),
         options: _auth,
       );
@@ -202,7 +202,7 @@ class TemplatesApi {
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/entries/',
+        '/professional/forms-groups/clients/$clientId/entries/',
         data: {
           'template_id': templateId,
           'entry_date': entryDate,
@@ -217,7 +217,7 @@ class TemplatesApi {
     });
   }
 
-  /// Note the different route: entries are edited at `/trainer/entries/{id}/`,
+  /// Note the different route: entries are edited at `/professional/entries/{id}/`,
   /// not under the client path.
   Future<TrackingEntryRecord> updateEntry(
     int entryId, {
@@ -228,7 +228,7 @@ class TemplatesApi {
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/entries/$entryId/',
+        '/professional/entries/$entryId/',
         data: {
           'answers': answers,
           'note': note,

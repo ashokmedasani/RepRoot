@@ -91,7 +91,6 @@ export interface ProfessionalDataUsageResponse {
   usage_label: ProfessionalUsageLabel;
   record_count: number;
   sections: Record<string, ProfessionalDataUsageSection>;
-  featured_client: ProfessionalClientDataUsage | null;
   warning_threshold_percent: number;
   danger_threshold_percent: number;
   is_warning: boolean;
@@ -146,6 +145,8 @@ export interface SupportIncidentListResponse {
   active_limit: number;
 }
 
+export type ProfessionalUpgradeTier = 'pro' | 'premium_unlimited';
+
 export interface ProfessionalBillingStatus {
   plan: {
     code: ProfessionalPlanCode;
@@ -155,16 +156,27 @@ export interface ProfessionalBillingStatus {
   plan_renews_at: string | null;
   has_billing_account: boolean;
   billing_configured: boolean;
+  // True while real Stripe pricing isn't wired up for every tier yet —
+  // "Update plan" applies the chosen tier directly with no charge so the
+  // rest of the lifecycle can be tested end-to-end.
+  test_mode: boolean;
+  available_upgrades: Partial<Record<ProfessionalUpgradeTier, boolean>>;
 }
 
-export interface ProfessionalClientDataUsage {
+// The Recycle Bin is scoped narrow: only chat images, references, and whole
+// client accounts go through it — see backend/accounts/recycle_bin.py.
+export type RecycleBinCategory = 'chat_message' | 'reference' | 'client_account';
+
+export interface RecycleBinItem {
   id: number;
-  reference_id: string;
-  username: string;
-  name: string;
-  percent_of_quota: number;
-  record_count: number;
-  sections: Record<string, ProfessionalDataUsageSection>;
+  category: RecycleBinCategory;
+  category_label: string;
+  title: string;
+  deleted_by: 'professional' | 'retention_policy';
+  deleted_by_label: string;
+  deleted_at: string;
+  expires_at: string;
+  days_remaining: number;
 }
 
 export interface ProfessionalProfile {
@@ -335,15 +347,48 @@ export class ProfessionalAuthApiService {
     return this.dataUsageRequest$;
   }
 
+  /** Drops the cached data-usage response so the next getDataUsage() call re-fetches — call after restore/plan changes. */
+  invalidateDataUsage(): void {
+    this.dataUsageRequest$ = undefined;
+  }
+
+  getRecycleBin(): Observable<{ items: RecycleBinItem[] }> {
+    return this.http.get<{ items: RecycleBinItem[] }>(`${this.apiBaseUrl}/professional/recycle-bin/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  restoreRecycleBinItem(itemId: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBaseUrl}/professional/recycle-bin/${itemId}/restore/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  deleteRecycleBinItemPermanently(itemId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.apiBaseUrl}/professional/recycle-bin/${itemId}/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
   getBillingStatus(): Observable<ProfessionalBillingStatus> {
     return this.http.get<ProfessionalBillingStatus>(`${this.apiBaseUrl}/professional/billing/status/`, {
       headers: this.getAuthHeaders()
     });
   }
 
-  createBillingCheckout(): Observable<{ checkout_url: string }> {
+  createBillingCheckout(targetTier: ProfessionalUpgradeTier): Observable<{ checkout_url: string }> {
     return this.http.post<{ checkout_url: string }>(
       `${this.apiBaseUrl}/professional/billing/checkout/`,
+      { target_tier: targetTier },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  cancelBillingPlan(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBaseUrl}/professional/billing/cancel/`,
       {},
       { headers: this.getAuthHeaders() }
     );

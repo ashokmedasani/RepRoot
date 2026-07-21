@@ -230,8 +230,10 @@ export class BarChartComponent implements AfterViewInit, OnChanges, OnDestroy {
           {
             label: this.spec.title,
             data: this.spec.data.map((point) => point.value),
-            backgroundColor: this.spec.data.map((_, index) => withAlpha(palette[index % palette.length], 0.78)),
-            hoverBackgroundColor: this.spec.data.map((_, index) => palette[index % palette.length]),
+            backgroundColor: this.spec.data.map((point, index) =>
+              withAlpha(point.color || palette[index % palette.length], 0.78)
+            ),
+            hoverBackgroundColor: this.spec.data.map((point, index) => point.color || palette[index % palette.length]),
             borderRadius: 8,
             maxBarThickness: 48
           }

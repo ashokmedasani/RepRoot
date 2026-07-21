@@ -50,7 +50,7 @@ export interface PublicLeadForm {
   id: number;
   title: string;
   public_slug: string;
-  trainer_name: string;
+  professional_name: string;
   fields: DynamicField[];
 }
 
@@ -63,7 +63,7 @@ export interface ClientRegistrationForm {
   updated_at: string;
 }
 
-export interface TrainerGroup {
+export interface ProfessionalGroup {
   id: number;
   name: string;
   description: string;
@@ -98,7 +98,7 @@ export interface LeadSubmission {
 export interface FormsGroupsOverview {
   has_lead_form: boolean;
   lead_form: LeadForm | null;
-  groups: TrainerGroup[];
+  groups: ProfessionalGroup[];
   pending_forms: LeadSubmission[];
   approved_forms: LeadSubmission[];
   deleted_forms: LeadSubmission[];
@@ -118,7 +118,7 @@ export interface ClientAccessPayload {
 
 export interface PublicGroupRegistrationForm {
   group: { id: number; name: string };
-  trainer_name: string;
+  professional_name: string;
   fields: DynamicField[];
 }
 
@@ -161,7 +161,7 @@ export interface ClientReminder {
   time: string | null;
   notes: string;
   status: ReminderStatus;
-  notify_trainer: boolean;
+  notify_professional: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -205,7 +205,7 @@ export interface ClientAccessRecord {
   id: number;
   group: number;
   group_name: string;
-  trainer_name: string;
+  professional_name: string;
   lead_submission: number | null;
   registration_submission: number | null;
   reference_id: string;
@@ -225,7 +225,7 @@ export interface ClientAccessRecord {
 }
 
 export interface GroupUsersResponse {
-  group: TrainerGroup;
+  group: ProfessionalGroup;
   clients: ClientAccessRecord[];
   registration_submissions: GroupRegistrationSubmission[];
 }
@@ -237,18 +237,18 @@ export interface ClientDetailChangeRequest {
   proposed_answers: Record<string, string>;
   status: 'pending' | 'approved' | 'rejected';
   client_note: string;
-  trainer_note: string;
+  professional_note: string;
   created_at: string;
   reviewed_at: string | null;
 }
 
 export interface ClientAccessDetailResponse {
   client: ClientAccessRecord;
-  group: TrainerGroup;
+  group: ProfessionalGroup;
   registration_fields: DynamicField[];
   lead_submission: LeadSubmission | null;
-  trainer_notes: string;
-  trainer_notes_updated_at: string | null;
+  professional_notes: string;
+  professional_notes_updated_at: string | null;
   pending_change_request: ClientDetailChangeRequest | null;
 }
 
@@ -263,30 +263,30 @@ export class FormsGroupsApiService {
   constructor(private readonly http: HttpClient) {}
 
   getOverview(): Observable<FormsGroupsOverview> {
-    return this.http.get<FormsGroupsOverview>(`${this.apiBaseUrl}/trainer/forms-groups/`, {
+    return this.http.get<FormsGroupsOverview>(`${this.apiBaseUrl}/professional/forms-groups/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   saveLeadForm(title: string, customFields: DynamicField[]): Observable<{ lead_form: LeadForm; message: string }> {
     return this.http.post<{ lead_form: LeadForm; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/lead-form/`,
+      `${this.apiBaseUrl}/professional/forms-groups/lead-form/`,
       { title, custom_fields: customFields },
       { headers: this.getAuthHeaders() }
     );
   }
 
-  createGroup(name: string, description: string): Observable<{ group: TrainerGroup; message: string }> {
-    return this.http.post<{ group: TrainerGroup; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/groups/`,
+  createGroup(name: string, description: string): Observable<{ group: ProfessionalGroup; message: string }> {
+    return this.http.post<{ group: ProfessionalGroup; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/groups/`,
       { name, description },
       { headers: this.getAuthHeaders() }
     );
   }
 
-  updateGroup(groupId: number, name: string, description: string): Observable<{ group: TrainerGroup; message: string }> {
-    return this.http.put<{ group: TrainerGroup; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/groups/${groupId}/`,
+  updateGroup(groupId: number, name: string, description: string): Observable<{ group: ProfessionalGroup; message: string }> {
+    return this.http.put<{ group: ProfessionalGroup; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/`,
       { name, description },
       { headers: this.getAuthHeaders() }
     );
@@ -297,14 +297,14 @@ export class FormsGroupsApiService {
     customFields: DynamicField[]
   ): Observable<{ registration_form: ClientRegistrationForm; message: string }> {
     return this.http.post<{ registration_form: ClientRegistrationForm; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/groups/${groupId}/registration-form/`,
+      `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/registration-form/`,
       { custom_fields: customFields },
       { headers: this.getAuthHeaders() }
     );
   }
 
   deletePendingForm(submissionId: number): Observable<MessageResponse> {
-    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/trainer/forms-groups/pending/${submissionId}/`, {
+    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/professional/forms-groups/pending/${submissionId}/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -314,7 +314,7 @@ export class FormsGroupsApiService {
     payload: ClientAccessPayload
   ): Observable<{ client_access: unknown; message: string }> {
     return this.http.post<{ client_access: unknown; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/pending/${submissionId}/create-client-access/`,
+      `${this.apiBaseUrl}/professional/forms-groups/pending/${submissionId}/create-client-access/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -333,17 +333,17 @@ export class FormsGroupsApiService {
       temporary_password: string;
       credentials_sent: boolean;
       message: string;
-    }>(`${this.apiBaseUrl}/trainer/forms-groups/clients/manual/`, payload, { headers: this.getAuthHeaders() });
+    }>(`${this.apiBaseUrl}/professional/forms-groups/clients/manual/`, payload, { headers: this.getAuthHeaders() });
   }
 
   getGroupUsers(groupId: number): Observable<GroupUsersResponse> {
-    return this.http.get<GroupUsersResponse>(`${this.apiBaseUrl}/trainer/forms-groups/groups/${groupId}/clients/`, {
+    return this.http.get<GroupUsersResponse>(`${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/clients/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   getClientProfile(clientId: number): Observable<ClientAccessDetailResponse> {
-    return this.http.get<ClientAccessDetailResponse>(`${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`, {
+    return this.http.get<ClientAccessDetailResponse>(`${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -360,18 +360,18 @@ export class FormsGroupsApiService {
     }>
   ): Observable<{ client: ClientAccessRecord; message: string }> {
     return this.http.put<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
   }
 
-  saveTrainerNotes(
+  saveProfessionalNotes(
     clientId: number,
     notes: string
-  ): Observable<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }> {
-    return this.http.put<{ trainer_notes: string; trainer_notes_updated_at: string | null; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/notes/`,
+  ): Observable<{ professional_notes: string; professional_notes_updated_at: string | null; message: string }> {
+    return this.http.put<{ professional_notes: string; professional_notes_updated_at: string | null; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/notes/`,
       { notes },
       { headers: this.getAuthHeaders() }
     );
@@ -379,7 +379,7 @@ export class FormsGroupsApiService {
 
   updateClientPhoto(clientId: number, photo: string): Observable<{ client: ClientAccessRecord; message: string }> {
     return this.http.put<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/photo/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/photo/`,
       { photo },
       { headers: this.getAuthHeaders() }
     );
@@ -397,7 +397,7 @@ export class FormsGroupsApiService {
     }
 
     return this.http.put<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/additional-info/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/additional-info/`,
       body,
       { headers: this.getAuthHeaders() }
     );
@@ -407,17 +407,17 @@ export class FormsGroupsApiService {
 
   getClientReminders(clientId: number): Observable<{ reminders: ClientReminder[] }> {
     return this.http.get<{ reminders: ClientReminder[] }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reminders/`,
       { headers: this.getAuthHeaders() }
     );
   }
 
   createClientReminder(
     clientId: number,
-    payload: { title: string; date: string; time: string | null; notes: string; notify_trainer: boolean }
+    payload: { title: string; date: string; time: string | null; notes: string; notify_professional: boolean }
   ): Observable<{ reminder: ClientReminder; message: string }> {
     return this.http.post<{ reminder: ClientReminder; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reminders/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reminders/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -425,23 +425,23 @@ export class FormsGroupsApiService {
 
   updateReminder(
     reminderId: number,
-    payload: Partial<{ title: string; date: string; time: string | null; notes: string; status: ReminderStatus; notify_trainer: boolean }>
+    payload: Partial<{ title: string; date: string; time: string | null; notes: string; status: ReminderStatus; notify_professional: boolean }>
   ): Observable<{ reminder: ClientReminder; message: string }> {
     return this.http.put<{ reminder: ClientReminder; message: string }>(
-      `${this.apiBaseUrl}/trainer/reminders/${reminderId}/`,
+      `${this.apiBaseUrl}/professional/reminders/${reminderId}/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
   }
 
   deleteReminder(reminderId: number): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(`${this.apiBaseUrl}/trainer/reminders/${reminderId}/`, {
+    return this.http.delete<{ message: string }>(`${this.apiBaseUrl}/professional/reminders/${reminderId}/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   getUpcomingReminders(): Observable<{ reminders: ClientReminder[]; profile_edits: ClientProfileEditActivity[]; summary: ScheduleSummary }> {
-    return this.http.get<{ reminders: ClientReminder[]; profile_edits: ClientProfileEditActivity[]; summary: ScheduleSummary }>(`${this.apiBaseUrl}/trainer/reminders/upcoming/`, {
+    return this.http.get<{ reminders: ClientReminder[]; profile_edits: ClientProfileEditActivity[]; summary: ScheduleSummary }>(`${this.apiBaseUrl}/professional/reminders/upcoming/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -450,7 +450,7 @@ export class FormsGroupsApiService {
 
   getClientProgress(clientId: number): Observable<{ progress: ProgressEntry[] }> {
     return this.http.get<{ progress: ProgressEntry[] }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/progress/`,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -460,7 +460,7 @@ export class FormsGroupsApiService {
     payload: { title: string; date: string; notes: string; status: string; next_step: string }
   ): Observable<{ progress: ProgressEntry; message: string }> {
     return this.http.post<{ progress: ProgressEntry; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/progress/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/progress/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -471,7 +471,7 @@ export class FormsGroupsApiService {
     payload: Partial<{ title: string; date: string; notes: string; status: string; next_step: string }>
   ): Observable<{ progress: ProgressEntry; message: string }> {
     return this.http.put<{ progress: ProgressEntry; message: string }>(
-      `${this.apiBaseUrl}/trainer/progress/${entryId}/`,
+      `${this.apiBaseUrl}/professional/progress/${entryId}/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -484,7 +484,7 @@ export class FormsGroupsApiService {
     note = ''
   ): Observable<{ change_request: ClientDetailChangeRequest; client: ClientAccessRecord; message: string }> {
     return this.http.post<{ change_request: ClientDetailChangeRequest; client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/change-requests/${requestId}/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/change-requests/${requestId}/`,
       { action, note },
       { headers: this.getAuthHeaders() }
     );
@@ -492,7 +492,7 @@ export class FormsGroupsApiService {
 
   updateClientStatus(clientId: number, isActive: boolean): Observable<{ client: ClientAccessRecord; message: string }> {
     return this.http.put<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/status/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/status/`,
       { is_active: isActive },
       { headers: this.getAuthHeaders() }
     );
@@ -500,7 +500,7 @@ export class FormsGroupsApiService {
 
   resetClient(clientId: number): Observable<{ client: ClientAccessRecord; message: string }> {
     return this.http.post<{ client: ClientAccessRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reset/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reset/`,
       {},
       { headers: this.getAuthHeaders() }
     );
@@ -508,14 +508,14 @@ export class FormsGroupsApiService {
 
   deleteClient(clientId: number): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/delete/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/delete/`,
       { headers: this.getAuthHeaders() }
     );
   }
 
   resetClientPassword(clientId: number, password = ''): Observable<{ temporary_password: string; message: string }> {
     return this.http.post<{ temporary_password: string; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/reset-password/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reset-password/`,
       password ? { password } : {},
       { headers: this.getAuthHeaders() }
     );
@@ -547,7 +547,7 @@ export class FormsGroupsApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('trainer-auth-token') || '';
+    const token = window.localStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 

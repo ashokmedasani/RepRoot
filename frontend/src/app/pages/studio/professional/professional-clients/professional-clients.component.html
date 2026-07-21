@@ -1,9 +1,9 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Clients"
   eyebrow="Client Workspace"
   subtitle="Review every approved client, open profiles, and continue conversations."
   activeSection="clients"
-  titleId="trainer-clients-title"
+  titleId="professional-clients-title"
 >
   <button page-actions type="button" class="secondary-action" (click)="loadClients()">Refresh</button>
 
@@ -77,7 +77,7 @@
               <tr>
                 <td>{{ index + 1 }}</td>
                 <td>
-                  <a [routerLink]="['/trainer/clients', client.id]" class="client-name">
+                  <a [routerLink]="['/professional/clients', client.id]" class="client-name">
                     <span class="avatar">{{ initials(client) }}</span>
                     <span>{{ client.first_name }} {{ client.last_name }}</span>
                     @if (unreadFor(client.id); as unreadCount) {
@@ -91,7 +91,7 @@
                 <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
                 <td>{{ client.created_at | date: 'mediumDate' }}</td>
                 <td>
-                  <a [routerLink]="['/trainer/clients', client.id]" class="ghost-action compact">Open</a>
+                  <a [routerLink]="['/professional/clients', client.id]" class="ghost-action compact">Open</a>
                 </td>
               </tr>
             } @empty {
@@ -104,4 +104,4 @@
       </div>
     </section>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

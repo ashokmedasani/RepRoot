@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/models/trainer_models.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/models/professional_models.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/auth_brand.dart';
 import '../../shared/widgets/password_field.dart';
@@ -14,16 +14,16 @@ enum UsernameStatus { idle, checking, available, taken }
 
 enum EmailStatus { idle, sending, sent, verifying, verified }
 
-/// Replica of mobile/src/app/pages/trainer/signup/trainer-signup.page.ts.
+/// Replica of mobile/src/app/pages/professional/signup/professional-signup.page.ts.
 /// Username check -> email OTP -> verify -> create account.
-class TrainerSignupPage extends ConsumerStatefulWidget {
-  const TrainerSignupPage({super.key});
+class ProfessionalSignupPage extends ConsumerStatefulWidget {
+  const ProfessionalSignupPage({super.key});
 
   @override
-  ConsumerState<TrainerSignupPage> createState() => _TrainerSignupPageState();
+  ConsumerState<ProfessionalSignupPage> createState() => _ProfessionalSignupPageState();
 }
 
-class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
+class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage> {
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _otp = TextEditingController();
@@ -74,7 +74,7 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
 
     setState(() => _usernameStatus = UsernameStatus.checking);
     try {
-      final result = await ref.read(trainerAuthApiProvider).checkUsername(username);
+      final result = await ref.read(professionalAuthApiProvider).checkUsername(username);
       if (!mounted) return;
       setState(() {
         _usernameStatus =
@@ -105,7 +105,7 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
       _emailError = false;
     });
     try {
-      final result = await ref.read(trainerAuthApiProvider).requestEmailOtp(email);
+      final result = await ref.read(professionalAuthApiProvider).requestEmailOtp(email);
       if (!mounted) return;
       setState(() {
         // available == false means the email is already registered.
@@ -135,7 +135,7 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
     });
     try {
       final result = await ref
-          .read(trainerAuthApiProvider)
+          .read(professionalAuthApiProvider)
           .verifyEmailOtp(_email.text.trim().toLowerCase(), _otp.text.trim());
       if (!mounted) return;
       setState(() {
@@ -176,10 +176,10 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
     }
 
     setState(() => _isSubmitting = true);
-    final api = ref.read(trainerAuthApiProvider);
+    final api = ref.read(professionalAuthApiProvider);
     try {
       final response = await api.signup(
-        TrainerSignupPayload(
+        ProfessionalSignupPayload(
           username: _username.text.trim().toLowerCase(),
           email: _email.text.trim().toLowerCase(),
           password: _password.text,
@@ -189,9 +189,9 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
       );
       await api.storeToken(response.token);
       if (!mounted) return;
-      // New accounts always need profile setup (name + trainer code) before
+      // New accounts always need profile setup (name + professional code) before
       // the dashboard, matching the web portal's first-login step.
-      context.go(Routes.trainerProfileSetup);
+      context.go(Routes.professionalProfileSetup);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -219,8 +219,8 @@ class _TrainerSignupPageState extends ConsumerState<TrainerSignupPage> {
                 children: [
                   const SizedBox(height: AppSpacing.md),
                   const AuthBrand(
-                    title: 'Join CoachFlow',
-                    subtitle: 'Set up your trainer account',
+                    title: 'Join RepRoot',
+                    subtitle: 'Set up your professional account',
                   ),
                   const SizedBox(height: AppSpacing.xl),
 

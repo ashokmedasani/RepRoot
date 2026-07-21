@@ -4,20 +4,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/auth_brand.dart';
 import '../../shared/widgets/password_field.dart';
 
-/// Replica of mobile/src/app/pages/trainer/login/trainer-login.page.ts.
-class TrainerLoginPage extends ConsumerStatefulWidget {
-  const TrainerLoginPage({super.key});
+/// Replica of mobile/src/app/pages/professional/login/professional-login.page.ts.
+class ProfessionalLoginPage extends ConsumerStatefulWidget {
+  const ProfessionalLoginPage({super.key});
 
   @override
-  ConsumerState<TrainerLoginPage> createState() => _TrainerLoginPageState();
+  ConsumerState<ProfessionalLoginPage> createState() => _ProfessionalLoginPageState();
 }
 
-class _TrainerLoginPageState extends ConsumerState<TrainerLoginPage> {
+class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
   final _identifier = TextEditingController();
   final _password = TextEditingController();
   bool _isSubmitting = false;
@@ -41,26 +41,26 @@ class _TrainerLoginPageState extends ConsumerState<TrainerLoginPage> {
       _message = '';
     });
 
-    final api = ref.read(trainerAuthApiProvider);
+    final api = ref.read(professionalAuthApiProvider);
     try {
       final response = await api.login(_identifier.text.trim(), _password.text);
       await api.storeToken(response.token);
 
       // Same rule as the web portal: incomplete profiles finish setup
-      // (name + trainer code) before reaching the dashboard. Without this a
-      // trainer can reach the dashboard with no trainer code, and their
+      // (name + professional code) before reaching the dashboard. Without this a
+      // professional can reach the dashboard with no professional code, and their
       // clients could never log in.
       bool setupComplete;
       try {
         setupComplete = await api.getProfileStatus();
       } catch (_) {
-        // Don't strand a signed-in trainer on the login screen if this
+        // Don't strand a signed-in professional on the login screen if this
         // secondary check fails — the dashboard re-checks anyway.
         setupComplete = true;
       }
 
       if (!mounted) return;
-      context.go(setupComplete ? Routes.trainerDashboard : Routes.trainerProfileSetup);
+      context.go(setupComplete ? Routes.professionalDashboard : Routes.professionalProfileSetup);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -73,7 +73,7 @@ class _TrainerLoginPageState extends ConsumerState<TrainerLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trainer Login')),
+      appBar: AppBar(title: const Text('Professional Login')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.screen),
@@ -86,7 +86,7 @@ class _TrainerLoginPageState extends ConsumerState<TrainerLoginPage> {
                     const SizedBox(height: AppSpacing.lg),
                     const AuthBrand(
                       title: 'Welcome back',
-                      subtitle: 'Sign in to your trainer workspace',
+                      subtitle: 'Sign in to your professional workspace',
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     TextField(
@@ -125,8 +125,8 @@ class _TrainerLoginPageState extends ConsumerState<TrainerLoginPage> {
                     TextButton(
                       onPressed: _isSubmitting
                           ? null
-                          : () => context.push(Routes.trainerSignup),
-                      child: const Text('New trainer? Create an account'),
+                          : () => context.push(Routes.professionalSignup),
+                      child: const Text('New professional? Create an account'),
                     ),
                     FormMessage(message: _message),
                   ],

@@ -1,4 +1,4 @@
-/* Trainer Client Profile page specific styles */
+/* Professional Client Profile page specific styles */
 
 .profile-stack {
   display: grid;
@@ -163,7 +163,7 @@
   gap: 0.75rem;
 }
 
-/* trainer notes */
+/* professional notes */
 .notes-card {
   background: var(--app-warning-soft);
   border-color: var(--app-warning-border);
@@ -807,6 +807,11 @@ app-chat-panel {
 
 .sched-item.done {
   opacity: 0.6;
+}
+
+.sched-item.editing {
+  border-color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface-soft));
 }
 
 .sched-main {

@@ -2,16 +2,16 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { AdminAuditLog, AdminPortalApiService } from '../../../core/api/admin-portal-api.service';
-import { AdminPageShellComponent } from '../../../shared/admin-page-shell/admin-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { AdminAuditLog, AdminPortalApiService } from '@core/api/admin-portal-api.service';
+import { AdminPageShellComponent } from '@admin-shared/admin-page-shell/admin-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({selector:'app-admin-audit-logs',standalone:true,imports:[AdminPageShellComponent,FormsModule,DatePipe],template:`
-<app-admin-page-shell title="Audit Logs" subtitle="Immutable administrative history using safe trainer and client references." activeSection="audit">
+<app-admin-page-shell title="Audit Logs" subtitle="Immutable administrative history using safe professional and client references." activeSection="audit">
   <form page-actions class="search" (ngSubmit)="load()"><input name="search" [(ngModel)]="search" placeholder="Correlation ID or account reference"><button class="secondary-action compact">Search</button></form>
   <section class="log-panel"><div class="section-head"><div><p class="eyebrow">Administrative activity</p><h2>{{count}} recorded actions</h2></div><span>Read only</span></div>
   @if(message){<p class="message">{{message}}</p>}@else if(logs.length){<div class="table-wrap"><table><thead><tr><th>Time</th><th>Staff</th><th>Action</th><th>Target</th><th>Permission</th><th>Correlation ID</th><th>Result</th></tr></thead><tbody>@for(log of logs;track log.id){<tr><td>{{log.created_at|date:'medium'}}</td><td><strong>{{log.staff_reference_snapshot||'System'}}</strong><small>{{log.role_snapshot}}</small></td><td>{{log.action}}</td><td><span class="target">{{log.target_display||'Platform'}}</span><small>{{log.target_type}}</small></td><td><code>{{log.permission_used}}</code></td><td><code>{{log.correlation_id}}</code></td><td><span class="result" [class.failed]="!log.success">{{log.success?'Success':'Failed'}}</span></td></tr>}</tbody></table></div>}@else{<div class="empty">No audit records match this search.</div>}</section>
-  <aside class="format-note"><strong>Identifier standard</strong><span>Trainer: <code>username · TRN-reference</code></span><span>Client: <code>trainer_username:CL-reference</code></span></aside>
+  <aside class="format-note"><strong>Identifier standard</strong><span>Professional: <code>username · TRN-reference</code></span><span>Client: <code>professional_username:CL-reference</code></span></aside>
 </app-admin-page-shell>`,styles:[`
 .search{display:flex;gap:.5rem}.search input{min-width:min(22rem,50vw);min-height:2.3rem}.log-panel{border:1px solid var(--app-border);border-radius:.9rem;padding:1.15rem;background:var(--app-surface);box-shadow:var(--app-shadow-sm)}.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}.section-head h2{margin:0;font-size:1.05rem}.section-head>span{color:var(--app-muted);font-size:.75rem}.table-wrap{max-height:34rem;overflow:auto}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid var(--app-border);padding:.72rem;text-align:left;vertical-align:top;white-space:nowrap}th{position:sticky;top:0;background:var(--app-surface);color:var(--app-muted);font-size:.68rem;text-transform:uppercase}td strong,td small{display:block}td small{color:var(--app-muted)}code{font-size:.72rem}.target{font-weight:750}.result{border-radius:2rem;padding:.25rem .5rem;background:#eaf8f1;color:#087443;font-size:.68rem;font-weight:800}.result.failed{background:#fff0ef;color:#b42318}.format-note{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1rem;border:1px solid var(--app-border);border-radius:.75rem;padding:.8rem;background:var(--app-surface-soft);color:var(--app-muted);font-size:.8rem}.format-note strong{color:var(--app-text)}.empty{padding:3rem;text-align:center;color:var(--app-muted)}.message{color:#b42318}
 `]})

@@ -6,26 +6,26 @@ import {
   DynamicField,
   FormsGroupsApiService,
   GroupRegistrationSubmission,
-  TrainerGroup
-} from '../../../core/api/forms-groups-api.service';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+  ProfessionalGroup
+} from '@core/api/forms-groups-api.service';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({
-  selector: 'app-trainer-manual-client-create',
+  selector: 'app-professional-manual-client-create',
   standalone: true,
-  imports: [FormsModule, PasswordInputComponent, RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-manual-client-create.component.html',
-  styleUrl: './trainer-manual-client-create.component.scss'
+  imports: [FormsModule, PasswordInputComponent, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-manual-client-create.component.html',
+  styleUrl: './professional-manual-client-create.component.scss'
 })
-export class TrainerManualClientCreateComponent implements OnInit {
+export class ProfessionalManualClientCreateComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(FormsGroupsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 
-  groups: TrainerGroup[] = [];
+  groups: ProfessionalGroup[] = [];
   selectedGroupId: number | null = null;
   registrationSubmission: GroupRegistrationSubmission | null = null;
   answers: Record<string, string> = {};
@@ -61,7 +61,7 @@ export class TrainerManualClientCreateComponent implements OnInit {
     });
   }
 
-  get selectedGroup(): TrainerGroup | null {
+  get selectedGroup(): ProfessionalGroup | null {
     return this.groups.find((group) => group.id === this.selectedGroupId) || null;
   }
 

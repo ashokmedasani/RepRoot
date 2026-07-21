@@ -3,24 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
-import '../../core/api/models/trainer_models.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/models/professional_models.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 
 /// More tab — profile header + menu rows (Shop deferred, as in the Ionic app).
-/// Replica of mobile/src/app/pages/trainer/more/trainer-more.page.ts.
-class TrainerMorePage extends ConsumerStatefulWidget {
-  const TrainerMorePage({super.key});
+/// Replica of mobile/src/app/pages/professional/more/professional-more.page.ts.
+class ProfessionalMorePage extends ConsumerStatefulWidget {
+  const ProfessionalMorePage({super.key});
 
   @override
-  ConsumerState<TrainerMorePage> createState() => _TrainerMorePageState();
+  ConsumerState<ProfessionalMorePage> createState() => _ProfessionalMorePageState();
 }
 
-class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
-  TrainerProfile? _profile;
-  TrainerDataUsage? _usage;
+class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
+  ProfessionalProfile? _profile;
+  ProfessionalDataUsage? _usage;
   bool _isSigningOut = false;
 
   @override
@@ -30,11 +30,11 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
   }
 
   Future<void> _load() async {
-    final api = ref.read(trainerAuthApiProvider);
+    final api = ref.read(professionalAuthApiProvider);
     try {
       final profile = await api.getProfile();
       if (mounted) setState(() => _profile = profile);
-    } catch (_) {/* header falls back to 'Trainer' */}
+    } catch (_) {/* header falls back to 'Professional' */}
     try {
       final usage = await api.getDataUsage();
       if (mounted) setState(() => _usage = usage);
@@ -43,7 +43,7 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
 
   String get _fullName {
     final profile = _profile;
-    if (profile == null) return 'Trainer';
+    if (profile == null) return 'Professional';
     final name = profile.displayName;
     return name.isNotEmpty ? name : profile.username;
   }
@@ -64,7 +64,7 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
 
   Future<void> _logout() async {
     setState(() => _isSigningOut = true);
-    final api = ref.read(trainerAuthApiProvider);
+    final api = ref.read(professionalAuthApiProvider);
     // Best effort: a failed server logout must still clear the local session.
     try {
       await api.logout();
@@ -108,7 +108,7 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
         onRefresh: _load,
         children: [
           AppCard(
-            onTap: () => context.go(Routes.trainerProfile),
+            onTap: () => context.go(Routes.professionalProfile),
             child: Row(
               children: [
                 AppAvatar(
@@ -131,7 +131,7 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
                       Text(
                         _profile?.professionalHeadline.isNotEmpty ?? false
                             ? _profile!.professionalHeadline
-                            : 'Personal Trainer',
+                            : 'Personal Professional',
                         style: context.text.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -149,19 +149,19 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
             items: [
               _MenuItem(
                 icon: Icons.person_outline,
-                label: 'Trainer Profile',
-                onTap: () => context.go(Routes.trainerProfile),
+                label: 'Professional Profile',
+                onTap: () => context.go(Routes.professionalProfile),
               ),
               _MenuItem(
                 icon: Icons.folder_open_outlined,
                 label: 'Reference Library',
-                onTap: () => context.go(Routes.trainerReferences),
+                onTap: () => context.go(Routes.professionalReferences),
               ),
               _MenuItem(
                 icon: Icons.storage_outlined,
                 label: 'Plan & Storage',
                 trailingText: '$_usagePercent% used',
-                onTap: () => context.go(Routes.trainerSettings),
+                onTap: () => context.go(Routes.professionalSettings),
               ),
             ],
           ),
@@ -172,12 +172,12 @@ class _TrainerMorePageState extends ConsumerState<TrainerMorePage> {
               _MenuItem(
                 icon: Icons.settings_outlined,
                 label: 'Settings',
-                onTap: () => context.go(Routes.trainerSettings),
+                onTap: () => context.go(Routes.professionalSettings),
               ),
               _MenuItem(
                 icon: Icons.help_outline,
                 label: 'Help & Support',
-                onTap: () => context.go(Routes.trainerSupport),
+                onTap: () => context.go(Routes.professionalSupport),
               ),
             ],
           ),

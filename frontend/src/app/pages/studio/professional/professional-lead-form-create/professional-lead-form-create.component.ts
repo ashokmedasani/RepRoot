@@ -3,23 +3,23 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { DynamicField, FormsGroupsApiService, FormsGroupsOverview } from '../../../core/api/forms-groups-api.service';
-import { FormFieldBuilderComponent } from '../../../shared/form-field-builder/form-field-builder.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { DynamicField, FormsGroupsApiService, FormsGroupsOverview } from '@core/api/forms-groups-api.service';
+import { FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 
 @Component({
-  selector: 'app-trainer-lead-form-create',
+  selector: 'app-professional-lead-form-create',
   standalone: true,
-  imports: [FormsModule, RouterLink, FormFieldBuilderComponent, TrainerPageShellComponent],
-  templateUrl: './trainer-lead-form-create.component.html',
-  styleUrl: './trainer-lead-form-create.component.scss'
+  imports: [FormsModule, RouterLink, FormFieldBuilderComponent, ProfessionalPageShellComponent],
+  templateUrl: './professional-lead-form-create.component.html',
+  styleUrl: './professional-lead-form-create.component.scss'
 })
-export class TrainerLeadFormCreateComponent implements OnInit {
+export class ProfessionalLeadFormCreateComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly router = inject(Router);
 
   overview: FormsGroupsOverview | null = null;
-  title = 'Trainer Lead Form';
+  title = 'Professional Lead Form';
   customFields: DynamicField[] = [];
   isLoading = true;
   isSaving = false;
@@ -72,7 +72,7 @@ export class TrainerLeadFormCreateComponent implements OnInit {
     this.formsGroupsApi.getOverview().subscribe({
       next: (overview) => {
         this.overview = overview;
-        this.title = overview.lead_form?.title || 'Trainer Lead Form';
+        this.title = overview.lead_form?.title || 'Professional Lead Form';
         const savedCustomFields = (overview.lead_form?.fields || []).filter((field) => !field.is_core);
         this.customFields = (savedCustomFields.length ? savedCustomFields : this.defaultLeadFields).map((field) => ({
           ...field,
@@ -95,7 +95,7 @@ export class TrainerLeadFormCreateComponent implements OnInit {
       next: () => {
         this.messageType = 'success';
         this.message = 'Form created successfully. Now create your first group.';
-        const nextRoute = this.overview?.groups.length ? '/trainer/forms-groups' : '/trainer/groups/create';
+        const nextRoute = this.overview?.groups.length ? '/professional/forms-groups' : '/professional/groups/create';
         window.setTimeout(() => void this.router.navigate([nextRoute]), 900);
       },
       error: (error: unknown) => {

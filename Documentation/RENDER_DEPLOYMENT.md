@@ -95,7 +95,7 @@ Frontend:
 ```text
 Root Directory: frontend
 Build Command: npm ci && npm run build:render
-Publish Directory: dist/trainer-management-platform/browser
+Publish Directory: dist/professional-management-platform/browser
 Rewrite Rule: /* -> /index.html
 ```
 

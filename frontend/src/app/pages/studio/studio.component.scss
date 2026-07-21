@@ -29,17 +29,29 @@
   flex: 0 0 auto;
   place-items: center;
   border-radius: var(--app-panel-radius);
-  background: var(--app-primary);
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 700;
+  background: #ffffff;
+  overflow: hidden;
   box-shadow: var(--app-shadow-sm);
+}
+
+.brand__mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand__text {
   overflow-wrap: anywhere;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.brand__rep {
+  color: var(--app-text);
+}
+
+.brand__root {
+  color: var(--app-primary);
 }
 
 .hero {

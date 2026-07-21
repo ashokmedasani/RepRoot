@@ -114,6 +114,7 @@ class KpiTile extends StatelessWidget {
     required this.value,
     this.caption,
     this.icon,
+    this.iconColor,
     this.valueColor,
     this.onTap,
   });
@@ -122,6 +123,9 @@ class KpiTile extends StatelessWidget {
   final String value;
   final String? caption;
   final IconData? icon;
+  /// Tints the icon and gives it a soft matching background chip. Null keeps
+  /// the plain muted icon — existing call sites are unaffected.
+  final Color? iconColor;
   final Color? valueColor;
   final VoidCallback? onTap;
 
@@ -137,7 +141,19 @@ class KpiTile extends StatelessWidget {
           Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: AppSize.iconRow, color: tokens.muted),
+                if (iconColor != null)
+                  Container(
+                    width: AppSize.iconRow,
+                    height: AppSize.iconRow,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: iconColor!.withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: AppSize.iconRow - 7, color: iconColor),
+                  )
+                else
+                  Icon(icon, size: AppSize.iconRow, color: tokens.muted),
                 const SizedBox(width: AppSpacing.xs + 2),
               ],
               Expanded(

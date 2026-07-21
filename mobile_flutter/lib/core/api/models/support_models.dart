@@ -1,4 +1,4 @@
-/// Support incident models. The trainer and client endpoints return the same
+/// Support incident models. The professional and client endpoints return the same
 /// shape, so one model serves both roles.
 /// Ported from the MobileSupportIncident / ClientSupportIncident interfaces in
 /// mobile/src/app/core/api/.

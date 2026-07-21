@@ -14,7 +14,7 @@ class AdditionalInfoType {
   static const all = [text, link, reference];
 }
 
-/// Extra items a trainer attaches to a client, optionally shared with them.
+/// Extra items a professional attaches to a client, optionally shared with them.
 /// Lives here rather than in forms_groups_models.dart because
 /// [ClientAccessRecord] embeds it and that would be a circular import.
 class AdditionalInfoItem {
@@ -71,7 +71,7 @@ class ClientAccessRecord {
     required this.id,
     required this.group,
     required this.groupName,
-    required this.trainerName,
+    required this.professionalName,
     required this.referenceId,
     required this.onboardingMethod,
     required this.firstName,
@@ -93,7 +93,7 @@ class ClientAccessRecord {
   final int id;
   final int? group;
   final String groupName;
-  final String trainerName;
+  final String professionalName;
   final String referenceId;
 
   /// 'public_lead' | 'manual' | 'group_registration'
@@ -125,7 +125,7 @@ class ClientAccessRecord {
         id: json['id'] as int? ?? 0,
         group: json['group'] as int?,
         groupName: json['group_name'] as String? ?? '',
-        trainerName: json['trainer_name'] as String? ?? '',
+        professionalName: json['professional_name'] as String? ?? '',
         referenceId: json['reference_id'] as String? ?? '',
         onboardingMethod: json['onboarding_method'] as String? ?? '',
         firstName: json['first_name'] as String? ?? '',
@@ -154,7 +154,7 @@ class ClientAccessRecord {
         'id': id,
         'group': group,
         'group_name': groupName,
-        'trainer_name': trainerName,
+        'professional_name': professionalName,
         'reference_id': referenceId,
         'onboarding_method': onboardingMethod,
         'first_name': firstName,
@@ -197,14 +197,14 @@ class ClientLoginResponse {
   }
 }
 
-/// The trainer as the client sees them.
+/// The professional as the client sees them.
 ///
-/// The backend only fills the sections the trainer set visible (see the
-/// visibility toggles on the trainer profile), so any of these may be absent —
+/// The backend only fills the sections the professional set visible (see the
+/// visibility toggles on the professional profile), so any of these may be absent —
 /// that is intended, not missing data.
-class ClientTrainerProfile {
-  const ClientTrainerProfile({
-    required this.trainerName,
+class ClientProfessionalProfile {
+  const ClientProfessionalProfile({
+    required this.professionalName,
     required this.profilePhotoUrl,
     required this.professionalHeadline,
     required this.location,
@@ -216,69 +216,69 @@ class ClientTrainerProfile {
     required this.links,
   });
 
-  final String trainerName;
+  final String professionalName;
   final String profilePhotoUrl;
   final String professionalHeadline;
   final String location;
   final String aboutMe;
   final String trainingStyle;
-  final TrainerProfessionalSummary? professionalSummary;
-  final TrainerCertification? certification;
-  final List<TrainerProfileImageRef> images;
-  final List<TrainerProfileLinkRef> links;
+  final ProfessionalProfessionalSummary? professionalSummary;
+  final ProfessionalCertification? certification;
+  final List<ProfessionalProfileImageRef> images;
+  final List<ProfessionalProfileLinkRef> links;
 
-  factory ClientTrainerProfile.fromJson(Map<String, dynamic> json) {
+  factory ClientProfessionalProfile.fromJson(Map<String, dynamic> json) {
     final summary = json['professional_summary'];
     final certification = json['certification'];
-    return ClientTrainerProfile(
-      trainerName: json['trainer_name'] as String? ?? '',
+    return ClientProfessionalProfile(
+      professionalName: json['professional_name'] as String? ?? '',
       profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
       professionalHeadline: json['professional_headline'] as String? ?? '',
       location: json['location'] as String? ?? '',
       aboutMe: json['about_me'] as String? ?? '',
       trainingStyle: json['training_style'] as String? ?? '',
       professionalSummary: summary is Map<String, dynamic>
-          ? TrainerProfessionalSummary.fromJson(summary)
+          ? ProfessionalProfessionalSummary.fromJson(summary)
           : null,
       certification: certification is Map<String, dynamic>
-          ? TrainerCertification.fromJson(certification)
+          ? ProfessionalCertification.fromJson(certification)
           : null,
       images: (json['images'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map(TrainerProfileImageRef.fromJson)
+          .map(ProfessionalProfileImageRef.fromJson)
           .toList(),
       links: (json['links'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map(TrainerProfileLinkRef.fromJson)
+          .map(ProfessionalProfileLinkRef.fromJson)
           .toList(),
     );
   }
 }
 
-class TrainerProfessionalSummary {
-  const TrainerProfessionalSummary({
-    required this.trainerType,
+class ProfessionalProfessionalSummary {
+  const ProfessionalProfessionalSummary({
+    required this.professionalType,
     required this.yearsExperience,
     required this.specializations,
     required this.languagesKnown,
   });
 
-  final String trainerType;
+  final String professionalType;
   final int? yearsExperience;
   final String specializations;
   final String languagesKnown;
 
-  factory TrainerProfessionalSummary.fromJson(Map<String, dynamic> json) =>
-      TrainerProfessionalSummary(
-        trainerType: json['trainer_type'] as String? ?? '',
+  factory ProfessionalProfessionalSummary.fromJson(Map<String, dynamic> json) =>
+      ProfessionalProfessionalSummary(
+        professionalType: json['professional_type'] as String? ?? '',
         yearsExperience: (json['years_experience'] as num?)?.toInt(),
         specializations: json['specializations'] as String? ?? '',
         languagesKnown: json['languages_known'] as String? ?? '',
       );
 }
 
-class TrainerCertification {
-  const TrainerCertification({
+class ProfessionalCertification {
+  const ProfessionalCertification({
     required this.name,
     required this.issuedBy,
     required this.year,
@@ -290,8 +290,8 @@ class TrainerCertification {
   final int? year;
   final String fileUrl;
 
-  factory TrainerCertification.fromJson(Map<String, dynamic> json) =>
-      TrainerCertification(
+  factory ProfessionalCertification.fromJson(Map<String, dynamic> json) =>
+      ProfessionalCertification(
         name: json['name'] as String? ?? '',
         issuedBy: json['issued_by'] as String? ?? '',
         year: (json['year'] as num?)?.toInt(),
@@ -299,8 +299,8 @@ class TrainerCertification {
       );
 }
 
-class TrainerProfileImageRef {
-  const TrainerProfileImageRef({
+class ProfessionalProfileImageRef {
+  const ProfessionalProfileImageRef({
     required this.category,
     required this.title,
     required this.url,
@@ -310,22 +310,22 @@ class TrainerProfileImageRef {
   final String title;
   final String url;
 
-  factory TrainerProfileImageRef.fromJson(Map<String, dynamic> json) =>
-      TrainerProfileImageRef(
+  factory ProfessionalProfileImageRef.fromJson(Map<String, dynamic> json) =>
+      ProfessionalProfileImageRef(
         category: json['category'] as String? ?? '',
         title: json['title'] as String? ?? '',
         url: json['url'] as String? ?? '',
       );
 }
 
-class TrainerProfileLinkRef {
-  const TrainerProfileLinkRef({required this.title, required this.url});
+class ProfessionalProfileLinkRef {
+  const ProfessionalProfileLinkRef({required this.title, required this.url});
 
   final String title;
   final String url;
 
-  factory TrainerProfileLinkRef.fromJson(Map<String, dynamic> json) =>
-      TrainerProfileLinkRef(
+  factory ProfessionalProfileLinkRef.fromJson(Map<String, dynamic> json) =>
+      ProfessionalProfileLinkRef(
         title: json['title'] as String? ?? '',
         url: json['url'] as String? ?? '',
       );
@@ -379,21 +379,21 @@ class ClientDashboardSummary {
   }
 }
 
-class TrainerDirectoryEntry {
-  const TrainerDirectoryEntry({
-    required this.trainerId,
-    required this.trainerName,
+class ProfessionalDirectoryEntry {
+  const ProfessionalDirectoryEntry({
+    required this.professionalId,
+    required this.professionalName,
     required this.professionalHeadline,
   });
 
-  final String trainerId;
-  final String trainerName;
+  final String professionalId;
+  final String professionalName;
   final String professionalHeadline;
 
-  factory TrainerDirectoryEntry.fromJson(Map<String, dynamic> json) =>
-      TrainerDirectoryEntry(
-        trainerId: json['trainer_id'] as String? ?? '',
-        trainerName: json['trainer_name'] as String? ?? '',
+  factory ProfessionalDirectoryEntry.fromJson(Map<String, dynamic> json) =>
+      ProfessionalDirectoryEntry(
+        professionalId: json['professional_id'] as String? ?? '',
+        professionalName: json['professional_name'] as String? ?? '',
         professionalHeadline: json['professional_headline'] as String? ?? '',
       );
 }

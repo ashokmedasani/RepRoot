@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/client_api.dart';
 import '../../core/theme/app_tokens.dart';
 
-/// Client bottom-tab shell: Dashboard | Programs | Progress | More.
-/// The unread badge sits on More, since chat lives under it.
+/// Client bottom-tab shell: Dashboard | Programs | Professional | More.
+/// The unread badge sits on Professional, since chat lives there as a segment
+/// (Profile | Chat). Progress no longer has its own tab — its charts moved
+/// onto the Dashboard.
 ///
 /// The forced password change is NOT gated here — it is gated at login and on
 /// session restore (see ClientChangePasswordPage), matching the web portal.
@@ -73,24 +75,24 @@ class _ClientTabsShellState extends ConsumerState<ClientTabsShell> {
               selectedIcon: Icon(Icons.list_alt_rounded),
               label: 'Programs',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.show_chart_outlined),
-              selectedIcon: Icon(Icons.show_chart_rounded),
-              label: 'Progress',
-            ),
             NavigationDestination(
               icon: Badge(
                 isLabelVisible: _unread > 0,
                 label: Text(_unread > 99 ? '99+' : '$_unread'),
                 backgroundColor: const Color(0xFFE11D48),
-                child: const Icon(Icons.more_horiz_outlined),
+                child: const Icon(Icons.badge_outlined),
               ),
               selectedIcon: Badge(
                 isLabelVisible: _unread > 0,
                 label: Text(_unread > 99 ? '99+' : '$_unread'),
                 backgroundColor: const Color(0xFFE11D48),
-                child: const Icon(Icons.more_horiz_rounded),
+                child: const Icon(Icons.badge_rounded),
               ),
+              label: 'Professional',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.more_horiz_outlined),
+              selectedIcon: Icon(Icons.more_horiz_rounded),
               label: 'More',
             ),
           ],

@@ -2,23 +2,24 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 
 @Component({
-  selector: 'app-trainer-login',
+  selector: 'app-professional-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent],
-  templateUrl: './trainer-login.component.html',
-  styleUrl: './trainer-login.component.scss'
+  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
+  templateUrl: './professional-login.component.html',
+  styleUrl: './professional-login.component.scss'
 })
-export class TrainerLoginComponent {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalLoginComponent {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
 
   isSubmitting = false;
   loginMessage = '';
-  loginNotice = window.sessionStorage.getItem('trainer-login-notice') || '';
+  loginNotice = window.sessionStorage.getItem('professional-login-notice') || '';
 
   readonly loginForm = {
     identifier: '',
@@ -27,11 +28,11 @@ export class TrainerLoginComponent {
 
   constructor() {
     if (this.loginNotice) {
-      window.sessionStorage.removeItem('trainer-login-notice');
+      window.sessionStorage.removeItem('professional-login-notice');
     }
   }
 
-  verifyTrainerLogin(): void {
+  verifyProfessionalLogin(): void {
     const identifier = this.loginForm.identifier.trim().toLowerCase();
 
     if (!identifier || !this.loginForm.password) {
@@ -40,13 +41,13 @@ export class TrainerLoginComponent {
     }
 
     this.isSubmitting = true;
-    this.loginMessage = 'Verifying trainer login...';
+    this.loginMessage = 'Verifying professional login...';
 
-    this.trainerAuthApi.login(identifier, this.loginForm.password).subscribe({
+    this.professionalAuthApi.login(identifier, this.loginForm.password).subscribe({
       next: (response) => {
-        window.localStorage.setItem('trainer-auth-token', response.token);
-        window.localStorage.setItem('trainer-account-id', String(response.trainer.id));
-        window.localStorage.setItem('trainer-account-username', response.trainer.username);
+        window.localStorage.setItem('professional-auth-token', response.token);
+        window.localStorage.setItem('professional-account-id', String(response.professional.id));
+        window.localStorage.setItem('professional-account-username', response.professional.username);
         this.loginMessage = 'Checking profile status...';
         this.routeAfterLogin();
       },
@@ -58,10 +59,10 @@ export class TrainerLoginComponent {
   }
 
   private routeAfterLogin(): void {
-    this.trainerAuthApi.getProfileStatus().subscribe({
+    this.professionalAuthApi.getProfileStatus().subscribe({
       next: (response) => {
         this.isSubmitting = false;
-        void this.router.navigate([response.profile_setup_completed ? '/trainer/dashboard' : '/trainer/profile-setup']);
+        void this.router.navigate([response.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup']);
       },
       error: (error: unknown) => {
         this.loginMessage = this.formatApiError(error, 'Login succeeded, but profile status could not be checked.');

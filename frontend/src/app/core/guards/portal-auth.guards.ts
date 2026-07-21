@@ -1,12 +1,12 @@
 import { CanActivateFn, Router } from '@angular/router';
 import { inject } from '@angular/core';
 
-export const trainerAuthGuard: CanActivateFn = () => {
-  if (window.localStorage.getItem('trainer-auth-token')) {
+export const professionalAuthGuard: CanActivateFn = () => {
+  if (window.localStorage.getItem('professional-auth-token')) {
     return true;
   }
 
-  return inject(Router).createUrlTree(['/trainer/login']);
+  return inject(Router).createUrlTree(['/professional/login']);
 };
 
 export const clientAuthGuard: CanActivateFn = () => {

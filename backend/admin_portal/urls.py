@@ -1,7 +1,8 @@
 from django.urls import path
 
 from .views import (
-  AdminAuditLogListView, AdminDashboardView, AdminFinanceView, AdminLoginView, AdminLogoutView, AdminMeView,
+  AdminAuditLogListView, AdminDashboardView, AdminErrorLogActionView, AdminErrorLogDetailView,
+  AdminErrorLogListView, AdminFinanceView, AdminLoginView, AdminLogoutView, AdminMeView,
   AdminSupportIncidentActionView, AdminSupportIncidentDetailView, AdminSupportIncidentListView,
 )
 
@@ -15,4 +16,7 @@ urlpatterns = [
   path('support/incidents/', AdminSupportIncidentListView.as_view(), name='admin-support-incidents'),
   path('support/incidents/<str:incident_id>/', AdminSupportIncidentDetailView.as_view(), name='admin-support-incident-detail'),
   path('support/incidents/<str:incident_id>/action/', AdminSupportIncidentActionView.as_view(), name='admin-support-incident-action'),
+  path('errors/', AdminErrorLogListView.as_view(), name='admin-error-logs'),
+  path('errors/<str:error_id>/', AdminErrorLogDetailView.as_view(), name='admin-error-log-detail'),
+  path('errors/<str:error_id>/action/', AdminErrorLogActionView.as_view(), name='admin-error-log-action'),
 ]

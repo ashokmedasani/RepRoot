@@ -8,16 +8,16 @@
   </header>
 
   <section class="entry-grid" aria-label="Client management access options">
-    <a class="entry-card" routerLink="/trainer/login" [class.entry-card--active]="selectedEntry === 'trainer'" (click)="selectEntry('trainer')">
+    <a class="entry-card" routerLink="/professional/login" [class.entry-card--active]="selectedEntry === 'professional'" (click)="selectEntry('professional')">
       <span class="entry-card__icon">T</span>
-      <strong>Trainer</strong>
-      <small>Login or create a global trainer account.</small>
+      <strong>Professional</strong>
+      <small>Login or create a global professional account.</small>
     </a>
 
     <a class="entry-card" routerLink="/client/login" [class.entry-card--active]="selectedEntry === 'client'" (click)="selectEntry('client')">
       <span class="entry-card__icon">C</span>
       <strong>Client Portal</strong>
-      <small>Login with the username and password created by your trainer.</small>
+      <small>Login with the username and password created by your professional.</small>
     </a>
   </section>
 </main>

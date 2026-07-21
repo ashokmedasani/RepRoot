@@ -12,13 +12,16 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from accounts.models import ClientAccess, LeadSubmission, ReferenceCategory, SupportIncident, SupportIncidentMessage, TrackingTemplate, TrainerGroup, TrainerLeadForm, TrainerProfile, TrainerReference, ClientReminder
+from accounts.models import ClientAccess, LeadSubmission, ReferenceCategory, SupportIncident, SupportIncidentMessage, TrackingTemplate, ProfessionalGroup, ProfessionalLeadForm, ProfessionalProfile, ProfessionalReference, ClientReminder
 from accounts.serializers import SupportIncidentSerializer
 
 from .audit import record_admin_action
-from .models import AdminAuditLog, AdminStaffProfile, FinanceLedgerEntry
+from .models import AdminAuditLog, AdminStaffProfile, ErrorLog, FinanceLedgerEntry
 from .permissions import HasAdminPermission, active_staff_for
-from .serializers import AdminAuditLogSerializer, AdminLoginSerializer, FinanceLedgerEntrySerializer, staff_payload
+from .serializers import (
+  AdminAuditLogSerializer, AdminLoginSerializer, ErrorLogListSerializer, ErrorLogSerializer,
+  FinanceLedgerEntrySerializer, staff_payload,
+)
 
 User = get_user_model()
 
@@ -75,27 +78,27 @@ class AdminDashboardView(APIView):
 
   def get(self, request):
     start = range_start(request)
-    trainers = User.objects.filter(trainer_profile__isnull=False)
+    professionals = User.objects.filter(professional_profile__isnull=False)
     clients = ClientAccess.objects.all()
     payload = {
       'range_start': start,
       'accounts': {
-        'total_trainers': trainers.count(), 'active_trainers': trainers.filter(is_active=True).count(),
-        'suspended_trainers': trainers.filter(is_active=False).count(), 'pending_deletion': 0,
-        'new_trainers': trainers.filter(date_joined__gte=start).count(),
+        'total_professionals': professionals.count(), 'active_professionals': professionals.filter(is_active=True).count(),
+        'suspended_professionals': professionals.filter(is_active=False).count(), 'pending_deletion': 0,
+        'new_professionals': professionals.filter(date_joined__gte=start).count(),
       },
       'clients': {
         'total_clients': clients.count(), 'active_clients': clients.filter(is_active=True).count(),
         'inactive_clients': clients.filter(is_active=False).count(), 'new_clients': clients.filter(created_at__gte=start).count(),
       },
       'users': {
-        'total_accounts': trainers.count() + clients.count() + AdminStaffProfile.objects.count(),
-        'trainer_accounts': trainers.count(), 'client_accounts': clients.count(), 'internal_accounts': AdminStaffProfile.objects.count(),
+        'total_accounts': professionals.count() + clients.count() + AdminStaffProfile.objects.count(),
+        'professional_accounts': professionals.count(), 'client_accounts': clients.count(), 'internal_accounts': AdminStaffProfile.objects.count(),
       },
       'usage': {
-        'lead_forms': TrainerLeadForm.objects.count(), 'active_lead_forms': TrainerLeadForm.objects.filter(is_active=True).count(),
-        'form_submissions': LeadSubmission.objects.count(), 'groups': TrainerGroup.objects.count(),
-        'templates': TrackingTemplate.objects.count(), 'references': TrainerReference.objects.count(),
+        'lead_forms': ProfessionalLeadForm.objects.count(), 'active_lead_forms': ProfessionalLeadForm.objects.filter(is_active=True).count(),
+        'form_submissions': LeadSubmission.objects.count(), 'groups': ProfessionalGroup.objects.count(),
+        'templates': TrackingTemplate.objects.count(), 'references': ProfessionalReference.objects.count(),
         'scheduled_followups': ClientReminder.objects.filter(status='pending').count(),
       },
     }
@@ -110,7 +113,7 @@ class AdminFinanceView(APIView):
 
   def get(self, request):
     start = range_start(request)
-    entries = FinanceLedgerEntry.objects.select_related('trainer', 'trainer__trainer_profile')
+    entries = FinanceLedgerEntry.objects.select_related('professional', 'professional__professional_profile')
     completed = entries.filter(status=FinanceLedgerEntry.STATUS_COMPLETED, occurred_at__gte=start)
     refunds = entries.filter(entry_type=FinanceLedgerEntry.TYPE_REFUND, occurred_at__gte=start)
     payload = {
@@ -274,3 +277,103 @@ class AdminSupportIncidentActionView(APIView):
       ).data,
       'message': 'Support incident updated.',
     })
+
+
+class AdminErrorLogListView(APIView):
+  """Two admin sections read from here — Web (?platform_group=web) and
+  Mobile (?platform_group=mobile, every non-web platform) — via the same
+  queue, just filtered differently. Default ordering (ErrorLog.Meta.ordering)
+  is professional_username then most-recently-seen, so the list always reads
+  grouped by professional without the caller asking for it.
+  """
+  authentication_classes = [TokenAuthentication]
+  required_permission = 'admin.errors.list'
+  permission_classes = [HasAdminPermission]
+
+  def get(self, request):
+    logs = ErrorLog.objects.all()
+    platform_group = request.query_params.get('platform_group', '').strip().lower()
+    if platform_group == 'web':
+      logs = logs.filter(platform=ErrorLog.PLATFORM_WEB)
+    elif platform_group == 'mobile':
+      logs = logs.filter(platform__in=ErrorLog.MOBILE_PLATFORMS)
+
+    search = request.query_params.get('search', '').strip()
+    if search:
+      logs = logs.filter(
+        Q(error_id__icontains=search) | Q(professional_username__icontains=search)
+        | Q(client_username__icontains=search) | Q(message__icontains=search)
+      )
+    for field in ('status', 'level', 'source', 'reporter_role', 'platform'):
+      value = request.query_params.get(field, '').strip()
+      if value:
+        logs = logs.filter(**{field: value})
+
+    record_admin_action(
+      request, permission=self.required_permission, action='LIST_ERROR_LOGS',
+      target_type='errors', target_display=f'Error log queue ({platform_group or "all"})'
+    )
+    return Response({
+      'results': ErrorLogListSerializer(logs[:200], many=True).data,
+      'count': logs.count(),
+      'open_count': logs.filter(status__in=ErrorLog.OPEN_STATUSES).count(),
+    })
+
+
+class AdminErrorLogDetailView(APIView):
+  authentication_classes = [TokenAuthentication]
+  required_permission = 'admin.errors.view'
+  permission_classes = [HasAdminPermission]
+
+  def get(self, request, error_id):
+    log = ErrorLog.objects.filter(error_id=error_id).first()
+    if log is None:
+      return Response({'message': 'Error log not found.'}, status=status.HTTP_404_NOT_FOUND)
+    record_admin_action(
+      request, permission=self.required_permission, action='VIEW_ERROR_LOG',
+      target_type='errors', target_id=log.error_id, target_display=log.message[:180],
+      professional=log.reporter_professional, client=log.reporter_client,
+    )
+    return Response({'error': ErrorLogSerializer(log).data})
+
+
+class AdminErrorLogActionView(APIView):
+  authentication_classes = [TokenAuthentication]
+  required_permission = 'admin.errors.manage'
+  permission_classes = [HasAdminPermission]
+
+  def post(self, request, error_id):
+    log = ErrorLog.objects.filter(error_id=error_id).first()
+    if log is None:
+      return Response({'message': 'Error log not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    requested_status = str(request.data.get('status', '')).strip()
+    resolution_note = str(request.data.get('resolution_note', '')).strip()
+    if requested_status and requested_status not in dict(ErrorLog.STATUS_CHOICES):
+      return Response({'message': 'Invalid error log status.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    changed_fields = []
+    if resolution_note:
+      log.resolution_note = resolution_note[:5000]
+      changed_fields.append('resolution_note')
+    if requested_status:
+      log.status = requested_status
+      changed_fields.append('status')
+      if requested_status == ErrorLog.STATUS_RESOLVED:
+        log.resolved_by = request.user
+        log.resolved_at = timezone.now()
+      else:
+        log.resolved_by = None
+        log.resolved_at = None
+      changed_fields.extend(['resolved_by', 'resolved_at'])
+    if changed_fields:
+      log.save(update_fields=list(dict.fromkeys(changed_fields)))
+
+    record_admin_action(
+      request, permission=self.required_permission, action='UPDATE_ERROR_LOG',
+      target_type='errors', target_id=log.error_id, target_display=log.message[:180],
+      professional=log.reporter_professional, client=log.reporter_client,
+      reason=resolution_note, metadata={'status': log.status},
+    )
+    log.refresh_from_db()
+    return Response({'error': ErrorLogSerializer(log).data, 'message': 'Error log updated.'})

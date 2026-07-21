@@ -1,131 +1,95 @@
-# How to View Your Mobile App (Beginner Guide)
+# How to View the Mobile App (Beginner Guide)
 
-You have never built a mobile app before — that's fine. There are 3 ways to see it,
-from easiest to most real. **The backend never changes: it is always Django on port 8000.**
+The mobile client is a native Flutter app (`mobile_flutter/`) — there is no browser
+preview option; it always runs on an emulator or a real Android device.
+**The backend never changes: it is always Django on port 8000.**
 
 ## Your ports (fixed)
 
 | Thing | Where | When it runs |
 | --- | --- | --- |
 | Web frontend | `http://localhost:4300` | `cd frontend && npm start` |
-| Backend API | `http://localhost:8000` | `cd backend && .venv\Scripts\python manage.py runserver` |
-| Mobile preview (browser) | `http://localhost:4400` | only while you run `cd mobile && npm start` — close it when done |
+| Backend API | `http://localhost:8000` | `cd backend && .venv\Scripts\python manage.py runserver 127.0.0.1:8000` |
 
-The old 4200 references were removed. The mobile app is NOT a website — 4400 is just a
-developer preview; the real thing runs inside an emulator or a phone (below).
-
----
-
-## Option A — Browser preview (5 minutes, do this first)
-
-The mobile app is web technology inside a native shell, so Chrome can preview it.
-
-1. Start the backend as usual (port 8000).
-2. ```
-   cd mobile
-   npm start
-   ```
-3. Open `http://localhost:4400` in Chrome.
-4. Press **F12** → click the **phone icon** (top-left of DevTools, or Ctrl+Shift+M).
-   Chrome now shows the app in a phone-sized frame. Pick "iPhone 12" or "Pixel 7" from the dropdown.
-5. Choose **Trainer** or **Client** (the role chooser does not show the temporary app name), then log in with your normal account.
-
-That's your mobile app, pixel-for-pixel, minus the native shell.
+The Flutter app talks to whichever `API_BASE_URL` you pass at launch — it isn't a
+website, so there's no dev port for it the way the web frontend has one.
 
 ---
 
-## Option A+ — On your ACTUAL phone's browser over Wi-Fi (10 minutes, no installs)
+## Option A — Android emulator (fastest way to see the real app)
 
-Your PC's Wi-Fi address is **192.168.4.68**. One script starts everything:
-
-```
-powershell -ExecutionPolicy Bypass -File scripts\start-mobile-test.ps1
-```
-
-It opens two windows (backend + mobile server) and prints the URL. Then on your
-phone (same Wi-Fi), open the browser and type:
-
-```
-http://192.168.4.68:4400
-```
-
-The app appears full-screen on your phone and talks to your real backend — the
-API address is detected automatically, no editing needed. Tip: in Chrome on the
-phone, menu → **"Add to Home screen"** puts a CoachFlow icon on your phone that
-opens like an app.
-
-If it doesn't load: the first time, Windows Firewall pops up asking to allow
-Node and Python — click **Allow**. And confirm both devices are on the same Wi-Fi.
-
----
-
-## Option B — Real Android emulator (the actual app on a virtual phone)
-
-**One-time setup (~30-60 min, mostly downloads):**
-1. Install **Android Studio**: https://developer.android.com/studio — run the installer,
-   accept the defaults (it installs the Android SDK for you).
+**One-time setup (~30-60 min, mostly downloads), if you don't already have one:**
+1. Install **Android Studio**: https://developer.android.com/studio — accept the
+   defaults (it installs the Android SDK for you).
 2. Open Android Studio → **More Actions → Virtual Device Manager** → **Create Device**
-   → pick "Pixel 7" → pick the newest system image (click download next to it) → Finish.
-   This creates your virtual phone.
+   → pick "Pixel 7" → pick the newest system image (download it) → Finish.
 
-**Point the app at your backend:**
-3. Open `mobile/src/environments/environment.ts` and change the URL to:
-   ```ts
-   apiBaseUrl: 'http://10.0.2.2:8000'
+**Every time:**
+1. Start Django: `cd backend && .venv\Scripts\python manage.py runserver 127.0.0.1:8000`
+2. Start the emulator: `scripts\start-flutter-emulator.ps1` (or open it from Android
+   Studio's Device Manager)
+3. Run the app, pointed at your PC through the emulator's special address:
    ```
-   Why? Inside the emulator, "localhost" means the *virtual phone itself*.
-   `10.0.2.2` is the emulator's special address for **your PC**, where Django runs.
-   (The backend is already configured to accept this — nothing to change there.)
-
-**Build and run (every time):**
-4. ```
-   cd mobile
-   npm run build
-   npx cap add android        # first time only - creates the android/ project
-   npx cap sync               # copies your latest build into it
-   npx cap open android       # opens Android Studio
+   cd mobile_flutter
+   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
    ```
-5. In Android Studio: wait for the bottom progress bar to finish ("Gradle sync"),
-   pick your Pixel 7 in the device dropdown (top toolbar), press the green **▶ Run** button.
-6. The virtual phone boots and **CoachFlow installs and opens like a real app**.
-   Make sure Django is running on your PC (`manage.py runserver`) — log in and use it.
+   Why `10.0.2.2`? Inside the emulator, "localhost" means the *virtual phone itself*;
+   `10.0.2.2` is the emulator's alias for **your PC**, where Django is listening.
 
-After code changes: `npm run build && npx cap sync`, then press ▶ again.
+The Flutter SDK lives at `C:\flutter` — make sure `C:\flutter\bin` is on your `PATH`
+(`$env:PATH = "C:\flutter\bin;$env:PATH"` in the same terminal if it isn't already).
+
+After code changes, `flutter run` hot-reloads automatically while it's running —
+press `r` in that terminal for a manual hot reload, or `R` for a full hot restart.
 
 ---
 
-## Option C — Your own Android phone
+## Option B — Your own Android phone
 
-1. On the phone: Settings → About phone → tap **Build number 7 times** (enables Developer mode)
-   → Settings → Developer options → turn on **USB debugging**.
+1. On the phone: Settings → About phone → tap **Build number 7 times** (enables
+   Developer mode) → Settings → Developer options → turn on **USB debugging**.
 2. Plug the phone into your PC with a USB cable → allow the prompt on the phone.
-3. Phone and PC must be on the **same Wi-Fi**. Find your PC's IP: run `ipconfig`
-   → note the IPv4 address (e.g. `192.168.1.5`).
-4. In `mobile/src/environments/environment.ts`:
-   ```ts
-   apiBaseUrl: 'http://192.168.1.5:8000'    // your PC's IP
+3. Phone and PC must be on the **same Wi-Fi**. Find your PC's IP: run `ipconfig` →
+   note the IPv4 address (e.g. `192.168.1.5`).
+4. Start Django listening on the network, not just localhost:
    ```
-5. Two backend tweaks for this case only:
-   - Start Django listening to the network: `python manage.py runserver 0.0.0.0:8000`
-   - Set the env var before starting: `set DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,10.0.2.2,192.168.1.5`
-6. `npm run build && npx cap sync && npx cap open android` → in Android Studio your
-   real phone appears in the device dropdown → press ▶. The app installs on your phone.
+   python manage.py runserver 0.0.0.0:8000
+   ```
+   and make sure that IP is in `DJANGO_ALLOWED_HOSTS` (check `backend/.env` /
+   `config/settings.py`).
+5. Run Flutter pointed at your PC's real LAN IP instead of the emulator alias:
+   ```
+   cd mobile_flutter
+   flutter run --dart-define=API_BASE_URL=http://192.168.1.5:8000
+   ```
+   `flutter devices` will list your phone once it's plugged in and trusted; `flutter
+   run` picks it automatically if it's the only device connected.
 
 ---
+
+## Building a release APK
+
+```
+cd mobile_flutter
+flutter build apk --release --dart-define=API_BASE_URL=https://your-production-domain
+```
+
+Release builds refuse a plaintext (`http://`) `API_BASE_URL` on purpose — see
+`FLUTTER_PARITY_REPORT.md` for why, and the `ALLOW_INSECURE_API=true` escape hatch for
+testing a release build against a LAN dev backend.
 
 ## What about iOS?
 
 **Honest answer: you cannot build or test the iOS app on Windows.** Apple only allows
-iOS builds through Xcode, which runs only on a Mac. Your options later:
-- Borrow/buy a Mac → `npx cap add ios && npx cap open ios` → run in the iPhone simulator.
-- Use a cloud build service (Ionic Appflow, Codemagic) that builds iOS for you.
-The codebase is already iOS-ready — nothing to rewrite when that day comes.
+iOS builds through Xcode, which runs only on a Mac. No Android-only APIs sit outside
+the platform folders, so the port should be mostly mechanical — but it has never
+actually been compiled for iOS, so treat that as unverified until it happens.
 
 ## Common problems
 
 | Symptom | Fix |
 | --- | --- |
-| Login fails in emulator | environment.ts must be `http://10.0.2.2:8000`, and Django must be running |
-| "Cleartext HTTP" error on Android | We use http in dev; if Android blocks it, add `android:usesCleartextTraffic="true"` to `android/app/src/main/AndroidManifest.xml` `<application>` tag |
-| Blank screen after build | Run `npx cap sync` again — it copies the fresh build into the native project |
-| Phone can't reach backend | Same Wi-Fi? Windows Firewall may block port 8000 — allow Python when prompted |
+| Login fails on the emulator | `API_BASE_URL` must be `http://10.0.2.2:8000`, and Django must be running |
+| Release build refuses to start | It rejected a plaintext `API_BASE_URL` — see the release-signing note above |
+| "Lost connection to device" mid-session | The Flutter tooling process was killed; just re-run `flutter run` |
+| Phone/emulator can't reach backend | Same Wi-Fi (for a real phone)? Windows Firewall may block port 8000 — allow Python when prompted |

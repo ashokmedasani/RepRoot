@@ -3,14 +3,15 @@ from django.db import migrations
 
 PERMISSIONS = {
   'admin.dashboard.view': ('View dashboard', 'Dashboard'),
-  'admin.trainers.list': ('List trainers', 'Trainers'),
-  'admin.trainers.view_basic': ('View basic trainer information', 'Trainers'),
-  'admin.trainers.view_sensitive': ('View sensitive trainer information', 'Trainers'),
+  'admin.professionals.list': ('List professionals', 'Professionals'),
+  'admin.professionals.view_basic': ('View basic professional information', 'Professionals'),
+  'admin.professionals.view_sensitive': ('View sensitive professional information', 'Professionals'),
   'admin.clients.list': ('List clients', 'Clients'),
   'admin.clients.view_basic': ('View basic client information', 'Clients'),
   'admin.clients.view_sensitive': ('View sensitive client information', 'Clients'),
   'admin.support.list': ('List support requests', 'Support'),
   'admin.support.view': ('View support requests', 'Support'),
+  'admin.support.manage': ('Manage support requests', 'Support'),
   'admin.staff.list': ('List staff', 'Staff'),
   'admin.staff.create': ('Create staff', 'Staff'),
   'admin.roles.manage': ('Manage roles and permissions', 'Staff'),
@@ -22,17 +23,22 @@ PERMISSIONS = {
   'admin.finance.export': ('Export finance summaries', 'Finance'),
   'admin.settings.view': ('View settings', 'Settings'),
   'admin.settings.edit': ('Edit settings', 'Settings'),
+  'admin.errors.list': ('List error logs', 'Errors'),
+  'admin.errors.view': ('View error log detail', 'Errors'),
+  'admin.errors.manage': ('Acknowledge, resolve, or ignore error logs', 'Errors'),
 }
 
 ROLE_GRANTS = {
   'super-admin': '*',
   'support-admin': {
-    'admin.dashboard.view', 'admin.trainers.list', 'admin.trainers.view_basic', 'admin.clients.list',
-    'admin.clients.view_basic', 'admin.support.list', 'admin.support.view', 'admin.audit.view',
+    'admin.dashboard.view', 'admin.professionals.list', 'admin.professionals.view_basic', 'admin.clients.list',
+    'admin.clients.view_basic', 'admin.support.list', 'admin.support.view', 'admin.support.manage',
+    'admin.audit.view', 'admin.errors.list', 'admin.errors.view', 'admin.errors.manage',
   },
   'support-agent': {
-    'admin.dashboard.view', 'admin.trainers.list', 'admin.trainers.view_basic', 'admin.clients.list',
+    'admin.dashboard.view', 'admin.professionals.list', 'admin.professionals.view_basic', 'admin.clients.list',
     'admin.clients.view_basic', 'admin.support.list', 'admin.support.view',
+    'admin.errors.list', 'admin.errors.view',
   },
   'operations-admin': {
     'admin.dashboard.view', 'admin.reports.view', 'admin.reports.export', 'admin.finance.view',

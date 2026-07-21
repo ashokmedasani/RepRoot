@@ -3,10 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_tokens.dart';
 
-/// Trainer bottom-tab shell: Dashboard | Clients | Manage | More.
+/// Professional bottom-tab shell: Dashboard | Manage | Clients | More.
 /// Shop is deferred by design, same as the Ionic app.
-class TrainerTabsShell extends StatelessWidget {
-  const TrainerTabsShell({super.key, required this.navigationShell});
+class ProfessionalTabsShell extends StatelessWidget {
+  const ProfessionalTabsShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
@@ -32,14 +32,14 @@ class TrainerTabsShell extends StatelessWidget {
               label: 'Dashboard',
             ),
             NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people_rounded),
-              label: 'Clients',
-            ),
-            NavigationDestination(
               icon: Icon(Icons.tune_outlined),
               selectedIcon: Icon(Icons.tune_rounded),
               label: 'Manage',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people_rounded),
+              label: 'Clients',
             ),
             NavigationDestination(
               icon: Icon(Icons.more_horiz_outlined),

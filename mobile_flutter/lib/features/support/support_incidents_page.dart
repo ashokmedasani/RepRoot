@@ -7,15 +7,15 @@ import '../../app/router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/models/support_models.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../trainer/trainer_format.dart';
+import '../professional/professional_format.dart';
 
-enum SupportRole { trainer, client }
+enum SupportRole { professional, client }
 
 /// Help & Support — one screen for both roles, as in the Ionic app.
-/// The trainer and client endpoints return the same shape; only the path
+/// The professional and client endpoints return the same shape; only the path
 /// prefix and auth scheme differ, so the role just picks the API.
 /// Replica of mobile/src/app/pages/shared/support-incidents.page.ts.
 class SupportIncidentsPage extends ConsumerStatefulWidget {
@@ -62,8 +62,8 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
 
   bool get _canCreate => _activeCount < _activeLimit;
 
-  Future<SupportListResponse> _fetch() => widget.role == SupportRole.trainer
-      ? ref.read(trainerAuthApiProvider).getSupportIncidents()
+  Future<SupportListResponse> _fetch() => widget.role == SupportRole.professional
+      ? ref.read(professionalAuthApiProvider).getSupportIncidents()
       : ref.read(clientApiProvider).getSupportIncidents();
 
   Future<void> _load() async {
@@ -111,8 +111,8 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      if (widget.role == SupportRole.trainer) {
-        await ref.read(trainerAuthApiProvider).createSupportIncident(
+      if (widget.role == SupportRole.professional) {
+        await ref.read(professionalAuthApiProvider).createSupportIncident(
               category: _category,
               subject: _subject.text.trim(),
               description: _description.text.trim(),
@@ -147,9 +147,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
 
   Future<void> _act(SupportIncident incident, String action, {String body = ''}) async {
     try {
-      if (widget.role == SupportRole.trainer) {
+      if (widget.role == SupportRole.professional) {
         await ref
-            .read(trainerAuthApiProvider)
+            .read(professionalAuthApiProvider)
             .actOnSupportIncident(incident.incidentId, action, body: body);
       } else {
         await ref
@@ -170,8 +170,8 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final backRoute = widget.role == SupportRole.trainer
-        ? Routes.trainerMore
+    final backRoute = widget.role == SupportRole.professional
+        ? Routes.professionalMore
         : Routes.clientMore;
 
     if (_loading) {

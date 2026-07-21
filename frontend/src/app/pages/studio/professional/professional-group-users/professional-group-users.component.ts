@@ -8,28 +8,28 @@ import {
   DynamicField,
   FormsGroupsApiService,
   GroupRegistrationSubmission,
-  TrainerGroup
-} from '../../../core/api/forms-groups-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
-import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
-import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
+  ProfessionalGroup
+} from '@core/api/forms-groups-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
+import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
 
 type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'settings';
 
 @Component({
-  selector: 'app-trainer-group-users',
+  selector: 'app-professional-group-users',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent, FixedHeightListComponent],
-  templateUrl: './trainer-group-users.component.html',
-  styleUrl: './trainer-group-users.component.scss'
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent],
+  templateUrl: './professional-group-users.component.html',
+  styleUrl: './professional-group-users.component.scss'
 })
-export class TrainerGroupUsersComponent implements OnInit {
+export class ProfessionalGroupUsersComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 
-  group: TrainerGroup | null = null;
+  group: ProfessionalGroup | null = null;
   clients: ClientAccessRecord[] = [];
   registrationSubmissions: GroupRegistrationSubmission[] = [];
   isLoading = true;
@@ -172,7 +172,7 @@ export class TrainerGroupUsersComponent implements OnInit {
       return;
     }
 
-    // Option A: the trainer defines the temporary password, exactly like
+    // Option A: the professional defines the temporary password, exactly like
     // manual client creation. A generated suggestion is offered as default.
     const suggested = this.generateTemporaryPassword();
     const entered = window.prompt(

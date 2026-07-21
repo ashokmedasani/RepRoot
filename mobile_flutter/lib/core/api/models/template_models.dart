@@ -1,4 +1,4 @@
-/// Template/entry models shared by trainer and client screens.
+/// Template/entry models shared by professional and client screens.
 /// 1:1 port of mobile/src/app/core/api/templates-api.service.ts.
 /// Field names match the Django payloads exactly; do not rename them.
 library;
@@ -305,7 +305,7 @@ class TrackingEntryRecord {
     required this.entryTime,
     required this.answers,
     required this.note,
-    required this.editedByTrainer,
+    required this.editedByProfessional,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -318,7 +318,7 @@ class TrackingEntryRecord {
   final String entryTime;
   final Map<String, String> answers;
   final String note;
-  final bool editedByTrainer;
+  final bool editedByProfessional;
   final String createdAt;
   final String updatedAt;
 
@@ -342,7 +342,7 @@ class TrackingEntryRecord {
           (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
         ),
         note: json['note'] as String? ?? '',
-        editedByTrainer: json['edited_by_trainer'] as bool? ?? false,
+        editedByProfessional: json['edited_by_professional'] as bool? ?? false,
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
       );

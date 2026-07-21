@@ -1,0 +1,18 @@
+<main class="auth-page">
+  <header class="auth-topbar">
+    <a routerLink="/portal" class="brand">
+      <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
+      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span> Studio</span>
+    </a>
+    <div class="top-action">
+      <span>{{ actionLabel }}</span>
+      <a [routerLink]="actionLink">{{ actionLinkText }}</a>
+    </div>
+  </header>
+
+  <section class="auth-card" [class.auth-card--wide]="wide" [attr.aria-labelledby]="titleId">
+    <p class="eyebrow">{{ eyebrow }}</p>
+    <h1 [id]="titleId">{{ title }}</h1>
+    <ng-content></ng-content>
+  </section>
+</main>

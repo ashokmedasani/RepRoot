@@ -4,33 +4,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../session/session_store.dart';
 import 'api_client.dart';
 import 'models/support_models.dart';
-import 'models/trainer_models.dart';
+import 'models/professional_models.dart';
 
-/// Trainer auth + profile + account.
-/// 1:1 port of mobile/src/app/core/api/trainer-auth-api.service.ts — same
+/// Professional auth + profile + account.
+/// 1:1 port of mobile/src/app/core/api/professional-auth-api.service.ts — same
 /// endpoints, same request/response field names as the web frontend.
-class TrainerAuthApi {
-  TrainerAuthApi(this._dio, this._session);
+class ProfessionalAuthApi {
+  ProfessionalAuthApi(this._dio, this._session);
 
   final Dio _dio;
   final SessionStore _session;
 
-  static final _auth = authOptions(AuthScheme.trainer);
+  static final _auth = authOptions(AuthScheme.professional);
 
-  Future<TrainerLoginResponse> login(String identifier, String password) {
+  Future<ProfessionalLoginResponse> login(String identifier, String password) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/login/',
+        '/professional/login/',
         data: {'identifier': identifier, 'password': password},
       );
-      return TrainerLoginResponse.fromJson(res.data ?? {});
+      return ProfessionalLoginResponse.fromJson(res.data ?? {});
     });
   }
 
   Future<UsernameAvailability> checkUsername(String username) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/check-username/',
+        '/professional/check-username/',
         data: {'username': username},
       );
       return UsernameAvailability.fromJson(res.data ?? {});
@@ -40,7 +40,7 @@ class TrainerAuthApi {
   Future<EmailOtpRequestResult> requestEmailOtp(String email) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/request-email-otp/',
+        '/professional/request-email-otp/',
         data: {'email': email},
       );
       return EmailOtpRequestResult.fromJson(res.data ?? {});
@@ -50,27 +50,27 @@ class TrainerAuthApi {
   Future<EmailOtpVerifyResult> verifyEmailOtp(String email, String otp) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/verify-email-otp/',
+        '/professional/verify-email-otp/',
         data: {'email': email, 'otp': otp},
       );
       return EmailOtpVerifyResult.fromJson(res.data ?? {});
     });
   }
 
-  Future<TrainerLoginResponse> signup(TrainerSignupPayload payload) {
+  Future<ProfessionalLoginResponse> signup(ProfessionalSignupPayload payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/signup/',
+        '/professional/signup/',
         data: payload.toJson(),
       );
-      return TrainerLoginResponse.fromJson(res.data ?? {});
+      return ProfessionalLoginResponse.fromJson(res.data ?? {});
     });
   }
 
   Future<String> logout() {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/logout/',
+        '/professional/logout/',
         data: const {},
         options: _auth,
       );
@@ -78,26 +78,26 @@ class TrainerAuthApi {
     });
   }
 
-  Future<TrainerProfile> getProfile() {
+  Future<ProfessionalProfile> getProfile() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/profile/',
+        '/professional/profile/',
         options: _auth,
       );
-      return TrainerProfile.fromJson(res.data ?? {});
+      return ProfessionalProfile.fromJson(res.data ?? {});
     });
   }
 
   /// Multipart PUT — the profile carries photo/certification file uploads.
-  Future<TrainerProfile> saveProfile(FormData profileData) {
+  Future<ProfessionalProfile> saveProfile(FormData profileData) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/profile/',
+        '/professional/profile/',
         data: profileData,
         options: _auth,
       );
       final profile = res.data?['profile'];
-      return TrainerProfile.fromJson(
+      return ProfessionalProfile.fromJson(
         profile is Map<String, dynamic> ? profile : {},
       );
     });
@@ -109,7 +109,7 @@ class TrainerAuthApi {
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/profile/visibility/',
+        '/professional/profile/visibility/',
         data: {'visibility': visibility},
         options: _auth,
       );
@@ -121,42 +121,42 @@ class TrainerAuthApi {
   Future<bool> getProfileStatus() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/profile/status/',
+        '/professional/profile/status/',
         options: _auth,
       );
       return res.data?['profile_setup_completed'] as bool? ?? false;
     });
   }
 
-  Future<TrainerDataUsage> getDataUsage() {
+  Future<ProfessionalDataUsage> getDataUsage() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/data-usage/',
+        '/professional/data-usage/',
         options: _auth,
       );
-      return TrainerDataUsage.fromJson(res.data ?? {});
+      return ProfessionalDataUsage.fromJson(res.data ?? {});
     });
   }
 
-  Future<bool> checkTrainerCode(String trainerCode) {
+  Future<bool> checkProfessionalCode(String professionalCode) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/check-trainer-code/',
-        queryParameters: {'trainer_code': trainerCode},
+        '/professional/check-professional-code/',
+        queryParameters: {'professional_code': professionalCode},
         options: _auth,
       );
       return res.data?['available'] as bool? ?? false;
     });
   }
 
-  Future<String> updateTrainerCode(String trainerCode) {
+  Future<String> updateProfessionalCode(String professionalCode) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/account/trainer-code/',
-        data: {'trainer_code': trainerCode},
+        '/professional/account/professional-code/',
+        data: {'professional_code': professionalCode},
         options: _auth,
       );
-      return res.data?['trainer_code'] as String? ?? '';
+      return res.data?['professional_code'] as String? ?? '';
     });
   }
 
@@ -167,7 +167,7 @@ class TrainerAuthApi {
   ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/account/change-password/',
+        '/professional/account/change-password/',
         data: {
           'current_password': currentPassword,
           'password': password,
@@ -182,7 +182,7 @@ class TrainerAuthApi {
   Future<String> deleteAccount() {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/account/',
+        '/professional/account/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -194,7 +194,7 @@ class TrainerAuthApi {
   Future<SupportListResponse> getSupportIncidents() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/support/incidents/',
+        '/professional/support/incidents/',
         options: _auth,
       );
       return SupportListResponse.fromJson(res.data ?? {});
@@ -226,7 +226,7 @@ class TrainerAuthApi {
         );
       }
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/support/incidents/',
+        '/professional/support/incidents/',
         data: FormData.fromMap(map),
         options: _auth,
       );
@@ -244,7 +244,7 @@ class TrainerAuthApi {
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/support/incidents/${Uri.encodeComponent(incidentId)}/',
+        '/professional/support/incidents/${Uri.encodeComponent(incidentId)}/',
         data: {'action': action, 'body': body},
         options: _auth,
       );
@@ -256,13 +256,13 @@ class TrainerAuthApi {
 
   // ----- session -----
 
-  Future<void> storeToken(String token) => _session.storeTrainerToken(token);
+  Future<void> storeToken(String token) => _session.storeProfessionalToken(token);
 
-  Future<void> clearSession() => _session.clearTrainerSession();
+  Future<void> clearSession() => _session.clearProfessionalSession();
 
-  bool hasSession() => _session.hasTrainerSession;
+  bool hasSession() => _session.hasProfessionalSession;
 }
 
-final trainerAuthApiProvider = Provider<TrainerAuthApi>((ref) {
-  return TrainerAuthApi(ref.watch(dioProvider), ref.watch(sessionStoreProvider));
+final professionalAuthApiProvider = Provider<ProfessionalAuthApi>((ref) {
+  return ProfessionalAuthApi(ref.watch(dioProvider), ref.watch(sessionStoreProvider));
 });

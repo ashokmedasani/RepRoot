@@ -1,14 +1,14 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Profile"
-  eyebrow="Trainer profile"
+  eyebrow="Professional profile"
   subtitle="View the professional information clients can see and manage section visibility."
   activeSection="profile"
-  titleId="trainer-profile-title"
+  titleId="professional-profile-title"
 >
   <button page-actions type="button" class="ghost-action" (click)="togglePreview()">
     {{ previewAsClient ? 'Exit preview' : 'Preview as Client' }}
   </button>
-  <a page-actions routerLink="/trainer/account-settings" class="secondary-action">Manage Profile</a>
+  <a page-actions routerLink="/professional/account-settings" class="secondary-action">Manage Profile</a>
 
   @if (isLoading) {
     <p class="message">Loading profile...</p>
@@ -17,7 +17,7 @@
       <div class="hero-content">
         <div class="photo-frame hero-photo">
           @if (profile.profile_photo_url) {
-            <img [src]="profile.profile_photo_url" alt="Trainer profile photo">
+            <img [src]="profile.profile_photo_url" alt="Professional profile photo">
           } @else {
             <div class="photo-placeholder">{{ fullName.slice(0, 1) }}</div>
           }
@@ -25,7 +25,7 @@
         <div class="hero-copy">
           <h2>{{ fullName }}</h2>
           @if (showSection('professional_headline')) {
-            <p class="headline">{{ profile.professional_headline || 'Professional trainer' }}</p>
+            <p class="headline">{{ profile.professional_headline || 'Professional professional' }}</p>
           }
           @if (location) {
             <p class="muted">{{ location }}</p>
@@ -60,7 +60,7 @@
         </section>
       }
 
-      @if (showSection('professional_summary') && profile.trainer_type) {
+      @if (showSection('professional_summary') && profile.professional_type) {
         <section class="read-card">
           <div class="card-head">
             <h3>Professional focus</h3>
@@ -71,7 +71,7 @@
               </span>
             }
           </div>
-          <p>{{ profile.trainer_type }}</p>
+          <p>{{ profile.professional_type }}</p>
         </section>
       }
 
@@ -204,4 +204,4 @@
   } @else if (message) {
     <p class="message error-message">{{ message }}</p>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

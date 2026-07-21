@@ -1,0 +1,322 @@
+<nav class="payment-sections" aria-label="Payment settings sections">
+  @for (section of sections; track section.id) {
+    <button
+      type="button"
+      class="section-pill"
+      [class.active]="activeSection === section.id"
+      (click)="activeSection = section.id; saveMessage = ''">
+      {{ section.label }}
+    </button>
+  }
+</nav>
+
+@if (loadError) {
+  <p class="message error-message">{{ loadError }}</p>
+}
+
+@if (activeSection === 'reporting') {
+  <section class="payment-section" aria-labelledby="reporting-currency-title">
+    <h3 id="reporting-currency-title">Payments Dashboard</h3>
+    <p class="section-note">
+      Your payments dashboard and summaries are locked until you set a reporting currency — this has
+      nothing to do with your manual payment methods (Zelle, UPI, etc.), which stay set up either way.
+      You can lock or unlock this whenever you like.
+    </p>
+
+    @if (settings) {
+      <div class="dashboard-lock-row">
+        <span class="lock-status" [class.unlocked]="!settings.reporting_currency_locked">
+          {{ settings.reporting_currency_locked ? '🔒 Dashboard locked' : '🔓 Dashboard unlocked' }}
+        </span>
+        <button type="button" class="secondary-action" [disabled]="isSaving" (click)="toggleDashboardLock()">
+          {{ isSaving ? 'Saving...' : (settings.reporting_currency_locked ? 'Unlock dashboard' : 'Lock dashboard') }}
+        </button>
+      </div>
+
+      @if (!settings.reporting_currency_locked) {
+        <div class="currency-row">
+          <label>
+            <span class="field-label">Reporting currency</span>
+            <select name="reportingCurrency" [(ngModel)]="reportingCurrencyDraft">
+              @for (code of currencyOptions; track code) {
+                <option [value]="code">{{ code }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" class="primary-action" [disabled]="isSaving || reportingCurrencyDraft === settings.reporting_currency" (click)="saveReportingCurrency()">
+            {{ isSaving ? 'Saving...' : 'Save Currency' }}
+          </button>
+        </div>
+
+        <p class="disclaimer-note">
+          Currency conversion values are used for reporting purposes only. They do not represent
+          settlement, banking, or payment-provider exchange rates.
+        </p>
+      }
+    }
+  </section>
+}
+
+@if (activeSection === 'methods') {
+  <section class="payment-section" aria-labelledby="manual-methods-title">
+    <div class="methods-header">
+      <div>
+        <h3 id="manual-methods-title">Manual Payment Methods</h3>
+        <p class="section-note">
+          Payment methods you manage yourself — UPI, bank transfer, Zelle, cash, and more. Methods are
+          private until you share them with a specific client. {{ activeMethodCount }}/{{ maxActiveMethods }} active.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="primary-action"
+        [disabled]="activeMethodCount >= maxActiveMethods"
+        [title]="activeMethodCount >= maxActiveMethods ? 'Deactivate a method to add another' : ''"
+        (click)="openCreateMethod()">
+        Add Payment Method
+      </button>
+    </div>
+
+    @if (methodsError) {
+      <p class="message error-message">{{ methodsError }}</p>
+    }
+
+    @if (!methods.length && !showMethodForm) {
+      <div class="placeholder-card">
+        <p>You haven't added a payment method yet. Clients can't see payment options until you add one.</p>
+        <button type="button" class="primary-action" (click)="openCreateMethod()">Add Payment Method</button>
+      </div>
+    }
+
+    @if (methods.length) {
+      <div class="method-list">
+        @for (method of methods; track method.id) {
+          <article class="method-row" [class.inactive]="method.status === 'inactive'">
+            <div class="method-identity">
+              <span class="method-icon" [attr.data-category]="method.category" aria-hidden="true">{{ categoryLabel(method.category).charAt(0) }}</span>
+              <div class="method-text">
+                <strong>{{ method.display_label }}</strong>
+                <small>
+                  {{ categoryLabel(method.category) }}
+                  @if (method.supported_currencies.length) { &middot; {{ method.supported_currencies.join(', ') }} }
+                </small>
+              </div>
+            </div>
+            <div class="method-controls">
+              <span class="status-pill" [attr.data-status]="method.status">{{ method.status === 'active' ? 'Active' : 'Inactive' }}</span>
+              <button type="button" class="ghost-action" (click)="openEditMethod(method)">Edit</button>
+              <button type="button" class="ghost-action" (click)="openPreview(method)">Preview as Client</button>
+              <button type="button" class="ghost-action" (click)="toggleMethodStatus(method)">
+                {{ method.status === 'active' ? 'Deactivate' : 'Activate' }}
+              </button>
+              <button type="button" class="ghost-action danger" (click)="deleteMethod(method)">Delete</button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+
+    @if (showMethodForm) {
+      <form class="method-form" (ngSubmit)="saveMethod()">
+        <h4>{{ editingMethodId ? 'Edit Payment Method' : 'New Payment Method' }}</h4>
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Category <span class="required">*</span></span>
+            <select name="methodCategory" [(ngModel)]="methodForm.category" (ngModelChange)="onCategoryChange()" [disabled]="!!editingMethodId">
+              @for (option of categoryOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Display label (client sees this) <span class="required">*</span></span>
+            <input name="displayLabel" type="text" [(ngModel)]="methodForm.display_label" placeholder="e.g. Maya UPI" required>
+          </label>
+
+          <label>
+            <span class="field-label">Supported currency</span>
+            <select name="supportedCurrency" [(ngModel)]="methodCurrencyDraft">
+              <option value="">Any currency</option>
+              @for (code of currencyOptions; track code) {
+                <option [value]="code">{{ code }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Country / region</span>
+            <input name="methodCountry" type="text" [(ngModel)]="methodForm.country" placeholder="e.g. India">
+          </label>
+        </div>
+
+        @if (clientFieldDefs.length) {
+          <div class="fields-block client-block">
+            <p class="block-title">Client-visible details</p>
+            <p class="block-note">Clients you share this method with will see these fields exactly as entered.</p>
+            <div class="form-grid">
+              @for (def of clientFieldDefs; track def.key) {
+                <label>
+                  <span class="field-label">{{ def.label }} @if (def.required) { <span class="required">*</span> }</span>
+                  <input
+                    [name]="'cf_' + def.key"
+                    [attr.name]="'cf_' + def.key"
+                    type="text"
+                    [(ngModel)]="clientFieldValues[def.key]"
+                    [placeholder]="def.placeholder">
+                </label>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">QR code image (optional)</span>
+            <input name="qrCode" type="file" accept="image/png,image/jpeg,image/webp" (change)="onQrFileSelected($event)">
+          </label>
+
+          <label>
+            <span class="field-label">Internal name (private)</span>
+            <input name="methodName" type="text" [(ngModel)]="methodForm.name" placeholder="Only you see this">
+          </label>
+        </div>
+
+        <label>
+          <span class="field-label">Payment instructions for the client</span>
+          <textarea name="clientInstructions" rows="2" [(ngModel)]="methodForm.client_instructions" placeholder="e.g. Include your payment request number in the note."></textarea>
+        </label>
+
+        <label>
+          <span class="field-label">Internal notes (private)</span>
+          <textarea name="internalNotes" rows="2" [(ngModel)]="methodForm.internal_notes" placeholder="Never shown to clients."></textarea>
+        </label>
+
+        @if (methodFormMessage) {
+          <p class="message error-message">{{ methodFormMessage }}</p>
+        }
+
+        <div class="form-actions">
+          <button type="button" class="ghost-action" (click)="showMethodForm = false">Cancel</button>
+          <button type="submit" class="primary-action" [disabled]="isSavingMethod || !methodForm.display_label.trim()">
+            {{ isSavingMethod ? 'Saving...' : (editingMethodId ? 'Save Changes' : 'Save Payment Method') }}
+          </button>
+        </div>
+      </form>
+    }
+  </section>
+}
+
+@if (showPreview && previewData) {
+  <div class="preview-backdrop" (click)="closePreview()">
+    <section class="preview-modal" role="dialog" aria-modal="true" aria-labelledby="method-preview-title" (click)="$event.stopPropagation()">
+      <header>
+        <div>
+          <p class="eyebrow">Preview as Client</p>
+          <h2 id="method-preview-title">{{ previewData.display_label }}</h2>
+          <p class="preview-note">This is everything the client can see. Private fields and internal notes are never included.</p>
+        </div>
+        <button type="button" class="modal-close" (click)="closePreview()" aria-label="Close preview">&times;</button>
+      </header>
+
+      <div class="preview-body">
+        <p class="preview-category">{{ categoryLabel(previewData.category) }}</p>
+        @for (entry of previewFieldEntries(); track entry.key) {
+          <div class="preview-row">
+            <span class="preview-key">{{ entry.key }}</span>
+            <span class="preview-value">{{ entry.value }}</span>
+          </div>
+        }
+        @if (previewData.supported_currencies.length) {
+          <div class="preview-row">
+            <span class="preview-key">currencies</span>
+            <span class="preview-value">{{ previewData.supported_currencies.join(', ') }}</span>
+          </div>
+        }
+        @if (previewData.qr_code) {
+          <img class="preview-qr" [src]="previewData.qr_code" alt="Payment QR code">
+        }
+        @if (previewData.client_instructions) {
+          <p class="preview-instructions">{{ previewData.client_instructions }}</p>
+        }
+      </div>
+    </section>
+  </div>
+}
+
+@if (activeSection === 'integrated') {
+  <section class="payment-section" aria-labelledby="integrated-title">
+    <h3 id="integrated-title">Integrated Payments</h3>
+    <p class="section-note">
+      Connect a payment provider to let clients pay you online directly. Connections use each
+      provider's own secure onboarding — RepRoot never asks for API keys or account passwords.
+    </p>
+    <div class="provider-grid">
+      @for (provider of ['Stripe', 'PayPal', 'Razorpay']; track provider) {
+        <article class="provider-card">
+          <strong>{{ provider }}</strong>
+          <span class="status-pill" data-status="not_connected">Not Connected</span>
+          <button type="button" class="ghost-action" disabled>Connect <small>(coming soon)</small></button>
+        </article>
+      }
+    </div>
+  </section>
+}
+
+@if (activeSection === 'preferences') {
+  <section class="payment-section" aria-labelledby="preferences-title">
+    <h3 id="preferences-title">Payment Preferences</h3>
+
+    @if (settings) {
+      <label class="pref-row">
+        <input
+          type="checkbox"
+          name="trackingEnabled"
+          [ngModel]="settings.payment_tracking_enabled"
+          (ngModelChange)="togglePreference('payment_tracking_enabled', $event)">
+        <span>
+          <strong>Track client payments</strong>
+          <small>Turn this off if you don't want to record or track payments from clients. When off, the Payments tab and payments dashboard are hidden — nothing is forced.</small>
+        </span>
+      </label>
+
+      <label class="pref-row">
+        <input
+          type="checkbox"
+          name="historyEnabled"
+          [ngModel]="settings.client_payment_history_enabled"
+          (ngModelChange)="togglePreference('client_payment_history_enabled', $event)">
+        <span>
+          <strong>Client payment history</strong>
+          <small>Let clients see their own completed payment history in the Client Portal.</small>
+        </span>
+      </label>
+    }
+  </section>
+}
+
+@if (activeSection === 'disclosures') {
+  <section class="payment-section" aria-labelledby="disclosures-title">
+    <h3 id="disclosures-title">Payment Disclosures</h3>
+    <div class="disclosure-block">
+      <p>
+        RepRoot Studio is a payment tracking and client-management platform. For manually collected
+        payments, RepRoot Studio does not receive, hold, transfer, or control the money.
+      </p>
+      <p>
+        Manual payment records reflect information entered by you and your clients. They are not
+        proof that RepRoot Studio processed a transaction — you and your client remain responsible
+        for confirming the payment.
+      </p>
+      <p>
+        RepRoot Studio does not verify ownership of external manual payment accounts or control how
+        externally received funds are transferred.
+      </p>
+    </div>
+  </section>
+}
+
+@if (saveMessage) {
+  <p class="message" [class.error-message]="saveMessageType === 'error'">{{ saveMessage }}</p>
+}

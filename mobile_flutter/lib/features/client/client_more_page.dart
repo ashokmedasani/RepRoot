@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,22 +19,12 @@ class ClientMorePage extends ConsumerStatefulWidget {
 
 class _ClientMorePageState extends ConsumerState<ClientMorePage> {
   ClientMeResponse? _me;
-  int _unread = 0;
   bool _isSigningOut = false;
-  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _loadUnread();
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _loadUnread());
-  }
-
-  @override
-  void dispose() {
-    _poll?.cancel();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -45,15 +33,6 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
       if (mounted) setState(() => _me = me);
     } catch (_) {
       if (mounted) setState(() => _me = null);
-    }
-  }
-
-  Future<void> _loadUnread() async {
-    try {
-      final count = await ref.read(clientApiProvider).getChatUnreadCount();
-      if (mounted) setState(() => _unread = count);
-    } catch (_) {
-      if (mounted) setState(() => _unread = 0);
     }
   }
 
@@ -155,26 +134,6 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
           _MenuCard(
             items: [
               _MenuItem(
-                icon: Icons.person_outline,
-                label: 'Your trainer',
-                subtitle: client?.trainerName.isNotEmpty ?? false
-                    ? client!.trainerName
-                    : null,
-                onTap: () => context.go(Routes.clientTrainer),
-              ),
-              _MenuItem(
-                icon: Icons.chat_bubble_outline,
-                label: 'Messages',
-                badge: _unread > 0 ? (_unread > 99 ? '99+' : '$_unread') : null,
-                onTap: () => context.go(Routes.clientChat),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          _MenuCard(
-            items: [
-              _MenuItem(
                 icon: Icons.settings_outlined,
                 label: 'Settings',
                 onTap: () => context.go(Routes.clientSettings),
@@ -225,15 +184,11 @@ class _MenuItem {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.subtitle,
-    this.badge,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final String? subtitle;
-  final String? badge;
 }
 
 class _MenuCard extends StatelessWidget {
@@ -262,36 +217,9 @@ class _MenuCard extends StatelessWidget {
                     Icon(items[i].icon, size: AppSize.iconRow, color: tokens.muted),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(items[i].label, style: context.text.bodyLarge),
-                          if (items[i].subtitle != null)
-                            Text(items[i].subtitle!, style: context.text.bodySmall),
-                        ],
-                      ),
+                      child: Text(items[i].label, style: context.text.bodyLarge),
                     ),
-                    if (items[i].badge != null)
-                      Container(
-                        constraints: const BoxConstraints(minWidth: 22),
-                        height: 22,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE11D48),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          items[i].badge!,
-                          style: context.text.labelSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10.5,
-                          ),
-                        ),
-                      )
-                    else
-                      Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
                   ],
                 ),
               ),

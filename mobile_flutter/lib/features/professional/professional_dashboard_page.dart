@@ -6,34 +6,34 @@ import '../../app/router.dart';
 import '../../core/api/forms_groups_api.dart';
 import '../../core/api/models/forms_groups_models.dart';
 import '../../core/api/models/template_models.dart';
-import '../../core/api/models/trainer_models.dart';
+import '../../core/api/models/professional_models.dart';
 import '../../core/api/templates_api.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/charts/analytics_types.dart';
 import '../../shared/charts/chart_card.dart';
 import '../../shared/widgets/app_widgets.dart';
 
-/// Trainer Dashboard — welcome header, overview KPIs, Client Tracking Center
+/// Professional Dashboard — welcome header, overview KPIs, Client Tracking Center
 /// charts, schedules, activity, templates.
-/// Replica of mobile/src/app/pages/trainer/dashboard/trainer-dashboard.page.ts.
-class TrainerDashboardPage extends ConsumerStatefulWidget {
-  const TrainerDashboardPage({super.key});
+/// Replica of mobile/src/app/pages/professional/dashboard/professional-dashboard.page.ts.
+class ProfessionalDashboardPage extends ConsumerStatefulWidget {
+  const ProfessionalDashboardPage({super.key});
 
   @override
-  ConsumerState<TrainerDashboardPage> createState() =>
-      _TrainerDashboardPageState();
+  ConsumerState<ProfessionalDashboardPage> createState() =>
+      _ProfessionalDashboardPageState();
 }
 
-class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
+class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboardPage> {
   FormsGroupsOverview? _overview;
   List<ClientReminder> _reminders = [];
   List<ClientProfileEditActivity> _profileEdits = [];
   ScheduleSummary? _summary;
   List<TrackingTemplateRecord> _templates = [];
-  TrainerProfile? _profile;
-  TrainerDataUsage? _usage;
+  ProfessionalProfile? _profile;
+  ProfessionalDataUsage? _usage;
 
   String _message = '';
   bool _loading = true;
@@ -46,15 +46,15 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
     _load();
   }
 
-  String get _trainerName {
+  String get _professionalName {
     final profile = _profile;
-    if (profile == null) return 'Trainer';
+    if (profile == null) return 'Professional';
     final name = profile.displayName;
     return name.isNotEmpty ? name : profile.username;
   }
 
   String get _initials {
-    final letters = _trainerName
+    final letters = _professionalName
         .trim()
         .split(RegExp(r'\s+'))
         .where((part) => part.isNotEmpty)
@@ -73,17 +73,17 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
   /// Each call is independent so one failing endpoint cannot blank the whole
   /// dashboard — same tolerance as the Ionic page, which subscribes separately.
   Future<void> _load() async {
-    final trainerAuth = ref.read(trainerAuthApiProvider);
+    final professionalAuth = ref.read(professionalAuthApiProvider);
     final formsGroups = ref.read(formsGroupsApiProvider);
     final templatesApi = ref.read(templatesApiProvider);
 
     await Future.wait([
       _guard(() async {
-        final profile = await trainerAuth.getProfile();
+        final profile = await professionalAuth.getProfile();
         if (mounted) setState(() => _profile = profile);
       }),
       _guard(() async {
-        final usage = await trainerAuth.getDataUsage();
+        final usage = await professionalAuth.getDataUsage();
         if (mounted) setState(() => _usage = usage);
       }),
       _guard(() async {
@@ -200,7 +200,7 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
       body: PagePad(
         onRefresh: _load,
         children: [
-          _Hero(name: _trainerName, initials: _initials, profile: _profile),
+          _Hero(name: _professionalName, initials: _initials, profile: _profile),
           if (_message.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             ErrorNote(message: _message, onRetry: _load),
@@ -209,7 +209,7 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
           SectionHeader(
             title: 'Overview',
             actionLabel: 'This week',
-            onAction: () => context.go(Routes.trainerSchedule),
+            onAction: () => context.go(Routes.professionalSchedule),
             topSpace: AppSpacing.lg,
           ),
           KpiGrid(
@@ -219,21 +219,21 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
                 icon: Icons.people_outline,
                 value: '$_clientCount',
                 caption: '$_activeClientCount active',
-                onTap: () => context.go(Routes.trainerClients),
+                onTap: () => context.go(Routes.professionalClients),
               ),
               KpiTile(
                 label: 'Schedules',
                 icon: Icons.calendar_today_outlined,
                 value: '${summary?.totalPending ?? 0}',
                 caption: '${summary?.due24Hours ?? 0} due in 24h',
-                onTap: () => context.go(Routes.trainerSchedule),
+                onTap: () => context.go(Routes.professionalSchedule),
               ),
               KpiTile(
                 label: 'Forms',
                 icon: Icons.description_outlined,
                 value: '${_overview?.pendingForms.length ?? 0}',
                 caption: 'pending review',
-                onTap: () => context.go(Routes.trainerFormsGroups),
+                onTap: () => context.go(Routes.professionalFormsGroups),
               ),
               KpiTile(
                 label: 'Storage',
@@ -276,7 +276,7 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
           SectionHeader(
             title: 'Upcoming Schedule',
             actionLabel: 'View all',
-            onAction: () => context.go(Routes.trainerSchedule),
+            onAction: () => context.go(Routes.professionalSchedule),
           ),
           if (_reminders.isEmpty)
             const EmptyState(message: 'No pending schedules.')
@@ -290,7 +290,7 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
                     ? reminder.time.substring(0, 5)
                     : 'Any time',
                 onTap: () => context.go(
-                  '${Routes.trainerClients}/${reminder.client}',
+                  '${Routes.professionalClients}/${reminder.client}',
                 ),
               ),
 
@@ -309,14 +309,14 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
                   tone: activity.isDeletion ? PillTone.bad : PillTone.info,
                 ),
                 onTap: () => context.go(
-                  '${Routes.trainerClients}/${activity.client}',
+                  '${Routes.professionalClients}/${activity.client}',
                 ),
               ),
 
           SectionHeader(
             title: 'Templates',
             actionLabel: 'Manage',
-            onAction: () => context.go(Routes.trainerTemplates),
+            onAction: () => context.go(Routes.professionalTemplates),
           ),
           if (_templates.isEmpty)
             const EmptyState(message: 'No templates yet.')
@@ -332,7 +332,7 @@ class _TrainerDashboardPageState extends ConsumerState<TrainerDashboardPage> {
 
           const SizedBox(height: AppSpacing.lg),
           OutlinedButton(
-            onPressed: () => context.go(Routes.trainerClients),
+            onPressed: () => context.go(Routes.professionalClients),
             child: const Text('Open Clients'),
           ),
         ],
@@ -357,7 +357,7 @@ class _Hero extends StatelessWidget {
 
   final String name;
   final String initials;
-  final TrainerProfile? profile;
+  final ProfessionalProfile? profile;
 
   @override
   Widget build(BuildContext context) {

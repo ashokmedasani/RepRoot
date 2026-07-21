@@ -2,7 +2,7 @@ import { Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Country, State } from 'country-state-city';
 
-import { DynamicField, DynamicFieldType } from '../../core/api/forms-groups-api.service';
+import { DynamicField, DynamicFieldType } from '@core/api/forms-groups-api.service';
 
 interface FieldTypeOption {
   value: DynamicFieldType;

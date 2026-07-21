@@ -2,20 +2,20 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { AdminDashboardSummary, AdminPortalApiService } from '../../../core/api/admin-portal-api.service';
-import { AdminPageShellComponent } from '../../../shared/admin-page-shell/admin-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { AdminDashboardSummary, AdminPortalApiService } from '@core/api/admin-portal-api.service';
+import { AdminPageShellComponent } from '@admin-shared/admin-page-shell/admin-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({selector:'app-admin-dashboard',standalone:true,imports:[AdminPageShellComponent,FormsModule,DecimalPipe],template:`
 <app-admin-page-shell title="Dashboard" subtitle="Aggregate platform health without exposing private user content." activeSection="dashboard">
   <label page-actions class="range">Date range<select [(ngModel)]="range" (change)="load()"><option value="today">Today</option><option value="7d">Last 7 Days</option><option value="30d">Last 30 Days</option><option value="90d">Last 90 Days</option></select></label>
   @if(message){<p class="message">{{message}}</p>}
   @if(summary){
-    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Accounts</p><h2>Trainer overview</h2></div><span>Aggregate only</span></div><div class="kpis">
-      <article><small>Total trainers</small><strong>{{summary.accounts.total_trainers|number}}</strong></article><article class="positive"><small>Active</small><strong>{{summary.accounts.active_trainers|number}}</strong></article><article class="warning"><small>Suspended</small><strong>{{summary.accounts.suspended_trainers|number}}</strong></article><article><small>Pending deletion</small><strong>{{summary.accounts.pending_deletion|number}}</strong></article><article><small>New in range</small><strong>{{summary.accounts.new_trainers|number}}</strong></article>
+    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Accounts</p><h2>Professional overview</h2></div><span>Aggregate only</span></div><div class="kpis">
+      <article><small>Total professionals</small><strong>{{summary.accounts.total_professionals|number}}</strong></article><article class="positive"><small>Active</small><strong>{{summary.accounts.active_professionals|number}}</strong></article><article class="warning"><small>Suspended</small><strong>{{summary.accounts.suspended_professionals|number}}</strong></article><article><small>Pending deletion</small><strong>{{summary.accounts.pending_deletion|number}}</strong></article><article><small>New in range</small><strong>{{summary.accounts.new_professionals|number}}</strong></article>
     </div></section>
     <div class="two-column"><section class="summary-section"><div class="section-head"><div><p class="eyebrow">Clients</p><h2>Client accounts</h2></div></div><div class="compact-grid"><article><small>Total</small><strong>{{summary.clients.total_clients|number}}</strong></article><article><small>Active</small><strong>{{summary.clients.active_clients|number}}</strong></article><article><small>Inactive</small><strong>{{summary.clients.inactive_clients|number}}</strong></article><article><small>New in range</small><strong>{{summary.clients.new_clients|number}}</strong></article></div></section>
-    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Platform</p><h2>Registered accounts</h2></div></div><div class="compact-grid"><article><small>Total</small><strong>{{summary.users.total_accounts|number}}</strong></article><article><small>Trainers</small><strong>{{summary.users.trainer_accounts|number}}</strong></article><article><small>Clients</small><strong>{{summary.users.client_accounts|number}}</strong></article><article><small>Internal staff</small><strong>{{summary.users.internal_accounts|number}}</strong></article></div></section></div>
+    <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Platform</p><h2>Registered accounts</h2></div></div><div class="compact-grid"><article><small>Total</small><strong>{{summary.users.total_accounts|number}}</strong></article><article><small>Professionals</small><strong>{{summary.users.professional_accounts|number}}</strong></article><article><small>Clients</small><strong>{{summary.users.client_accounts|number}}</strong></article><article><small>Internal staff</small><strong>{{summary.users.internal_accounts|number}}</strong></article></div></section></div>
     <section class="summary-section"><div class="section-head"><div><p class="eyebrow">Usage</p><h2>Platform activity</h2></div></div><div class="usage-grid"><span><strong>{{summary.usage.lead_forms}}</strong> Lead forms</span><span><strong>{{summary.usage.form_submissions}}</strong> Submissions</span><span><strong>{{summary.usage.groups}}</strong> Groups</span><span><strong>{{summary.usage.templates}}</strong> Templates</span><span><strong>{{summary.usage.references}}</strong> References</span><span><strong>{{summary.usage.scheduled_followups}}</strong> Follow-ups</span></div></section>
   } @else if(!message){<p>Loading dashboard…</p>}
 </app-admin-page-shell>`,styles:[`

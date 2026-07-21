@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.coachflow.flutter"
+    namespace = "com.reproot.flutter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,9 +15,9 @@ android {
     }
 
     defaultConfig {
-        // Distinct from the Ionic app's com.coachflow.app so both install side by side
+        // Distinct from the Ionic app's com.reproot.app so both install side by side
         // during the migration. Switch to the real id at release.
-        applicationId = "com.coachflow.flutter"
+        applicationId = "com.reproot.flutter"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

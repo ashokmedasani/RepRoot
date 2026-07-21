@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/client_api.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 
 /// Entry screen: pick a role. Stored sessions skip straight to the right shell.
@@ -27,8 +27,8 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
 
   void _redirectIfSignedIn() {
     if (!mounted) return;
-    if (ref.read(trainerAuthApiProvider).hasSession()) {
-      context.go(Routes.trainerDashboard);
+    if (ref.read(professionalAuthApiProvider).hasSession()) {
+      context.go(Routes.professionalDashboard);
       return;
     }
 
@@ -114,10 +114,10 @@ class _Brand extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Text('CoachFlow', style: text.displaySmall),
+        Text('RepRoot', style: text.displaySmall),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Trainer & Client Management',
+          'Professional & Client Management',
           style: text.bodyMedium?.copyWith(
             color: tokens.muted,
             fontWeight: FontWeight.w600,
@@ -156,9 +156,9 @@ class _Choices extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
-            onPressed: () => context.push(Routes.trainerLogin),
+            onPressed: () => context.push(Routes.professionalLogin),
             icon: const Icon(Icons.fitness_center),
-            label: const Text('Trainer'),
+            label: const Text('Professional'),
           ),
           const SizedBox(height: AppSpacing.md),
           OutlinedButton.icon(

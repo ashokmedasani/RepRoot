@@ -1,12 +1,12 @@
-import 'package:coachflow/core/api/api_client.dart';
-import 'package:coachflow/core/api/chat_api.dart';
-import 'package:coachflow/core/api/forms_groups_api.dart';
-import 'package:coachflow/core/api/references_api.dart';
-import 'package:coachflow/core/api/templates_api.dart';
-import 'package:coachflow/core/api/trainer_auth_api.dart';
-import 'package:coachflow/core/session/session_store.dart';
-import 'package:coachflow/shared/charts/analytics_types.dart';
-import 'package:coachflow/shared/charts/graph_engine.dart';
+import 'package:reproot/core/api/api_client.dart';
+import 'package:reproot/core/api/chat_api.dart';
+import 'package:reproot/core/api/forms_groups_api.dart';
+import 'package:reproot/core/api/references_api.dart';
+import 'package:reproot/core/api/templates_api.dart';
+import 'package:reproot/core/api/professional_auth_api.dart';
+import 'package:reproot/core/session/session_store.dart';
+import 'package:reproot/shared/charts/analytics_types.dart';
+import 'package:reproot/shared/charts/graph_engine.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,7 +23,7 @@ const bool _live = bool.fromEnvironment('LIVE');
 
 void main() {
   group(
-    'live trainer API',
+    'live professional API',
     () {
       late SessionStore session;
       late FormsGroupsApi formsGroups;
@@ -34,13 +34,13 @@ void main() {
       setUpAll(() async {
         session = SessionStore(const FlutterSecureStorage())..seed({});
         final dio = buildDio(session);
-        final auth = TrainerAuthApi(dio, session);
+        final auth = ProfessionalAuthApi(dio, session);
 
         final login = await auth.login(
           'nolan.performance@example.com',
-          'TrainerScale!2026',
+          'ProfessionalScale!2026',
         );
-        session.seed({SessionKeys.trainerToken: login.token});
+        session.seed({SessionKeys.professionalToken: login.token});
 
         formsGroups = FormsGroupsApi(dio);
         templates = TemplatesApi(dio);
@@ -124,7 +124,7 @@ void main() {
       });
 
       test('chat unread counts parse', () async {
-        final unread = await chat.getTrainerUnreadCounts();
+        final unread = await chat.getProfessionalUnreadCounts();
         expect(unread.unreadCount, greaterThanOrEqualTo(0));
         // forClient() must not throw for an unknown client.
         expect(unread.forClient(999999), 0);

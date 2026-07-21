@@ -148,8 +148,8 @@ class WorkflowRefinementTests(APITestCase):
     self.assertIn('professional_profile', response.data['sections'])
     self.assertIn('clients', response.data['sections'])
     self.assertEqual(response.data['sections']['clients']['record_count'], 1)
-    self.assertEqual(response.data['featured_client']['username'], 'usage-client')
-    self.assertGreater(response.data['featured_client']['percent_of_quota'], 0)
+    # Per-client "most active client" breakdown was removed from this response.
+    self.assertNotIn('featured_client', response.data)
 
   def test_manual_client_gets_reference_credentials_and_first_login_change(self):
     response = self.client.post('/api/accounts/professional/forms-groups/clients/manual/', self.manual_payload(), format='json')
@@ -683,7 +683,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
     )
     self.assertEqual(response.status_code, 400)
 
-  def test_full_verification_flow_creates_completed_record_and_writes_audit_log(self):
+  def test_acknowledge_then_log_flow_creates_completed_record_and_writes_audit_log(self):
     method_id = self.create_method()
     self.share_method(method_id)
     request_id = self.create_request(method_id)
@@ -707,27 +707,50 @@ class ClientPaymentsWorkflowTests(APITestCase):
     self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_PROOF_SUBMITTED)
 
     self.client.force_authenticate(self.user)
-    verified = self.client.post(
-      '/api/accounts/professional/payments/proofs/' + str(proof_id) + '/verify/',
+    acknowledged = self.client.post(
+      '/api/accounts/professional/payments/proofs/' + str(proof_id) + '/acknowledge/',
+      {'acknowledgement_note': 'Confirmed in app'},
+      format='json',
+    )
+    self.assertEqual(acknowledged.status_code, 200, acknowledged.data)
+    self.assertTrue(acknowledged.data['needs_logging'])
+
+    payment_request = PaymentRequest.objects.get(request_id=request_id)
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_ACKNOWLEDGED)
+    self.assertFalse(PaymentRecord.objects.filter(payment_request=payment_request).exists())
+    self.assertTrue(PaymentAuditLog.objects.filter(action='payment_acknowledged', payment_request=payment_request).exists())
+
+    reconciliation = self.client.get('/api/accounts/professional/payments/reconciliation/')
+    self.assertEqual(reconciliation.status_code, 200, reconciliation.data)
+    self.assertEqual(reconciliation.data['acknowledged_count'], 1)
+    self.assertEqual(reconciliation.data['unlogged_count'], 1)
+
+    logged = self.client.post(
+      '/api/accounts/professional/payments/records/',
       {
-        'outcome': 'completed',
+        'client': self.client_access_id,
+        'payment_request_id': request_id,
         'original_amount': '200.00',
         'original_currency': 'USD',
         'reporting_amount': '16750.00',
         'reporting_currency': 'INR',
         'received_date': timezone.now().date().isoformat(),
-        'verification_note': 'Confirmed in app',
+        'status': 'completed',
       },
       format='json',
     )
-    self.assertEqual(verified.status_code, 201, verified.data)
+    self.assertEqual(logged.status_code, 201, logged.data)
 
-    payment_request = PaymentRequest.objects.get(request_id=request_id)
+    payment_request.refresh_from_db()
     self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
     record = PaymentRecord.objects.get(payment_request=payment_request)
     self.assertEqual(record.status, PaymentRecord.STATUS_COMPLETED)
     self.assertEqual(str(record.reporting_amount), '16750.00')
-    self.assertTrue(PaymentAuditLog.objects.filter(action='payment_verified', payment_record=record).exists())
+    self.assertTrue(PaymentAuditLog.objects.filter(action='payment_recorded', payment_record=record).exists())
+
+    reconciliation_after = self.client.get('/api/accounts/professional/payments/reconciliation/')
+    self.assertEqual(reconciliation_after.data['unlogged_count'], 0)
+    self.assertEqual(reconciliation_after.data['logged_count'], 1)
 
   def test_reject_proof_requires_reason_and_client_can_resubmit(self):
     method_id = self.create_method()

@@ -74,7 +74,7 @@ services:
     name: fitness-app-frontend
     rootDir: frontend
     buildCommand: npm ci && npm run build:render
-    staticPublishPath: dist/trainer-management-platform/browser
+    staticPublishPath: dist/professional-management-platform/browser
     envVars:
       - key: RENDER_API_BASE_URL
         sync: false

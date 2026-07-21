@@ -10,6 +10,8 @@ export interface DataPoint {
   label: string;
   value: number;
   tooltip?: string;
+  /** Explicit bar color (CSS color / var()). Falls back to the categorical palette when omitted. */
+  color?: string;
 }
 
 export interface ChartMeta {

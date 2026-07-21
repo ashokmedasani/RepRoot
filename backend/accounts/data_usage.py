@@ -2,7 +2,6 @@ import json
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Count
 from django.forms.models import model_to_dict
 
 from .models import (
@@ -91,51 +90,6 @@ def _usage_status_label(usage_percent: float) -> str:
   return 'plenty_of_room'
 
 
-def _client_usage(client, quota_bytes: int) -> dict:
-  lead_values = []
-  if client.lead_submission_id:
-    lead = LeadSubmission.objects.filter(pk=client.lead_submission_id).values().first()
-    if lead:
-      lead_values.append(lead)
-  if client.registration_submission_id:
-    submission = GroupRegistrationSubmission.objects.filter(pk=client.registration_submission_id).values().first()
-    if submission:
-      lead_values.append(submission)
-
-  assignments = TemplateAssignment.objects.filter(client=client)
-  assignment_links = TemplateAssignment.references.through.objects.filter(templateassignment__client=client)
-  sections = {
-    'profile_intake': _section_usage(values=[model_to_dict(client), *lead_values]),
-    'templates': _section_usage(querysets=[assignments, assignment_links]),
-    'tracking_history': _section_usage(querysets=[TrackingEntry.objects.filter(client=client)]),
-    'progress': _section_usage(querysets=[ProgressEntry.objects.filter(client=client)]),
-    'schedules': _section_usage(querysets=[ClientReminder.objects.filter(client=client)]),
-    'messages': _section_usage(
-      querysets=[ChatMessage.objects.filter(client=client)],
-      files=[
-        message.image
-        for message in ChatMessage.objects.filter(client=client).exclude(image='').only('image')
-      ],
-    ),
-    'account_activity': _section_usage(
-      querysets=[
-        ClientDetailChangeRequest.objects.filter(client=client),
-        ClientAuthToken.objects.filter(client=client),
-      ]
-    ),
-  }
-  total_bytes = sum(section['total_bytes'] for section in sections.values())
-  return {
-    'id': client.pk,
-    'reference_id': client.reference_id,
-    'username': client.username,
-    'name': f'{client.first_name} {client.last_name}'.strip(),
-    'percent_of_quota': min(100, _percent_of_quota(total_bytes, quota_bytes)),
-    'record_count': sum(section['record_count'] for section in sections.values()),
-    'sections': _sanitize_sections(sections, quota_bytes),
-  }
-
-
 def calculate_professional_data_usage(professional) -> dict:
   """Estimate professional-owned storage, broken down by product section and client."""
   cache_key = f'professional-data-usage:v5:{professional.pk}'
@@ -216,21 +170,6 @@ def calculate_professional_data_usage(professional) -> dict:
   plan = professional_plan(professional)
   quota_bytes = max(1, int(plan.get('professional_storage_bytes') or 1))
 
-  # The most active client is the most useful single-client storage example;
-  # detailed histories naturally sort above profile-only clients.
-  featured_client = (
-    ClientAccess.objects.filter(professional=professional)
-    .annotate(
-      activity_count=(
-        Count('tracking_entries', distinct=True)
-        + Count('progress_entries', distinct=True)
-        + Count('chat_messages', distinct=True)
-      )
-    )
-    .order_by('-activity_count', 'pk')
-    .first()
-  )
-
   # Uncapped: over-100 values are what drive is_over_quota / account-lock logic
   # below, so this must never be clamped. Anything shown to the professional
   # goes through _usage_status_label()/usage_display_percent instead, which is
@@ -262,7 +201,6 @@ def calculate_professional_data_usage(professional) -> dict:
     'usage_label': _usage_status_label(usage_percent),
     'record_count': sum(section['record_count'] for section in sections.values()),
     'sections': _sanitize_sections(sections, quota_bytes),
-    'featured_client': _client_usage(featured_client, quota_bytes) if featured_client else None,
 
     # NEW: Warning & account lifecycle fields
     'warning_threshold_percent': warning_threshold,

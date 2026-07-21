@@ -82,7 +82,7 @@ export interface TrackingEntryRecord {
   entry_time: string | null;
   answers: Record<string, string>;
   note: string;
-  edited_by_trainer: boolean;
+  edited_by_professional: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -100,27 +100,27 @@ export class TemplatesApiService {
 
   getTemplates(): Observable<{ templates: TrackingTemplateRecord[]; max_templates: number }> {
     return this.http.get<{ templates: TrackingTemplateRecord[]; max_templates: number }>(
-      `${this.apiBaseUrl}/trainer/templates/`,
+      `${this.apiBaseUrl}/professional/templates/`,
       { headers: this.getAuthHeaders() }
     );
   }
 
   getTemplate(templateId: number): Observable<{ template: TrackingTemplateRecord }> {
-    return this.http.get<{ template: TrackingTemplateRecord }>(`${this.apiBaseUrl}/trainer/templates/${templateId}/`, {
+    return this.http.get<{ template: TrackingTemplateRecord }>(`${this.apiBaseUrl}/professional/templates/${templateId}/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   getStandardTemplates(): Observable<{ standard_templates: StandardTemplateRecord[] }> {
     return this.http.get<{ standard_templates: StandardTemplateRecord[] }>(
-      `${this.apiBaseUrl}/trainer/templates/standard/`,
+      `${this.apiBaseUrl}/professional/templates/standard/`,
       { headers: this.getAuthHeaders() }
     );
   }
 
   adoptStandardTemplate(key: string): Observable<{ template: TrackingTemplateRecord; message: string }> {
     return this.http.post<{ template: TrackingTemplateRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/templates/adopt-standard/`,
+      `${this.apiBaseUrl}/professional/templates/adopt-standard/`,
       { key },
       { headers: this.getAuthHeaders() }
     );
@@ -128,7 +128,7 @@ export class TemplatesApiService {
 
   createTemplate(payload: TemplatePayload): Observable<{ template: TrackingTemplateRecord; message: string }> {
     return this.http.post<{ template: TrackingTemplateRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/templates/`,
+      `${this.apiBaseUrl}/professional/templates/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -139,21 +139,21 @@ export class TemplatesApiService {
     payload: TemplatePayload
   ): Observable<{ template: TrackingTemplateRecord; message: string }> {
     return this.http.put<{ template: TrackingTemplateRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/templates/${templateId}/`,
+      `${this.apiBaseUrl}/professional/templates/${templateId}/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
   }
 
   deleteTemplate(templateId: number): Observable<MessageResponse> {
-    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/trainer/templates/${templateId}/`, {
+    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/professional/templates/${templateId}/`, {
       headers: this.getAuthHeaders()
     });
   }
 
   getAssignments(clientId: number): Observable<{ assignments: TemplateAssignmentRecord[] }> {
     return this.http.get<{ assignments: TemplateAssignmentRecord[] }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/`,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -164,7 +164,7 @@ export class TemplatesApiService {
     referenceIds: number[] = []
   ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
     return this.http.post<{ assignment: TemplateAssignmentRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/`,
       { template_id: templateId, reference_ids: referenceIds },
       { headers: this.getAuthHeaders() }
     );
@@ -176,7 +176,7 @@ export class TemplatesApiService {
     referenceIds: number[]
   ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
     return this.http.put<{ assignment: TemplateAssignmentRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
       { reference_ids: referenceIds },
       { headers: this.getAuthHeaders() }
     );
@@ -184,14 +184,14 @@ export class TemplatesApiService {
 
   unassignTemplate(clientId: number, assignmentId: number): Observable<MessageResponse> {
     return this.http.delete<MessageResponse>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
       { headers: this.getAuthHeaders() }
     );
   }
 
   getClientEntries(clientId: number, filters: EntryFilters = {}): Observable<{ entries: TrackingEntryRecord[] }> {
     return this.http.get<{ entries: TrackingEntryRecord[] }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/entries/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/entries/`,
       { headers: this.getAuthHeaders(), params: this.buildEntryParams(filters) }
     );
   }
@@ -201,7 +201,7 @@ export class TemplatesApiService {
     payload: { template_id: number; entry_date: string; answers: Record<string, string>; note: string }
   ): Observable<{ entry: TrackingEntryRecord; message: string }> {
     return this.http.post<{ entry: TrackingEntryRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/forms-groups/clients/${clientId}/entries/`,
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/entries/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -212,7 +212,7 @@ export class TemplatesApiService {
     payload: { answers: Record<string, string>; note: string; entry_date?: string; entry_time?: string | null }
   ): Observable<{ entry: TrackingEntryRecord; message: string }> {
     return this.http.put<{ entry: TrackingEntryRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/entries/${entryId}/`,
+      `${this.apiBaseUrl}/professional/entries/${entryId}/`,
       payload,
       { headers: this.getAuthHeaders() }
     );
@@ -233,7 +233,7 @@ export class TemplatesApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('trainer-auth-token') || '';
+    const token = window.localStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 

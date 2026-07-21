@@ -14,9 +14,9 @@ import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/password_field.dart';
-import '../trainer/trainer_format.dart';
+import '../professional/professional_format.dart';
 
-/// Client settings — profile, trainer-approved edit requests, password, and
+/// Client settings — profile, professional-approved edit requests, password, and
 /// account deletion requests.
 /// Replica of mobile/src/app/pages/client/settings/client-settings.page.ts.
 class ClientSettingsPage extends ConsumerStatefulWidget {
@@ -162,7 +162,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
             group: me.group,
             registrationFields: me.registrationFields,
             sharedAdditionalInfo: me.sharedAdditionalInfo,
-            trainerProfile: me.trainerProfile,
+            professionalProfile: me.professionalProfile,
           );
         }
       });
@@ -212,7 +212,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
         _isSubmittingEdit = false;
         _isEditing = false;
       });
-      _setMessage('Edit request sent to your trainer.', false);
+      _setMessage('Edit request sent to your professional.', false);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _isSubmittingEdit = false);
@@ -265,7 +265,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Your trainer will review this request. Your data stays until it '
+              'Your professional will review this request. Your data stays until it '
               'is approved.',
               style: context.text.bodySmall,
             ),
@@ -274,7 +274,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
               controller: note,
               maxLines: 3,
               decoration: const InputDecoration(
-                labelText: 'Note to your trainer (optional)',
+                labelText: 'Note to your professional (optional)',
               ),
             ),
           ],
@@ -401,7 +401,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      'Your edit request is waiting for your trainer to review.',
+                      'Your edit request is waiting for your professional to review.',
                       style: context.text.bodySmall,
                     ),
                   ),
@@ -430,7 +430,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
-                'Changes to your details need your trainer to approve them.',
+                'Changes to your details need your professional to approve them.',
                 style: context.text.bodySmall,
               ),
             ),
@@ -441,7 +441,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Your trainer reviews these changes before they apply.',
+                    'Your professional reviews these changes before they apply.',
                     style: context.text.bodySmall,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -457,7 +457,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                     controller: _editNote,
                     maxLines: 2,
                     decoration: const InputDecoration(
-                      labelText: 'Note to your trainer (optional)',
+                      labelText: 'Note to your professional (optional)',
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -537,7 +537,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Your trainer is reviewing it. Your data stays until '
+                        'Your professional is reviewing it. Your data stays until '
                         'they approve.',
                         style: context.text.bodySmall,
                       ),
@@ -557,7 +557,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                       Text('Delete your account', style: context.text.titleSmall),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Your trainer reviews the request. Nothing is removed '
+                        'Your professional reviews the request. Nothing is removed '
                         'until they approve it.',
                         style: context.text.bodySmall,
                       ),

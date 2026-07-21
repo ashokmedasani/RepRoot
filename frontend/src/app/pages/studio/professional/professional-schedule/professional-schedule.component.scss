@@ -1,0 +1,510 @@
+h2 {
+  margin: 0 0 0.75rem;
+  color: var(--app-text);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.state-note,
+.empty-note {
+  color: var(--app-muted);
+  font-weight: 600;
+}
+
+.field-label {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.required {
+  color: #d92d20;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 2.65rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+textarea {
+  resize: vertical;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.primary-action,
+.ghost-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  border-radius: 0.65rem;
+  padding: 0 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primary-action {
+  border: 0;
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
+.primary-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ghost-action {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+}
+
+.ghost-action.danger {
+  border-color: rgba(217, 45, 32, 0.35);
+  color: #d92d20;
+}
+
+/* ---- Connect panel ---- */
+.connect-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 1.25rem;
+  background: var(--app-surface);
+  max-width: 40rem;
+}
+
+.section-note {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.event-type-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.event-type-picker select {
+  width: auto;
+  min-width: 16rem;
+}
+
+/* ---- Calendar ---- */
+.calendar-section {
+  margin-bottom: 1.75rem;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.calendar-header h2 {
+  margin: 0;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calendar-nav .ghost-action {
+  min-height: 2.1rem;
+  padding: 0 0.75rem;
+}
+
+.calendar-month-label {
+  min-width: 9rem;
+  color: var(--app-text);
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar-grid {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 0.75rem;
+  background: var(--app-surface);
+}
+
+.calendar-weekday-row,
+.calendar-week-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+}
+
+.calendar-weekday-row {
+  margin-bottom: 0.4rem;
+}
+
+.calendar-weekday {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-week-row {
+  margin-bottom: 0.35rem;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.25rem;
+  min-height: 3.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.2rem;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+  cursor: pointer;
+}
+
+.calendar-day.outside-month {
+  opacity: 0.4;
+}
+
+.calendar-day.is-today {
+  border-color: var(--app-primary);
+}
+
+.calendar-day.is-selected {
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
+.calendar-day.has-meetings:not(.is-selected) {
+  background: var(--app-primary-soft);
+}
+
+.calendar-day-number {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.calendar-day-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.calendar-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.calendar-day-extra {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.link-action {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--app-primary);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Client picker (group meetings) ---- */
+.field-block {
+  margin-bottom: 1rem;
+}
+
+.field-block > .field-label {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.group-quick-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.group-chip {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.group-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.group-chip.selected {
+  border-color: var(--app-primary);
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.client-search {
+  margin-bottom: 0.6rem;
+}
+
+.client-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.65rem;
+  background: var(--app-surface-soft);
+}
+
+.client-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.client-picker-option input {
+  width: auto;
+  min-height: 0;
+}
+
+.guest-list {
+  color: var(--app-primary-strong);
+}
+
+/* ---- Meetings ---- */
+.meetings-section {
+  margin-bottom: 1.75rem;
+}
+
+.meeting-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.meeting-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.9rem 1.1rem;
+  background: var(--app-surface);
+}
+
+.meeting-card.clash {
+  border-color: rgba(217, 45, 32, 0.4);
+  background: rgba(217, 45, 32, 0.06);
+}
+
+.meeting-card.muted {
+  opacity: 0.7;
+}
+
+.meeting-main {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.meeting-main strong {
+  color: var(--app-text);
+}
+
+.meeting-main small {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+
+.clash-tag {
+  color: #d92d20;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.meeting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-pill[data-status='cancelled'] {
+  background: rgba(217, 45, 32, 0.1);
+  color: #d92d20;
+}
+
+.status-pill[data-status='completed'] {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.message {
+  margin-top: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 600;
+}
+
+.message.error-message {
+  background: rgba(217, 45, 32, 0.08);
+  color: #d92d20;
+}
+
+/* ---- Modals ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.modal-panel {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 42rem);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 1.25rem;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.modal-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-panel header h2 {
+  margin: 0;
+}
+
+.modal-close {
+  border: 0;
+  background: none;
+  color: var(--app-muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.slot-date-picker {
+  max-width: 16rem;
+}
+
+.slot-days {
+  display: grid;
+  gap: 0.85rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.85rem;
+  background: var(--app-surface-soft);
+}
+
+.slot-day-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.slot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.slot-chip {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.slot-chip.selected {
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: #ffffff;
+}

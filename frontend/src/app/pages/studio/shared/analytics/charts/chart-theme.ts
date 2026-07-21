@@ -34,6 +34,11 @@ export interface ChartTheme {
   muted: string;
   border: string;
   surface: string;
+  /** Matches the dashboard's .attention-kpi.overdue color. */
+  danger: string;
+  /** Matches the dashboard's .attention-kpi.urgent color. */
+  warning: string;
+  success: string;
 }
 
 export function chartTheme(): ChartTheme {
@@ -44,7 +49,10 @@ export function chartTheme(): ChartTheme {
     text: cssVar('--app-text', '#122033'),
     muted: cssVar('--app-muted', '#64748b'),
     border: cssVar('--app-border', '#d7e5f5'),
-    surface: cssVar('--app-surface', '#ffffff')
+    surface: cssVar('--app-surface', '#ffffff'),
+    danger: '#d92d20',
+    warning: '#f79009',
+    success: cssVar('--app-success', '#1f9d63')
   };
 }
 

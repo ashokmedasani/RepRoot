@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 
-from .models import AdminAuditLog, AdminStaffProfile, FinanceLedgerEntry
+from .models import AdminAuditLog, AdminStaffProfile, ErrorLog, FinanceLedgerEntry
 from .permissions import permission_codes_for
 
 User = get_user_model()
@@ -52,14 +52,44 @@ class AdminAuditLogSerializer(serializers.ModelSerializer):
 
 
 class FinanceLedgerEntrySerializer(serializers.ModelSerializer):
-  trainer_display = serializers.SerializerMethodField()
+  professional_display = serializers.SerializerMethodField()
 
   class Meta:
     model = FinanceLedgerEntry
-    fields = ['entry_id', 'entry_type', 'status', 'amount', 'currency', 'trainer_display', 'description', 'occurred_at']
+    fields = ['entry_id', 'entry_type', 'status', 'amount', 'currency', 'professional_display', 'description', 'occurred_at']
 
-  def get_trainer_display(self, obj):
-    if not obj.trainer:
+  def get_professional_display(self, obj):
+    if not obj.professional:
       return 'Platform'
-    profile = getattr(obj.trainer, 'trainer_profile', None)
-    return f'{obj.trainer.username} · {getattr(profile, "internal_reference_code", "")}'.strip(' ·')
+    profile = getattr(obj.professional, 'professional_profile', None)
+    return f'{obj.professional.username} · {getattr(profile, "internal_reference_code", "")}'.strip(' ·')
+
+
+class ErrorLogListSerializer(serializers.ModelSerializer):
+  """Compact row for the queue view — stack_trace/context are only sent on
+  the detail fetch so a 200-row list doesn't drag megabytes of traceback."""
+
+  class Meta:
+    model = ErrorLog
+    fields = [
+      'error_id', 'platform', 'source', 'level', 'reporter_role',
+      'professional_username', 'client_username', 'message',
+      'occurrence_count', 'status', 'first_seen_at', 'last_seen_at',
+    ]
+
+
+class ErrorLogSerializer(serializers.ModelSerializer):
+  resolved_by_username = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ErrorLog
+    fields = [
+      'error_id', 'platform', 'source', 'level', 'reporter_role',
+      'professional_username', 'client_username', 'client_reference',
+      'message', 'stack_trace', 'context', 'app_version', 'device_info', 'request_path',
+      'occurrence_count', 'status', 'resolution_note', 'resolved_by_username', 'resolved_at',
+      'first_seen_at', 'last_seen_at',
+    ]
+
+  def get_resolved_by_username(self, obj):
+    return obj.resolved_by.username if obj.resolved_by else ''

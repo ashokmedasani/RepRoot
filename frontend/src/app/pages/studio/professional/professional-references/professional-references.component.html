@@ -1,7 +1,7 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="References / Resources"
-  eyebrow="Trainer library"
-  subtitle="Store trainer-owned reusable exercises, nutrition plans, documents, images, links, and notes."
+  eyebrow="Professional library"
+  subtitle="Store professional-owned reusable exercises, nutrition plans, documents, images, links, and notes."
   activeSection="references"
   titleId="references-title"
 >
@@ -191,8 +191,19 @@
             <textarea rows="3" [(ngModel)]="form.description" name="description"></textarea>
           </label>
         } @else if (form.type === 'PDF Link') {
+          <label class="upload-box">
+            <span>PDF Upload</span>
+            <input
+              type="file"
+              accept="application/pdf"
+              (change)="handleFileUpload($event)"
+            >
+            @if (form.fileName) {
+              <small>{{ form.fileName }}</small>
+            }
+          </label>
           <label>
-            <span>PDF URL</span>
+            <span>Or a PDF URL</span>
             <input type="url" [(ngModel)]="form.link" name="link" placeholder="https://">
           </label>
           <label>
@@ -243,7 +254,7 @@
             <h2 id="category-editor-title">
               {{ categoryEditorMode() === 'create' ? 'Create Category' : (categoryEditorMode() === 'edit' ? 'Edit Category' : 'Add Subcategory') }}
             </h2>
-            <p>Use categories to organize trainer-owned reusable resources.</p>
+            <p>Use categories to organize professional-owned reusable resources.</p>
           </div>
           <button type="button" class="icon-button" title="Close" (click)="isCategoryEditorOpen.set(false)">x</button>
         </div>
@@ -284,4 +295,4 @@
       </form>
     </section>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

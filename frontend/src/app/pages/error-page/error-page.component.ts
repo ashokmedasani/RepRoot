@@ -2,7 +2,7 @@ import { Location } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import { AppErrorViewModel } from '../../core/errors/error-navigation.service';
+import { AppErrorViewModel } from '@core/errors/error-navigation.service';
 
 const DEFAULT_ERROR: AppErrorViewModel = {
   status: 500,
@@ -57,8 +57,8 @@ export class ErrorPageComponent implements OnInit {
   }
 
   private safeStartUrl(): string {
-    if (window.localStorage.getItem('trainer-auth-token')) {
-      return '/trainer/dashboard';
+    if (window.localStorage.getItem('professional-auth-token')) {
+      return '/professional/dashboard';
     }
 
     if (window.sessionStorage.getItem('client-auth-token')) {

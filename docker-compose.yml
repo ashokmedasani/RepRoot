@@ -1,10 +1,10 @@
 services:
   postgres:
     image: postgres:16
-    container_name: trainer-platform-postgres
+    container_name: professional-platform-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: trainer_platform
+      POSTGRES_DB: professional_platform
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -13,7 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/database/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d trainer_platform"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d professional_platform"]
       interval: 5s
       timeout: 5s
       retries: 10

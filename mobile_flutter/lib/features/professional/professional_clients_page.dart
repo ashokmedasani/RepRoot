@@ -16,20 +16,21 @@ import '../../shared/widgets/app_widgets.dart';
 enum ClientStatusFilter { all, active, inactive }
 
 /// Clients tab — searchable list with All / Active / Inactive filters.
-/// Replica of mobile/src/app/pages/trainer/clients/trainer-clients.page.ts.
-class TrainerClientsPage extends ConsumerStatefulWidget {
-  const TrainerClientsPage({super.key});
+/// Replica of mobile/src/app/pages/professional/clients/professional-clients.page.ts.
+class ProfessionalClientsPage extends ConsumerStatefulWidget {
+  const ProfessionalClientsPage({super.key});
 
   @override
-  ConsumerState<TrainerClientsPage> createState() => _TrainerClientsPageState();
+  ConsumerState<ProfessionalClientsPage> createState() => _ProfessionalClientsPageState();
 }
 
-class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
+class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPage> {
   final _search = TextEditingController();
 
   List<ClientAccessRecord> _clients = [];
-  List<TrainerGroup> _groups = [];
+  List<ProfessionalGroup> _groups = [];
   Map<String, int> _unreadByClient = {};
+  Map<String, DateTime> _lastUnreadAt = {};
   bool _isLoading = true;
   String _message = '';
   String _groupFilter = 'all';
@@ -57,7 +58,7 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
 
   List<ClientAccessRecord> get _filteredClients {
     final term = _search.text.trim().toLowerCase();
-    return _clients.where((client) {
+    final matches = _clients.where((client) {
       final matchesSearch = term.isEmpty ||
           client.displayName.toLowerCase().contains(term) ||
           client.email.toLowerCase().contains(term) ||
@@ -72,9 +73,31 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
       };
       return matchesSearch && matchesGroup && matchesStatus;
     }).toList();
+
+    // Clients waiting on a reply come first, newest message at the top; everyone
+    // else stays alphabetical. Deliberately only unread chats float: this list is
+    // a roster of 100 people that a professional searches by name, so reordering all
+    // of it by chat activity would move familiar rows around for no reason.
+    // Reading a chat drops it out of the unread map and the row settles back into
+    // place on the next poll.
+    //
+    // The name comparison has to be spelled out rather than returning 0 for
+    // "no opinion": List.sort is not stable, so equal-ranked rows would come
+    // back in whatever order the sort happened to leave them.
+    matches.sort((a, b) {
+      final aAt = _lastUnreadFor(a.id);
+      final bAt = _lastUnreadFor(b.id);
+      if (aAt != null && bAt != null) return bAt.compareTo(aAt);
+      if (aAt != null) return -1;
+      if (bAt != null) return 1;
+      return a.displayName.compareTo(b.displayName);
+    });
+    return matches;
   }
 
   int _unreadFor(int clientId) => _unreadByClient['$clientId'] ?? 0;
+
+  DateTime? _lastUnreadFor(int clientId) => _lastUnreadAt['$clientId'];
 
   String _badgeLabel(int count) => count > 99 ? '99+' : '$count';
 
@@ -135,10 +158,20 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
 
   Future<void> _loadUnread() async {
     try {
-      final summary = await ref.read(chatApiProvider).getTrainerUnreadCounts();
-      if (mounted) setState(() => _unreadByClient = summary.byClient);
+      final summary = await ref.read(chatApiProvider).getProfessionalUnreadCounts();
+      if (mounted) {
+        setState(() {
+          _unreadByClient = summary.byClient;
+          _lastUnreadAt = summary.lastUnreadAt;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _unreadByClient = {});
+      if (mounted) {
+        setState(() {
+          _unreadByClient = {};
+          _lastUnreadAt = {};
+        });
+      }
     }
   }
 
@@ -151,7 +184,7 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
         title: const Text('Clients'),
         actions: [
           IconButton(
-            onPressed: () => context.go(Routes.trainerClientCreate),
+            onPressed: () => context.go(Routes.professionalClientCreate),
             icon: const Icon(Icons.add),
             tooltip: 'Add client',
           ),
@@ -234,7 +267,7 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
                   : 'No clients match your filters.',
               actionLabel: _clients.isEmpty ? 'Add your first client' : null,
               onAction: _clients.isEmpty
-                  ? () => context.go(Routes.trainerClientCreate)
+                  ? () => context.go(Routes.professionalClientCreate)
                   : null,
             )
           else
@@ -254,7 +287,7 @@ class _TrainerClientsPageState extends ConsumerState<TrainerClientsPage> {
                     : (client.isActive
                         ? null
                         : const StatusPill(label: 'Inactive')),
-                onTap: () => context.go('${Routes.trainerClients}/${client.id}'),
+                onTap: () => context.go('${Routes.professionalClients}/${client.id}'),
               ),
         ],
       ),
@@ -269,7 +302,7 @@ class _GroupChips extends StatelessWidget {
     required this.onSelect,
   });
 
-  final List<TrainerGroup> groups;
+  final List<ProfessionalGroup> groups;
   final String selected;
   final ValueChanged<String> onSelect;
 

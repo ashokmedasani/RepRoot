@@ -24,19 +24,19 @@ class OtpCooldownError(Exception):
 
 
 def _otp_cache_key(email: str, purpose: str) -> str:
-  return f'trainer-email-otp:{purpose}:{email}'
+  return f'professional-email-otp:{purpose}:{email}'
 
 
 def _otp_attempts_cache_key(email: str, purpose: str) -> str:
-  return f'trainer-email-otp-attempts:{purpose}:{email}'
+  return f'professional-email-otp-attempts:{purpose}:{email}'
 
 
 def _otp_cooldown_cache_key(email: str, purpose: str) -> str:
-  return f'trainer-email-otp-cooldown:{purpose}:{email}'
+  return f'professional-email-otp-cooldown:{purpose}:{email}'
 
 
 def _verified_cache_key(token: str, purpose: str) -> str:
-  return f'trainer-email-verified:{purpose}:{token}'
+  return f'professional-email-verified:{purpose}:{token}'
 
 
 def send_email_otp(email: str, purpose: str = 'signup') -> str:
@@ -53,8 +53,8 @@ def send_email_otp(email: str, purpose: str = 'signup') -> str:
   cache.set(cooldown_key, current_time + OTP_RESEND_COOLDOWN_SECONDS, OTP_RESEND_COOLDOWN_SECONDS)
 
   send_mail(
-    subject='Your CoachFlow verification code',
-    message=f'Your CoachFlow verification code is {otp}. It expires in 10 minutes.',
+    subject='Your RepRoot verification code',
+    message=f'Your RepRoot verification code is {otp}. It expires in 10 minutes.',
     from_email=None,
     recipient_list=[email],
     fail_silently=False,

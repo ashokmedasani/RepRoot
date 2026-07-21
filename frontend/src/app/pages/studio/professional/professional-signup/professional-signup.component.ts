@@ -3,21 +3,22 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { TrainerAuthApiService, TrainerSignupPayload } from '../../../core/api/trainer-auth-api.service';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ProfessionalAuthApiService, ProfessionalSignupPayload } from '@core/api/professional-auth-api.service';
+import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 
 type EmailOtpStatus = 'idle' | 'sending' | 'sent' | 'verified' | 'failed';
 type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
 
 @Component({
-  selector: 'app-trainer-signup',
+  selector: 'app-professional-signup',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent],
-  templateUrl: './trainer-signup.component.html',
-  styleUrl: './trainer-signup.component.scss'
+  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
+  templateUrl: './professional-signup.component.html',
+  styleUrl: './professional-signup.component.scss'
 })
-export class TrainerSignupComponent implements OnDestroy {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalSignupComponent implements OnDestroy {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
   private resendTimerId: number | undefined;
 
@@ -32,6 +33,7 @@ export class TrainerSignupComponent implements OnDestroy {
   localDebugOtp = '';
   emailOtpStatus: EmailOtpStatus = 'idle';
   usernameStatus: UsernameStatus = 'idle';
+  usernameSuggestions: string[] = [];
   verifiedUsername = '';
   isEmailAlreadyRegistered = false;
   resendCountdown = 0;
@@ -124,7 +126,14 @@ export class TrainerSignupComponent implements OnDestroy {
     this.usernameStatus = 'idle';
     this.verifiedUsername = '';
     this.usernameCheckMessage = '';
+    this.usernameSuggestions = [];
     this.fieldErrors.username = '';
+  }
+
+  applyUsernameSuggestion(suggestion: string): void {
+    this.signupForm.username = suggestion;
+    this.usernameSuggestions = [];
+    this.verifyUsername();
   }
 
   handleEmailChange(): void {
@@ -191,7 +200,7 @@ export class TrainerSignupComponent implements OnDestroy {
       return;
     }
 
-    this.trainerAuthApi.checkEmail(email).subscribe({
+    this.professionalAuthApi.checkEmail(email).subscribe({
       next: (response) => {
         if (!response.available) {
           this.isEmailAlreadyRegistered = true;
@@ -229,7 +238,7 @@ export class TrainerSignupComponent implements OnDestroy {
     this.fieldErrors.otp = '';
     this.emailCheckMessage = 'Verifying email code...';
 
-    this.trainerAuthApi.verifyEmailOtp(email, otp).subscribe({
+    this.professionalAuthApi.verifyEmailOtp(email, otp).subscribe({
       next: (response) => {
         this.emailVerificationToken = response.email_verification_token;
         this.emailOtpStatus = 'verified';
@@ -264,7 +273,7 @@ export class TrainerSignupComponent implements OnDestroy {
     this.usernameStatus = 'idle';
     this.usernameCheckMessage = 'Checking username...';
 
-    this.trainerAuthApi.checkUsername(username).subscribe({
+    this.professionalAuthApi.checkUsername(username).subscribe({
       next: (response) => {
         this.usernameStatus = response.available ? 'available' : 'taken';
         this.verifiedUsername = response.available ? username : '';
@@ -272,18 +281,20 @@ export class TrainerSignupComponent implements OnDestroy {
           ? `${username} is available.`
           : '';
         this.fieldErrors.username = response.available ? '' : response.message;
+        this.usernameSuggestions = response.available ? [] : response.suggestions || [];
         this.isCheckingUsername = false;
       },
       error: () => {
         this.usernameStatus = 'failed';
         this.fieldErrors.username = 'Could not verify username. Please refresh and try again.';
         this.usernameCheckMessage = '';
+        this.usernameSuggestions = [];
         this.isCheckingUsername = false;
       }
     });
   }
 
-  createTrainerAccount(): void {
+  createProfessionalAccount(): void {
     this.clearFieldErrors();
     const form = this.signupForm;
     const username = form.username.trim().toLowerCase();
@@ -311,7 +322,7 @@ export class TrainerSignupComponent implements OnDestroy {
       return;
     }
 
-    const payload: TrainerSignupPayload = {
+    const payload: ProfessionalSignupPayload = {
       email: form.email.trim().toLowerCase(),
       username,
       password: form.password,
@@ -320,15 +331,15 @@ export class TrainerSignupComponent implements OnDestroy {
     };
 
     this.isSubmitting = true;
-    this.signupMessage = 'Creating trainer account...';
+    this.signupMessage = 'Creating professional account...';
 
-    this.trainerAuthApi.signup(payload).subscribe({
+    this.professionalAuthApi.signup(payload).subscribe({
       next: (response) => {
-        window.localStorage.removeItem('trainer-auth-token');
-        window.sessionStorage.setItem('trainer-login-notice', `${response.message} Please login now.`);
+        window.localStorage.removeItem('professional-auth-token');
+        window.sessionStorage.setItem('professional-login-notice', `${response.message} Please login now.`);
         this.clearSignupState();
         this.isSubmitting = false;
-        void this.router.navigate(['/trainer/login']);
+        void this.router.navigate(['/professional/login']);
       },
       error: (error: unknown) => {
         this.applySignupApiErrors(error);
@@ -368,7 +379,7 @@ export class TrainerSignupComponent implements OnDestroy {
   private sendOtpToAvailableEmail(email: string): void {
     this.emailCheckMessage = 'Sending verification code...';
 
-    this.trainerAuthApi.requestEmailOtp(email).subscribe({
+    this.professionalAuthApi.requestEmailOtp(email).subscribe({
       next: (response) => {
         if (response.available === false) {
           this.isEmailAlreadyRegistered = true;
@@ -415,6 +426,7 @@ export class TrainerSignupComponent implements OnDestroy {
     this.localDebugOtp = '';
     this.emailOtpStatus = 'idle';
     this.usernameStatus = 'idle';
+    this.usernameSuggestions = [];
     this.verifiedUsername = '';
     this.isEmailAlreadyRegistered = false;
     this.resendCountdown = 0;

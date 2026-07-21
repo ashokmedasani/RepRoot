@@ -1,4 +1,4 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   [title]="assignment?.template_name || 'Template'"
   eyebrow="Client workspace"
   [subtitle]="assignment ? 'Assigned on ' + (assignment.assigned_at | date: 'dd MMM yyyy') : 'Loading template.'"
@@ -126,8 +126,8 @@
                   <td class="values-cell">{{ answerPreview(entry) }}</td>
                   <td class="values-cell">{{ entry.note || '-' }}</td>
                   <td>
-                    @if (entry.edited_by_trainer) {
-                      <span class="edited-pill">By trainer</span>
+                    @if (entry.edited_by_professional) {
+                      <span class="edited-pill">By professional</span>
                     } @else {
                       <span class="client-pill">Client</span>
                     }
@@ -163,7 +163,7 @@
               <button type="button" class="secondary-action compact" (click)="openProgressForm()">+ Add Record</button>
             }
           </div>
-          <p class="muted-note">Trainer-written notes after reviewing or meeting with {{ client.first_name }}.</p>
+          <p class="muted-note">Professional-written notes after reviewing or meeting with {{ client.first_name }}.</p>
 
           @if (isProgressFormOpen) {
             <div class="progress-form">
@@ -406,7 +406,7 @@
   } @else {
     <section class="panel error-panel">
       <p>{{ message || 'Template assignment not found.' }}</p>
-      <a [routerLink]="['/trainer/clients', clientId]" class="secondary-action">Back to Client Profile</a>
+      <a [routerLink]="['/professional/clients', clientId]" class="secondary-action">Back to Client Profile</a>
     </section>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

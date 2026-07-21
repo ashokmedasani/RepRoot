@@ -48,7 +48,7 @@ class ClientTokenAuthentication(authentication.BaseAuthentication):
     except UnicodeError:
       raise exceptions.AuthenticationFailed('Invalid client token header.')
 
-    token = ClientAuthToken.objects.select_related('client__trainer', 'client__group', 'client__lead_submission').filter(key=key).first()
+    token = ClientAuthToken.objects.select_related('client__professional', 'client__group', 'client__lead_submission').filter(key=key).first()
 
     if token is None or not token.client.is_active:
       raise exceptions.AuthenticationFailed('Invalid or expired client token.')

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// CoachFlow design tokens. Colors are ported 1:1 from
+/// RepRoot design tokens. Colors are ported 1:1 from
 /// mobile/src/theme/variables.scss so the Flutter app matches the web + Ionic
 /// brand exactly — do not change them here.
 ///
@@ -211,4 +211,14 @@ extension AppTokensX on BuildContext {
   AppTokens get tokens => Theme.of(this).extension<AppTokens>()!;
   ColorScheme get colors => Theme.of(this).colorScheme;
   TextTheme get text => Theme.of(this).textTheme;
+}
+
+/// Each tracking template carries its own professional-picked accent
+/// ("#rrggbb", see professional_templates_page.dart's swatch picker) — reused here
+/// rather than inventing new colors for template rows/lists.
+Color parseAccentColor(String hex) {
+  final cleaned = hex.replaceAll('#', '').trim();
+  if (cleaned.length != 6) return AppColors.lightPrimary;
+  final value = int.tryParse(cleaned, radix: 16);
+  return value == null ? AppColors.lightPrimary : Color(0xFF000000 | value);
 }

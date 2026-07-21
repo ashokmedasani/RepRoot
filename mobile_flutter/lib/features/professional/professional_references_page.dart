@@ -2,33 +2,32 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/references_api.dart';
-import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../shared/video/open_resource.dart';
 import '../../shared/widgets/app_widgets.dart';
 
 enum CategoryEditorMode { create, edit, subcategory }
 
 /// Reference library: categories -> subcategories -> references, with editors
 /// for both and file upload.
-/// Replica of mobile/src/app/pages/trainer/references/trainer-references.page.ts.
-class TrainerReferencesPage extends ConsumerStatefulWidget {
-  const TrainerReferencesPage({super.key});
+/// Replica of mobile/src/app/pages/professional/references/professional-references.page.ts.
+class ProfessionalReferencesPage extends ConsumerStatefulWidget {
+  const ProfessionalReferencesPage({super.key});
 
   @override
-  ConsumerState<TrainerReferencesPage> createState() =>
-      _TrainerReferencesPageState();
+  ConsumerState<ProfessionalReferencesPage> createState() =>
+      _ProfessionalReferencesPageState();
 }
 
-class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
+class _ProfessionalReferencesPageState extends ConsumerState<ProfessionalReferencesPage> {
   final _query = TextEditingController();
 
   List<ReferenceCategoryRecord> _categories = [];
-  List<TrainerReferenceRecord> _references = [];
+  List<ProfessionalReferenceRecord> _references = [];
   ReferenceUsage _usage = const ReferenceUsage(used: 0, limit: null);
   String _message = '';
   bool _loading = true;
@@ -79,10 +78,10 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
 
   bool get _atLimit => _usage.atLimit;
 
-  List<TrainerReferenceRecord> _referencesForCategory(String name) =>
+  List<ProfessionalReferenceRecord> _referencesForCategory(String name) =>
       _references.where((r) => r.categoryName == name).toList();
 
-  List<TrainerReferenceRecord> _referencesFor(String name, String subcategory) =>
+  List<ProfessionalReferenceRecord> _referencesFor(String name, String subcategory) =>
       _referencesForCategory(name).where((r) => r.subcategory == subcategory).toList();
 
   /// Includes the unnamed bucket when references sit directly on the category.
@@ -158,14 +157,16 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     );
   }
 
-  Future<void> _open(TrainerReferenceRecord reference) async {
+  Future<void> _open(ProfessionalReferenceRecord reference) async {
     final raw = reference.fileUrl.isNotEmpty ? reference.fileUrl : reference.link;
     if (raw.isEmpty) return;
-    final uri = Uri.tryParse(Env.mediaUrl(raw));
-    if (uri == null) return;
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      _toast('Could not open this reference.');
-    }
+    await openResource(
+      context,
+      raw,
+      title: reference.title,
+      description: reference.description,
+      failureMessage: 'Could not open this reference.',
+    );
   }
 
   // ----- category editor -----
@@ -305,7 +306,7 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     });
   }
 
-  void _startEditReference(TrainerReferenceRecord reference) {
+  void _startEditReference(ProfessionalReferenceRecord reference) {
     setState(() {
       _editingReferenceId = reference.id;
       _draftCategory = reference.category;
@@ -405,7 +406,7 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     }
   }
 
-  Future<void> _duplicateReference(TrainerReferenceRecord reference) async {
+  Future<void> _duplicateReference(ProfessionalReferenceRecord reference) async {
     if (_atLimit) {
       _toast('Reference limit reached on your plan.');
       return;
@@ -433,10 +434,10 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     }
   }
 
-  Future<void> _removeReference(TrainerReferenceRecord reference) async {
+  Future<void> _removeReference(ProfessionalReferenceRecord reference) async {
     if (!await _confirm(
       'Delete "${reference.title}"?',
-      'This removes the reference from the trainer library.',
+      'This removes the reference from the professional library.',
     )) {
       return;
     }
@@ -490,7 +491,7 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('References'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerManage)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
         actions: [
           IconButton(
             onPressed: () => _openCategoryEditor(CategoryEditorMode.create),
@@ -721,7 +722,7 @@ class _TrainerReferencesPageState extends ConsumerState<TrainerReferencesPage> {
     );
   }
 
-  Widget _referenceRow(TrainerReferenceRecord reference) {
+  Widget _referenceRow(ProfessionalReferenceRecord reference) {
     final expanded = _expandedReferenceId == reference.id;
     final tokens = context.tokens;
 

@@ -8,13 +8,13 @@ import {
   FormsGroupsApiService,
   LeadForm,
   LeadSubmission,
-  TrainerGroup
-} from '../../../core/api/forms-groups-api.service';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+  ProfessionalGroup
+} from '@core/api/forms-groups-api.service';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { readImageAsDataUrl } from '@shared/utils/image-helpers';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
 interface SubmittedAnswer {
   label: string;
@@ -22,20 +22,20 @@ interface SubmittedAnswer {
 }
 
 @Component({
-  selector: 'app-trainer-form-request-detail',
+  selector: 'app-professional-form-request-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, PasswordInputComponent, TrainerPageShellComponent],
-  templateUrl: './trainer-form-request-detail.component.html',
-  styleUrl: './trainer-form-request-detail.component.scss'
+  imports: [DatePipe, FormsModule, PasswordInputComponent, ProfessionalPageShellComponent],
+  templateUrl: './professional-form-request-detail.component.html',
+  styleUrl: './professional-form-request-detail.component.scss'
 })
-export class TrainerFormRequestDetailComponent implements OnInit {
+export class ProfessionalFormRequestDetailComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly confirmation = inject(ConfirmationDialogService);
 
   submission: LeadSubmission | null = null;
-  groups: TrainerGroup[] = [];
+  groups: ProfessionalGroup[] = [];
   private leadForm: LeadForm | null = null;
 
   isLoading = true;
@@ -212,7 +212,7 @@ export class TrainerFormRequestDetailComponent implements OnInit {
         next: () => {
           this.messageType = 'success';
           this.message = 'Client access created. Redirecting to Forms & Groups...';
-          window.setTimeout(() => void this.router.navigate(['/trainer/forms-groups']), 900);
+          window.setTimeout(() => void this.router.navigate(['/professional/forms-groups']), 900);
         },
         error: (error: unknown) => {
           this.messageType = 'error';

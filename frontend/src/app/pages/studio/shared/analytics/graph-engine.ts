@@ -19,7 +19,26 @@ export function extractUnit(label: string): string {
 }
 
 function numericValue(raw: unknown): number {
-  return Number(String(raw ?? '').trim());
+  // Number('') === 0 in JS, which let a blank answer aggregate as a real
+  // zero measurement (e.g. a body-weight chart plunging to 0 on a day the
+  // client skipped that field). Every caller already guards with
+  // !Number.isNaN(raw), so returning NaN here makes a blank behave the same
+  // way non-numeric text already correctly does. See
+  // Documentation/CHANGELOG-graph-engine-bugs-2026-07-16.md.
+  const text = String(raw ?? '').trim();
+  return text === '' ? NaN : Number(text);
+}
+
+/**
+ * Parses a `YYYY-MM-DD` date-only string as local midnight. `new Date(iso)`
+ * parses date-only strings as UTC midnight per the ECMAScript spec, which
+ * reads back a day early anywhere west of UTC. See
+ * Documentation/CHANGELOG-graph-engine-bugs-2026-07-16.md.
+ */
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return new Date(iso);
+  return new Date(y, m - 1, d);
 }
 
 /** Chronological ascending by date then time. */
@@ -41,13 +60,13 @@ export function withinRange(entries: EntryLike[], range: DateRange): EntryLike[]
   cutoff.setDate(cutoff.getDate() - (range - 1));
 
   return entries.filter((entry) => {
-    const date = new Date(entry.entry_date);
+    const date = parseLocalDate(entry.entry_date);
     return !Number.isNaN(date.getTime()) && date >= cutoff;
   });
 }
 
 function shortDate(iso: string): string {
-  const date = new Date(iso);
+  const date = parseLocalDate(iso);
   return Number.isNaN(date.getTime()) ? iso : `${date.getMonth() + 1}/${date.getDate()}`;
 }
 

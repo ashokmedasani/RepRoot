@@ -8,25 +8,25 @@ def correlation_id():
   return f'ADM-{timezone.now():%Y%m%d}-{uuid.uuid4().hex[:8].upper()}'
 
 
-def trainer_log_identity(trainer):
-  profile = getattr(trainer, 'trainer_profile', None)
+def professional_log_identity(professional):
+  profile = getattr(professional, 'professional_profile', None)
   reference = getattr(profile, 'internal_reference_code', '') or ''
-  return f'{trainer.username} · {reference}'.strip(' ·')
+  return f'{professional.username} · {reference}'.strip(' ·')
 
 
 def client_log_identity(client):
-  return f'{client.trainer.username}:{client.reference_id}'
+  return f'{client.professional.username}:{client.reference_id}'
 
 
-def record_admin_action(request, *, permission, action, target_type='', target_id='', target_display='', trainer=None, client=None, success=True, reason='', metadata=None):
+def record_admin_action(request, *, permission, action, target_type='', target_id='', target_display='', professional=None, client=None, success=True, reason='', metadata=None):
   staff = getattr(request, 'admin_staff', None)
   if client is not None:
-    trainer = client.trainer
+    professional = client.professional
     target_display = target_display or client_log_identity(client)
     target_id = target_id or client.reference_id
-  elif trainer is not None:
-    target_display = target_display or trainer_log_identity(trainer)
-    target_id = target_id or getattr(trainer.trainer_profile, 'internal_reference_code', '')
+  elif professional is not None:
+    target_display = target_display or professional_log_identity(professional)
+    target_id = target_id or getattr(professional.professional_profile, 'internal_reference_code', '')
   return AdminAuditLog.objects.create(
     staff=staff,
     staff_reference_snapshot=f'{staff.staff_id} · {staff.user.get_full_name() or staff.user.username}' if staff else '',
@@ -36,8 +36,8 @@ def record_admin_action(request, *, permission, action, target_type='', target_i
     target_type=target_type,
     target_id=str(target_id),
     target_display=target_display,
-    trainer_username_snapshot=trainer.username if trainer else '',
-    trainer_reference_snapshot=getattr(getattr(trainer, 'trainer_profile', None), 'internal_reference_code', '') if trainer else '',
+    professional_username_snapshot=professional.username if professional else '',
+    professional_reference_snapshot=getattr(getattr(professional, 'professional_profile', None), 'internal_reference_code', '') if professional else '',
     client_reference_snapshot=client.reference_id if client else '',
     reason=reason,
     ip_address=request.META.get('REMOTE_ADDR') or None,

@@ -3,20 +3,21 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
-import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 
 type ResetOtpStatus = 'idle' | 'sent' | 'verified' | 'failed';
 
 @Component({
-  selector: 'app-trainer-forgot-password',
+  selector: 'app-professional-forgot-password',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent],
-  templateUrl: './trainer-forgot-password.component.html',
-  styleUrl: './trainer-forgot-password.component.scss'
+  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
+  templateUrl: './professional-forgot-password.component.html',
+  styleUrl: './professional-forgot-password.component.scss'
 })
-export class TrainerForgotPasswordComponent implements OnDestroy {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalForgotPasswordComponent implements OnDestroy {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
   private resendTimerId: number | undefined;
 
@@ -148,11 +149,11 @@ export class TrainerForgotPasswordComponent implements OnDestroy {
       return;
     }
 
-    this.trainerAuthApi.checkEmail(email).subscribe({
+    this.professionalAuthApi.checkEmail(email).subscribe({
       next: (response) => {
         if (response.available) {
           this.isEmailMissing = true;
-          this.resetOtpMessage = 'No trainer account found for this email.';
+          this.resetOtpMessage = 'No professional account found for this email.';
           this.resetOtpStatus = 'idle';
           this.isRequestingOtp = false;
           return;
@@ -181,7 +182,7 @@ export class TrainerForgotPasswordComponent implements OnDestroy {
     this.resetFieldErrors.otp = '';
     this.resetOtpMessage = 'Verifying reset code...';
 
-    this.trainerAuthApi.verifyPasswordResetOtp(email, otp).subscribe({
+    this.professionalAuthApi.verifyPasswordResetOtp(email, otp).subscribe({
       next: (response) => {
         this.resetToken = response.reset_token;
         this.resetOtpStatus = 'verified';
@@ -232,14 +233,14 @@ export class TrainerForgotPasswordComponent implements OnDestroy {
     this.isResettingPassword = true;
     this.resetMessage = 'Resetting password...';
 
-    this.trainerAuthApi
+    this.professionalAuthApi
       .confirmPasswordReset(email, this.resetToken, this.resetForm.password, this.resetForm.confirmPassword)
       .subscribe({
         next: (response) => {
-          window.sessionStorage.setItem('trainer-login-notice', `${response.message} Please login now.`);
+          window.sessionStorage.setItem('professional-login-notice', `${response.message} Please login now.`);
           this.clearResetState();
           this.isResettingPassword = false;
-          void this.router.navigate(['/trainer/login']);
+          void this.router.navigate(['/professional/login']);
         },
         error: (error: unknown) => {
           this.applyResetApiErrors(error);
@@ -251,11 +252,11 @@ export class TrainerForgotPasswordComponent implements OnDestroy {
   private sendResetOtpToExistingEmail(email: string): void {
     this.resetOtpMessage = 'Sending password reset code...';
 
-    this.trainerAuthApi.requestPasswordResetOtp(email).subscribe({
+    this.professionalAuthApi.requestPasswordResetOtp(email).subscribe({
       next: (response) => {
         if (response.available === true) {
           this.isEmailMissing = true;
-          this.resetOtpMessage = 'No trainer account found for this email.';
+          this.resetOtpMessage = 'No professional account found for this email.';
           this.resetOtpStatus = 'idle';
           this.isRequestingOtp = false;
           return;

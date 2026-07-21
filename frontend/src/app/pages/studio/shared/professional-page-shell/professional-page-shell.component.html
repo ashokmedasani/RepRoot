@@ -1,34 +1,32 @@
 <div class="app-shell">
-  <aside class="sidebar" aria-label="Trainer navigation">
-    <a class="brand" routerLink="/">
+  <aside class="sidebar" aria-label="Professional navigation">
+    <a class="brand" routerLink="/professional/dashboard">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-          <path d="M6 8v8M18 8v8M6 12h12M3.5 9.5v5M20.5 9.5v5"/>
-        </svg>
+        <img src="/brand/studio/mark.png" alt="">
       </span>
-      <span>CoachFlow</span>
+      <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span></span>
     </a>
 
     <nav>
-      <a routerLink="/trainer/dashboard" class="nav-item" [class.active]="activeSection === 'dashboard'">
+      <a routerLink="/professional/dashboard" class="nav-item" [class.active]="activeSection === 'dashboard'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>
         </svg>
         <span>Dashboard</span>
       </a>
-      <a routerLink="/trainer/forms-groups" class="nav-item" [class.active]="activeSection === 'forms-groups'">
+      <a routerLink="/professional/forms-groups" class="nav-item" [class.active]="activeSection === 'forms-groups'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>
         </svg>
         <span>Forms &amp; Groups</span>
       </a>
-      <a routerLink="/trainer/templates" class="nav-item" [class.active]="activeSection === 'templates'">
+      <a routerLink="/professional/templates" class="nav-item" [class.active]="activeSection === 'templates'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2.5M16 4V2.5M7.5 13.5h3M7.5 17h3M13.5 13.5h3"/>
         </svg>
         <span>Templates</span>
       </a>
-      <a routerLink="/trainer/clients" class="nav-item" [class.active]="activeSection === 'clients'">
+      <a routerLink="/professional/clients" class="nav-item" [class.active]="activeSection === 'clients'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c.7-3.2 3-5 5.5-5s4.8 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.6"/><path d="M16 14.6c2.3.2 4 1.8 4.5 4.4"/>
         </svg>
@@ -37,19 +35,25 @@
           <span class="nav-badge" [attr.aria-label]="unreadMessages + ' unread messages'">{{ badgeLabel(unreadMessages) }}</span>
         }
       </a>
-      <a routerLink="/trainer/references" class="nav-item" [class.active]="activeSection === 'references'">
+      <a routerLink="/professional/schedule" class="nav-item" [class.active]="activeSection === 'schedule'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v3M16 3v3"/><circle cx="8.5" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="14" r="1.1" fill="currentColor" stroke="none"/>
+        </svg>
+        <span>Schedule</span>
+      </a>
+      <a routerLink="/professional/references" class="nav-item" [class.active]="activeSection === 'references'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M9 7h6"/>
         </svg>
         <span>References</span>
       </a>
-      <a routerLink="/trainer/profile" class="nav-item" [class.active]="activeSection === 'profile'">
+      <a routerLink="/professional/profile" class="nav-item" [class.active]="activeSection === 'profile'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.6 3.7-5.5 7-5.5s6.1 1.9 7 5.5"/>
         </svg>
         <span>Profile</span>
       </a>
-      <a routerLink="/trainer/account-settings" class="nav-item" [class.active]="activeSection === 'settings'">
+      <a routerLink="/professional/account-settings" class="nav-item" [class.active]="activeSection === 'settings'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.5a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.5h4l.4-2.5a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/>
         </svg>
@@ -57,12 +61,12 @@
       </a>
     </nav>
 
-    <section class="data-usage" aria-label="Total trainer data usage" title="Trainer-owned records, uploaded files, and client content">
+    <section class="data-usage" aria-label="Total professional data usage" title="Professional-owned records, uploaded files, and client content">
       <div
         class="usage-gauge"
         [style.--usage-percent]="dataUsagePercent"
         role="img"
-        [attr.aria-label]="dataUsagePercent + '% of trainer storage used'"
+        [attr.aria-label]="dataUsagePercent + '% of professional storage used'"
       >
         <span>{{ dataUsagePercent | number: '1.0-1' }}%</span>
       </div>
@@ -83,11 +87,11 @@
 
   <main class="shell-main">
     <section
-      class="trainer-workspace"
-      [style.--trainer-shell-max-width]="maxWidth"
+      class="professional-workspace"
+      [style.--professional-shell-max-width]="maxWidth"
       [attr.aria-labelledby]="titleId"
     >
-      <header class="trainer-page-header">
+      <header class="professional-page-header">
         <div>
           @if (eyebrow) {
             <p class="eyebrow">{{ eyebrow }}</p>

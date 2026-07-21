@@ -1,9 +1,10 @@
 # Flutter Migration — Final Parity Report (2026-07-16)
 
 The Android client is now a Flutter app in `mobile_flutter/`. All six phases of
-[FLUTTER_MIGRATION_PLAN.md](FLUTTER_MIGRATION_PLAN.md) are complete. **The Ionic app in
-`mobile/` is untouched and still builds** — it stays the fallback until this one has been
-lived with for a while.
+[FLUTTER_MIGRATION_PLAN.md](FLUTTER_MIGRATION_PLAN.md) are complete. **The Ionic app that
+used to live in `mobile/` has since been removed from the repo** — Flutter is the sole
+mobile client. The comparisons below are kept as a historical record of what parity was
+verified against during the migration.
 
 | | Ionic (`mobile/`) | Flutter (`mobile_flutter/`) |
 |---|---|---|
@@ -12,10 +13,10 @@ lived with for a while.
 | Tests | none | 51 passing (~940 lines) |
 | Charts | Chart.js 4 | fl_chart |
 | Font | Manrope (downloaded) | Roboto (Android system) |
-| App id | `com.coachflow.app` | `com.coachflow.flutter` |
+| App id | `com.reproot.app` | `com.reproot.flutter` |
 | Release APK | — | 56.7 MB (fat, all ABIs) |
 
-Screens: **14 trainer**, **8 client**, 5 auth (role chooser, both logins, signup, profile
+Screens: **14 professional**, **8 client**, 5 auth (role chooser, both logins, signup, profile
 setup), 1 shared support incidents — 28, plus the two tab shells. Every route in
 `mobile/src/app/app.routes.ts` has a Flutter counterpart at the same path, so deep links
 stay portable. No placeholder screens remain.
@@ -26,10 +27,10 @@ migration workaround.
 
 ## How this was verified
 
-Against the **live Django backend with real seeded data** (trainer Nolan Brooks, 100
+Against the **live Django backend with real seeded data** (professional Nolan Brooks, 100
 clients; client Ava Martinez, 63), on the Android emulator — not against mocks:
 
-- Both roles sign in; trainer and client walkthroughs cover every screen.
+- Both roles sign in; professional and client walkthroughs cover every screen.
 - Bar, ring and line charts export as branded PNGs; the share sheet opens with the right
   caption. The exported files were pulled off the device and **looked at**, which is how
   two chart bugs were found.
@@ -54,10 +55,11 @@ does not reproduce (marked `FIX #1` / `FIX #2` in the source):
 2. **Date-only strings parse as UTC midnight.** Read back as local time, every entry
    lands a day early anywhere west of UTC.
 
-**Both bugs are still live in the web portal and the Ionic app.** They were left alone on
-purpose — you asked for the write-up and a decision later. The fixes are small and the
-tests already encode the correct behaviour. Full write-up, including how each was proved
-by running the real TypeScript rather than reading it:
+**Fixed in the web portal on 2026-07-18** (left live in the retired Ionic app on
+purpose — see the changelog). The fixes were exactly what this report anticipated:
+tiny, and the Dart tests already encoded the correct behaviour to verify against.
+Full write-up, including how each was proved by running the real TypeScript rather
+than reading it:
 [CHANGELOG-graph-engine-bugs-2026-07-16.md](CHANGELOG-graph-engine-bugs-2026-07-16.md).
 
 ## Deliberate divergences from Ionic
@@ -113,8 +115,15 @@ Nothing blocking, but honest:
 - **iOS is unbuilt.** No Android-only APIs sit outside the platform folders, so the port
   should be mostly mechanical, but "should" is doing real work in that sentence — it has
   never been compiled for iOS.
-- **A reminder's time can't be cleared.** `entry_time: null` / `time: null` can't be sent
-  explicitly. Pre-existing across all three clients, not a migration regression.
+- **A reminder's time couldn't be cleared — turned out to be a missing edit UI, not a
+  backend bug.** Verified 2026-07-18: `PUT /professional/reminders/<id>/` already applies
+  `time: null` correctly (the `ClientReminderSerializer` partial-update path was always
+  fine) — no client ever called it with anything but `{status: 'done'}`, because there
+  was no edit form anywhere, on any of the three clients. **Fixed on the web portal**
+  (`professional-client-profile` "Follow-up Scheduler" now has an Edit action that reuses the
+  create form, pre-filled, wired to the existing `updateReminder`), verified end-to-end
+  in a real browser session including restoring the demo data afterward. **Flutter and
+  the retired Ionic app still have no edit UI** — same gap, not yet ported.
 - **No widget tests**, only unit tests. The UI was verified by driving the emulator.
 - **The web portal's template-delete guard UI was never opened in a browser.** The backend
   guard is proven (a raw `DELETE` bypassing every UI returns HTTP 400); the web-side

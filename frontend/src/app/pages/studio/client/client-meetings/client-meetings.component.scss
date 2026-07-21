@@ -1,0 +1,146 @@
+h2 {
+  margin: 0 0 0.75rem;
+  color: var(--app-text);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.state-note,
+.empty-note {
+  color: var(--app-muted);
+  font-weight: 600;
+}
+
+.meetings-section {
+  margin-bottom: 1.75rem;
+}
+
+.meeting-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.meeting-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 0.9rem 1.1rem;
+  background: var(--app-surface);
+}
+
+.meeting-card.muted {
+  opacity: 0.7;
+}
+
+.meeting-main {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.meeting-main strong {
+  color: var(--app-text);
+}
+
+.meeting-main small {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+
+.meeting-main small.notes {
+  font-style: italic;
+}
+
+.meeting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.primary-action,
+.ghost-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  border-radius: 0.65rem;
+  padding: 0 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primary-action {
+  border: 0;
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
+.primary-action:disabled,
+.ghost-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ghost-action {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+}
+
+.ghost-action.danger {
+  border-color: rgba(217, 45, 32, 0.35);
+  color: #d92d20;
+}
+
+.response-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.response-pill[data-response='accepted'] {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.response-pill[data-response='declined'] {
+  background: rgba(217, 45, 32, 0.1);
+  color: #d92d20;
+}
+
+.status-pill[data-status='cancelled'] {
+  background: rgba(217, 45, 32, 0.1);
+  color: #d92d20;
+}
+
+.status-pill[data-status='completed'] {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.message {
+  margin-top: 1rem;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 600;
+}
+
+.message.error-message {
+  background: rgba(217, 45, 32, 0.08);
+  color: #d92d20;
+}

@@ -14,9 +14,9 @@ export interface AdminStaffSession {
 
 export interface AdminDashboardSummary {
   range_start: string;
-  accounts: { total_trainers: number; active_trainers: number; suspended_trainers: number; pending_deletion: number; new_trainers: number };
+  accounts: { total_professionals: number; active_professionals: number; suspended_professionals: number; pending_deletion: number; new_professionals: number };
   clients: { total_clients: number; active_clients: number; inactive_clients: number; new_clients: number };
-  users: { total_accounts: number; trainer_accounts: number; client_accounts: number; internal_accounts: number };
+  users: { total_accounts: number; professional_accounts: number; client_accounts: number; internal_accounts: number };
   usage: { lead_forms: number; active_lead_forms: number; form_submissions: number; groups: number; templates: number; references: number; scheduled_followups: number };
 }
 
@@ -25,7 +25,7 @@ export interface AdminFinanceSummary {
   billing_provider: string;
   finance_tracking_status: string;
   summary: { gross_revenue: string; completed_transactions: number; pending_transactions: number; failed_transactions: number; refund_total: string };
-  recent_entries: Array<{ entry_id: string; entry_type: string; status: string; amount: string; currency: string; trainer_display: string; description: string; occurred_at: string }>;
+  recent_entries: Array<{ entry_id: string; entry_type: string; status: string; amount: string; currency: string; professional_display: string; description: string; occurred_at: string }>;
 }
 
 export interface AdminAuditLog {
@@ -39,6 +39,50 @@ export interface AdminAuditLog {
   target_display: string;
   success: boolean;
   created_at: string;
+}
+
+export type ErrorLogPlatform = 'web' | 'android' | 'ios' | 'unknown';
+export type ErrorLogSource = 'client_app' | 'backend';
+export type ErrorLogLevel = 'warning' | 'error' | 'fatal';
+export type ErrorLogStatus = 'new' | 'acknowledged' | 'resolved' | 'ignored';
+
+export interface ErrorLogListItem {
+  error_id: string;
+  platform: ErrorLogPlatform;
+  source: ErrorLogSource;
+  level: ErrorLogLevel;
+  reporter_role: 'professional' | 'client' | '';
+  professional_username: string;
+  client_username: string;
+  message: string;
+  occurrence_count: number;
+  status: ErrorLogStatus;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface ErrorLogDetail extends ErrorLogListItem {
+  client_reference: string;
+  stack_trace: string;
+  context: Record<string, unknown>;
+  app_version: string;
+  device_info: string;
+  request_path: string;
+  resolution_note: string;
+  resolved_by_username: string;
+  resolved_at: string | null;
+}
+
+export interface ErrorLogListResponse {
+  results: ErrorLogListItem[];
+  count: number;
+  open_count: number;
+}
+
+export interface ErrorLogFilters {
+  search?: string;
+  status?: ErrorLogStatus | '';
+  level?: ErrorLogLevel | '';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -77,6 +121,31 @@ export class AdminPortalApiService {
   getAuditLogs(search = ''): Observable<{ results: AdminAuditLog[]; count: number }> {
     const params = search ? new HttpParams().set('search', search) : undefined;
     return this.http.get<{ results: AdminAuditLog[]; count: number }>(`${this.apiBaseUrl}/audit-logs/`, { headers: this.headers(), params });
+  }
+
+  getErrorLogs(platformGroup: 'web' | 'mobile', filters: ErrorLogFilters = {}): Observable<ErrorLogListResponse> {
+    let params = new HttpParams().set('platform_group', platformGroup);
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.status) params = params.set('status', filters.status);
+    if (filters.level) params = params.set('level', filters.level);
+    return this.http.get<ErrorLogListResponse>(`${this.apiBaseUrl}/errors/`, { headers: this.headers(), params });
+  }
+
+  getErrorLogDetail(errorId: string): Observable<{ error: ErrorLogDetail }> {
+    return this.http.get<{ error: ErrorLogDetail }>(`${this.apiBaseUrl}/errors/${encodeURIComponent(errorId)}/`, {
+      headers: this.headers()
+    });
+  }
+
+  actErrorLog(
+    errorId: string,
+    payload: { status?: ErrorLogStatus; resolution_note?: string }
+  ): Observable<{ error: ErrorLogDetail; message: string }> {
+    return this.http.post<{ error: ErrorLogDetail; message: string }>(
+      `${this.apiBaseUrl}/errors/${encodeURIComponent(errorId)}/action/`,
+      payload,
+      { headers: this.headers() }
+    );
   }
 
   currentStaff(): AdminStaffSession | null {

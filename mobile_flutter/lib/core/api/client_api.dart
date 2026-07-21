@@ -11,34 +11,34 @@ import 'models/forms_groups_models.dart';
 import 'models/support_models.dart';
 import 'models/template_models.dart';
 
-/// The client's own view of their account, group, and trainer.
+/// The client's own view of their account, group, and professional.
 class ClientMeResponse {
   const ClientMeResponse({
     required this.client,
     required this.group,
     required this.registrationFields,
     required this.sharedAdditionalInfo,
-    this.trainerProfile,
+    this.professionalProfile,
   });
 
   final ClientAccessRecord client;
-  final TrainerGroup? group;
+  final ProfessionalGroup? group;
   final List<DynamicField> registrationFields;
   final List<AdditionalInfoItem> sharedAdditionalInfo;
 
-  /// Null when the trainer has made nothing visible.
-  final ClientTrainerProfile? trainerProfile;
+  /// Null when the professional has made nothing visible.
+  final ClientProfessionalProfile? professionalProfile;
 
   factory ClientMeResponse.fromJson(Map<String, dynamic> json) {
     final group = json['group'];
-    final trainer = json['trainer_profile'];
+    final professional = json['professional_profile'];
     return ClientMeResponse(
       client: ClientAccessRecord.fromJson(
         json['client'] as Map<String, dynamic>? ?? {},
       ),
-      group: group is Map<String, dynamic> ? TrainerGroup.fromJson(group) : null,
-      trainerProfile: trainer is Map<String, dynamic>
-          ? ClientTrainerProfile.fromJson(trainer)
+      group: group is Map<String, dynamic> ? ProfessionalGroup.fromJson(group) : null,
+      professionalProfile: professional is Map<String, dynamic>
+          ? ClientProfessionalProfile.fromJson(professional)
           : null,
       registrationFields: (json['registration_fields'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
@@ -70,10 +70,10 @@ class ClientApi {
 
   static final _auth = authOptions(AuthScheme.client);
 
-  /// The backend field is `trainer_id` but it carries the trainer *code*
+  /// The backend field is `professional_id` but it carries the professional *code*
   /// the client types in — same as the Ionic app.
   Future<ClientLoginResponse> login(
-    String trainerCode,
+    String professionalCode,
     String username,
     String password,
   ) {
@@ -81,7 +81,7 @@ class ClientApi {
       final res = await _dio.post<Map<String, dynamic>>(
         '/client/login/',
         data: {
-          'trainer_id': trainerCode,
+          'professional_id': professionalCode,
           'username': username,
           'password': password,
         },
@@ -90,18 +90,18 @@ class ClientApi {
     });
   }
 
-  Future<List<TrainerDirectoryEntry>> getTrainerDirectory({
+  Future<List<ProfessionalDirectoryEntry>> getProfessionalDirectory({
     String search = '',
   }) {
     return runApi(() async {
       final trimmed = search.trim();
       final res = await _dio.get<Map<String, dynamic>>(
-        '/client/trainer-directory/',
+        '/client/professional-directory/',
         queryParameters: trimmed.isEmpty ? null : {'search': trimmed},
       );
-      return (res.data?['trainers'] as List<dynamic>? ?? [])
+      return (res.data?['professionals'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map(TrainerDirectoryEntry.fromJson)
+          .map(ProfessionalDirectoryEntry.fromJson)
           .toList();
     });
   }

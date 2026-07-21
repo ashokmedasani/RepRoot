@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { ThemeSwitcherComponent } from '../../shared/theme-switcher/theme-switcher.component';
+import { ThemeSwitcherComponent } from '@shared/theme-switcher/theme-switcher.component';
 
 interface PlatformFeature {
   title: string;
@@ -9,17 +9,17 @@ interface PlatformFeature {
 }
 
 @Component({
-  selector: 'app-landing',
+  selector: 'app-studio',
   standalone: true,
   imports: [RouterLink, ThemeSwitcherComponent],
-  templateUrl: './landing.component.html',
-  styleUrl: './landing.component.scss'
+  templateUrl: './studio.component.html',
+  styleUrl: './studio.component.scss'
 })
-export class LandingComponent {
-  readonly temporaryAppName = 'CoachFlow Studio';
-  readonly nextPageRoute = '/portal';
+export class StudioComponent {
+  readonly appName = 'RepRoot Studio';
+  readonly launchRoute = '/portal';
 
-  readonly trainerFeatures: PlatformFeature[] = [
+  readonly professionalFeatures: PlatformFeature[] = [
     {
       title: 'Leads',
       description: 'Track new prospects from first conversation to conversion.'
@@ -30,7 +30,7 @@ export class LandingComponent {
     },
     {
       title: 'Clients',
-      description: 'Manage profiles, goals, progress notes, and trainer follow-ups.'
+      description: 'Manage profiles, goals, progress notes, and professional follow-ups.'
     },
     {
       title: 'Targets',
@@ -41,7 +41,7 @@ export class LandingComponent {
   readonly clientFeatures: PlatformFeature[] = [
     {
       title: 'Profile',
-      description: 'Review personal details and trainer-approved fitness information.'
+      description: 'Review personal details and professional-approved fitness information.'
     },
     {
       title: 'Goals',
@@ -53,7 +53,7 @@ export class LandingComponent {
     },
     {
       title: 'Progress',
-      description: 'Submit updates that help the trainer guide the next step.'
+      description: 'Submit updates that help the professional guide the next step.'
     }
   ];
 }

@@ -1,0 +1,318 @@
+.state-note {
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
+.request-header-card {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-xl);
+  padding: 1.5rem;
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow-sm);
+  margin-bottom: 1.5rem;
+}
+
+.request-headline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.request-headline h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.request-meta {
+  margin: 0.25rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.82rem;
+}
+
+.amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.amount {
+  color: var(--app-primary-strong);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.due {
+  color: var(--app-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.request-description {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.pay-section,
+.proof-section {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.section-note {
+  margin: -0.4rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.method-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.method-tab {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  padding: 0.45rem 0.9rem;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--app-transition-fast);
+}
+
+.method-tab.active {
+  border-color: color-mix(in srgb, var(--app-primary) 25%, transparent);
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 700;
+}
+
+.method-details {
+  display: grid;
+  gap: 0.6rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.1rem;
+  background: var(--app-surface);
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.6rem 0.85rem;
+  background: var(--app-surface-soft);
+}
+
+.detail-key {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.detail-value {
+  color: var(--app-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.method-qr {
+  width: min(12rem, 100%);
+  border-radius: var(--app-radius-md);
+  border: 1px solid var(--app-border);
+  justify-self: center;
+}
+
+.method-instructions {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.placeholder-block {
+  border: 1px dashed var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.25rem;
+  background: var(--app-surface-soft);
+}
+
+.placeholder-block p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.proof-done {
+  border: 1px solid color-mix(in srgb, var(--app-primary) 20%, transparent);
+  border-radius: var(--app-radius-lg);
+  padding: 1.1rem 1.25rem;
+  background: var(--app-primary-soft);
+}
+
+.proof-done p {
+  margin: 0;
+  color: var(--app-primary-strong);
+  font-size: 0.9rem;
+}
+
+.proof-rejected {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid rgba(217, 45, 32, 0.35);
+  border-radius: var(--app-radius-lg);
+  padding: 1.1rem 1.25rem;
+  background: rgba(217, 45, 32, 0.08);
+}
+
+.proof-rejected p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.proof-rejected strong {
+  color: #d92d20;
+}
+
+.proof-form {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.25rem;
+  background: var(--app-surface);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.85rem;
+}
+
+.proof-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.proof-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.field-label {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+}
+
+.field-hint {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+}
+
+.required {
+  color: #d92d20;
+  font-weight: 700;
+}
+
+.confirm-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.confirm-check input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.confirm-check span {
+  color: var(--app-text);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.disclaimer-note {
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.75rem 1rem;
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.status-pill {
+  border-radius: var(--app-radius-pill);
+  padding: 0.3rem 0.7rem;
+  background: color-mix(in srgb, var(--app-primary) 12%, transparent);
+  color: var(--app-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill[data-status='completed'] {
+  background: #e7f6ed;
+  color: #18794e;
+}
+
+.status-pill[data-status='sent'],
+.status-pill[data-status='viewed'],
+.status-pill[data-status='proof_submitted'],
+.status-pill[data-status='under_review'],
+.status-pill[data-status='partially_paid'] {
+  background: #fff5dc;
+  color: #8a5c00;
+}
+
+.status-pill[data-status='rejected'],
+.status-pill[data-status='cancelled'],
+.status-pill[data-status='overdue'] {
+  background: #fff0ef;
+  color: #b42318;
+}
+
+.message {
+  border-radius: var(--app-radius-md);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.error-message {
+  background: #fff0ef;
+  color: #b42318;
+}

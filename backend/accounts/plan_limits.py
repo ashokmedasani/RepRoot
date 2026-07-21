@@ -1,23 +1,23 @@
 from django.conf import settings
 
 
-def trainer_plan_code(trainer) -> str:
-  default_plan = settings.COACHFLOW_DEFAULT_PLAN
+def professional_plan_code(professional) -> str:
+  default_plan = settings.REPROOT_DEFAULT_PLAN
   try:
-    requested_plan = str(trainer.trainer_profile.plan_tier or default_plan).strip().lower()
-  except (AttributeError, trainer.__class__.trainer_profile.RelatedObjectDoesNotExist):
+    requested_plan = str(professional.professional_profile.plan_tier or default_plan).strip().lower()
+  except (AttributeError, professional.__class__.professional_profile.RelatedObjectDoesNotExist):
     requested_plan = default_plan
-  return requested_plan if requested_plan in settings.COACHFLOW_PLAN_TIERS else default_plan
+  return requested_plan if requested_plan in settings.REPROOT_PLAN_TIERS else default_plan
 
 
-def trainer_plan(trainer) -> dict:
-  code = trainer_plan_code(trainer)
-  plan = {'code': code, **settings.COACHFLOW_PLAN_TIERS[code]}
+def professional_plan(professional) -> dict:
+  code = professional_plan_code(professional)
+  plan = {'code': code, **settings.REPROOT_PLAN_TIERS[code]}
   # Keep compatibility with older deployments/tests that override the former
-  # single-tier dictionary while they transition to COACHFLOW_PLAN_TIERS.
-  plan.update(getattr(settings, 'COACHFLOW_PLAN_LIMITS', {}) or {})
+  # single-tier dictionary while they transition to REPROOT_PLAN_TIERS.
+  plan.update(getattr(settings, 'REPROOT_PLAN_LIMITS', {}) or {})
   return plan
 
 
-def plan_limit(trainer, name: str):
-  return trainer_plan(trainer).get(name)
+def plan_limit(professional, name: str):
+  return professional_plan(professional).get(name)

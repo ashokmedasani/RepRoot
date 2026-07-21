@@ -8,21 +8,21 @@ import {
   FormsGroupsApiService,
   FormsGroupsOverview,
   LeadSubmission
-} from '../../../core/api/forms-groups-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
-import { FixedHeightListComponent } from '../../../shared/fixed-height-list/fixed-height-list.component';
+} from '@core/api/forms-groups-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
 
 type SubmissionView = 'pending' | 'approved' | 'deleted';
 
 @Component({
-  selector: 'app-trainer-forms-groups',
+  selector: 'app-professional-forms-groups',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, TrainerPageShellComponent, FixedHeightListComponent],
-  templateUrl: './trainer-forms-groups.component.html',
-  styleUrl: './trainer-forms-groups.component.scss'
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent],
+  templateUrl: './professional-forms-groups.component.html',
+  styleUrl: './professional-forms-groups.component.scss'
 })
-export class TrainerFormsGroupsComponent implements OnInit {
+export class ProfessionalFormsGroupsComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 

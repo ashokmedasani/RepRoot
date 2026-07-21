@@ -315,6 +315,10 @@ REPROOT_DATA_USAGE_DANGER_PERCENT = int(os.environ.get('REPROOT_DATA_USAGE_DANGE
 REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS = int(os.environ.get('REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS', '7'))
 REPROOT_DATA_DELETION_DAYS = int(os.environ.get('REPROOT_DATA_DELETION_DAYS', '30'))
 
+# Recycle Bin: how long a soft-deleted item (chat message, tracking/progress
+# entry, reminder, reference, template) stays restorable before permanent purge.
+REPROOT_RECYCLE_BIN_DAYS = int(os.environ.get('REPROOT_RECYCLE_BIN_DAYS', '14'))
+
 # Storage usage is intentionally a calm operational indicator, not a live
 # counter that changes while the professional navigates between pages.
 REPROOT_DATA_USAGE_CACHE_SECONDS = int(os.environ.get('REPROOT_DATA_USAGE_CACHE_SECONDS', '900'))
@@ -337,5 +341,17 @@ REPROOT_BILLING_CANCEL_URL = os.environ.get(
   'REPROOT_BILLING_CANCEL_URL', 'http://localhost:4300/professional/account-settings?billing=cancelled'
 )
 
+# No real Stripe pricing is wired up yet. Rather than hide "Update plan" until
+# it exists, checkout falls back to instantly applying the chosen tier with no
+# payment involved whenever a tier's real Stripe price isn't configured — lets
+# the whole lifecycle (limits, storage quota, lock/grace clearing) be exercised
+# end-to-end today. Flip this off once real prices are set for every tier.
+REPROOT_BILLING_TEST_MODE = os.environ.get('REPROOT_BILLING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
+
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')
+
+# Scheduling — each professional connects their own Cal.com account (API key
+# stored per-professional in CalComConnection, not here). This is only the
+# API host, overridable for a self-hosted Cal.com instance later.
+CAL_COM_API_BASE_URL = os.environ.get('CAL_COM_API_BASE_URL', 'https://api.cal.com')

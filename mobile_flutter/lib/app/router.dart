@@ -3,34 +3,33 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/client_login_page.dart';
 import '../features/auth/role_chooser_page.dart';
-import '../features/auth/trainer_login_page.dart';
-import '../features/auth/trainer_profile_setup_page.dart';
-import '../features/auth/trainer_signup_page.dart';
+import '../features/auth/professional_login_page.dart';
+import '../features/auth/professional_profile_setup_page.dart';
+import '../features/auth/professional_signup_page.dart';
 import '../features/client/client_change_password_page.dart';
-import '../features/client/client_chat_page.dart';
 import '../features/client/client_dashboard_page.dart';
 import '../features/client/client_more_page.dart';
 import '../features/client/client_programs_page.dart';
-import '../features/client/client_progress_page.dart';
 import '../features/client/client_settings_page.dart';
 import '../features/client/client_tabs_shell.dart';
-import '../features/client/client_trainer_page.dart';
+import '../features/client/client_template_resources_page.dart';
+import '../features/client/client_professional_page.dart';
 import '../features/support/support_incidents_page.dart';
-import '../features/trainer/trainer_client_create_page.dart';
-import '../features/trainer/trainer_client_detail_page.dart';
-import '../features/trainer/trainer_client_template_page.dart';
-import '../features/trainer/trainer_clients_page.dart';
-import '../features/trainer/trainer_dashboard_page.dart';
-import '../features/trainer/trainer_forms_groups_page.dart';
-import '../features/trainer/trainer_group_detail_page.dart';
-import '../features/trainer/trainer_manage_page.dart';
-import '../features/trainer/trainer_more_page.dart';
-import '../features/trainer/trainer_profile_page.dart';
-import '../features/trainer/trainer_references_page.dart';
-import '../features/trainer/trainer_schedule_page.dart';
-import '../features/trainer/trainer_settings_page.dart';
-import '../features/trainer/trainer_tabs_shell.dart';
-import '../features/trainer/trainer_templates_page.dart';
+import '../features/professional/professional_client_create_page.dart';
+import '../features/professional/professional_client_detail_page.dart';
+import '../features/professional/professional_client_template_page.dart';
+import '../features/professional/professional_clients_page.dart';
+import '../features/professional/professional_dashboard_page.dart';
+import '../features/professional/professional_forms_groups_page.dart';
+import '../features/professional/professional_group_detail_page.dart';
+import '../features/professional/professional_manage_page.dart';
+import '../features/professional/professional_more_page.dart';
+import '../features/professional/professional_profile_page.dart';
+import '../features/professional/professional_references_page.dart';
+import '../features/professional/professional_schedule_page.dart';
+import '../features/professional/professional_settings_page.dart';
+import '../features/professional/professional_tabs_shell.dart';
+import '../features/professional/professional_templates_page.dart';
 
 /// Route paths mirror mobile/src/app/app.routes.ts exactly so the two apps
 /// navigate identically and deep links stay portable.
@@ -38,37 +37,35 @@ class Routes {
   const Routes._();
 
   static const roleChooser = '/';
-  static const trainerLogin = '/trainer/login';
-  static const trainerSignup = '/trainer/signup';
-  static const trainerProfileSetup = '/trainer/profile-setup';
-  static const trainerDashboard = '/trainer/tabs/dashboard';
-  static const trainerClients = '/trainer/tabs/clients';
-  static const trainerManage = '/trainer/tabs/manage';
-  static const trainerMore = '/trainer/tabs/more';
+  static const professionalLogin = '/professional/login';
+  static const professionalSignup = '/professional/signup';
+  static const professionalProfileSetup = '/professional/profile-setup';
+  static const professionalDashboard = '/professional/tabs/dashboard';
+  static const professionalClients = '/professional/tabs/clients';
+  static const professionalManage = '/professional/tabs/manage';
+  static const professionalMore = '/professional/tabs/more';
 
-  static const trainerClientCreate = '/trainer/tabs/clients/new';
+  static const professionalClientCreate = '/professional/tabs/clients/new';
 
   // Sub-pages that stack inside the Manage / More tabs.
-  static const trainerGroups = '/trainer/tabs/manage/groups';
-  static const trainerFormsGroups = '/trainer/tabs/manage/forms-groups';
-  static const trainerTemplates = '/trainer/tabs/manage/templates';
-  static const trainerReferences = '/trainer/tabs/manage/references';
-  static const trainerSchedule = '/trainer/tabs/manage/schedule';
-  static const trainerProfile = '/trainer/tabs/more/profile';
-  static const trainerSettings = '/trainer/tabs/more/settings';
-  static const trainerSupport = '/trainer/tabs/more/support';
+  static const professionalGroups = '/professional/tabs/manage/groups';
+  static const professionalFormsGroups = '/professional/tabs/manage/forms-groups';
+  static const professionalTemplates = '/professional/tabs/manage/templates';
+  static const professionalReferences = '/professional/tabs/manage/references';
+  static const professionalSchedule = '/professional/tabs/manage/schedule';
+  static const professionalProfile = '/professional/tabs/more/profile';
+  static const professionalSettings = '/professional/tabs/more/settings';
+  static const professionalSupport = '/professional/tabs/more/support';
 
   static const clientLogin = '/client/login';
   static const clientChangePassword = '/client/change-password';
   static const clientDashboard = '/client/tabs/dashboard';
   static const clientPrograms = '/client/tabs/programs';
-  static const clientProgress = '/client/tabs/progress';
+  static const clientProfessional = '/client/tabs/professional';
   static const clientMore = '/client/tabs/more';
 
   // Sub-pages that stack inside the client More tab.
   static const clientSettings = '/client/tabs/more/profile';
-  static const clientTrainer = '/client/tabs/more/trainer';
-  static const clientChat = '/client/tabs/more/chat';
   static const clientSupport = '/client/tabs/more/support';
 }
 
@@ -81,16 +78,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RoleChooserPage(),
       ),
       GoRoute(
-        path: Routes.trainerLogin,
-        builder: (context, state) => const TrainerLoginPage(),
+        path: Routes.professionalLogin,
+        builder: (context, state) => const ProfessionalLoginPage(),
       ),
       GoRoute(
-        path: Routes.trainerSignup,
-        builder: (context, state) => const TrainerSignupPage(),
+        path: Routes.professionalSignup,
+        builder: (context, state) => const ProfessionalSignupPage(),
       ),
       GoRoute(
-        path: Routes.trainerProfileSetup,
-        builder: (context, state) => const TrainerProfileSetupPage(),
+        path: Routes.professionalProfileSetup,
+        builder: (context, state) => const ProfessionalProfileSetupPage(),
       ),
       GoRoute(
         path: Routes.clientLogin,
@@ -101,40 +98,75 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ClientChangePasswordPage(),
       ),
 
-      // Trainer tab shell: Dashboard | Clients | Manage | More
+      // Professional tab shell: Dashboard | Manage | Clients | More
       // (Shop deferred by design, as in the Ionic app.)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
-            TrainerTabsShell(navigationShell: navigationShell),
+            ProfessionalTabsShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: Routes.trainerDashboard,
-                builder: (context, state) => const TrainerDashboardPage(),
+                path: Routes.professionalDashboard,
+                builder: (context, state) => const ProfessionalDashboardPage(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: Routes.trainerClients,
-                builder: (context, state) => const TrainerClientsPage(),
+                path: Routes.professionalManage,
+                builder: (context, state) => const ProfessionalManagePage(),
+                routes: [
+                  GoRoute(
+                    path: 'forms-groups',
+                    builder: (context, state) => ProfessionalFormsGroupsPage(
+                      initialTab: state.uri.queryParameters['tab'],
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'groups/:groupId',
+                    builder: (context, state) => ProfessionalGroupDetailPage(
+                      groupId:
+                          int.tryParse(state.pathParameters['groupId'] ?? '') ?? 0,
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'templates',
+                    builder: (context, state) => const ProfessionalTemplatesPage(),
+                  ),
+                  GoRoute(
+                    path: 'references',
+                    builder: (context, state) => const ProfessionalReferencesPage(),
+                  ),
+                  GoRoute(
+                    path: 'schedule',
+                    builder: (context, state) => const ProfessionalSchedulePage(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.professionalClients,
+                builder: (context, state) => const ProfessionalClientsPage(),
                 routes: [
                   GoRoute(
                     path: 'new',
-                    builder: (context, state) => const TrainerClientCreatePage(),
+                    builder: (context, state) => const ProfessionalClientCreatePage(),
                   ),
                   GoRoute(
                     path: ':clientId',
-                    builder: (context, state) => TrainerClientDetailPage(
+                    builder: (context, state) => ProfessionalClientDetailPage(
                       clientId:
                           int.tryParse(state.pathParameters['clientId'] ?? '') ?? 0,
                     ),
                     routes: [
                       GoRoute(
                         path: 'templates/:assignmentId',
-                        builder: (context, state) => TrainerClientTemplatePage(
+                        builder: (context, state) => ProfessionalClientTemplatePage(
                           clientId:
                               int.tryParse(state.pathParameters['clientId'] ?? '') ?? 0,
                           assignmentId: int.tryParse(
@@ -151,56 +183,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: Routes.trainerManage,
-                builder: (context, state) => const TrainerManagePage(),
-                routes: [
-                  GoRoute(
-                    path: 'forms-groups',
-                    builder: (context, state) => TrainerFormsGroupsPage(
-                      initialTab: state.uri.queryParameters['tab'],
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'groups/:groupId',
-                    builder: (context, state) => TrainerGroupDetailPage(
-                      groupId:
-                          int.tryParse(state.pathParameters['groupId'] ?? '') ?? 0,
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'templates',
-                    builder: (context, state) => const TrainerTemplatesPage(),
-                  ),
-                  GoRoute(
-                    path: 'references',
-                    builder: (context, state) => const TrainerReferencesPage(),
-                  ),
-                  GoRoute(
-                    path: 'schedule',
-                    builder: (context, state) => const TrainerSchedulePage(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: Routes.trainerMore,
-                builder: (context, state) => const TrainerMorePage(),
+                path: Routes.professionalMore,
+                builder: (context, state) => const ProfessionalMorePage(),
                 routes: [
                   GoRoute(
                     path: 'profile',
-                    builder: (context, state) => const TrainerProfilePage(),
+                    builder: (context, state) => const ProfessionalProfilePage(),
                   ),
                   GoRoute(
                     path: 'settings',
-                    builder: (context, state) => const TrainerSettingsPage(),
+                    builder: (context, state) => const ProfessionalSettingsPage(),
                   ),
                   GoRoute(
                     path: 'support',
                     builder: (context, state) => const SupportIncidentsPage(
-                      role: SupportRole.trainer,
+                      role: SupportRole.professional,
                     ),
                   ),
                 ],
@@ -210,7 +207,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Client tab shell: Dashboard | Programs | Progress | More
+      // Client tab shell: Dashboard | Programs | Professional | More
+      // Progress lives inside Programs (opens first there) rather than its
+      // own bottom tab; the Dashboard keeps a short preview.
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             ClientTabsShell(navigationShell: navigationShell),
@@ -228,14 +227,24 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.clientPrograms,
                 builder: (context, state) => const ClientProgramsPage(),
+                routes: [
+                  GoRoute(
+                    path: ':templateId/resources',
+                    builder: (context, state) => ClientTemplateResourcesPage(
+                      templateId:
+                          int.tryParse(state.pathParameters['templateId'] ?? '') ??
+                              0,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: Routes.clientProgress,
-                builder: (context, state) => const ClientProgressPage(),
+                path: Routes.clientProfessional,
+                builder: (context, state) => const ClientProfessionalPage(),
               ),
             ],
           ),
@@ -248,14 +257,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'profile',
                     builder: (context, state) => const ClientSettingsPage(),
-                  ),
-                  GoRoute(
-                    path: 'trainer',
-                    builder: (context, state) => const ClientTrainerPage(),
-                  ),
-                  GoRoute(
-                    path: 'chat',
-                    builder: (context, state) => const ClientChatPage(),
                   ),
                   GoRoute(
                     path: 'support',

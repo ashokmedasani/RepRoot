@@ -1,0 +1,305 @@
+<app-professional-page-shell
+  title="Schedule"
+  eyebrow="Professional Workspace"
+  subtitle="Every upcoming meeting across your clients, in one place — book, reschedule, or cancel without leaving RepRoot."
+  activeSection="schedule"
+  titleId="schedule-title">
+
+  @if (connection?.is_connected) {
+    <button page-actions type="button" class="primary-action" (click)="openScheduleForm()">Schedule Meeting</button>
+  }
+
+  @if (isLoading) {
+    <p class="state-note">Loading...</p>
+  } @else if (!connection?.is_connected) {
+    <section class="connect-panel">
+      <h2>Connect Cal.com</h2>
+      <p class="section-note">
+        Link your Cal.com account so you can pick a client and an open time slot right here, and RepRoot books the
+        real meeting (with a video link) on your behalf.
+      </p>
+      <div class="form-grid">
+        <label>
+          <span class="field-label">Cal.com API key</span>
+          <input type="password" [(ngModel)]="connectForm.api_key" placeholder="cal_live_...">
+        </label>
+        <label>
+          <span class="field-label">Cal.com username</span>
+          <input type="text" [(ngModel)]="connectForm.cal_username" placeholder="your-username">
+        </label>
+      </div>
+      <button type="button" class="primary-action" [disabled]="isConnecting || !connectForm.api_key.trim() || !connectForm.cal_username.trim()" (click)="connectCalCom()">
+        {{ isConnecting ? 'Connecting...' : 'Connect' }}
+      </button>
+    </section>
+  } @else {
+    @if (eventTypes.length > 1) {
+      <section class="event-type-picker">
+        <span class="field-label">Default meeting type</span>
+        <select [ngModel]="connection?.default_event_type_id" (ngModelChange)="setDefaultEventType($event)">
+          @for (type of eventTypes; track type.id) {
+            <option [ngValue]="type.id">{{ type.title }} ({{ type.lengthInMinutes }} min)</option>
+          }
+        </select>
+      </section>
+    }
+
+    <section class="calendar-section">
+      <div class="calendar-header">
+        <h2>Calendar</h2>
+        <div class="calendar-nav">
+          <button type="button" class="ghost-action" (click)="goToPrevMonth()" aria-label="Previous month">&lsaquo;</button>
+          <span class="calendar-month-label">{{ calendarMonthLabel }}</span>
+          <button type="button" class="ghost-action" (click)="goToNextMonth()" aria-label="Next month">&rsaquo;</button>
+          <button type="button" class="ghost-action" (click)="goToToday()">Today</button>
+        </div>
+      </div>
+      <div class="calendar-grid">
+        <div class="calendar-weekday-row">
+          @for (label of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track label) {
+            <span class="calendar-weekday">{{ label }}</span>
+          }
+        </div>
+        @for (week of calendarWeeks; track $index) {
+          <div class="calendar-week-row">
+            @for (cell of week; track cell.iso) {
+              <button
+                type="button"
+                class="calendar-day"
+                [class.outside-month]="!cell.inMonth"
+                [class.is-today]="cell.isToday"
+                [class.is-selected]="selectedCalendarDate === cell.iso"
+                [class.has-meetings]="cell.meetingCount > 0"
+                (click)="selectCalendarDay(cell.iso)">
+                <span class="calendar-day-number">{{ cell.day }}</span>
+                @if (cell.meetingCount) {
+                  <span class="calendar-day-dots">
+                    @for (dot of dotsArray(cell.meetingCount); track $index) {
+                      <span class="calendar-dot"></span>
+                    }
+                    @if (cell.meetingCount > 3) {
+                      <span class="calendar-day-extra">+{{ cell.meetingCount - 3 }}</span>
+                    }
+                  </span>
+                }
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (selectedCalendarDate) {
+        <p class="section-note">
+          Showing meetings on {{ selectedCalendarDate }} &middot;
+          <button type="button" class="link-action" (click)="clearCalendarSelection()">Show all upcoming</button>
+        </p>
+      }
+    </section>
+
+    <section class="meetings-section">
+      <h2>Upcoming</h2>
+      @if (displayedUpcomingMeetings.length) {
+        <div class="meeting-list">
+          @for (meeting of displayedUpcomingMeetings; track meeting.id) {
+            <article class="meeting-card" [class.clash]="isClashing(meeting)">
+              <div class="meeting-main">
+                <strong>{{ meeting.client_name }}</strong>
+                @if (meeting.is_group_meeting) {
+                  <small class="guest-list">Group meeting with {{ meeting.client_name }} + {{ guestNames(meeting) }}</small>
+                }
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} &ndash; {{ meeting.end_at | date: 'h:mm a' }}</small>
+                @if (isClashing(meeting)) {
+                  <span class="clash-tag">⚠️ Overlaps another meeting</span>
+                }
+              </div>
+              <div class="meeting-actions">
+                <a class="ghost-action" [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer">Join Link</a>
+                <button type="button" class="ghost-action" (click)="openReschedule(meeting)">Reschedule</button>
+                <button type="button" class="ghost-action danger" (click)="cancelMeeting(meeting)">Cancel</button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No upcoming meetings{{ selectedCalendarDate ? ' on this day' : '' }}. Schedule one whenever you're ready.</p>
+      }
+    </section>
+
+    @if (pastMeetings.length) {
+      <section class="meetings-section">
+        <h2>Past &amp; Cancelled</h2>
+        <div class="meeting-list">
+          @for (meeting of pastMeetings; track meeting.id) {
+            <article class="meeting-card muted">
+              <div class="meeting-main">
+                <strong>{{ meeting.client_name }}</strong>
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }}</small>
+              </div>
+              <span class="status-pill" [attr.data-status]="meeting.status">{{ meeting.status }}</span>
+            </article>
+          }
+        </div>
+      </section>
+    }
+  }
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (showScheduleForm) {
+    <div class="modal-backdrop" (click)="showScheduleForm = false">
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title" (click)="$event.stopPropagation()">
+        <header>
+          <h2 id="schedule-modal-title">Schedule Meeting</h2>
+          <button type="button" class="modal-close" (click)="showScheduleForm = false" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="field-block">
+          <span class="field-label">Clients <span class="required">*</span></span>
+          <p class="section-note">Select one client, several for a group meeting, or add a whole group at once.</p>
+
+          @if (clientGroups.length) {
+            <div class="group-quick-select">
+              @for (group of clientGroups; track group.id) {
+                <button
+                  type="button"
+                  class="group-chip"
+                  [class.selected]="isGroupFullySelected(group)"
+                  [disabled]="!group.clients.length"
+                  (click)="toggleGroupSelection(group)">
+                  {{ isGroupFullySelected(group) ? '✓ ' : '+ ' }}{{ group.name }} ({{ group.clients.length }})
+                </button>
+              }
+            </div>
+          }
+
+          <input
+            type="search"
+            class="client-search"
+            placeholder="Search clients by name or username..."
+            [(ngModel)]="clientSearchQuery">
+
+          <div class="client-picker">
+            @for (client of filteredClients; track client.id) {
+              <label class="client-picker-option">
+                <input
+                  type="checkbox"
+                  [checked]="scheduleForm.client_ids.includes(client.id)"
+                  (change)="toggleClientSelection(client.id)">
+                <span>{{ client.first_name }} {{ client.last_name }}</span>
+              </label>
+            } @empty {
+              <p class="empty-note">No clients match "{{ clientSearchQuery }}".</p>
+            }
+          </div>
+
+          @if (scheduleForm.client_ids.length) {
+            <p class="section-note">{{ scheduleForm.client_ids.length }} client(s) selected.</p>
+          }
+        </div>
+
+        <div class="form-grid">
+          @if (eventTypes.length > 1) {
+            <label>
+              <span class="field-label">Meeting type</span>
+              <select [(ngModel)]="scheduleForm.event_type_id" (ngModelChange)="loadSlots()">
+                @for (type of eventTypes; track type.id) {
+                  <option [ngValue]="type.id">{{ type.title }} ({{ type.lengthInMinutes }} min)</option>
+                }
+              </select>
+            </label>
+          }
+
+          <label>
+            <span class="field-label">Title</span>
+            <input type="text" [(ngModel)]="scheduleForm.title" placeholder="e.g. Monthly check-in">
+          </label>
+        </div>
+
+        <label>
+          <span class="field-label">Notes</span>
+          <textarea rows="2" [(ngModel)]="scheduleForm.notes" placeholder="Optional agenda or context"></textarea>
+        </label>
+
+        <label class="slot-date-picker">
+          <span class="field-label">Week starting</span>
+          <input type="date" [(ngModel)]="slotDate" (ngModelChange)="loadSlots()">
+        </label>
+
+        @if (isLoadingSlots) {
+          <p class="state-note">Loading available times...</p>
+        } @else if (slotDays.length) {
+          <div class="slot-days">
+            @for (day of slotDays; track day) {
+              <div class="slot-day">
+                <span class="slot-day-label">{{ day | date: 'EEE, MMM d' }}</span>
+                <div class="slot-chips">
+                  @for (slot of slots[day]; track slot.start) {
+                    <button type="button" class="slot-chip" [class.selected]="selectedSlot === slot.start" (click)="selectedSlot = slot.start">
+                      {{ slot.start | date: 'h:mm a' }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">No open slots in this week.</p>
+        }
+
+        <div class="modal-actions">
+          <button type="button" class="ghost-action" (click)="showScheduleForm = false">Cancel</button>
+          <button type="button" class="primary-action" [disabled]="isSavingMeeting || !scheduleForm.client_ids.length || !selectedSlot" (click)="confirmScheduleMeeting()">
+            {{ isSavingMeeting ? 'Scheduling...' : 'Schedule Meeting' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (reschedulingMeeting; as meeting) {
+    <div class="modal-backdrop" (click)="closeReschedule()">
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title" (click)="$event.stopPropagation()">
+        <header>
+          <h2 id="reschedule-modal-title">Reschedule with {{ meeting.client_name }}</h2>
+          <button type="button" class="modal-close" (click)="closeReschedule()" aria-label="Close">&times;</button>
+        </header>
+
+        <label class="slot-date-picker">
+          <span class="field-label">Week starting</span>
+          <input type="date" [(ngModel)]="rescheduleDate" (ngModelChange)="loadRescheduleSlots()">
+        </label>
+
+        @if (isLoadingRescheduleSlots) {
+          <p class="state-note">Loading available times...</p>
+        } @else if (rescheduleSlotDays.length) {
+          <div class="slot-days">
+            @for (day of rescheduleSlotDays; track day) {
+              <div class="slot-day">
+                <span class="slot-day-label">{{ day | date: 'EEE, MMM d' }}</span>
+                <div class="slot-chips">
+                  @for (slot of rescheduleSlots[day]; track slot.start) {
+                    <button type="button" class="slot-chip" [class.selected]="selectedRescheduleSlot === slot.start" (click)="selectedRescheduleSlot = slot.start">
+                      {{ slot.start | date: 'h:mm a' }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">No open slots in this week.</p>
+        }
+
+        <div class="modal-actions">
+          <button type="button" class="ghost-action" (click)="closeReschedule()">Cancel</button>
+          <button type="button" class="primary-action" [disabled]="isSavingReschedule || !selectedRescheduleSlot" (click)="confirmReschedule()">
+            {{ isSavingReschedule ? 'Saving...' : 'Confirm New Time' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+</app-professional-page-shell>

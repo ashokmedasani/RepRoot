@@ -2,9 +2,9 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { ClientApiService } from '../../../core/api/client-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
+import { ClientApiService } from '@core/api/client-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 
 @Component({
   selector: 'app-client-change-password',

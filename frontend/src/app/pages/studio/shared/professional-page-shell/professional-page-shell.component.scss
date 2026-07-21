@@ -44,15 +44,24 @@
   height: 2.2rem;
   place-items: center;
   border-radius: var(--app-radius-md);
-  background: var(--app-primary);
-  color: #ffffff;
+  background: #ffffff;
+  overflow: hidden;
   box-shadow: 0 4px 10px rgba(11, 125, 227, 0.25);
   transition: transform var(--app-transition-fast);
 }
 
-.brand-mark svg {
-  width: 1.25rem;
-  height: 1.25rem;
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-rep {
+  color: var(--app-text);
+}
+
+.brand-root {
+  color: var(--app-primary);
 }
 
 .brand:hover .brand-mark {
@@ -212,14 +221,14 @@ nav {
   min-width: 0;
 }
 
-.trainer-workspace {
-  width: min(100%, var(--trainer-shell-max-width));
+.professional-workspace {
+  width: min(100%, var(--professional-shell-max-width));
   margin: 0 auto;
   padding: 2rem 2.5rem 3rem;
   animation: fade-in 300ms ease-out;
 }
 
-.trainer-page-header {
+.professional-page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -374,11 +383,11 @@ button:disabled {
     display: none;
   }
 
-  .trainer-workspace {
+  .professional-workspace {
     padding: 1.5rem 1.25rem 2.5rem;
   }
 
-  .trainer-page-header {
+  .professional-page-header {
     align-items: flex-start;
     flex-direction: column;
     gap: 1rem;

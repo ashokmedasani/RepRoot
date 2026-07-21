@@ -7,13 +7,13 @@ import '../session/session_store.dart';
 /// Which token a request should authenticate with.
 ///
 /// The backend uses two schemes against the same API root:
-///   trainer -> `Authorization: Token <t>`
+///   professional -> `Authorization: Token <t>`
 ///   client  -> `Authorization: ClientToken <t>`
 /// Mirrors the header logic spread across the Ionic API services.
-enum AuthScheme { none, trainer, client }
+enum AuthScheme { none, professional, client }
 
 /// Marker for [Options.extra] telling the interceptor which token to attach.
-const String kAuthSchemeKey = 'coachflow.authScheme';
+const String kAuthSchemeKey = 'reproot.authScheme';
 
 Options authOptions(AuthScheme scheme) =>
     Options(extra: {kAuthSchemeKey: scheme});
@@ -45,7 +45,7 @@ class _AuthInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final scheme = options.extra[kAuthSchemeKey] as AuthScheme? ?? AuthScheme.none;
     final token = switch (scheme) {
-      AuthScheme.trainer => _session.trainerToken,
+      AuthScheme.professional => _session.professionalToken,
       AuthScheme.client => _session.clientToken,
       AuthScheme.none => '',
     };
@@ -113,7 +113,10 @@ Dio buildDio(SessionStore session) {
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 30),
       sendTimeout: const Duration(seconds: 30),
-      headers: {'Accept': 'application/json'},
+      // Lets admin_portal.middleware.ErrorCaptureMiddleware tag a backend
+      // exception with the right platform even when the mobile app never
+      // sees the failure itself.
+      headers: {'Accept': 'application/json', 'X-Client-Platform': 'android'},
       // DRF returns 4xx with a JSON body we want to parse rather than throw on.
       validateStatus: (status) => status != null && status < 400,
     ),

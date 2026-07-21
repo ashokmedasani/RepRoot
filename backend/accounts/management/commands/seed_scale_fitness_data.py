@@ -23,19 +23,19 @@ from accounts.models import (
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
-  TrainerGroup,
-  TrainerLeadForm,
-  TrainerProfile,
-  TrainerReference,
+  ProfessionalGroup,
+  ProfessionalLeadForm,
+  ProfessionalProfile,
+  ProfessionalReference,
   default_client_registration_fields,
 )
 
 
 User = get_user_model()
 
-TRAINER_USERNAME = 'nolan_performance'
-TRAINER_EMAIL = 'nolan.performance@example.com'
-TRAINER_PASSWORD = 'TrainerScale!2026'
+PROFESSIONAL_USERNAME = 'nolan_performance'
+PROFESSIONAL_EMAIL = 'nolan.performance@example.com'
+PROFESSIONAL_PASSWORD = 'ProfessionalScale!2026'
 CLIENT_PASSWORD = 'ClientScale!2026'
 FEATURED_CLIENT_USERNAME = 'ava_martinez'
 CLIENT_COUNT = 100
@@ -294,50 +294,50 @@ def tracking_answers(template_name, day_index):
 
 
 class Command(BaseCommand):
-  help = 'Seed a full trainer account with 100 clients and six months of detailed featured-client data.'
+  help = 'Seed a full professional account with 100 clients and six months of detailed featured-client data.'
 
   def handle(self, *args, **options):
     with transaction.atomic():
-      trainer = self.seed_trainer()
-      groups = self.seed_groups(trainer)
-      lead_form = self.seed_lead_form(trainer)
-      clients = self.seed_clients(trainer, groups, lead_form)
-      references = self.seed_references(trainer)
-      templates = self.seed_templates(trainer)
+      professional = self.seed_professional()
+      groups = self.seed_groups(professional)
+      lead_form = self.seed_lead_form(professional)
+      clients = self.seed_clients(professional, groups, lead_form)
+      references = self.seed_references(professional)
+      templates = self.seed_templates(professional)
       self.seed_assignments(clients, templates, references)
       self.seed_featured_tracking(clients[0], templates)
-      self.seed_reminders(trainer, clients)
-      self.seed_progress(trainer, clients[0])
-      self.seed_chat(trainer, clients[0])
+      self.seed_reminders(professional, clients)
+      self.seed_progress(professional, clients[0])
+      self.seed_chat(professional, clients[0])
 
-    cache.delete(f'trainer-data-usage:v3:{trainer.pk}')
+    cache.delete(f'professional-data-usage:v3:{professional.pk}')
 
-    trainer_token, _created = Token.objects.get_or_create(user=trainer)
+    professional_token, _created = Token.objects.get_or_create(user=professional)
     client_token = issue_client_token(clients[0])
 
     self.stdout.write(self.style.SUCCESS('Scale demo fitness data seeded successfully.'))
-    self.stdout.write(f'Trainer login: {TRAINER_USERNAME} / {TRAINER_PASSWORD}')
-    self.stdout.write(f'Trainer email: {TRAINER_EMAIL}')
-    self.stdout.write(f'Trainer token: {trainer_token.key}')
-    self.stdout.write(f'Featured client login: trainer_id=coach-nolan, username={clients[0].username}, password={CLIENT_PASSWORD}')
+    self.stdout.write(f'Professional login: {PROFESSIONAL_USERNAME} / {PROFESSIONAL_PASSWORD}')
+    self.stdout.write(f'Professional email: {PROFESSIONAL_EMAIL}')
+    self.stdout.write(f'Professional token: {professional_token.key}')
+    self.stdout.write(f'Featured client login: professional_id=coach-nolan, username={clients[0].username}, password={CLIENT_PASSWORD}')
     self.stdout.write(f'Featured client token: {client_token.key}')
     featured_entry_count = TrackingEntry.objects.filter(client=clients[0], template__in=templates).count()
-    reminder_count = ClientReminder.objects.filter(trainer=trainer).count()
-    self.stdout.write(f'Created/updated: 1 trainer, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, {reminder_count} reminders, {featured_entry_count} six-month tracking entries for {clients[0].first_name}.')
+    reminder_count = ClientReminder.objects.filter(professional=professional).count()
+    self.stdout.write(f'Created/updated: 1 professional, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, {reminder_count} reminders, {featured_entry_count} six-month tracking entries for {clients[0].first_name}.')
 
-  def seed_trainer(self):
-    trainer, _created = User.objects.get_or_create(
-      username=TRAINER_USERNAME,
-      defaults={'email': TRAINER_EMAIL, 'first_name': 'Nolan', 'last_name': 'Brooks'},
+  def seed_professional(self):
+    professional, _created = User.objects.get_or_create(
+      username=PROFESSIONAL_USERNAME,
+      defaults={'email': PROFESSIONAL_EMAIL, 'first_name': 'Nolan', 'last_name': 'Brooks'},
     )
-    trainer.email = TRAINER_EMAIL
-    trainer.first_name = 'Nolan'
-    trainer.last_name = 'Brooks'
-    trainer.set_password(TRAINER_PASSWORD)
-    trainer.save()
+    professional.email = PROFESSIONAL_EMAIL
+    professional.first_name = 'Nolan'
+    professional.last_name = 'Brooks'
+    professional.set_password(PROFESSIONAL_PASSWORD)
+    professional.save()
 
-    profile, _created = TrainerProfile.objects.get_or_create(user=trainer)
-    profile.trainer_id = 'coach-nolan'
+    profile, _created = ProfessionalProfile.objects.get_or_create(user=professional)
+    profile.professional_id = 'coach-nolan'
     profile.profile_setup_completed = True
     profile.phone = '555-0199'
     profile.gender = 'Male'
@@ -347,7 +347,7 @@ class Command(BaseCommand):
     profile.birth_year = 1985
     profile.professional_headline = 'Performance, habits, and lifestyle transformation coach'
     profile.about_me = 'Nolan coaches busy adults and recreational athletes with practical strength plans, clear nutrition targets, and high-accountability follow-up.'
-    profile.trainer_type = 'Performance Coach'
+    profile.professional_type = 'Performance Coach'
     profile.years_experience = 12
     profile.specializations = 'Strength and conditioning, body recomposition, habit coaching, mobility, return-to-training support'
     profile.training_style = 'Direct, supportive, structured, and metrics-driven with flexible adjustments for real life.'
@@ -383,7 +383,7 @@ class Command(BaseCommand):
     profile.privacy_policy_accepted = True
     self.seed_profile_uploads(profile)
     profile.save()
-    return trainer
+    return professional
 
   def seed_profile_uploads(self, profile):
     uploads = [
@@ -396,7 +396,7 @@ class Command(BaseCommand):
       if file_field:
         continue
       try:
-        request = Request(url, headers={'User-Agent': 'CoachFlow demo data seeder'})
+        request = Request(url, headers={'User-Agent': 'RepRoot demo data seeder'})
         with urlopen(request, timeout=20) as response:
           content = response.read(2 * 1024 * 1024 + 1)
         if len(content) > 2 * 1024 * 1024:
@@ -405,11 +405,11 @@ class Command(BaseCommand):
       except Exception as exc:
         self.stdout.write(self.style.WARNING(f'Could not load {field_name}: {exc}'))
 
-  def seed_groups(self, trainer):
+  def seed_groups(self, professional):
     groups = {}
     for name, description in GROUPS:
-      group, _created = TrainerGroup.objects.update_or_create(
-        trainer=trainer,
+      group, _created = ProfessionalGroup.objects.update_or_create(
+        professional=professional,
         name=name,
         defaults={'description': description, 'is_active': True},
       )
@@ -420,9 +420,9 @@ class Command(BaseCommand):
       groups[name] = group
     return groups
 
-  def seed_lead_form(self, trainer):
-    lead_form, _created = TrainerLeadForm.objects.update_or_create(
-      trainer=trainer,
+  def seed_lead_form(self, professional):
+    lead_form, _created = ProfessionalLeadForm.objects.update_or_create(
+      professional=professional,
       defaults={
         'public_slug': 'coach-nolan-scale-demo',
         'title': 'Coach Nolan Intake Form',
@@ -432,7 +432,7 @@ class Command(BaseCommand):
     )
     return lead_form
 
-  def seed_clients(self, trainer, groups, lead_form):
+  def seed_clients(self, professional, groups, lead_form):
     clients = []
     for index in range(CLIENT_COUNT):
       client_data = build_client_data(index)
@@ -452,7 +452,7 @@ class Command(BaseCommand):
       )
       additional_info = featured_additional_info() if index == 0 else client_additional_info(client_data, index)
       client, _created = ClientAccess.objects.update_or_create(
-        trainer=trainer,
+        professional=professional,
         email=client_data['email'],
         defaults={
           'group': groups[client_data['group_name']],
@@ -465,8 +465,8 @@ class Command(BaseCommand):
           'registration_answers': answers,
           'additional_info': additional_info,
           'additional_info_shared': index == 0,
-          'trainer_notes': self.featured_notes() if index == 0 else f'{client_data["goal"]} client. Keep reminders active and review weekly adherence.',
-          'trainer_notes_updated_at': timezone.now(),
+          'professional_notes': self.featured_notes() if index == 0 else f'{client_data["goal"]} client. Keep reminders active and review weekly adherence.',
+          'professional_notes_updated_at': timezone.now(),
           'must_change_password': False,
           'is_active': True,
         },
@@ -482,11 +482,11 @@ class Command(BaseCommand):
       'Watch right knee response on lunges and running. Strong compliance when meals are planned before work.'
     )
 
-  def seed_references(self, trainer):
+  def seed_references(self, professional):
     categories = {}
     for name, description, subcategories in REFERENCE_CATEGORIES:
       category, _created = ReferenceCategory.objects.update_or_create(
-        trainer=trainer,
+        professional=professional,
         name=name,
         defaults={'description': description, 'subcategories': subcategories},
       )
@@ -494,8 +494,8 @@ class Command(BaseCommand):
 
     references = []
     for category_name, subcategory, title, reference_type, description, link, tags in REFERENCES:
-      reference, _created = TrainerReference.objects.update_or_create(
-        trainer=trainer,
+      reference, _created = ProfessionalReference.objects.update_or_create(
+        professional=professional,
         title=title,
         defaults={
           'category': categories[category_name],
@@ -509,11 +509,11 @@ class Command(BaseCommand):
       references.append(reference)
     return references
 
-  def seed_templates(self, trainer):
+  def seed_templates(self, professional):
     templates = []
     for data in TEMPLATES:
       template, _created = TrackingTemplate.objects.update_or_create(
-        trainer=trainer,
+        professional=professional,
         name=data['name'],
         defaults={
           'purpose': data['purpose'],
@@ -562,13 +562,13 @@ class Command(BaseCommand):
             entry_time=time(hour=7 + template_index),
             answers=tracking_answers(template.name, day_index),
             note='Detailed scale-demo history for the featured client.',
-            edited_by_trainer=False,
+            edited_by_professional=False,
           )
         )
     TrackingEntry.objects.bulk_create(entries)
 
-  def seed_reminders(self, trainer, clients):
-    ClientReminder.objects.filter(trainer=trainer).delete()
+  def seed_reminders(self, professional, clients):
+    ClientReminder.objects.filter(professional=professional).delete()
     today = date.today()
     titles = ['Progress review', 'Workout form check', 'Nutrition follow-up', 'Payment/check-in note', 'Recovery audit']
     reminders = []
@@ -576,20 +576,20 @@ class Command(BaseCommand):
       for offset in (index % 14, 14 + index % 21):
         reminders.append(
           ClientReminder(
-            trainer=trainer,
+            professional=professional,
             client=client,
             title=titles[index % len(titles)],
             date=today + timedelta(days=offset),
             time=time(hour=9 + index % 8, minute=30 if index % 2 else 0),
             notes=f'Scheduled demo follow-up for {client.first_name}: review adherence, notes, and next action.',
             status=ClientReminder.STATUS_PENDING,
-            notify_trainer=True,
+            notify_professional=True,
           )
         )
     ClientReminder.objects.bulk_create(reminders)
 
-  def seed_progress(self, trainer, client):
-    ProgressEntry.objects.filter(trainer=trainer, client=client).delete()
+  def seed_progress(self, professional, client):
+    ProgressEntry.objects.filter(professional=professional, client=client).delete()
     today = date.today()
     entries = [
       ('Initial Assessment', today - timedelta(days=180), 'Baseline intake completed. Knee note captured. Training starts with controlled lower-body volume.', 'Baseline', 'Start daily habit scorecard and three strength days.'),
@@ -603,7 +603,7 @@ class Command(BaseCommand):
     ProgressEntry.objects.bulk_create(
       [
         ProgressEntry(
-          trainer=trainer,
+          professional=professional,
           client=client,
           title=title,
           date=entry_date,
@@ -616,21 +616,21 @@ class Command(BaseCommand):
       ]
     )
 
-  def seed_chat(self, trainer, client):
-    ChatMessage.objects.filter(trainer=trainer, client=client).delete()
+  def seed_chat(self, professional, client):
+    ChatMessage.objects.filter(professional=professional, client=client).delete()
     messages = [
-      (ChatMessage.SENDER_TRAINER, 'Ava, your full 90-day dashboard is loaded. Start with today\'s scorecard and Friday review.'),
+      (ChatMessage.SENDER_PROFESSIONAL, 'Ava, your full 90-day dashboard is loaded. Start with today\'s scorecard and Friday review.'),
       (ChatMessage.SENDER_CLIENT, 'Got it. I checked the meal prep notes and will log after my lower-body session.'),
-      (ChatMessage.SENDER_TRAINER, 'Perfect. Keep knee feedback honest and choose bike intervals instead of running if anything feels sharp.'),
+      (ChatMessage.SENDER_PROFESSIONAL, 'Perfect. Keep knee feedback honest and choose bike intervals instead of running if anything feels sharp.'),
     ]
     ChatMessage.objects.bulk_create(
       [
         ChatMessage(
-          trainer=trainer,
+          professional=professional,
           client=client,
           sender=sender,
           text=text,
-          is_read=sender == ChatMessage.SENDER_TRAINER,
+          is_read=sender == ChatMessage.SENDER_PROFESSIONAL,
         )
         for sender, text in messages
       ]

@@ -11,13 +11,13 @@ import '../../shared/widgets/app_widgets.dart';
 
 /// Tracking template library: create/edit with a field builder, adopt
 /// standards, delete.
-/// Replica of mobile/src/app/pages/trainer/templates/trainer-templates.page.ts.
-class TrainerTemplatesPage extends ConsumerStatefulWidget {
-  const TrainerTemplatesPage({super.key});
+/// Replica of mobile/src/app/pages/professional/templates/professional-templates.page.ts.
+class ProfessionalTemplatesPage extends ConsumerStatefulWidget {
+  const ProfessionalTemplatesPage({super.key});
 
   @override
-  ConsumerState<TrainerTemplatesPage> createState() =>
-      _TrainerTemplatesPageState();
+  ConsumerState<ProfessionalTemplatesPage> createState() =>
+      _ProfessionalTemplatesPageState();
 }
 
 /// Mutable field row for the builder — TemplateField is immutable.
@@ -53,7 +53,7 @@ class _DraftField {
       );
 }
 
-class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
+class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplatesPage> {
   List<TrackingTemplateRecord> _templates = [];
   List<StandardTemplateRecord> _standards = [];
   int _maxTemplates = 0;
@@ -201,7 +201,7 @@ class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
   }
 
   Future<void> _remove(TrackingTemplateRecord template) async {
-    // A template still assigned to clients cannot be deleted: the trainer must
+    // A template still assigned to clients cannot be deleted: the professional must
     // unassign it from each client first. This protects clients from silently
     // losing a tracker they are actively logging against.
     if (template.assignedCount > 0) {
@@ -222,7 +222,7 @@ class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
             FilledButton(
               onPressed: () {
                 context.pop();
-                context.go(Routes.trainerClients);
+                context.go(Routes.professionalClients);
               },
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -279,7 +279,7 @@ class _TrainerTemplatesPageState extends ConsumerState<TrainerTemplatesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Templates'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerManage)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
         actions: [
           IconButton(
             onPressed: _startCreate,

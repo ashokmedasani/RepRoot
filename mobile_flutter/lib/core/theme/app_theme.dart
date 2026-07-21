@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
 
-/// Material 3 themes built from the CoachFlow tokens.
+/// Material 3 themes built from the RepRoot tokens.
 ///
 /// Font: Roboto, Android's system font. Chosen over the web/Ionic brand font
 /// (Manrope) so the app feels native on Android and needs no font download —

@@ -1,12 +1,12 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Tracking Templates"
-  eyebrow="Trainer workspace"
+  eyebrow="Professional workspace"
   subtitle="One set of templates for all your groups. Assign any template to any client, up to 5 templates total."
   activeSection="templates"
   titleId="templates-title"
 >
   @if (hasFreeSlot) {
-    <a page-actions routerLink="/trainer/templates/create" class="primary-action">+ Create Template</a>
+    <a page-actions routerLink="/professional/templates/create" class="primary-action">+ Create Template</a>
   } @else {
     <span page-actions class="slots-full-note">All 5 template slots are used</span>
   }
@@ -23,7 +23,7 @@
     <section class="panel slots-panel" aria-label="Template slots">
       <div>
         <h2>Template Slots</h2>
-        <p>Templates are trainer-level: every group and client can use the same {{ maxTemplates }} templates.</p>
+        <p>Templates are professional-level: every group and client can use the same {{ maxTemplates }} templates.</p>
       </div>
       <div class="slots-indicator">
         <strong>{{ slotsUsed }} / {{ maxTemplates }}</strong>
@@ -35,7 +35,7 @@
       <div class="section-heading">
         <div>
           <h2 id="standard-templates-title">Standard Templates</h2>
-          <p>Ready-made templates from CoachFlow. Adopt one and customize it instead of starting from scratch.</p>
+          <p>Ready-made templates from RepRoot. Adopt one and customize it instead of starting from scratch.</p>
         </div>
       </div>
 
@@ -96,7 +96,7 @@
             </div>
 
             <div class="template-actions">
-              <a [routerLink]="['/trainer/templates', template.id, 'edit']" class="secondary-action">Edit</a>
+              <a [routerLink]="['/professional/templates', template.id, 'edit']" class="secondary-action">Edit</a>
               <button type="button" class="danger-action" (click)="deleteTemplate(template)">Delete</button>
             </div>
           </article>
@@ -109,4 +109,4 @@
       </div>
     </section>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

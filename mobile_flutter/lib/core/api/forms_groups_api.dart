@@ -5,21 +5,21 @@ import 'api_client.dart';
 import 'models/client_models.dart';
 import 'models/forms_groups_models.dart';
 
-/// Trainer forms / groups / clients / reminders / progress.
+/// Professional forms / groups / clients / reminders / progress.
 /// 1:1 port of mobile/src/app/core/api/forms-groups-api.service.ts.
 class FormsGroupsApi {
   FormsGroupsApi(this._dio);
 
   final Dio _dio;
 
-  static final _auth = authOptions(AuthScheme.trainer);
+  static final _auth = authOptions(AuthScheme.professional);
 
   // ----- overview / forms / groups -----
 
   Future<FormsGroupsOverview> getOverview() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/',
+        '/professional/forms-groups/',
         options: _auth,
       );
       return FormsGroupsOverview.fromJson(res.data ?? {});
@@ -29,7 +29,7 @@ class FormsGroupsApi {
   Future<LeadForm> saveLeadForm(String title, List<DynamicField> customFields) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/lead-form/',
+        '/professional/forms-groups/lead-form/',
         data: {
           'title': title,
           'custom_fields': customFields.map((f) => f.toJson()).toList(),
@@ -40,25 +40,25 @@ class FormsGroupsApi {
     });
   }
 
-  Future<TrainerGroup> createGroup(String name, String description) {
+  Future<ProfessionalGroup> createGroup(String name, String description) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/groups/',
+        '/professional/forms-groups/groups/',
         data: {'name': name, 'description': description},
         options: _auth,
       );
-      return TrainerGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
+      return ProfessionalGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
     });
   }
 
-  Future<TrainerGroup> updateGroup(int groupId, String name, String description) {
+  Future<ProfessionalGroup> updateGroup(int groupId, String name, String description) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/groups/$groupId/',
+        '/professional/forms-groups/groups/$groupId/',
         data: {'name': name, 'description': description},
         options: _auth,
       );
-      return TrainerGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
+      return ProfessionalGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
     });
   }
 
@@ -68,7 +68,7 @@ class FormsGroupsApi {
   ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/groups/$groupId/registration-form/',
+        '/professional/forms-groups/groups/$groupId/registration-form/',
         data: {'custom_fields': customFields.map((f) => f.toJson()).toList()},
         options: _auth,
       );
@@ -81,7 +81,7 @@ class FormsGroupsApi {
   Future<String> deletePendingForm(int submissionId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/forms-groups/pending/$submissionId/',
+        '/professional/forms-groups/pending/$submissionId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -93,7 +93,7 @@ class FormsGroupsApi {
   Future<String> createClientAccess(int submissionId, ClientAccessPayload payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/pending/$submissionId/create-client-access/',
+        '/professional/forms-groups/pending/$submissionId/create-client-access/',
         data: payload.toJson(),
         options: _auth,
       );
@@ -104,7 +104,7 @@ class FormsGroupsApi {
   Future<ManualClientResult> createManualClient(ClientAccessPayload payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/manual/',
+        '/professional/forms-groups/clients/manual/',
         data: payload.toJson(),
         options: _auth,
       );
@@ -122,11 +122,11 @@ class FormsGroupsApi {
   Future<GroupUsersResponse> getGroupUsers(int groupId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/groups/$groupId/clients/',
+        '/professional/forms-groups/groups/$groupId/clients/',
         options: _auth,
       );
       return GroupUsersResponse(
-        group: TrainerGroup.fromJson(
+        group: ProfessionalGroup.fromJson(
           res.data?['group'] as Map<String, dynamic>? ?? {},
         ),
         clients: (res.data?['clients'] as List<dynamic>? ?? [])
@@ -145,7 +145,7 @@ class FormsGroupsApi {
   Future<ClientAccessDetailResponse> getClientProfile(int clientId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/',
+        '/professional/forms-groups/clients/$clientId/',
         options: _auth,
       );
       return ClientAccessDetailResponse.fromJson(res.data ?? {});
@@ -164,7 +164,7 @@ class FormsGroupsApi {
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/',
+        '/professional/forms-groups/clients/$clientId/',
         data: {
           'first_name': ?firstName,
           'last_name': ?lastName,
@@ -181,19 +181,19 @@ class FormsGroupsApi {
     });
   }
 
-  Future<({String notes, String? updatedAt})> saveTrainerNotes(
+  Future<({String notes, String? updatedAt})> saveProfessionalNotes(
     int clientId,
     String notes,
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/notes/',
+        '/professional/forms-groups/clients/$clientId/notes/',
         data: {'notes': notes},
         options: _auth,
       );
       return (
-        notes: res.data?['trainer_notes'] as String? ?? '',
-        updatedAt: res.data?['trainer_notes_updated_at'] as String?,
+        notes: res.data?['professional_notes'] as String? ?? '',
+        updatedAt: res.data?['professional_notes_updated_at'] as String?,
       );
     });
   }
@@ -202,7 +202,7 @@ class FormsGroupsApi {
   Future<ClientAccessRecord> updateClientPhoto(int clientId, String photo) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/photo/',
+        '/professional/forms-groups/clients/$clientId/photo/',
         data: {'photo': photo},
         options: _auth,
       );
@@ -219,7 +219,7 @@ class FormsGroupsApi {
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/additional-info/',
+        '/professional/forms-groups/clients/$clientId/additional-info/',
         data: {
           'additional_info': items.map((i) => i.toJson()).toList(),
           'additional_info_shared': ?shared,
@@ -241,7 +241,7 @@ class FormsGroupsApi {
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/change-requests/$requestId/',
+        '/professional/forms-groups/clients/$clientId/change-requests/$requestId/',
         data: {'action': action, 'note': note},
         options: _auth,
       );
@@ -259,7 +259,7 @@ class FormsGroupsApi {
   Future<ClientAccessRecord> updateClientStatus(int clientId, bool isActive) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/status/',
+        '/professional/forms-groups/clients/$clientId/status/',
         data: {'is_active': isActive},
         options: _auth,
       );
@@ -272,7 +272,7 @@ class FormsGroupsApi {
   Future<ClientAccessRecord> resetClient(int clientId) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/reset/',
+        '/professional/forms-groups/clients/$clientId/reset/',
         data: const {},
         options: _auth,
       );
@@ -285,7 +285,7 @@ class FormsGroupsApi {
   Future<String> deleteClient(int clientId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/delete/',
+        '/professional/forms-groups/clients/$clientId/delete/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -296,7 +296,7 @@ class FormsGroupsApi {
   Future<String> resetClientPassword(int clientId, {String password = ''}) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/reset-password/',
+        '/professional/forms-groups/clients/$clientId/reset-password/',
         data: password.isNotEmpty ? {'password': password} : const {},
         options: _auth,
       );
@@ -309,7 +309,7 @@ class FormsGroupsApi {
   Future<List<ClientReminder>> getClientReminders(int clientId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/reminders/',
+        '/professional/forms-groups/clients/$clientId/reminders/',
         options: _auth,
       );
       return (res.data?['reminders'] as List<dynamic>? ?? [])
@@ -325,17 +325,17 @@ class FormsGroupsApi {
     required String date,
     String? time,
     String notes = '',
-    bool notifyTrainer = false,
+    bool notifyProfessional = false,
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/reminders/',
+        '/professional/forms-groups/clients/$clientId/reminders/',
         data: {
           'title': title,
           'date': date,
           'time': time,
           'notes': notes,
-          'notify_trainer': notifyTrainer,
+          'notify_professional': notifyProfessional,
         },
         options: _auth,
       );
@@ -345,7 +345,7 @@ class FormsGroupsApi {
     });
   }
 
-  /// Note the route: reminders are edited at `/trainer/reminders/{id}/`.
+  /// Note the route: reminders are edited at `/professional/reminders/{id}/`.
   Future<ClientReminder> updateReminder(
     int reminderId, {
     String? title,
@@ -353,18 +353,18 @@ class FormsGroupsApi {
     String? time,
     String? notes,
     String? status,
-    bool? notifyTrainer,
+    bool? notifyProfessional,
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/reminders/$reminderId/',
+        '/professional/reminders/$reminderId/',
         data: {
           'title': ?title,
           'date': ?date,
           'time': ?time,
           'notes': ?notes,
           'status': ?status,
-          'notify_trainer': ?notifyTrainer,
+          'notify_professional': ?notifyProfessional,
         },
         options: _auth,
       );
@@ -377,7 +377,7 @@ class FormsGroupsApi {
   Future<String> deleteReminder(int reminderId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/reminders/$reminderId/',
+        '/professional/reminders/$reminderId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -387,7 +387,7 @@ class FormsGroupsApi {
   Future<UpcomingRemindersResponse> getUpcomingReminders() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/reminders/upcoming/',
+        '/professional/reminders/upcoming/',
         options: _auth,
       );
       return UpcomingRemindersResponse(
@@ -411,7 +411,7 @@ class FormsGroupsApi {
   Future<List<ProgressEntry>> getClientProgress(int clientId) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/progress/',
+        '/professional/forms-groups/clients/$clientId/progress/',
         options: _auth,
       );
       return (res.data?['progress'] as List<dynamic>? ?? [])
@@ -431,7 +431,7 @@ class FormsGroupsApi {
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/forms-groups/clients/$clientId/progress/',
+        '/professional/forms-groups/clients/$clientId/progress/',
         data: {
           'title': title,
           'date': date,
@@ -447,7 +447,7 @@ class FormsGroupsApi {
     });
   }
 
-  /// Note the route: progress is edited at `/trainer/progress/{id}/`.
+  /// Note the route: progress is edited at `/professional/progress/{id}/`.
   Future<ProgressEntry> updateProgress(
     int entryId, {
     String? title,
@@ -458,7 +458,7 @@ class FormsGroupsApi {
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/progress/$entryId/',
+        '/professional/progress/$entryId/',
         data: {
           'title': ?title,
           'date': ?date,

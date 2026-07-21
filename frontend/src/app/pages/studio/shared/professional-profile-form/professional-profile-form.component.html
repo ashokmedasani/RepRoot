@@ -7,7 +7,7 @@
         <div class="hero-content">
           <div class="photo-frame hero-photo">
             @if (selectedProfilePhotoPreview || loadedProfile?.profile_photo_url) {
-              <img [src]="selectedProfilePhotoPreview || loadedProfile?.profile_photo_url" alt="Trainer profile photo">
+              <img [src]="selectedProfilePhotoPreview || loadedProfile?.profile_photo_url" alt="Professional profile photo">
             } @else {
               <div class="photo-placeholder">{{ previewName.slice(0, 1) }}</div>
             }
@@ -118,8 +118,8 @@
         </div>
         <div class="form-grid">
           <label>
-            <span class="field-label">Trainer type</span>
-            <input type="text" formControlName="trainer_type">
+            <span class="field-label">Professional type</span>
+            <input type="text" formControlName="professional_type">
           </label>
           <label>
             <span class="field-label">Years of experience</span>

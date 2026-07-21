@@ -3,8 +3,8 @@ import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 
-import { ChatApiService, ChatMessageRecord } from '../../core/api/chat-api.service';
-import { formatApiError } from '../utils/ui-helpers';
+import { ChatApiService, ChatMessageRecord } from '@core/api/chat-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 const CHAT_POLL_INTERVAL_MS = 5000;
 
@@ -19,15 +19,20 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
   private readonly chatApi = inject(ChatApiService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  @Input({ required: true }) mode: 'trainer' | 'client' = 'trainer';
+  @Input({ required: true }) mode: 'professional' | 'client' = 'professional';
   @Input() clientId: number | null = null;
   @Input() counterpartName = '';
   @Input() description = '';
+
+  private static readonly MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  private static readonly ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
   messages: ChatMessageRecord[] = [];
   draft = '';
   errorMessage = '';
   isSending = false;
+  pendingImage: File | null = null;
+  pendingImagePreviewUrl: string | null = null;
 
   ngOnInit(): void {
     this.loadMessages();
@@ -38,9 +43,43 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
     }
+    this.clearPendingImage();
   }
 
-  get ownSender(): 'trainer' | 'client' {
+  onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!ChatPanelComponent.ALLOWED_IMAGE_TYPES.has(file.type)) {
+      this.errorMessage = 'Images must be JPEG, PNG, WebP, or GIF.';
+      return;
+    }
+
+    if (file.size > ChatPanelComponent.MAX_IMAGE_BYTES) {
+      this.errorMessage = 'Images must be 5MB or smaller.';
+      return;
+    }
+
+    this.clearPendingImage();
+    this.pendingImage = file;
+    this.pendingImagePreviewUrl = URL.createObjectURL(file);
+    this.errorMessage = '';
+  }
+
+  clearPendingImage(): void {
+    if (this.pendingImagePreviewUrl) {
+      URL.revokeObjectURL(this.pendingImagePreviewUrl);
+    }
+    this.pendingImage = null;
+    this.pendingImagePreviewUrl = null;
+  }
+
+  get ownSender(): 'professional' | 'client' {
     return this.mode;
   }
 
@@ -49,21 +88,23 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
       return 'You';
     }
 
-    return this.counterpartName || (message.sender === 'trainer' ? 'Trainer' : 'Client');
+    return this.counterpartName || (message.sender === 'professional' ? 'Professional' : 'Client');
   }
 
   sendMessage(): void {
     const text = this.draft.trim();
+    const image = this.pendingImage;
 
-    if (!text || this.isSending) {
+    if ((!text && !image) || this.isSending) {
       return;
     }
 
     this.isSending = true;
-    this.sendRequest(text).subscribe({
+    this.sendRequest(text, image).subscribe({
       next: (response) => {
         this.messages = [...this.messages, response.chat_message];
         this.draft = '';
+        this.clearPendingImage();
         this.errorMessage = '';
         this.isSending = false;
       },
@@ -74,12 +115,12 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
     });
   }
 
-  private sendRequest(text: string): Observable<{ chat_message: ChatMessageRecord }> {
-    if (this.mode === 'trainer') {
-      return this.chatApi.sendTrainerMessage(this.clientId || 0, text);
+  private sendRequest(text: string, image: File | null): Observable<{ chat_message: ChatMessageRecord }> {
+    if (this.mode === 'professional') {
+      return this.chatApi.sendProfessionalMessage(this.clientId || 0, text, image);
     }
 
-    return this.chatApi.sendClientMessage(text);
+    return this.chatApi.sendClientMessage(text, image);
   }
 
   private loadMessages(): void {
@@ -110,8 +151,8 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
   }
 
   private fetchRequest(afterId?: number): Observable<{ messages: ChatMessageRecord[] }> {
-    if (this.mode === 'trainer') {
-      return this.chatApi.getTrainerMessages(this.clientId || 0, afterId);
+    if (this.mode === 'professional') {
+      return this.chatApi.getProfessionalMessages(this.clientId || 0, afterId);
     }
 
     return this.chatApi.getClientMessages(afterId);

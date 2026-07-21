@@ -3,7 +3,7 @@ import { Inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 
 import { ThemeId, ThemeOption } from './theme.model';
 
-const THEME_STORAGE_KEY = 'trainer-platform-theme';
+const THEME_STORAGE_KEY = 'professional-platform-theme';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {

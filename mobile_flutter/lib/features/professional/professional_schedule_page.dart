@@ -7,18 +7,18 @@ import '../../core/api/forms_groups_api.dart';
 import '../../core/api/models/forms_groups_models.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 /// Full schedule overview: every pending reminder, soonest first.
-/// Replica of mobile/src/app/pages/trainer/schedule/trainer-schedule.page.ts.
-class TrainerSchedulePage extends ConsumerStatefulWidget {
-  const TrainerSchedulePage({super.key});
+/// Replica of mobile/src/app/pages/professional/schedule/professional-schedule.page.ts.
+class ProfessionalSchedulePage extends ConsumerStatefulWidget {
+  const ProfessionalSchedulePage({super.key});
 
   @override
-  ConsumerState<TrainerSchedulePage> createState() => _TrainerSchedulePageState();
+  ConsumerState<ProfessionalSchedulePage> createState() => _ProfessionalSchedulePageState();
 }
 
-class _TrainerSchedulePageState extends ConsumerState<TrainerSchedulePage> {
+class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalSchedulePage> {
   List<ClientReminder> _reminders = [];
   ScheduleSummary? _summary;
   String _message = '';
@@ -108,7 +108,7 @@ class _TrainerSchedulePageState extends ConsumerState<TrainerSchedulePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Schedule'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerManage)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
       ),
       body: PagePad(
         onRefresh: _load,
@@ -150,7 +150,7 @@ class _TrainerSchedulePageState extends ConsumerState<TrainerSchedulePage> {
                 onComplete: () => _complete(reminder),
                 onDelete: () => _remove(reminder),
                 onOpenClient: () =>
-                    context.go('${Routes.trainerClients}/${reminder.client}'),
+                    context.go('${Routes.professionalClients}/${reminder.client}'),
               ),
         ],
       ),

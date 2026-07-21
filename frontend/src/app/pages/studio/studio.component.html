@@ -1,8 +1,8 @@
 <main class="landing-shell">
-  <nav class="landing-nav" aria-label="Landing page navigation">
-    <a class="brand" routerLink="/" aria-label="CoachFlow Studio home">
-      <span class="brand__mark">CF</span>
-      <span class="brand__text">{{ temporaryAppName }}</span>
+  <nav class="landing-nav" aria-label="Studio page navigation">
+    <a class="brand" routerLink="/" aria-label="Back to RepRoot home">
+      <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
+      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span> <em>Studio</em></span>
     </a>
 
     <app-theme-switcher />
@@ -10,17 +10,17 @@
 
   <section class="hero" aria-labelledby="landing-title">
     <div class="hero__content">
-      <p class="eyebrow">Trainer and client management platform</p>
-      <h1 id="landing-title">A professional workspace for trainers, clients, goals, and measurable progress.</h1>
+      <p class="eyebrow">Part of the RepRoot family &middot; Professional and client management</p>
+      <h1 id="landing-title">A professional workspace for professionals, clients, goals, and measurable progress.</h1>
       <p class="hero__summary">
-        {{ temporaryAppName }} helps trainers manage leads, groups, clients, targets, and progress tracking from one
+        {{ appName }} helps professionals manage leads, groups, clients, targets, and progress tracking from one
         premium SaaS workspace. Clients can log in to view their profile, goals, daily targets, weekly targets,
         monthly targets, and submit progress updates.
       </p>
 
       <div class="hero__actions">
-        <a class="primary-action" [routerLink]="nextPageRoute" aria-label="Go to trainer and client login page">
-          Let's Start
+        <a class="primary-action" [routerLink]="launchRoute" aria-label="Go to professional and client login page">
+          Launch Studio
           <span aria-hidden="true">→</span>
         </a>
       </div>
@@ -60,15 +60,15 @@
   <section class="feature-section" aria-label="Platform capabilities">
     <article class="feature-column">
       <div class="section-heading">
-        <span class="section-heading__icon" aria-hidden="true">T</span>
+        <span class="section-heading__icon" aria-hidden="true">P</span>
         <div>
-          <p class="eyebrow">For trainers</p>
+          <p class="eyebrow">For professionals</p>
           <h2>Run the business side of coaching with clarity.</h2>
         </div>
       </div>
 
       <div class="feature-list">
-        @for (feature of trainerFeatures; track feature.title) {
+        @for (feature of professionalFeatures; track feature.title) {
           <div class="feature-card">
             <strong>{{ feature.title }}</strong>
             <p>{{ feature.description }}</p>

@@ -1,9 +1,9 @@
-/// Trainer models — ported from mobile/src/app/core/api/trainer-auth-api.service.ts.
+/// Professional models — ported from mobile/src/app/core/api/professional-auth-api.service.ts.
 /// Field names match the Django payloads exactly; do not rename them.
 library;
 
-class TrainerAccount {
-  const TrainerAccount({
+class ProfessionalAccount {
+  const ProfessionalAccount({
     required this.id,
     required this.email,
     required this.username,
@@ -25,7 +25,7 @@ class TrainerAccount {
   final int? birthYear;
   final bool profileSetupCompleted;
 
-  factory TrainerAccount.fromJson(Map<String, dynamic> json) => TrainerAccount(
+  factory ProfessionalAccount.fromJson(Map<String, dynamic> json) => ProfessionalAccount(
         id: json['id'] as int? ?? 0,
         email: json['email'] as String? ?? '',
         username: json['username'] as String? ?? '',
@@ -38,31 +38,31 @@ class TrainerAccount {
       );
 }
 
-class TrainerLoginResponse {
-  const TrainerLoginResponse({
+class ProfessionalLoginResponse {
+  const ProfessionalLoginResponse({
     required this.token,
-    required this.trainer,
+    required this.professional,
     required this.message,
   });
 
   final String token;
-  final TrainerAccount? trainer;
+  final ProfessionalAccount? professional;
   final String message;
 
-  factory TrainerLoginResponse.fromJson(Map<String, dynamic> json) {
-    final trainer = json['trainer'];
-    return TrainerLoginResponse(
+  factory ProfessionalLoginResponse.fromJson(Map<String, dynamic> json) {
+    final professional = json['professional'];
+    return ProfessionalLoginResponse(
       token: json['token'] as String? ?? '',
-      trainer: trainer is Map<String, dynamic>
-          ? TrainerAccount.fromJson(trainer)
+      professional: professional is Map<String, dynamic>
+          ? ProfessionalAccount.fromJson(professional)
           : null,
       message: json['message'] as String? ?? '',
     );
   }
 }
 
-class TrainerSignupPayload {
-  const TrainerSignupPayload({
+class ProfessionalSignupPayload {
+  const ProfessionalSignupPayload({
     required this.email,
     required this.username,
     required this.password,
@@ -147,8 +147,8 @@ class EmailOtpVerifyResult {
       );
 }
 
-class TrainerDataUsage {
-  const TrainerDataUsage({
+class ProfessionalDataUsage {
+  const ProfessionalDataUsage({
     required this.planCode,
     required this.planName,
     required this.totalBytes,
@@ -173,7 +173,7 @@ class TrainerDataUsage {
   /// null values mean "unlimited" for that limit.
   final Map<String, int?> planLimits;
 
-  factory TrainerDataUsage.fromJson(Map<String, dynamic> json) => TrainerDataUsage(
+  factory ProfessionalDataUsage.fromJson(Map<String, dynamic> json) => ProfessionalDataUsage(
         planCode: json['plan_code'] as String? ?? '',
         planName: json['plan_name'] as String? ?? '',
         totalBytes: (json['total_bytes'] as num?)?.toInt() ?? 0,
@@ -188,8 +188,8 @@ class TrainerDataUsage {
       );
 }
 
-class TrainerProfileImage {
-  const TrainerProfileImage({
+class ProfessionalProfileImage {
+  const ProfessionalProfileImage({
     required this.category,
     required this.title,
     required this.url,
@@ -199,36 +199,36 @@ class TrainerProfileImage {
   final String title;
   final String url;
 
-  factory TrainerProfileImage.fromJson(Map<String, dynamic> json) =>
-      TrainerProfileImage(
+  factory ProfessionalProfileImage.fromJson(Map<String, dynamic> json) =>
+      ProfessionalProfileImage(
         category: json['category'] as String? ?? '',
         title: json['title'] as String? ?? '',
         url: json['url'] as String? ?? '',
       );
 }
 
-class TrainerProfileLink {
-  const TrainerProfileLink({required this.title, required this.url});
+class ProfessionalProfileLink {
+  const ProfessionalProfileLink({required this.title, required this.url});
 
   final String title;
   final String url;
 
-  factory TrainerProfileLink.fromJson(Map<String, dynamic> json) =>
-      TrainerProfileLink(
+  factory ProfessionalProfileLink.fromJson(Map<String, dynamic> json) =>
+      ProfessionalProfileLink(
         title: json['title'] as String? ?? '',
         url: json['url'] as String? ?? '',
       );
 }
 
-class TrainerProfile {
-  const TrainerProfile({
+class ProfessionalProfile {
+  const ProfessionalProfile({
     required this.firstName,
     required this.middleName,
     required this.lastName,
     required this.email,
     required this.username,
-    required this.trainerId,
-    required this.trainerCode,
+    required this.professionalId,
+    required this.professionalCode,
     required this.profileSetupCompleted,
     required this.profilePhotoUrl,
     required this.professionalHeadline,
@@ -240,7 +240,7 @@ class TrainerProfile {
     required this.state,
     required this.aboutMe,
     required this.location,
-    required this.trainerType,
+    required this.professionalType,
     required this.yearsExperience,
     required this.specializations,
     required this.trainingStyle,
@@ -265,8 +265,8 @@ class TrainerProfile {
   final String lastName;
   final String email;
   final String username;
-  final String trainerId;
-  final String trainerCode;
+  final String professionalId;
+  final String professionalCode;
   final bool profileSetupCompleted;
   final String profilePhotoUrl;
   final String professionalHeadline;
@@ -278,7 +278,7 @@ class TrainerProfile {
   final String state;
   final String aboutMe;
   final String location;
-  final String trainerType;
+  final String professionalType;
   final int? yearsExperience;
   final String specializations;
   final String trainingStyle;
@@ -293,8 +293,8 @@ class TrainerProfile {
   final String instagramUrl;
   final String youtubeUrl;
   final String websiteUrl;
-  final List<TrainerProfileImage> profileImages;
-  final List<TrainerProfileLink> profileLinks;
+  final List<ProfessionalProfileImage> profileImages;
+  final List<ProfessionalProfileLink> profileLinks;
   final Map<String, bool> profileVisibility;
 
   String get displayName => [firstName, lastName]
@@ -302,14 +302,14 @@ class TrainerProfile {
       .join(' ')
       .trim();
 
-  factory TrainerProfile.fromJson(Map<String, dynamic> json) => TrainerProfile(
+  factory ProfessionalProfile.fromJson(Map<String, dynamic> json) => ProfessionalProfile(
         firstName: json['first_name'] as String? ?? '',
         middleName: json['middle_name'] as String? ?? '',
         lastName: json['last_name'] as String? ?? '',
         email: json['email'] as String? ?? '',
         username: json['username'] as String? ?? '',
-        trainerId: json['trainer_id'] as String? ?? '',
-        trainerCode: json['trainer_code'] as String? ?? '',
+        professionalId: json['professional_id'] as String? ?? '',
+        professionalCode: json['professional_code'] as String? ?? '',
         profileSetupCompleted: json['profile_setup_completed'] as bool? ?? false,
         profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
         professionalHeadline: json['professional_headline'] as String? ?? '',
@@ -321,7 +321,7 @@ class TrainerProfile {
         state: json['state'] as String? ?? '',
         aboutMe: json['about_me'] as String? ?? '',
         location: json['location'] as String? ?? '',
-        trainerType: json['trainer_type'] as String? ?? '',
+        professionalType: json['professional_type'] as String? ?? '',
         yearsExperience: json['years_experience'] as int?,
         specializations: json['specializations'] as String? ?? '',
         trainingStyle: json['training_style'] as String? ?? '',
@@ -338,11 +338,11 @@ class TrainerProfile {
         websiteUrl: json['website_url'] as String? ?? '',
         profileImages: (json['profile_images'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
-            .map(TrainerProfileImage.fromJson)
+            .map(ProfessionalProfileImage.fromJson)
             .toList(),
         profileLinks: (json['profile_links'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
-            .map(TrainerProfileLink.fromJson)
+            .map(ProfessionalProfileLink.fromJson)
             .toList(),
         profileVisibility:
             (json['profile_visibility'] as Map<dynamic, dynamic>? ?? {}).map(

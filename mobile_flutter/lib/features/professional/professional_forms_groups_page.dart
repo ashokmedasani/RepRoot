@@ -12,21 +12,21 @@ import '../../core/api/forms_groups_api.dart';
 import '../../core/api/models/forms_groups_models.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 enum FormsTab { form, groups, requests }
 
 /// Forms & Groups — the lead form builder, groups, and lead requests.
-/// Replica of mobile/src/app/pages/trainer/forms-groups/trainer-forms-groups.page.ts.
-class TrainerFormsGroupsPage extends ConsumerStatefulWidget {
-  const TrainerFormsGroupsPage({super.key, this.initialTab});
+/// Replica of mobile/src/app/pages/professional/forms-groups/professional-forms-groups.page.ts.
+class ProfessionalFormsGroupsPage extends ConsumerStatefulWidget {
+  const ProfessionalFormsGroupsPage({super.key, this.initialTab});
 
   /// From ?tab=groups|requests, as the Manage hub links deep into a tab.
   final String? initialTab;
 
   @override
-  ConsumerState<TrainerFormsGroupsPage> createState() =>
-      _TrainerFormsGroupsPageState();
+  ConsumerState<ProfessionalFormsGroupsPage> createState() =>
+      _ProfessionalFormsGroupsPageState();
 }
 
 /// Mutable field row for the builder — DynamicField is immutable.
@@ -68,8 +68,8 @@ class _DraftField {
       );
 }
 
-class _TrainerFormsGroupsPageState
-    extends ConsumerState<TrainerFormsGroupsPage> {
+class _ProfessionalFormsGroupsPageState
+    extends ConsumerState<ProfessionalFormsGroupsPage> {
   FormsTab _tab = FormsTab.form;
   FormsGroupsOverview? _overview;
   String _message = '';
@@ -363,7 +363,7 @@ class _TrainerFormsGroupsPageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Forms & Groups'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerManage)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
       ),
       body: _loading
           ? const PagePad(
@@ -573,7 +573,7 @@ class _TrainerFormsGroupsPageState
 
   Widget _groupsTab() {
     final overview = _overview;
-    final groups = overview?.groups ?? const <TrainerGroup>[];
+    final groups = overview?.groups ?? const <ProfessionalGroup>[];
 
     return PagePad(
       onRefresh: _load,
@@ -664,7 +664,7 @@ class _TrainerFormsGroupsPageState
               trailing: group.hasRegistrationForm
                   ? const StatusPill(label: 'Form', tone: PillTone.good)
                   : null,
-              onTap: () => context.go('${Routes.trainerGroups}/${group.id}'),
+              onTap: () => context.go('${Routes.professionalGroups}/${group.id}'),
             ),
       ],
     );
@@ -703,7 +703,7 @@ class _TrainerFormsGroupsPageState
   Widget _pendingCard(LeadSubmission submission) {
     final expanded = _expandedId == submission.id;
     final approving = _approvingId == submission.id;
-    final groups = _overview?.groups ?? const <TrainerGroup>[];
+    final groups = _overview?.groups ?? const <ProfessionalGroup>[];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),

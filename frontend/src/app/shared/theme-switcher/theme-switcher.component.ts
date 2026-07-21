@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 
-import { ThemeId } from '../../core/theme/theme.model';
-import { ThemeService } from '../../core/theme/theme.service';
+import { ThemeId } from '@core/theme/theme.model';
+import { ThemeService } from '@core/theme/theme.service';
 
 @Component({
   selector: 'app-theme-switcher',

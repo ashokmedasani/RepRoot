@@ -6,8 +6,8 @@ import {
   DynamicField,
   FormsGroupsApiService,
   PublicGroupRegistrationForm
-} from '../../../core/api/forms-groups-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+} from '@core/api/forms-groups-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-public-group-registration',

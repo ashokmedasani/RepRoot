@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/models/template_models.dart';
-import '../../core/api/references_api.dart';
-import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../trainer/trainer_format.dart';
+import '../professional/professional_format.dart';
+import 'client_progress_section.dart';
 
-enum ProgramsTab { program, log, resources }
+enum ProgramsTab { progress, program, log, references }
 
-/// Client programs — pick a template, log an entry, see history and the
-/// references the trainer attached.
+/// Client programs — Progress opens first (the charts are the attractive
+/// part), then pick a template to log an entry or see history. References
+/// live one level down per template (see ClientTemplateResourcesPage).
 /// Replica of mobile/src/app/pages/client/programs/client-programs.page.ts.
 class ClientProgramsPage extends ConsumerStatefulWidget {
   const ClientProgramsPage({super.key});
@@ -24,7 +25,7 @@ class ClientProgramsPage extends ConsumerStatefulWidget {
 }
 
 class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
-  ProgramsTab _tab = ProgramsTab.program;
+  ProgramsTab _tab = ProgramsTab.progress;
   List<TrackingTemplateRecord> _templates = [];
   List<TrackingEntryRecord> _entries = [];
   int? _selectedTemplateId;
@@ -72,18 +73,6 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
   /// The Ionic page's rough progress read: 10% per entry, capped at 100.
   int get _completionPercent =>
       (_entriesForSelected.length * 10).clamp(0, 100);
-
-  /// Every reference across all templates, de-duplicated by id.
-  List<TemplateReference> get _allReferences {
-    final seen = <int>{};
-    final references = <TemplateReference>[];
-    for (final template in _templates) {
-      for (final reference in template.references) {
-        if (seen.add(reference.id)) references.add(reference);
-      }
-    }
-    return references;
-  }
 
   Future<void> _load() async {
     final api = ref.read(clientApiProvider);
@@ -172,20 +161,6 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     }
   }
 
-  Future<void> _open(TemplateReference reference) async {
-    final raw = reference.link.isNotEmpty ? reference.link : reference.fileUrl;
-    if (raw.isEmpty) return;
-    final uri = Uri.tryParse(Env.mediaUrl(raw));
-    if (uri == null) return;
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open this resource.')),
-        );
-      }
-    }
-  }
-
   String _summary(TrackingEntryRecord entry) {
     final values = entry.answers.values
         .map((v) => v.trim())
@@ -219,9 +194,11 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
             ),
             child: SegmentedButton<ProgramsTab>(
               segments: const [
+                ButtonSegment(value: ProgramsTab.progress, label: Text('Progress')),
                 ButtonSegment(value: ProgramsTab.program, label: Text('Program')),
                 ButtonSegment(value: ProgramsTab.log, label: Text('Log')),
-                ButtonSegment(value: ProgramsTab.resources, label: Text('Resources')),
+                ButtonSegment(
+                    value: ProgramsTab.references, label: Text('References')),
               ],
               selected: {_tab},
               showSelectedIcon: false,
@@ -234,9 +211,10 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
           ),
           Expanded(
             child: switch (_tab) {
+              ProgramsTab.progress => const ClientProgressSection(),
               ProgramsTab.program => _programTab(),
               ProgramsTab.log => _logTab(),
-              ProgramsTab.resources => _resourcesTab(),
+              ProgramsTab.references => _referencesTab(),
             },
           ),
         ],
@@ -312,7 +290,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
           const EmptyState(
             compact: false,
             icon: Icons.list_alt_outlined,
-            message: 'Your trainer has not assigned any programs yet.',
+            message: 'Your professional has not assigned any programs yet.',
           )
         else ...[
           AppCard(
@@ -367,7 +345,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
                 subtitle: _summary(entry),
                 trailingCaption:
                     entry.entryTime.isNotEmpty ? hhmm(entry.entryTime) : null,
-                trailingValue: entry.editedByTrainer ? 'Edited' : null,
+                trailingValue: entry.editedByProfessional ? 'Edited' : null,
               ),
         ],
       ],
@@ -474,41 +452,31 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     );
   }
 
-  Widget _resourcesTab() {
-    final references = _allReferences;
-
+  /// Every assigned program, each linking to its own resources page —
+  /// resources are a top-level section reached through Templates, not part
+  /// of the Program/Log entry-logging flow.
+  Widget _referencesTab() {
     return PagePad(
       onRefresh: _load,
       children: [
-        if (references.isEmpty)
+        if (_templates.isEmpty)
           const EmptyState(
             compact: false,
-            icon: Icons.folder_open_outlined,
-            message: 'Your trainer has not shared any resources yet.',
+            icon: Icons.list_alt_outlined,
+            message: 'Your professional has not assigned any programs yet.',
           )
         else
-          for (final reference in references)
+          for (final template in _templates)
             RowItem(
-              title: reference.title,
-              subtitle: [
-                ReferenceType.label(reference.referenceType),
-                if (reference.categoryName.isNotEmpty) reference.categoryName,
-                if (reference.subcategory.isNotEmpty) reference.subcategory,
-              ].join(' · '),
-              leading: Icon(
-                switch (reference.referenceType) {
-                  ReferenceType.videoLink => Icons.play_circle_outline,
-                  ReferenceType.pdf => Icons.picture_as_pdf_outlined,
-                  ReferenceType.image => Icons.image_outlined,
-                  _ => Icons.notes_outlined,
-                },
-                size: 22,
-                color: context.colors.primary,
+              title: template.name,
+              subtitle:
+                  '${TemplateCadence.label(template.cadence)} · ${template.references.length} reference${template.references.length == 1 ? '' : 's'}',
+              leading: Icon(Icons.folder_open_outlined,
+                  size: 22, color: parseAccentColor(template.accent)),
+              trailing: const Icon(Icons.chevron_right, size: AppSize.iconRow),
+              onTap: () => context.go(
+                '${Routes.clientPrograms}/${template.id}/resources',
               ),
-              trailing: reference.link.isNotEmpty || reference.fileUrl.isNotEmpty
-                  ? const Icon(Icons.open_in_new, size: AppSize.iconRow)
-                  : null,
-              onTap: () => _open(reference),
             ),
       ],
     );

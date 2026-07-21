@@ -9,11 +9,11 @@ import {
   ReferencePayload,
   ReferenceType,
   ReferencesApiService,
-  TrainerReferenceRecord
-} from '../../../core/api/references-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
+  ProfessionalReferenceRecord
+} from '@core/api/references-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
 type ReferenceTypeLabel = 'Video Link' | 'PDF Link' | 'Text' | 'Image';
 
@@ -31,7 +31,7 @@ const TYPE_VALUES: Record<ReferenceTypeLabel, ReferenceType> = {
   'Text': 'text_note'
 };
 
-interface TrainerReferenceView {
+interface ProfessionalReferenceView {
   id: number;
   title: string;
   category: string;
@@ -67,19 +67,19 @@ interface CategoryForm {
 }
 
 @Component({
-  selector: 'app-trainer-references',
+  selector: 'app-professional-references',
   standalone: true,
-  imports: [DatePipe, FormsModule, TrainerPageShellComponent],
-  templateUrl: './trainer-references.component.html',
-  styleUrl: './trainer-references.component.scss'
+  imports: [DatePipe, FormsModule, ProfessionalPageShellComponent],
+  templateUrl: './professional-references.component.html',
+  styleUrl: './professional-references.component.scss'
 })
-export class TrainerReferencesComponent implements OnInit {
+export class ProfessionalReferencesComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly referencesApi = inject(ReferencesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 
   readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF Link', 'Text', 'Image'];
-  readonly references = signal<TrainerReferenceView[]>([]);
+  readonly references = signal<ProfessionalReferenceView[]>([]);
   readonly categories = signal<ReferenceCategoryRecord[]>([]);
   readonly selectedCategory = signal('All References');
   readonly selectedReferenceId = signal(0);
@@ -146,7 +146,7 @@ export class TrainerReferencesComponent implements OnInit {
     this.query.set(value);
   }
 
-  selectReference(reference: TrainerReferenceView): void {
+  selectReference(reference: ProfessionalReferenceView): void {
     this.selectedReferenceId.set(reference.id);
   }
 
@@ -163,7 +163,7 @@ export class TrainerReferencesComponent implements OnInit {
     return this.expandedCategory() === name || Boolean(this.query().trim());
   }
 
-  referencesForCategory(name: string): TrainerReferenceView[] {
+  referencesForCategory(name: string): ProfessionalReferenceView[] {
     const search = this.query().trim().toLowerCase();
 
     return this.references().filter((reference) => {
@@ -268,7 +268,7 @@ export class TrainerReferencesComponent implements OnInit {
     });
   }
 
-  editReference(reference: TrainerReferenceView): void {
+  editReference(reference: ProfessionalReferenceView): void {
     this.form = {
       id: reference.id,
       title: reference.title,
@@ -285,7 +285,7 @@ export class TrainerReferencesComponent implements OnInit {
     this.message.set('');
   }
 
-  duplicateReference(reference: TrainerReferenceView): void {
+  duplicateReference(reference: ProfessionalReferenceView): void {
     if (this.referenceLimitReached()) {
       this.message.set('You have reached the Version 1 reference limit.');
       return;
@@ -314,7 +314,7 @@ export class TrainerReferencesComponent implements OnInit {
     });
   }
 
-  async deleteReference(reference: TrainerReferenceView): Promise<void> {
+  async deleteReference(reference: ProfessionalReferenceView): Promise<void> {
     const confirmed = await this.confirmation.confirm({
       kind: 'delete',
       title: 'Delete',
@@ -446,7 +446,13 @@ export class TrainerReferencesComponent implements OnInit {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (this.form.type === 'PDF Link') {
+      if (file.type !== 'application/pdf') {
+        this.message.set('Only PDF uploads are supported for PDF references.');
+        input.value = '';
+        return;
+      }
+    } else if (!file.type.startsWith('image/')) {
       this.message.set('Only image uploads are supported for image references.');
       input.value = '';
       return;
@@ -454,10 +460,12 @@ export class TrainerReferencesComponent implements OnInit {
 
     this.form.file = file;
     this.form.fileName = file.name;
-    this.form.type = 'Image';
+    if (this.form.type !== 'PDF Link') {
+      this.form.type = 'Image';
+    }
   }
 
-  openReference(reference: TrainerReferenceView): void {
+  openReference(reference: ProfessionalReferenceView): void {
     const url = reference.fileUrl || reference.link;
 
     if (!url) {
@@ -483,7 +491,7 @@ export class TrainerReferencesComponent implements OnInit {
     return embedUrl ? this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl) : null;
   }
 
-  resourceInitial(reference: TrainerReferenceView): string {
+  resourceInitial(reference: ProfessionalReferenceView): string {
     return reference.title.trim().charAt(0).toUpperCase() || 'R';
   }
 
@@ -509,7 +517,7 @@ export class TrainerReferencesComponent implements OnInit {
     });
   }
 
-  private toView(reference: TrainerReferenceRecord): TrainerReferenceView {
+  private toView(reference: ProfessionalReferenceRecord): ProfessionalReferenceView {
     return {
       id: reference.id,
       title: reference.title,
@@ -549,8 +557,8 @@ export class TrainerReferencesComponent implements OnInit {
       }
     }
 
-    if (this.form.type === 'PDF Link' && !this.form.link.trim()) {
-      return 'Paste a PDF URL.';
+    if (this.form.type === 'PDF Link' && !this.form.link.trim() && !this.form.file && !this.form.fileName) {
+      return 'Upload a PDF or paste a PDF URL.';
     }
 
     if (this.form.type === 'Text' && !this.form.description.trim()) {

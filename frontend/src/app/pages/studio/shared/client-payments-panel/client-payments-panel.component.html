@@ -1,0 +1,47 @@
+@if (isLoading) {
+  <p class="state-note">Loading payment requests...</p>
+} @else if (loadError) {
+  <p class="message error-message">{{ loadError }}</p>
+} @else if (!requests.length) {
+  <div class="placeholder-block">
+    <p>You don't have any payment requests yet.</p>
+  </div>
+} @else {
+  @if (openRequests.length) {
+    <section class="request-group" aria-labelledby="open-requests-title">
+      <h2 id="open-requests-title">Needs your attention</h2>
+      <div class="request-list">
+        @for (request of openRequests; track request.request_id) {
+          <a class="request-card" [routerLink]="['/client/payments/requests', request.request_id]">
+            <div class="request-main">
+              <strong>{{ request.title }}</strong>
+              <small>
+                {{ request.requested_amount }} {{ request.requested_currency }}
+                @if (request.due_date) { &middot; due {{ request.due_date | date: 'MMM d, y' }} }
+                &middot; {{ request.request_id }}
+              </small>
+            </div>
+            <span class="status-pill" [attr.data-status]="request.status">{{ statusLabel(request.status) }}</span>
+          </a>
+        }
+      </div>
+    </section>
+  }
+
+  @if (closedRequests.length) {
+    <section class="request-group" aria-labelledby="closed-requests-title">
+      <h2 id="closed-requests-title">Completed &amp; closed</h2>
+      <div class="request-list">
+        @for (request of closedRequests; track request.request_id) {
+          <a class="request-card muted" [routerLink]="['/client/payments/requests', request.request_id]">
+            <div class="request-main">
+              <strong>{{ request.title }}</strong>
+              <small>{{ request.requested_amount }} {{ request.requested_currency }} &middot; {{ request.request_id }}</small>
+            </div>
+            <span class="status-pill" [attr.data-status]="request.status">{{ statusLabel(request.status) }}</span>
+          </a>
+        }
+      </div>
+    </section>
+  }
+}

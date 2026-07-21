@@ -1,11 +1,11 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Client Profile"
   eyebrow="Client workspace"
   subtitle="Review client information, activity, conversations, and account actions."
   activeSection="clients"
   titleId="client-profile-title"
 >
-  <a page-actions routerLink="/trainer/clients" class="secondary-action">&#8592; Back to Clients</a>
+  <a page-actions routerLink="/professional/clients" class="secondary-action">&#8592; Back to Clients</a>
 
   @if (isLoading) {
     <section class="panel">
@@ -33,7 +33,7 @@
               <h2>{{ client.first_name }} {{ client.last_name }}</h2>
               <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
             </div>
-            <a class="group-link" [routerLink]="['/trainer/groups', profile.group.id]">{{ profile.group.name }}</a>
+            <a class="group-link" [routerLink]="['/professional/groups', profile.group.id]">{{ profile.group.name }}</a>
             <p class="joined">Joined on {{ client.created_at | date: 'dd MMM yyyy' }}</p>
           </div>
           @if (!isEditingClientInfo) {
@@ -151,6 +151,9 @@
             <span class="message-count">{{ chatBadgeLabel() }}</span>
           }
         </button>
+        @if (paymentsEnabled) {
+          <button type="button" [class.active]="workspaceTab === 'payments'" (click)="selectWorkspaceTab('payments')">Payments</button>
+        }
         <button type="button" [class.active]="workspaceTab === 'actions'" (click)="selectWorkspaceTab('actions')">Actions</button>
       </nav>
 
@@ -202,13 +205,13 @@
 
       <section class="panel notes-card">
         <div class="panel-heading">
-          <h3>Trainer Notes <small>(Private)</small></h3>
+          <h3>Professional Notes <small>(Private)</small></h3>
           @if (!isEditingNotes) {
             <button type="button" class="ghost-action compact" (click)="startEditNotes()">Edit Note</button>
           }
         </div>
         @if (isEditingNotes) {
-          <textarea rows="4" [(ngModel)]="notesDraft" name="trainerNotes" placeholder="Private notes about this client - goals, injuries, focus areas..."></textarea>
+          <textarea rows="4" [(ngModel)]="notesDraft" name="professionalNotes" placeholder="Private notes about this client - goals, injuries, focus areas..."></textarea>
           <div class="notes-actions">
             <button type="button" class="ghost-action compact" (click)="cancelEditNotes()">Cancel</button>
             <button type="button" class="primary-action compact" [disabled]="isSavingNotes" (click)="saveNotes()">
@@ -217,8 +220,8 @@
           </div>
         } @else {
           <div class="notes-body">
-            @if (trainerNotes) {
-              <p class="notes-text">{{ trainerNotes }}</p>
+            @if (professionalNotes) {
+              <p class="notes-text">{{ professionalNotes }}</p>
             } @else {
               <p class="empty-note">No notes yet. Only you can see what you write here.</p>
             }
@@ -231,9 +234,29 @@
 
       <section class="panel scheduler-card">
         <div class="panel-heading">
-          <h3>Follow-up Scheduler</h3>
+          <h3>{{ editingReminderId === null ? 'Follow-up Scheduler' : 'Edit Reminder' }}</h3>
+          <a class="primary-action compact" [routerLink]="['/professional/schedule']" [queryParams]="{ client: clientId }">Schedule Meeting</a>
         </div>
         <p class="section-sub">Schedule a reminder about this client - reviews, follow-ups, calls, payments.</p>
+
+        @if (upcomingMeetings.length) {
+          <div class="sched-list">
+            @for (meeting of upcomingMeetings; track meeting.id) {
+              <div class="sched-item meeting-item">
+                <div class="sched-main">
+                  <strong>{{ meeting.title }}</strong>
+                  <span class="sched-when">{{ meeting.start_at | date: 'dd MMM yyyy, h:mm a' }}</span>
+                  @if (meeting.notes) { <p>{{ meeting.notes }}</p> }
+                </div>
+                <div class="sched-side">
+                  <a class="ghost-action compact" [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer">Join Link</a>
+                  <a class="ghost-action compact" [routerLink]="['/professional/schedule']">Reschedule</a>
+                  <button type="button" class="ghost-action compact danger" (click)="cancelMeeting(meeting)">Cancel</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
 
         <div class="sched-form">
           <div class="sched-row">
@@ -243,17 +266,24 @@
           </div>
           <label><span>Notes (optional)</span><textarea rows="2" [(ngModel)]="reminderDraft.notes" name="rNotes"></textarea></label>
           <div class="sched-actions">
-            <label class="notify-toggle"><input type="checkbox" [(ngModel)]="reminderDraft.notify_trainer" name="rNotify"> Notify me</label>
-            <button type="button" class="primary-action compact" [disabled]="isSavingReminder" (click)="addReminder()">
-              {{ isSavingReminder ? 'Saving...' : 'Schedule reminder' }}
-            </button>
+            <label class="notify-toggle"><input type="checkbox" [(ngModel)]="reminderDraft.notify_professional" name="rNotify"> Notify me</label>
+            @if (editingReminderId === null) {
+              <button type="button" class="primary-action compact" [disabled]="isSavingReminder" (click)="addReminder()">
+                {{ isSavingReminder ? 'Saving...' : 'Schedule reminder' }}
+              </button>
+            } @else {
+              <button type="button" class="ghost-action compact" [disabled]="isSavingReminder" (click)="cancelReminderEdit()">Cancel</button>
+              <button type="button" class="primary-action compact" [disabled]="isSavingReminder" (click)="saveReminderEdit()">
+                {{ isSavingReminder ? 'Saving...' : 'Save changes' }}
+              </button>
+            }
           </div>
         </div>
 
         @if (reminders.length) {
           <div class="sched-list">
             @for (reminder of reminders; track reminder.id) {
-              <div class="sched-item" [class.done]="reminder.status === 'done'">
+              <div class="sched-item" [class.done]="reminder.status === 'done'" [class.editing]="editingReminderId === reminder.id">
                 <div class="sched-main">
                   <strong>{{ reminder.title }}</strong>
                   <span class="sched-when">{{ reminder.date | date: 'dd MMM yyyy' }}{{ reminder.time ? ' ' + reminder.time : '' }}</span>
@@ -261,6 +291,7 @@
                 </div>
                 <div class="sched-side">
                   <span class="sched-status">{{ reminder.status }}</span>
+                  <button type="button" class="ghost-action compact" (click)="startEditReminder(reminder)">Edit</button>
                   @if (reminder.status !== 'done') {
                     <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Complete</button>
                   }
@@ -390,12 +421,18 @@
       @if (workspaceTab === 'chat') {
         <div class="chat-layout">
           <app-chat-panel
-            mode="trainer"
+            mode="professional"
             [clientId]="client.id"
             [counterpartName]="client.first_name"
             [description]="'Communicate with ' + client.first_name + ' about check-ins and next steps.'"
           />
         </div>
+      }
+
+      @if (workspaceTab === 'payments') {
+        <section class="panel" aria-label="Client payments">
+          <app-client-payments-tab [clientId]="client.id" [clientName]="client.first_name" />
+        </section>
       }
 
       @if (workspaceTab === 'actions') {
@@ -510,4 +547,4 @@
       <p>{{ message || 'Client profile not found.' }}</p>
     </section>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

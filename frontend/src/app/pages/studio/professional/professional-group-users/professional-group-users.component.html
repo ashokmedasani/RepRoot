@@ -1,13 +1,13 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   [title]="group ? 'Group: ' + group.name : 'Group details'"
   eyebrow="Forms & Groups"
   [subtitle]="group ? 'Manage approved users, registration forms, and group settings.' : 'Loading group details.'"
   activeSection="forms-groups"
   titleId="group-users-title"
 >
-    <a page-actions routerLink="/trainer/forms-groups" class="secondary-action">Back</a>
+    <a page-actions routerLink="/professional/forms-groups" class="secondary-action">Back</a>
     @if (group) {
-      <a page-actions [routerLink]="['/trainer/groups', group.id, 'clients', 'add']" class="primary-action">Add Client</a>
+      <a page-actions [routerLink]="['/professional/groups', group.id, 'clients', 'add']" class="primary-action">Add Client</a>
     }
     @if (group) {
       <button page-actions type="button" class="primary-action" (click)="setTab('settings')">Edit Group</button>
@@ -93,7 +93,7 @@
             </div>
             <div class="mini-list wide">
               @for (client of recentApprovedUsers; track client.id) {
-                <a [routerLink]="['/trainer/clients', client.id]">
+                <a [routerLink]="['/professional/clients', client.id]">
                   <span class="avatar">{{ initials(client) }}</span>
                   <span>
                     <strong>{{ client.first_name }} {{ client.last_name }}</strong>
@@ -153,7 +153,7 @@
                       <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
                       <td>{{ client.created_at | date: 'mediumDate' }}</td>
                       <td>
-                        <a [routerLink]="['/trainer/clients', client.id]" class="ghost-action compact">View Profile</a>
+                        <a [routerLink]="['/professional/clients', client.id]" class="ghost-action compact">View Profile</a>
                       </td>
                     </tr>
                   } @empty {
@@ -178,13 +178,13 @@
               </div>
               <div class="registration-actions">
                 <button type="button" class="ghost-action" [disabled]="!registrationLink" (click)="copyRegistrationLink()">Share Registration Form</button>
-                <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
+                <a [routerLink]="['/professional/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
               </div>
             </div>
 
             <div class="flow-note">
               <strong>Group Registration Form</strong>
-              <span>Known client &rarr; group-specific details &rarr; trainer review &rarr; account credentials.</span>
+              <span>Known client &rarr; group-specific details &rarr; professional review &rarr; account credentials.</span>
             </div>
 
             <div class="registration-link-box">
@@ -240,7 +240,7 @@
                         <small>{{ submission.reference_id }} &middot; {{ submission.submitted_at | date: 'medium' }}</small>
                       </div>
                       <a
-                        [routerLink]="['/trainer/groups', group.id, 'clients', 'add']"
+                        [routerLink]="['/professional/groups', group.id, 'clients', 'add']"
                         [queryParams]="{ registrationSubmissionId: submission.id }"
                         class="primary-action compact"
                       >Create Account</a>
@@ -289,4 +289,4 @@
         <p>{{ message || 'Group not found.' }}</p>
       </section>
     }
-</app-trainer-page-shell>
+</app-professional-page-shell>

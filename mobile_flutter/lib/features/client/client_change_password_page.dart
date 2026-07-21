@@ -12,7 +12,7 @@ import '../../shared/widgets/password_field.dart';
 /// Forced first-login password change.
 ///
 /// DELIBERATE DIFFERENCE from the Ionic app: mobile never enforced this — it
-/// sent every client straight to the dashboard, so a trainer-issued temporary
+/// sent every client straight to the dashboard, so a professional-issued temporary
 /// password stayed valid indefinitely. The web portal gates on
 /// `must_change_password` at login, and this matches the web.
 ///
@@ -49,7 +49,7 @@ class _ClientChangePasswordPageState
       _next.text == _confirm.text;
 
   String _validate() {
-    if (_current.text.isEmpty) return 'Enter the password your trainer gave you.';
+    if (_current.text.isEmpty) return 'Enter the password your professional gave you.';
     if (_next.text.length < 8) return 'New password must be at least 8 characters.';
     if (_next.text == _current.text) {
       return 'Choose a different password from the temporary one.';
@@ -126,7 +126,7 @@ class _ClientChangePasswordPageState
                     const AuthBrand(
                       title: 'Choose a password',
                       subtitle:
-                          'Your trainer gave you a temporary one. Pick your own '
+                          'Your professional gave you a temporary one. Pick your own '
                           'to continue.',
                     ),
                     const SizedBox(height: AppSpacing.xl),

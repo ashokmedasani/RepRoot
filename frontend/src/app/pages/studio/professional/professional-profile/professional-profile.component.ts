@@ -1,30 +1,30 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { TrainerAuthApiService, TrainerProfile, TrainerProfileVisibility } from '../../../core/api/trainer-auth-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ProfessionalAuthApiService, ProfessionalProfile, ProfessionalProfileVisibility } from '@core/api/professional-auth-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 /**
  * Read-only professional profile. Content editing lives in Settings -> My
  * Account; only per-section Public/Private visibility is controlled here.
  */
 @Component({
-  selector: 'app-trainer-profile',
+  selector: 'app-professional-profile',
   standalone: true,
-  imports: [RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-profile.component.html',
-  styleUrl: './trainer-profile.component.scss'
+  imports: [RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-profile.component.html',
+  styleUrl: './professional-profile.component.scss'
 })
-export class TrainerProfileComponent implements OnInit {
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+export class ProfessionalProfileComponent implements OnInit {
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
 
   isLoading = true;
   message = '';
-  profile: TrainerProfile | null = null;
+  profile: ProfessionalProfile | null = null;
   previewAsClient = false;
-  visibility: TrainerProfileVisibility = {
+  visibility: ProfessionalProfileVisibility = {
     professional_headline: false,
     about: false,
     professional_summary: false,
@@ -38,10 +38,10 @@ export class TrainerProfileComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    this.trainerAuthApi.getProfile().subscribe({
+    this.professionalAuthApi.getProfile().subscribe({
       next: (profile) => {
         if (!profile.profile_setup_completed) {
-          void this.router.navigate(['/trainer/profile-setup']);
+          void this.router.navigate(['/professional/profile-setup']);
           return;
         }
 
@@ -50,14 +50,14 @@ export class TrainerProfileComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.message = formatApiError(error, 'Could not load trainer profile.');
+        this.message = formatApiError(error, 'Could not load professional profile.');
         this.isLoading = false;
       }
     });
   }
 
   get fullName(): string {
-    return `${this.profile?.first_name || ''} ${this.profile?.last_name || ''}`.trim() || 'Trainer';
+    return `${this.profile?.first_name || ''} ${this.profile?.last_name || ''}`.trim() || 'Professional';
   }
 
   get location(): string {
@@ -93,18 +93,18 @@ export class TrainerProfileComponent implements OnInit {
   }
 
   /** In preview mode, only Public sections are shown. */
-  showSection(section: keyof TrainerProfileVisibility): boolean {
+  showSection(section: keyof ProfessionalProfileVisibility): boolean {
     return this.previewAsClient ? this.visibility[section] : true;
   }
 
-  setSectionVisibility(section: keyof TrainerProfileVisibility, isPublic: boolean): void {
+  setSectionVisibility(section: keyof ProfessionalProfileVisibility, isPublic: boolean): void {
     if (this.visibility[section] === isPublic) {
       return;
     }
 
     const next = { ...this.visibility, [section]: isPublic };
     this.visibility = next;
-    this.trainerAuthApi.updateProfileVisibility(next).subscribe({
+    this.professionalAuthApi.updateProfileVisibility(next).subscribe({
       next: (response) => (this.visibility = { ...this.visibility, ...response.profile_visibility }),
       error: (error: unknown) => {
         this.message = formatApiError(error, 'Visibility could not be updated.');

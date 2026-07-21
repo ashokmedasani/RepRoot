@@ -3,19 +3,19 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Country, State } from 'country-state-city';
 
-import { TrainerAuthApiService } from '../../../core/api/trainer-auth-api.service';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({
-  selector: 'app-trainer-profile-setup',
+  selector: 'app-professional-profile-setup',
   standalone: true,
   imports: [ReactiveFormsModule],
-  templateUrl: './trainer-profile-setup.component.html',
-  styleUrl: './trainer-profile-setup.component.scss'
+  templateUrl: './professional-profile-setup.component.html',
+  styleUrl: './professional-profile-setup.component.scss'
 })
-export class TrainerProfileSetupComponent implements OnInit {
+export class ProfessionalProfileSetupComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
 
   readonly months = [
@@ -52,7 +52,7 @@ export class TrainerProfileSetupComponent implements OnInit {
     first_name: ['', Validators.required],
     middle_name: [''],
     last_name: ['', Validators.required],
-    trainer_code: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
+    professional_code: ['', [Validators.required, Validators.minLength(4), Validators.pattern(/^[A-Za-z0-9_-]+$/)]],
     birth_month: ['', Validators.required],
     birth_year: ['', Validators.required],
     gender: ['', Validators.required],
@@ -75,7 +75,7 @@ export class TrainerProfileSetupComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.trainerAuthApi.getProfile().subscribe({
+    this.professionalAuthApi.getProfile().subscribe({
       next: (profile) => {
         this.profilePhotoUrl = profile.profile_photo_url || '';
         this.isPatchingProfile = true;
@@ -83,7 +83,7 @@ export class TrainerProfileSetupComponent implements OnInit {
           first_name: profile.first_name || '',
           middle_name: profile.middle_name || '',
           last_name: profile.last_name || '',
-          trainer_code: profile.trainer_id || profile.trainer_code || '',
+          professional_code: profile.professional_id || profile.professional_code || '',
           birth_month: profile.birth_month ? String(profile.birth_month) : '',
           birth_year: profile.birth_year ? String(profile.birth_year) : '',
           gender: profile.gender || '',
@@ -96,7 +96,7 @@ export class TrainerProfileSetupComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.setupMessage = formatApiError(error, 'Could not load trainer profile. Please login again.');
+        this.setupMessage = formatApiError(error, 'Could not load professional profile. Please login again.');
         this.isLoading = false;
       }
     });
@@ -108,7 +108,7 @@ export class TrainerProfileSetupComponent implements OnInit {
     });
   }
 
-  checkTrainerCode(): void {
+  checkProfessionalCode(): void {
     this.codeStatus = 'idle';
   }
 
@@ -130,10 +130,10 @@ export class TrainerProfileSetupComponent implements OnInit {
     }
 
     this.isSaving = true;
-    this.trainerAuthApi.saveProfile(this.buildProfileFormData()).subscribe({
+    this.professionalAuthApi.saveProfile(this.buildProfileFormData()).subscribe({
       next: () => {
         this.isSaving = false;
-        void this.router.navigate(['/trainer/profile']);
+        void this.router.navigate(['/professional/profile']);
       },
       error: (error: unknown) => {
         this.setupMessage = formatApiError(error, 'Profile setup could not be saved.');
@@ -152,8 +152,8 @@ export class TrainerProfileSetupComponent implements OnInit {
     const value = this.setupForm.getRawValue();
 
     Object.entries(value).forEach(([key, fieldValue]) => {
-      if (key === 'trainer_code') {
-        formData.append('trainer_id', String(fieldValue ?? '').trim().toLowerCase());
+      if (key === 'professional_code') {
+        formData.append('professional_id', String(fieldValue ?? '').trim().toLowerCase());
         return;
       }
 

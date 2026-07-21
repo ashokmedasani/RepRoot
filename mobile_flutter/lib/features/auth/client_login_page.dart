@@ -23,7 +23,7 @@ class ClientLoginPage extends ConsumerStatefulWidget {
 }
 
 class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
-  final _trainerCode = TextEditingController();
+  final _professionalCode = TextEditingController();
   final _username = TextEditingController();
   final _password = TextEditingController();
   final _directorySearch = TextEditingController();
@@ -33,11 +33,11 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
 
   bool _showDirectory = false;
   bool _directoryLoaded = false;
-  List<TrainerDirectoryEntry> _directory = [];
+  List<ProfessionalDirectoryEntry> _directory = [];
 
   @override
   void dispose() {
-    _trainerCode.dispose();
+    _professionalCode.dispose();
     _username.dispose();
     _password.dispose();
     _directorySearch.dispose();
@@ -45,13 +45,13 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
   }
 
   /// Filters the loaded list client-side, matching the Ionic getter.
-  List<TrainerDirectoryEntry> get _filteredTrainers {
+  List<ProfessionalDirectoryEntry> get _filteredProfessionals {
     final term = _directorySearch.text.trim().toLowerCase();
     if (term.isEmpty) return _directory;
     return _directory
         .where((t) =>
-            t.trainerName.toLowerCase().contains(term) ||
-            t.trainerId.toLowerCase().contains(term))
+            t.professionalName.toLowerCase().contains(term) ||
+            t.professionalId.toLowerCase().contains(term))
         .toList();
   }
 
@@ -60,10 +60,10 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     if (!_showDirectory || _directoryLoaded) return;
 
     try {
-      final trainers = await ref.read(clientApiProvider).getTrainerDirectory();
+      final professionals = await ref.read(clientApiProvider).getProfessionalDirectory();
       if (!mounted) return;
       setState(() {
-        _directory = trainers;
+        _directory = professionals;
         _directoryLoaded = true;
       });
     } catch (_) {
@@ -72,19 +72,19 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     }
   }
 
-  void _pickTrainer(TrainerDirectoryEntry trainer) {
+  void _pickProfessional(ProfessionalDirectoryEntry professional) {
     setState(() {
-      _trainerCode.text = trainer.trainerId;
+      _professionalCode.text = professional.professionalId;
       _showDirectory = false;
     });
   }
 
   Future<void> _login() async {
-    if (_trainerCode.text.trim().isEmpty ||
+    if (_professionalCode.text.trim().isEmpty ||
         _username.text.trim().isEmpty ||
         _password.text.isEmpty) {
       setState(() =>
-          _message = 'Trainer code, username, and password are all required.');
+          _message = 'Professional code, username, and password are all required.');
       return;
     }
 
@@ -96,7 +96,7 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     final api = ref.read(clientApiProvider);
     try {
       final response = await api.login(
-        _trainerCode.text.trim(),
+        _professionalCode.text.trim(),
         _username.text.trim().toLowerCase(),
         _password.text,
       );
@@ -110,7 +110,7 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
       }
       await api.storeSession(response.token, client);
       if (!mounted) return;
-      // A trainer-issued temporary password must be replaced before the client
+      // A professional-issued temporary password must be replaced before the client
       // can use the app. The Ionic app skipped this and went straight to the
       // dashboard; the web portal gates here, and so do we.
       context.go(
@@ -144,16 +144,16 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
                     const SizedBox(height: AppSpacing.lg),
                     const AuthBrand(
                       title: 'Client sign in',
-                      subtitle: 'Use the details your trainer shared with you',
+                      subtitle: 'Use the details your professional shared with you',
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     TextField(
-                      controller: _trainerCode,
+                      controller: _professionalCode,
                       enabled: !_isSubmitting,
                       autocorrect: false,
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
-                        labelText: 'Trainer code',
+                        labelText: 'Professional code',
                         suffixIcon: IconButton(
                           onPressed: _isSubmitting ? null : _toggleDirectory,
                           icon: Icon(
@@ -162,7 +162,7 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
                                 : Icons.search_outlined,
                           ),
                           iconSize: AppSize.iconRow,
-                          tooltip: "Find your trainer's code",
+                          tooltip: "Find your professional's code",
                         ),
                       ),
                     ),
@@ -225,7 +225,7 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
             controller: _directorySearch,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
-              hintText: 'Search trainers by name or code',
+              hintText: 'Search professionals by name or code',
               prefixIcon: Icon(Icons.search, size: AppSize.iconRow),
             ),
           ),
@@ -241,11 +241,11 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
                 ),
               ),
             )
-          else if (_filteredTrainers.isEmpty)
+          else if (_filteredProfessionals.isEmpty)
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Text(
-                'No trainers found.',
+                'No professionals found.',
                 textAlign: TextAlign.center,
                 style: context.text.bodySmall,
               ),
@@ -255,22 +255,22 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
               constraints: const BoxConstraints(maxHeight: 240),
               child: ListView.separated(
                 shrinkWrap: true,
-                itemCount: _filteredTrainers.length,
+                itemCount: _filteredProfessionals.length,
                 separatorBuilder: (_, _) => Divider(color: tokens.border),
                 itemBuilder: (context, index) {
-                  final trainer = _filteredTrainers[index];
+                  final professional = _filteredProfessionals[index];
                   return ListTile(
                     dense: true,
-                    title: Text(trainer.trainerName,
+                    title: Text(professional.professionalName,
                         style: context.text.titleSmall),
                     subtitle: Text(
-                      trainer.professionalHeadline.isEmpty
-                          ? trainer.trainerId
-                          : '${trainer.trainerId} · ${trainer.professionalHeadline}',
+                      professional.professionalHeadline.isEmpty
+                          ? professional.professionalId
+                          : '${professional.professionalId} · ${professional.professionalHeadline}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    onTap: () => _pickTrainer(trainer),
+                    onTap: () => _pickProfessional(professional),
                   );
                 },
               ),

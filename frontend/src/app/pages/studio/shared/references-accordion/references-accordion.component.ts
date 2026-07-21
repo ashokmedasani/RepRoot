@@ -1,10 +1,10 @@
 import { Component, Input, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
-import { TemplateReference } from '../../core/api/templates-api.service';
+import { TemplateReference } from '@core/api/templates-api.service';
 
 /**
- * Compact accordion for a template's assigned references. Reused on the trainer
+ * Compact accordion for a template's assigned references. Reused on the professional
  * template page and the client-facing template view so references never need a
  * separate page. Expanding a row plays YouTube inline, previews images, shows
  * note text, or offers an Open button for PDFs/documents/links.

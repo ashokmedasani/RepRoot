@@ -140,22 +140,70 @@
                   </div>
                 </div>
 
-                @if (billing.has_billing_account) {
-                  <button type="button" class="primary-action" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
-                    {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
-                  </button>
-                } @else if (billing.billing_configured && !isTopTier(billing.plan.code)) {
-                  <button type="button" class="primary-action" [disabled]="isStartingCheckout" (click)="upgradeToPremium()">
-                    {{ isStartingCheckout ? 'Starting checkout...' : 'Upgrade plan' }}
-                  </button>
-                } @else if (!billing.billing_configured) {
-                  <p class="section-note">Upgrades aren't open yet — check back soon.</p>
-                }
+                <div class="plan-actions">
+                  @if (billing.has_billing_account) {
+                    <button type="button" class="primary-action" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
+                      {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
+                    </button>
+                  }
+                  @if (availableUpgradeTiers(billing).length > 0) {
+                    <button type="button" class="secondary-action" (click)="openUpdatePlan()">Update plan</button>
+                  } @else if (!billing.billing_configured) {
+                    <p class="section-note">Upgrades aren't open yet — check back soon.</p>
+                  }
+                  @if (billing.plan.code !== 'starter_free' && billing.plan.code !== 'starter') {
+                    <button type="button" class="link-action danger" [disabled]="isCancellingPlan" (click)="cancelPlan()">
+                      {{ isCancellingPlan ? 'Cancelling...' : 'Cancel plan / back to Starter Free' }}
+                    </button>
+                  }
+                </div>
 
                 @if (billingActionMessage) {
                   <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
                 }
               </div>
+
+              @if (isUpdatePlanOpen) {
+                <div class="update-plan-overlay" (click)="closeUpdatePlan()">
+                  <div class="update-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="update-plan-title" (click)="$event.stopPropagation()">
+                    <h3 id="update-plan-title">Update plan</h3>
+                    <p class="section-note">Pick the tier that fits where your business is headed.</p>
+                    @if (billing.test_mode) {
+                      <p class="test-mode-note">🧪 Test environment — this applies the plan instantly with no real payment.</p>
+                    }
+
+                    <div class="tier-options">
+                      @for (tier of availableUpgradeTiers(billing); track tier) {
+                        <button
+                          type="button"
+                          class="tier-option"
+                          [class.selected]="selectedUpgradeTier === tier"
+                          (click)="selectUpgradeTier(tier)"
+                        >
+                          <strong>{{ upgradeTierCopy[tier].name }}</strong>
+                          <span>{{ upgradeTierCopy[tier].blurb }}</span>
+                        </button>
+                      }
+                    </div>
+
+                    @if (billingActionMessage) {
+                      <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
+                    }
+
+                    <div class="update-plan-actions">
+                      <button type="button" class="secondary-action" (click)="closeUpdatePlan()">Cancel</button>
+                      <button
+                        type="button"
+                        class="primary-action"
+                        [disabled]="!selectedUpgradeTier || isStartingCheckout"
+                        (click)="confirmUpdatePlan()"
+                      >
+                        {{ isStartingCheckout ? 'Applying...' : (billing.test_mode ? 'Apply plan (test)' : 'Continue to checkout') }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
             }
           </section>
         </div>
@@ -295,27 +343,51 @@
                 </table>
               </div>
 
-              @if (usage.featured_client; as client) {
-                <section class="featured-storage" aria-labelledby="featured-client-storage-title">
+              <section class="recycle-bin-panel" aria-labelledby="recycle-bin-title">
+                <div class="recycle-bin-header">
                   <div>
-                    <p class="eyebrow">Most active client</p>
-                    <h3 id="featured-client-storage-title">{{ client.name }}</h3>
-                    <p>{{ '@' + client.username }} · {{ client.reference_id }} · {{ client.record_count }} records</p>
+                    <h3 id="recycle-bin-title">Recycle Bin</h3>
+                    <p class="section-note">Deleted client accounts, chat images, and references stay here for 14 days before they're gone for good.</p>
                   </div>
-                  <strong class="featured-total">{{ client.percent_of_quota }}%</strong>
-                  <small>of your plan's storage</small>
+                  <button type="button" class="secondary-action" [disabled]="isLoadingRecycleBin" (click)="loadRecycleBin()">
+                    {{ isLoadingRecycleBin ? 'Loading...' : 'Refresh' }}
+                  </button>
+                </div>
 
-                  <div class="client-usage-grid">
-                    @for (row of usageRows(client.sections, clientUsageLabels); track row.key) {
-                      <article>
-                        <span>{{ row.label }}</span>
-                        <strong>{{ row.usage.percent_of_quota }}%</strong>
-                        <small>{{ row.usage.record_count }} records</small>
-                      </article>
-                    }
+                @if (recycleBinMessage) {
+                  <p class="message" [class.error-message]="recycleBinMessageType === 'error'">{{ recycleBinMessage }}</p>
+                }
+
+                @if (recycleBinItems().length > 0) {
+                  <div class="usage-table-wrap">
+                    <table class="usage-table">
+                      <thead>
+                        <tr><th>Item</th><th>Type</th><th>Deleted</th><th>Days left</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        @for (item of recycleBinItems(); track item.id) {
+                          <tr>
+                            <td><strong>{{ item.title }}</strong></td>
+                            <td>{{ item.category_label }}</td>
+                            <td>{{ item.deleted_at | date: 'mediumDate' }} · {{ item.deleted_by_label }}</td>
+                            <td>{{ item.days_remaining }}</td>
+                            <td class="recycle-bin-actions">
+                              <button type="button" class="link-action" [disabled]="restoringItemId === item.id" (click)="restoreRecycleBinItem(item)">
+                                {{ restoringItemId === item.id ? 'Restoring...' : 'Restore' }}
+                              </button>
+                              <button type="button" class="link-action danger" [disabled]="deletingItemId === item.id" (click)="deleteRecycleBinItemPermanently(item)">
+                                Delete permanently
+                              </button>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
                   </div>
-                </section>
-              }
+                } @else if (!isLoadingRecycleBin) {
+                  <p class="section-note">Nothing in the Recycle Bin.</p>
+                }
+              </section>
             } @else if (dataUsageError) {
               <p class="account-message error-message">{{ dataUsageError }}</p>
             } @else {

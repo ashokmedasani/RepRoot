@@ -4,30 +4,30 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
-import '../../core/api/models/trainer_models.dart';
-import '../../core/api/trainer_auth_api.dart';
+import '../../core/api/models/professional_models.dart';
+import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/password_field.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
-/// Settings — My Account, Plan & Storage, Security (trainer code + password).
-/// Replica of mobile/src/app/pages/trainer/settings/trainer-settings.page.ts.
-class TrainerSettingsPage extends ConsumerStatefulWidget {
-  const TrainerSettingsPage({super.key});
+/// Settings — My Account, Plan & Storage, Security (professional code + password).
+/// Replica of mobile/src/app/pages/professional/settings/professional-settings.page.ts.
+class ProfessionalSettingsPage extends ConsumerStatefulWidget {
+  const ProfessionalSettingsPage({super.key});
 
   @override
-  ConsumerState<TrainerSettingsPage> createState() => _TrainerSettingsPageState();
+  ConsumerState<ProfessionalSettingsPage> createState() => _ProfessionalSettingsPageState();
 }
 
-class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
-  final _trainerCode = TextEditingController();
+class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsPage> {
+  final _professionalCode = TextEditingController();
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
   final _confirmPassword = TextEditingController();
 
-  TrainerProfile? _profile;
-  TrainerDataUsage? _usage;
+  ProfessionalProfile? _profile;
+  ProfessionalDataUsage? _usage;
   String _originalCode = '';
   bool _isSavingCode = false;
   String _codeMessage = '';
@@ -44,7 +44,7 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
 
   @override
   void dispose() {
-    _trainerCode.dispose();
+    _professionalCode.dispose();
     _currentPassword.dispose();
     _newPassword.dispose();
     _confirmPassword.dispose();
@@ -52,16 +52,16 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
   }
 
   Future<void> _load() async {
-    final api = ref.read(trainerAuthApiProvider);
+    final api = ref.read(professionalAuthApiProvider);
     try {
       final profile = await api.getProfile();
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _trainerCode.text = profile.trainerId.isNotEmpty
-            ? profile.trainerId
-            : profile.trainerCode;
-        _originalCode = _trainerCode.text;
+        _professionalCode.text = profile.professionalId.isNotEmpty
+            ? profile.professionalId
+            : profile.professionalCode;
+        _originalCode = _professionalCode.text;
       });
     } catch (_) {/* the account card just shows blanks */}
     try {
@@ -74,8 +74,8 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
 
   bool get _canSaveCode =>
       !_isSavingCode &&
-      _trainerCode.text.trim().isNotEmpty &&
-      _trainerCode.text != _originalCode;
+      _professionalCode.text.trim().isNotEmpty &&
+      _professionalCode.text != _originalCode;
 
   bool get _canChangePassword =>
       !_isChangingPassword &&
@@ -83,22 +83,22 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
       _newPassword.text.length >= 8 &&
       _newPassword.text == _confirmPassword.text;
 
-  Future<void> _saveTrainerCode() async {
+  Future<void> _saveProfessionalCode() async {
     setState(() {
       _isSavingCode = true;
       _codeMessage = '';
     });
     try {
       final code = await ref
-          .read(trainerAuthApiProvider)
-          .updateTrainerCode(_trainerCode.text.trim());
+          .read(professionalAuthApiProvider)
+          .updateProfessionalCode(_professionalCode.text.trim());
       if (!mounted) return;
       setState(() {
         _isSavingCode = false;
-        _trainerCode.text = code;
+        _professionalCode.text = code;
         _originalCode = code;
         _codeError = false;
-        _codeMessage = 'Trainer code updated.';
+        _codeMessage = 'Professional code updated.';
       });
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -116,7 +116,7 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
       _passwordMessage = '';
     });
     try {
-      final message = await ref.read(trainerAuthApiProvider).changePassword(
+      final message = await ref.read(professionalAuthApiProvider).changePassword(
             _currentPassword.text,
             _newPassword.text,
             _confirmPassword.text,
@@ -148,7 +148,7 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        leading: BackButton(onPressed: () => context.go(Routes.trainerMore)),
+        leading: BackButton(onPressed: () => context.go(Routes.professionalMore)),
       ),
       body: PagePad(
         onRefresh: _load,
@@ -204,11 +204,11 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
                   children: [
                     Expanded(
                       child: TextField(
-                        controller: _trainerCode,
+                        controller: _professionalCode,
                         autocorrect: false,
                         onChanged: (_) => setState(() => _codeMessage = ''),
                         decoration: const InputDecoration(
-                          labelText: 'Trainer code',
+                          labelText: 'Professional code',
                           helperText: 'Clients log in with this',
                         ),
                       ),
@@ -217,7 +217,7 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.xs),
                       child: FilledButton(
-                        onPressed: _canSaveCode ? _saveTrainerCode : null,
+                        onPressed: _canSaveCode ? _saveProfessionalCode : null,
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(84, AppSize.buttonHeightSm),
                         ),
@@ -291,7 +291,7 @@ class _TrainerSettingsPageState extends ConsumerState<TrainerSettingsPage> {
           _Card(
             title: 'Account deletion',
             child: Text(
-              'Trainer accounts are deleted through support so your client data '
+              'Professional accounts are deleted through support so your client data '
               'is handled safely. Open Help & Support from the More tab to '
               'request deletion.',
               style: context.text.bodySmall,

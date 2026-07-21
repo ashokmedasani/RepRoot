@@ -42,11 +42,11 @@
               </div>
             }
             <article [class.overdue]="isOverdue(schedule)" [class.due-soon]="isDueSoon(schedule)">
-              <div class="schedule-main"><strong>{{ schedule.title }}</strong><span>Trainer-scheduled activity</span></div>
+              <div class="schedule-main"><strong>{{ schedule.title }}</strong><span>Professional-scheduled activity</span></div>
               <time>{{ schedule.date | date: 'mediumDate' }}</time>
               <span>{{ schedule.time || 'Time not set' }}</span>
               <span class="status-pill" [class.overdue]="isOverdue(schedule)">{{ isOverdue(schedule) ? 'Overdue' : schedule.status }}</span>
-              <a routerLink="/client/profile" [queryParams]="{ tab: 'trainer' }" class="ghost-action">Open Details</a>
+              <a routerLink="/client/profile" [queryParams]="{ tab: 'professional' }" class="ghost-action">Open Details</a>
             </article>
           } @empty { <p class="empty-state">No upcoming schedules.</p> }
         </div>

@@ -5,6 +5,7 @@ from accounts.account_lifecycle import (
     send_overage_notifications,
 )
 from accounts.data_retention import purge_expired_client_data
+from accounts.recycle_bin import purge_expired as purge_expired_recycle_bin
 
 
 class Command(BaseCommand):
@@ -35,10 +36,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'[FAILED] Data deletion check failed: {e}'))
 
         try:
-            self.stdout.write('Purging client chat/activity data past plan retention window...')
+            self.stdout.write('Removing client chat/activity data past plan retention window...')
             purge_expired_client_data()
             self.stdout.write(self.style.SUCCESS('[OK] Data retention purge complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Data retention purge failed: {e}'))
+
+        try:
+            self.stdout.write('Permanently removing Recycle Bin items past their restore window...')
+            purge_expired_recycle_bin()
+            self.stdout.write(self.style.SUCCESS('[OK] Recycle Bin purge complete'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'[FAILED] Recycle Bin purge failed: {e}'))
 
         self.stdout.write(self.style.SUCCESS('All account lifecycle checks complete'))

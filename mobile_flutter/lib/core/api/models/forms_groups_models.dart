@@ -185,8 +185,8 @@ class ClientRegistrationForm {
       );
 }
 
-class TrainerGroup {
-  const TrainerGroup({
+class ProfessionalGroup {
+  const ProfessionalGroup({
     required this.id,
     required this.name,
     required this.description,
@@ -204,9 +204,9 @@ class TrainerGroup {
   final String createdAt;
   final String updatedAt;
 
-  factory TrainerGroup.fromJson(Map<String, dynamic> json) {
+  factory ProfessionalGroup.fromJson(Map<String, dynamic> json) {
     final form = json['registration_form'];
-    return TrainerGroup(
+    return ProfessionalGroup(
       id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
@@ -315,7 +315,7 @@ class FormsGroupsOverview {
 
   final bool hasLeadForm;
   final LeadForm? leadForm;
-  final List<TrainerGroup> groups;
+  final List<ProfessionalGroup> groups;
   final List<LeadSubmission> pendingForms;
   final List<LeadSubmission> approvedForms;
   final List<LeadSubmission> deletedForms;
@@ -336,7 +336,7 @@ class FormsGroupsOverview {
       leadForm: form is Map<String, dynamic> ? LeadForm.fromJson(form) : null,
       groups: (json['groups'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map(TrainerGroup.fromJson)
+          .map(ProfessionalGroup.fromJson)
           .toList(),
       pendingForms: subs('pending_forms'),
       approvedForms: subs('approved_forms'),
@@ -462,7 +462,7 @@ class ClientReminder {
     required this.time,
     required this.notes,
     required this.status,
-    required this.notifyTrainer,
+    required this.notifyProfessional,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -475,7 +475,7 @@ class ClientReminder {
   final String time;
   final String notes;
   final String status;
-  final bool notifyTrainer;
+  final bool notifyProfessional;
   final String createdAt;
   final String updatedAt;
 
@@ -490,7 +490,7 @@ class ClientReminder {
         time: json['time'] as String? ?? '',
         notes: json['notes'] as String? ?? '',
         status: json['status'] as String? ?? '',
-        notifyTrainer: json['notify_trainer'] as bool? ?? false,
+        notifyProfessional: json['notify_professional'] as bool? ?? false,
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
       );
@@ -625,7 +625,7 @@ class GroupUsersResponse {
     required this.registrationSubmissions,
   });
 
-  final TrainerGroup group;
+  final ProfessionalGroup group;
   final List<ClientAccessRecord> clients;
   final List<GroupRegistrationSubmission> registrationSubmissions;
 }
@@ -638,7 +638,7 @@ class ClientDetailChangeRequest {
     required this.proposedAnswers,
     required this.status,
     required this.clientNote,
-    required this.trainerNote,
+    required this.professionalNote,
     required this.createdAt,
     this.reviewedAt,
   });
@@ -653,7 +653,7 @@ class ClientDetailChangeRequest {
   /// 'pending' | 'approved' | 'rejected'
   final String status;
   final String clientNote;
-  final String trainerNote;
+  final String professionalNote;
   final String createdAt;
   final String? reviewedAt;
 
@@ -670,7 +670,7 @@ class ClientDetailChangeRequest {
         ),
         status: json['status'] as String? ?? '',
         clientNote: json['client_note'] as String? ?? '',
-        trainerNote: json['trainer_note'] as String? ?? '',
+        professionalNote: json['professional_note'] as String? ?? '',
         createdAt: json['created_at'] as String? ?? '',
         reviewedAt: json['reviewed_at'] as String?,
       );
@@ -682,17 +682,17 @@ class ClientAccessDetailResponse {
     required this.group,
     required this.registrationFields,
     this.leadSubmission,
-    required this.trainerNotes,
-    this.trainerNotesUpdatedAt,
+    required this.professionalNotes,
+    this.professionalNotesUpdatedAt,
     this.pendingChangeRequest,
   });
 
   final ClientAccessRecord client;
-  final TrainerGroup group;
+  final ProfessionalGroup group;
   final List<DynamicField> registrationFields;
   final LeadSubmission? leadSubmission;
-  final String trainerNotes;
-  final String? trainerNotesUpdatedAt;
+  final String professionalNotes;
+  final String? professionalNotesUpdatedAt;
   final ClientDetailChangeRequest? pendingChangeRequest;
 
   factory ClientAccessDetailResponse.fromJson(Map<String, dynamic> json) {
@@ -702,7 +702,7 @@ class ClientAccessDetailResponse {
       client: ClientAccessRecord.fromJson(
         json['client'] as Map<String, dynamic>? ?? {},
       ),
-      group: TrainerGroup.fromJson(
+      group: ProfessionalGroup.fromJson(
         json['group'] as Map<String, dynamic>? ?? {},
       ),
       registrationFields: (json['registration_fields'] as List<dynamic>? ?? [])
@@ -711,8 +711,8 @@ class ClientAccessDetailResponse {
           .toList(),
       leadSubmission:
           lead is Map<String, dynamic> ? LeadSubmission.fromJson(lead) : null,
-      trainerNotes: json['trainer_notes'] as String? ?? '',
-      trainerNotesUpdatedAt: json['trainer_notes_updated_at'] as String?,
+      professionalNotes: json['professional_notes'] as String? ?? '',
+      professionalNotesUpdatedAt: json['professional_notes_updated_at'] as String?,
       pendingChangeRequest: change is Map<String, dynamic>
           ? ClientDetailChangeRequest.fromJson(change)
           : null,

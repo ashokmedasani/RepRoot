@@ -2,21 +2,21 @@
   <section class="setup-shell" aria-labelledby="profile-setup-title">
     <div class="setup-intro">
       <p class="eyebrow">Required first login step</p>
-      <h1 id="profile-setup-title">Trainer profile setup</h1>
+      <h1 id="profile-setup-title">Professional profile setup</h1>
       <p class="warning">
-        Profile setup is required before using your trainer dashboard. This may take around 10-15 minutes. Your profile
+        Profile setup is required before using your professional dashboard. This may take around 10-15 minutes. Your profile
         helps organize your forms, groups, clients, and references.
       </p>
     </div>
 
     @if (isLoading) {
-      <p class="status-message">Loading your trainer details...</p>
+      <p class="status-message">Loading your professional details...</p>
     } @else {
       <form class="setup-form" [formGroup]="setupForm" (ngSubmit)="saveProfileSetup()">
         <div class="photo-field">
           <div class="photo-frame">
             @if (selectedPhotoPreview || profilePhotoUrl) {
-              <img [src]="selectedPhotoPreview || profilePhotoUrl" alt="Trainer profile photo">
+              <img [src]="selectedPhotoPreview || profilePhotoUrl" alt="Professional profile photo">
             } @else {
               <div class="photo-placeholder">{{ setupForm.controls.first_name.value.slice(0, 1) || 'P' }}</div>
             }
@@ -68,8 +68,8 @@
           <div class="field-row">
           <label class="code-field">
             <span class="field-label">
-              Trainer code <span class="required">*</span>
-              <span class="help-tip" tabindex="0" aria-label="Why a trainer code is needed">
+              Professional code <span class="required">*</span>
+              <span class="help-tip" tabindex="0" aria-label="Why a professional code is needed">
                 ?
                 <span class="help-bubble" role="tooltip">
                   Your clients log in with this code plus their username and password. It links each client's login to your account, so choose something short and easy to share (for example FITJOHN or COACH-99). You can change it later in Settings.
@@ -78,12 +78,12 @@
             </span>
             <input
               type="text"
-              formControlName="trainer_code"
+              formControlName="professional_code"
               autocomplete="off"
               placeholder="e.g. FITJOHN"
-              (input)="checkTrainerCode()"
+              (input)="checkProfessionalCode()"
             >
-            @if (hasError('trainer_code')) {
+            @if (hasError('professional_code')) {
               <span class="field-help error-text">Enter a code of at least 4 letters, numbers, hyphens, or underscores.</span>
             } @else if (codeStatus === 'available') {
               <span class="field-help success-text">This code is available.</span>

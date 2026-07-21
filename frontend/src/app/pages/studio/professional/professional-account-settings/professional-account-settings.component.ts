@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
@@ -10,13 +10,16 @@ import {
   ProfessionalDataUsageResponse,
   ProfessionalDataUsageSection,
   ProfessionalPlanCode,
-  ProfessionalUsageLabel
+  ProfessionalUpgradeTier,
+  ProfessionalUsageLabel,
+  RecycleBinItem
 } from '@core/api/professional-auth-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ProfessionalProfileFormComponent } from '@studio-shared/professional-profile-form/professional-profile-form.component';
 import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 import { ThemeSwitcherComponent } from '@shared/theme-switcher/theme-switcher.component';
 import { SupportIncidentsComponent } from '@studio-shared/support-incidents/support-incidents.component';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { ProfessionalPaymentSettingsComponent } from '../professional-payment-settings/professional-payment-settings.component';
 
 type SettingsSection =
@@ -59,6 +62,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   private static readonly NOTIFICATION_KEY = 'professional-notification-prefs';
 
@@ -95,6 +99,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   billingError = '';
   isStartingCheckout = false;
   isOpeningPortal = false;
+  isCancellingPlan = false;
   billingActionMessage = '';
   billingActionMessageType: 'success' | 'error' = 'success';
 
@@ -108,15 +113,12 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     messages: 'Messages'
   };
 
-  readonly clientUsageLabels: Record<string, string> = {
-    profile_intake: 'Profile & intake',
-    templates: 'Template assignments',
-    tracking_history: 'Tracking history',
-    progress: 'Progress reviews',
-    schedules: 'Schedules',
-    messages: 'Messages',
-    account_activity: 'Account activity'
-  };
+  readonly recycleBinItems = signal<RecycleBinItem[]>([]);
+  isLoadingRecycleBin = false;
+  recycleBinMessage = '';
+  recycleBinMessageType: 'success' | 'error' = 'success';
+  restoringItemId: number | null = null;
+  deletingItemId: number | null = null;
 
   readonly guideItems = [
     { title: 'Dashboard', route: '/professional/dashboard', detail: 'Review business KPIs, client activity, schedules, profile edit requests, account deletion requests, and recent work that needs attention.' },
@@ -155,6 +157,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
       next: (usage) => (this.dataUsage = usage),
       error: () => (this.dataUsageError = 'Storage usage is temporarily unavailable.')
     });
+    this.loadRecycleBin();
     this.loadBillingStatus();
 
     const billingParam = this.route.snapshot.queryParamMap.get('billing');
@@ -177,10 +180,152 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     });
   }
 
-  upgradeToPremium(): void {
+  private refreshDataUsage(): void {
+    this.professionalAuthApi.invalidateDataUsage();
+    this.professionalAuthApi.getDataUsage().subscribe({
+      next: (usage) => (this.dataUsage = usage),
+      error: () => (this.dataUsageError = 'Storage usage is temporarily unavailable.')
+    });
+  }
+
+  loadRecycleBin(): void {
+    this.isLoadingRecycleBin = true;
+    this.professionalAuthApi.getRecycleBin().subscribe({
+      next: (response) => {
+        this.recycleBinItems.set(response.items);
+        this.isLoadingRecycleBin = false;
+      },
+      error: () => {
+        this.recycleBinMessageType = 'error';
+        this.recycleBinMessage = 'Recycle Bin is temporarily unavailable.';
+        this.isLoadingRecycleBin = false;
+      }
+    });
+  }
+
+  restoreRecycleBinItem(item: RecycleBinItem): void {
+    this.recycleBinMessage = '';
+    this.restoringItemId = item.id;
+    this.professionalAuthApi.restoreRecycleBinItem(item.id).subscribe({
+      next: () => {
+        this.recycleBinMessageType = 'success';
+        this.recycleBinMessage = `Restored "${item.title}".`;
+        this.restoringItemId = null;
+        this.loadRecycleBin();
+        this.refreshDataUsage();
+      },
+      error: (error: unknown) => {
+        this.recycleBinMessageType = 'error';
+        this.recycleBinMessage = this.formatApiError(error, 'Could not restore this item.');
+        this.restoringItemId = null;
+      }
+    });
+  }
+
+  async deleteRecycleBinItemPermanently(item: RecycleBinItem): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Delete permanently',
+      target: item.title,
+      impact: 'This cannot be undone — the item will no longer be restorable.',
+      confirmLabel: 'Delete Permanently'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.recycleBinMessage = '';
+    this.deletingItemId = item.id;
+    this.professionalAuthApi.deleteRecycleBinItemPermanently(item.id).subscribe({
+      next: () => {
+        this.recycleBinMessageType = 'success';
+        this.recycleBinMessage = `Permanently deleted "${item.title}".`;
+        this.deletingItemId = null;
+        this.loadRecycleBin();
+      },
+      error: (error: unknown) => {
+        this.recycleBinMessageType = 'error';
+        this.recycleBinMessage = this.formatApiError(error, 'Could not permanently delete this item.');
+        this.deletingItemId = null;
+      }
+    });
+  }
+
+  async cancelPlan(): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'warning',
+      title: 'Cancel plan',
+      target: 'your current plan',
+      impact: 'Your account moves to Starter Free. If your current usage is over the Starter Free limit, premium features will lock after a 7-day grace period unless you reduce your data or upgrade again.',
+      confirmLabel: 'Cancel Plan'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.billingActionMessage = '';
+    this.isCancellingPlan = true;
+    this.professionalAuthApi.cancelBillingPlan().subscribe({
+      next: (response) => {
+        this.billingActionMessageType = 'success';
+        this.billingActionMessage = response.message;
+        this.isCancellingPlan = false;
+        this.loadBillingStatus();
+        this.refreshDataUsage();
+      },
+      error: (error: unknown) => {
+        this.billingActionMessageType = 'error';
+        this.billingActionMessage = this.formatApiError(error, 'Could not cancel the plan.');
+        this.isCancellingPlan = false;
+      }
+    });
+  }
+
+  readonly upgradeTierCopy: Record<ProfessionalUpgradeTier, { name: string; blurb: string }> = {
+    pro: { name: 'Pro', blurb: '5x the storage plus higher client, template, and reference limits.' },
+    premium_unlimited: { name: 'Premium Unlimited', blurb: '50x the storage of Starter Free and every feature unlocked.' }
+  };
+
+  isUpdatePlanOpen = false;
+  selectedUpgradeTier: ProfessionalUpgradeTier | null = null;
+
+  private readonly planRank: Record<ProfessionalPlanCode, number> = {
+    starter_free: 0,
+    starter: 0,
+    pro: 1,
+    premium_unlimited: 2,
+    premium: 2
+  };
+
+  /** Tiers that are both Stripe-configured and strictly above the professional's current plan. */
+  availableUpgradeTiers(billing: ProfessionalBillingStatus): ProfessionalUpgradeTier[] {
+    const currentRank = this.planRank[billing.plan.code] ?? 0;
+    return (['pro', 'premium_unlimited'] as ProfessionalUpgradeTier[]).filter(
+      (tier) => billing.available_upgrades[tier] && this.planRank[tier] > currentRank
+    );
+  }
+
+  openUpdatePlan(): void {
+    this.billingActionMessage = '';
+    this.selectedUpgradeTier = null;
+    this.isUpdatePlanOpen = true;
+  }
+
+  closeUpdatePlan(): void {
+    this.isUpdatePlanOpen = false;
+  }
+
+  selectUpgradeTier(tier: ProfessionalUpgradeTier): void {
+    this.selectedUpgradeTier = tier;
+  }
+
+  confirmUpdatePlan(): void {
+    if (!this.selectedUpgradeTier) return;
     this.billingActionMessage = '';
     this.isStartingCheckout = true;
-    this.professionalAuthApi.createBillingCheckout().subscribe({
+    this.professionalAuthApi.createBillingCheckout(this.selectedUpgradeTier).subscribe({
       next: (response) => {
         window.location.href = response.checkout_url;
       },

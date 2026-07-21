@@ -9,11 +9,14 @@ from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
 from .models import (
+  CalComConnection,
   ChatMessage,
   ClientAccess,
   ClientDetailChangeRequest,
   ClientRegistrationForm,
   ClientReminder,
+  ScheduledMeeting,
+  ScheduledMeetingGuest,
   GroupRegistrationSubmission,
   LeadSubmission,
   ProgressEntry,
@@ -23,11 +26,25 @@ from .models import (
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
-  TrainerGroup,
-  TrainerLeadForm,
-  TrainerProfile,
-  TrainerReference,
+  ManualPaymentProfile,
+  PaymentProof,
+  PaymentRecord,
+  PaymentRequest,
+  ProfessionalGroup,
+  ProfessionalLeadForm,
+  ProfessionalPaymentSettings,
+  ProfessionalProfile,
+  ProfessionalReference,
+  RecycleBinItem,
   UNIVERSAL_CORE_FIELDS,
+)
+from .payment_constants import (
+  CATEGORY_REQUIRED_CLIENT_FIELDS,
+  ISO_4217_CODES,
+  PAYMENT_PROOF_CONTENT_TYPES,
+  PAYMENT_PROOF_MAX_BYTES,
+  PAYMENT_QR_CONTENT_TYPES,
+  PAYMENT_QR_MAX_BYTES,
 )
 
 User = get_user_model()
@@ -156,7 +173,7 @@ FIELD_TYPES = {
   'image',
 }
 
-TRAINER_ID_PATTERN = re.compile(r'^[a-z0-9._-]+$')
+PROFESSIONAL_ID_PATTERN = re.compile(r'^[a-z0-9._-]+$')
 
 
 def normalize_dynamic_fields(fields):
@@ -275,7 +292,7 @@ class EmailOtpVerifySerializer(serializers.Serializer):
     return value.strip().lower()
 
 
-class TrainerSignupSerializer(serializers.Serializer):
+class ProfessionalSignupSerializer(serializers.Serializer):
   email = serializers.EmailField()
   username = serializers.CharField(min_length=5, max_length=10)
   password = serializers.CharField(min_length=8, write_only=True)
@@ -327,12 +344,12 @@ class TrainerSignupSerializer(serializers.Serializer):
         first_name='',
         last_name='',
       )
-      TrainerProfile.objects.create(user=user)
+      ProfessionalProfile.objects.create(user=user)
 
     return user
 
 
-class TrainerLoginSerializer(serializers.Serializer):
+class ProfessionalLoginSerializer(serializers.Serializer):
   identifier = serializers.CharField()
   password = serializers.CharField(write_only=True)
 
@@ -350,8 +367,8 @@ class TrainerLoginSerializer(serializers.Serializer):
     if user is None:
       raise serializers.ValidationError('Invalid username/email or password.')
 
-    if not hasattr(user, 'trainer_profile'):
-      raise serializers.ValidationError('This account is not a trainer account.')
+    if not hasattr(user, 'professional_profile'):
+      raise serializers.ValidationError('This account is not a professional account.')
 
     attrs['user'] = user
     return attrs
@@ -402,7 +419,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     return user
 
 
-class TrainerPasswordChangeSerializer(serializers.Serializer):
+class ProfessionalPasswordChangeSerializer(serializers.Serializer):
   current_password = serializers.CharField(write_only=True)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
@@ -429,11 +446,11 @@ class TrainerPasswordChangeSerializer(serializers.Serializer):
     return user
 
 
-class TrainerAccountSerializer(serializers.ModelSerializer):
-  middle_name = serializers.CharField(source='trainer_profile.middle_name')
-  birth_month = serializers.IntegerField(source='trainer_profile.birth_month', allow_null=True)
-  birth_year = serializers.IntegerField(source='trainer_profile.birth_year', allow_null=True)
-  profile_setup_completed = serializers.BooleanField(source='trainer_profile.profile_setup_completed')
+class ProfessionalAccountSerializer(serializers.ModelSerializer):
+  middle_name = serializers.CharField(source='professional_profile.middle_name')
+  birth_month = serializers.IntegerField(source='professional_profile.birth_month', allow_null=True)
+  birth_year = serializers.IntegerField(source='professional_profile.birth_year', allow_null=True)
+  profile_setup_completed = serializers.BooleanField(source='professional_profile.profile_setup_completed')
 
   class Meta:
     model = User
@@ -450,14 +467,14 @@ class TrainerAccountSerializer(serializers.ModelSerializer):
     ]
 
 
-class TrainerProfileStatusSerializer(serializers.ModelSerializer):
+class ProfessionalProfileStatusSerializer(serializers.ModelSerializer):
   class Meta:
-    model = TrainerProfile
+    model = ProfessionalProfile
     fields = ['profile_setup_completed']
 
 
-class TrainerProfileSerializer(serializers.ModelSerializer):
-  trainer_id = serializers.CharField(max_length=32)
+class ProfessionalProfileSerializer(serializers.ModelSerializer):
+  professional_id = serializers.CharField(max_length=32)
   first_name = serializers.CharField(source='user.first_name', max_length=150)
   middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
   last_name = serializers.CharField(source='user.last_name', max_length=150)
@@ -469,11 +486,11 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
   training_photo_url = serializers.SerializerMethodField()
 
   class Meta:
-    model = TrainerProfile
+    model = ProfessionalProfile
     fields = [
       'email',
       'username',
-      'trainer_id',
+      'professional_id',
       'first_name',
       'middle_name',
       'last_name',
@@ -488,7 +505,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
       'state',
       'professional_headline',
       'about_me',
-      'trainer_type',
+      'professional_type',
       'years_experience',
       'specializations',
       'training_style',
@@ -538,7 +555,7 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     return request.build_absolute_uri(file_field.url) if request else file_field.url
 
   def validate(self, attrs):
-    required_fields = ['trainer_id', 'first_name', 'last_name', 'gender', 'birth_month', 'birth_year', 'country', 'state']
+    required_fields = ['professional_id', 'first_name', 'last_name', 'gender', 'birth_month', 'birth_year', 'country', 'state']
     user_attrs = attrs.get('user', {})
 
     for field in required_fields:
@@ -549,27 +566,27 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
 
     return attrs
 
-  def validate_trainer_id(self, value: str) -> str:
-    trainer_id = value.strip().lower()
+  def validate_professional_id(self, value: str) -> str:
+    professional_id = value.strip().lower()
 
-    if not trainer_id:
-      raise serializers.ValidationError('Trainer ID is required.')
+    if not professional_id:
+      raise serializers.ValidationError('Professional ID is required.')
 
-    if len(trainer_id) < 4:
-      raise serializers.ValidationError('Trainer ID must be at least 4 characters.')
+    if len(professional_id) < 4:
+      raise serializers.ValidationError('Professional ID must be at least 4 characters.')
 
-    if not TRAINER_ID_PATTERN.match(trainer_id):
+    if not PROFESSIONAL_ID_PATTERN.match(professional_id):
       raise serializers.ValidationError('Use only letters, numbers, periods, underscores, or hyphens.')
 
-    query = TrainerProfile.objects.filter(trainer_id__iexact=trainer_id)
+    query = ProfessionalProfile.objects.filter(professional_id__iexact=professional_id)
 
     if self.instance:
       query = query.exclude(pk=self.instance.pk)
 
     if query.exists():
-      raise serializers.ValidationError('Trainer ID is already taken.')
+      raise serializers.ValidationError('Professional ID is already taken.')
 
-    return trainer_id
+    return professional_id
 
   def validate_profile_photo(self, value):
     return self.validate_image_upload(value)
@@ -662,12 +679,12 @@ class TrainerProfileSerializer(serializers.ModelSerializer):
     return instance
 
 
-class TrainerLeadFormSerializer(serializers.ModelSerializer):
+class ProfessionalLeadFormSerializer(serializers.ModelSerializer):
   public_link = serializers.SerializerMethodField()
   custom_fields = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
 
   class Meta:
-    model = TrainerLeadForm
+    model = ProfessionalLeadForm
     fields = ['id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
     read_only_fields = ['public_slug', 'public_link', 'fields', 'is_active', 'created_at', 'updated_at']
 
@@ -676,27 +693,27 @@ class TrainerLeadFormSerializer(serializers.ModelSerializer):
 
   def validate(self, attrs):
     attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields', []))
-    attrs['title'] = attrs.get('title', 'Trainer Lead Form').strip() or 'Trainer Lead Form'
+    attrs['title'] = attrs.get('title', 'Professional Lead Form').strip() or 'Professional Lead Form'
     return attrs
 
 
 class PublicLeadFormSerializer(serializers.ModelSerializer):
-  trainer_name = serializers.SerializerMethodField()
+  professional_name = serializers.SerializerMethodField()
 
   class Meta:
-    model = TrainerLeadForm
-    fields = ['id', 'title', 'public_slug', 'trainer_name', 'fields']
+    model = ProfessionalLeadForm
+    fields = ['id', 'title', 'public_slug', 'professional_name', 'fields']
 
-  def get_trainer_name(self, obj):
-    return obj.trainer.get_full_name() or obj.trainer.username
+  def get_professional_name(self, obj):
+    return obj.professional.get_full_name() or obj.professional.username
 
 
-class TrainerGroupSerializer(serializers.ModelSerializer):
+class ProfessionalGroupSerializer(serializers.ModelSerializer):
   has_registration_form = serializers.SerializerMethodField()
   registration_form = serializers.SerializerMethodField()
 
   class Meta:
-    model = TrainerGroup
+    model = ProfessionalGroup
     fields = ['id', 'name', 'description', 'is_active', 'has_registration_form', 'registration_form', 'created_at', 'updated_at']
     read_only_fields = ['id', 'is_active', 'has_registration_form', 'registration_form', 'created_at', 'updated_at']
 
@@ -854,9 +871,9 @@ class ClientAccessCreateSerializer(serializers.Serializer):
 
     validate_username_charset(username)
 
-    trainer = self.context.get('trainer')
+    professional = self.context.get('professional')
 
-    if trainer and ClientAccess.objects.filter(trainer=trainer, username__iexact=username).exists():
+    if professional and ClientAccess.objects.filter(professional=professional, username__iexact=username).exists():
       raise serializers.ValidationError('Client username is already taken.')
 
     return username
@@ -874,23 +891,23 @@ class ClientAccessCreateSerializer(serializers.Serializer):
 
 
 class ClientLoginSerializer(serializers.Serializer):
-  trainer_id = serializers.CharField(max_length=32)
+  professional_id = serializers.CharField(max_length=32)
   username = serializers.CharField(max_length=150)
   password = serializers.CharField(write_only=True)
 
   def validate(self, attrs):
-    trainer_id = attrs['trainer_id'].strip().lower()
+    professional_id = attrs['professional_id'].strip().lower()
     username = attrs['username'].strip().lower()
     password = attrs['password']
 
-    if not trainer_id:
-      raise serializers.ValidationError({'trainer_id': 'Trainer ID is required.'})
+    if not professional_id:
+      raise serializers.ValidationError({'professional_id': 'Professional ID is required.'})
 
     access_records = ClientAccess.objects.filter(
-      trainer__trainer_profile__trainer_id__iexact=trainer_id,
+      professional__professional_profile__professional_id__iexact=professional_id,
       username__iexact=username,
       is_active=True,
-    ).select_related('trainer', 'group', 'lead_submission', 'registration_submission')
+    ).select_related('professional', 'group', 'lead_submission', 'registration_submission')
 
     client_access = None
 
@@ -909,22 +926,22 @@ class ClientLoginSerializer(serializers.Serializer):
         break
 
     if client_access is None:
-      raise serializers.ValidationError('Invalid trainer ID, client username, or password.')
+      raise serializers.ValidationError('Invalid professional ID, client username, or password.')
 
     attrs['client_access'] = client_access
     return attrs
 
 
-class ClientTrainerLookupSerializer(serializers.Serializer):
-  trainer_id = serializers.CharField(max_length=32)
+class ClientProfessionalLookupSerializer(serializers.Serializer):
+  professional_id = serializers.CharField(max_length=32)
 
-  def validate_trainer_id(self, value: str) -> str:
-    trainer_id = value.strip().lower()
+  def validate_professional_id(self, value: str) -> str:
+    professional_id = value.strip().lower()
 
-    if not trainer_id:
-      raise serializers.ValidationError('Trainer ID is required.')
+    if not professional_id:
+      raise serializers.ValidationError('Professional ID is required.')
 
-    return trainer_id
+    return professional_id
 
 
 TEMPLATE_FIELD_TYPES = {
@@ -1030,13 +1047,13 @@ class ReferenceCategorySerializer(serializers.ModelSerializer):
     return [str(subcategory).strip() for subcategory in value if str(subcategory).strip()]
 
 
-class TrainerReferenceSerializer(serializers.ModelSerializer):
+class ProfessionalReferenceSerializer(serializers.ModelSerializer):
   category_name = serializers.CharField(source='category.name', read_only=True)
   file_url = serializers.SerializerMethodField()
   file_name = serializers.SerializerMethodField()
 
   class Meta:
-    model = TrainerReference
+    model = ProfessionalReference
     fields = [
       'id',
       'category',
@@ -1094,7 +1111,7 @@ class TrainerReferenceSerializer(serializers.ModelSerializer):
     link = (attrs.get('link') if 'link' in attrs else (self.instance.link if self.instance else '')) or ''
     file = attrs.get('file') if 'file' in attrs else (self.instance.file if self.instance else None)
 
-    if reference_type == TrainerReference.TYPE_VIDEO_LINK:
+    if reference_type == ProfessionalReference.TYPE_VIDEO_LINK:
       if not link:
         raise serializers.ValidationError({'link': 'Video URL is required.'})
 
@@ -1105,20 +1122,21 @@ class TrainerReferenceSerializer(serializers.ModelSerializer):
 
     upload = attrs.get('file')
 
-    if reference_type == TrainerReference.TYPE_PDF:
-      if not link:
-        raise serializers.ValidationError({'link': 'PDF URL is required.'})
+    if reference_type == ProfessionalReference.TYPE_PDF:
+      if not link and not file:
+        raise serializers.ValidationError({'file': 'Upload a PDF or paste a PDF URL.'})
 
-      attrs['file'] = None
+      if upload and getattr(upload, 'content_type', '') != 'application/pdf':
+        raise serializers.ValidationError({'file': 'Only PDF uploads are allowed.'})
 
-    if reference_type == TrainerReference.TYPE_TEXT_NOTE:
+    if reference_type == ProfessionalReference.TYPE_TEXT_NOTE:
       if not attrs.get('description', '').strip():
         raise serializers.ValidationError({'description': 'Text is required.'})
 
       attrs['link'] = ''
       attrs['file'] = None
 
-    if reference_type == TrainerReference.TYPE_IMAGE:
+    if reference_type == ProfessionalReference.TYPE_IMAGE:
       if not file:
         raise serializers.ValidationError({'file': 'Image upload is required.'})
 
@@ -1136,7 +1154,7 @@ class TrackingTemplateReferenceSerializer(serializers.ModelSerializer):
   file_url = serializers.SerializerMethodField()
 
   class Meta:
-    model = TrainerReference
+    model = ProfessionalReference
     fields = ['id', 'title', 'reference_type', 'category_name', 'subcategory', 'description', 'link', 'file_url', 'tags']
     read_only_fields = fields
 
@@ -1221,26 +1239,66 @@ class TrackingEntrySerializer(serializers.ModelSerializer):
       'entry_time',
       'answers',
       'note',
-      'edited_by_trainer',
+      'edited_by_professional',
       'created_at',
       'updated_at',
     ]
-    read_only_fields = ['id', 'client', 'template', 'template_name', 'edited_by_trainer', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'client', 'template', 'template_name', 'edited_by_professional', 'created_at', 'updated_at']
+
+
+CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+CHAT_IMAGE_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+
+
+class RecycleBinItemSerializer(serializers.ModelSerializer):
+  days_remaining = serializers.SerializerMethodField()
+  category_label = serializers.CharField(source='get_category_display', read_only=True)
+  deleted_by_label = serializers.CharField(source='get_deleted_by_display', read_only=True)
+
+  class Meta:
+    model = RecycleBinItem
+    fields = [
+      'id', 'category', 'category_label', 'title', 'deleted_by', 'deleted_by_label',
+      'deleted_at', 'expires_at', 'days_remaining',
+    ]
+    read_only_fields = fields
+
+  def get_days_remaining(self, obj):
+    from django.utils import timezone
+
+    remaining = (obj.expires_at - timezone.now()).days
+    return max(0, remaining)
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
+  image_url = serializers.SerializerMethodField()
+
   class Meta:
     model = ChatMessage
-    fields = ['id', 'sender', 'text', 'created_at']
-    read_only_fields = ['id', 'sender', 'created_at']
+    fields = ['id', 'sender', 'text', 'image', 'image_url', 'created_at']
+    read_only_fields = ['id', 'sender', 'image_url', 'created_at']
+    extra_kwargs = {'image': {'write_only': True, 'required': False}}
 
   def validate_text(self, value):
-    text = value.strip()
+    return value.strip()
 
-    if not text:
-      raise serializers.ValidationError('Message text is required.')
+  def validate_image(self, value):
+    if value.size > CHAT_IMAGE_MAX_BYTES:
+      raise serializers.ValidationError('Images must be 5MB or smaller.')
+    if value.content_type not in CHAT_IMAGE_CONTENT_TYPES:
+      raise serializers.ValidationError('Images must be JPEG, PNG, WebP, or GIF.')
+    return value
 
-    return text
+  def validate(self, attrs):
+    if not attrs.get('text') and not attrs.get('image'):
+      raise serializers.ValidationError('Send some text, an image, or both.')
+    return attrs
+
+  def get_image_url(self, obj):
+    if not obj.image:
+      return ''
+    request = self.context.get('request')
+    return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
 
 class ClientPasswordChangeSerializer(serializers.Serializer):
@@ -1274,7 +1332,7 @@ class ClientPasswordChangeSerializer(serializers.Serializer):
 
 class ClientAccessSerializer(serializers.ModelSerializer):
   group_name = serializers.CharField(source='group.name', read_only=True)
-  trainer_name = serializers.SerializerMethodField()
+  professional_name = serializers.SerializerMethodField()
   additional_info = serializers.SerializerMethodField()
 
   class Meta:
@@ -1283,7 +1341,7 @@ class ClientAccessSerializer(serializers.ModelSerializer):
       'id',
       'group',
       'group_name',
-      'trainer_name',
+      'professional_name',
       'lead_submission',
       'registration_submission',
       'reference_id',
@@ -1303,8 +1361,8 @@ class ClientAccessSerializer(serializers.ModelSerializer):
     ]
     read_only_fields = fields
 
-  def get_trainer_name(self, obj):
-    return obj.trainer.get_full_name() or obj.trainer.username
+  def get_professional_name(self, obj):
+    return obj.professional.get_full_name() or obj.professional.username
 
   def get_additional_info(self, obj):
     return normalize_additional_info(obj.additional_info)
@@ -1343,7 +1401,7 @@ class ClientDetailChangeRequestSerializer(serializers.ModelSerializer):
       'proposed_answers',
       'status',
       'client_note',
-      'trainer_note',
+      'professional_note',
       'created_at',
       'reviewed_at',
       'reviewed_by',
@@ -1354,8 +1412,8 @@ class ClientDetailChangeRequestSerializer(serializers.ModelSerializer):
   def get_reviewed_by(self, obj):
     if not obj.reviewed_at:
       return ''
-    trainer = obj.client.trainer
-    return trainer.get_full_name() or trainer.username
+    professional = obj.client.professional
+    return professional.get_full_name() or professional.username
 
 
 class SupportIncidentMessageSerializer(serializers.ModelSerializer):
@@ -1419,6 +1477,24 @@ class SupportIncidentCreateSerializer(serializers.Serializer):
     return value
 
 
+class ErrorReportSerializer(serializers.Serializer):
+  """Automatic crash/error capture from the running web or mobile app — a
+  fire-and-forget beacon, not a user-filled form, so every field beyond
+  platform/message stays optional rather than rejecting a malformed report.
+  """
+  platform = serializers.ChoiceField(choices=['web', 'android', 'ios'])
+  level = serializers.ChoiceField(choices=['warning', 'error', 'fatal'], default='error')
+  message = serializers.CharField(max_length=500)
+  stack_trace = serializers.CharField(max_length=20000, required=False, allow_blank=True, default='')
+  context = serializers.JSONField(required=False, default=dict)
+  app_version = serializers.CharField(max_length=40, required=False, allow_blank=True, default='')
+  device_info = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+  request_path = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+
+  def validate_context(self, value):
+    return value if isinstance(value, dict) else {}
+
+
 class ClientReminderSerializer(serializers.ModelSerializer):
   client_name = serializers.SerializerMethodField()
 
@@ -1433,7 +1509,7 @@ class ClientReminderSerializer(serializers.ModelSerializer):
       'time',
       'notes',
       'status',
-      'notify_trainer',
+      'notify_professional',
       'created_at',
       'updated_at',
     ]
@@ -1441,6 +1517,95 @@ class ClientReminderSerializer(serializers.ModelSerializer):
 
   def get_client_name(self, obj):
     return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+
+class CalComConnectionSerializer(serializers.ModelSerializer):
+  """Never exposes api_key back to the client — write-only, and the field
+  itself isn't even included in the read shape (has_api_key is)."""
+
+  has_api_key = serializers.SerializerMethodField()
+
+  class Meta:
+    model = CalComConnection
+    fields = [
+      'cal_username',
+      'default_event_type_id',
+      'default_event_type_slug',
+      'default_event_type_label',
+      'default_duration_minutes',
+      'timezone',
+      'is_connected',
+      'has_api_key',
+      'updated_at',
+    ]
+    read_only_fields = ['is_connected', 'has_api_key', 'updated_at']
+
+  def get_has_api_key(self, obj):
+    return bool(obj.api_key)
+
+
+class ScheduledMeetingGuestSerializer(serializers.ModelSerializer):
+  client_name = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ScheduledMeetingGuest
+    fields = ['id', 'client', 'client_name', 'response_status', 'responded_at']
+    read_only_fields = fields
+
+  def get_client_name(self, obj):
+    return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+
+class ScheduledMeetingSerializer(serializers.ModelSerializer):
+  """`context['client']` (a ClientAccess), when present, is the requesting
+  client-portal user — used to surface `my_response_status` so the client's
+  own UI doesn't have to figure out whether they're the primary attendee or
+  a guest to know which response applies to them."""
+
+  client_name = serializers.SerializerMethodField()
+  guests = ScheduledMeetingGuestSerializer(many=True, read_only=True)
+  is_group_meeting = serializers.SerializerMethodField()
+  my_response_status = serializers.SerializerMethodField()
+
+  class Meta:
+    model = ScheduledMeeting
+    fields = [
+      'id',
+      'client',
+      'client_name',
+      'title',
+      'notes',
+      'start_at',
+      'end_at',
+      'meeting_url',
+      'status',
+      'cancellation_reason',
+      'client_response_status',
+      'guests',
+      'is_group_meeting',
+      'my_response_status',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = [
+      'id', 'client_name', 'meeting_url', 'status', 'cancellation_reason', 'client_response_status',
+      'guests', 'is_group_meeting', 'my_response_status', 'created_at', 'updated_at',
+    ]
+
+  def get_client_name(self, obj):
+    return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+  def get_is_group_meeting(self, obj):
+    return len(obj.guests.all()) > 0
+
+  def get_my_response_status(self, obj):
+    requesting_client = self.context.get('client')
+    if requesting_client is None:
+      return None
+    if requesting_client.id == obj.client_id:
+      return obj.client_response_status
+    guest = next((g for g in obj.guests.all() if g.client_id == requesting_client.id), None)
+    return guest.response_status if guest else None
 
 
 class ProgressEntrySerializer(serializers.ModelSerializer):
@@ -1459,3 +1624,437 @@ class ProgressEntrySerializer(serializers.ModelSerializer):
       'updated_at',
     ]
     read_only_fields = ['id', 'client', 'created_by', 'created_at', 'updated_at']
+
+
+class ProfessionalPaymentSettingsSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = ProfessionalPaymentSettings
+    fields = [
+      'payment_tracking_enabled',
+      'reporting_currency',
+      'reporting_currency_locked',
+      'client_payment_history_enabled',
+      'updated_at',
+    ]
+    read_only_fields = ['updated_at']
+
+  def validate_reporting_currency(self, value):
+    code = value.strip().upper()
+    if code not in ISO_4217_CODES:
+      raise serializers.ValidationError('Choose a supported ISO currency code.')
+    return code
+
+
+class ManualPaymentProfileSerializer(serializers.ModelSerializer):
+  """Full professional-facing view of a manual payment method. The redacted
+  client projection lives in ManualPaymentProfileClientSerializer - private
+  fields must never be added there."""
+
+  class Meta:
+    model = ManualPaymentProfile
+    fields = [
+      'id',
+      'name',
+      'category',
+      'display_label',
+      'supported_currencies',
+      'country',
+      'private_fields',
+      'client_visible_fields',
+      'qr_code',
+      'internal_notes',
+      'client_instructions',
+      'status',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = ['id', 'created_at', 'updated_at']
+
+  def validate_display_label(self, value):
+    label = value.strip()
+    if not label:
+      raise serializers.ValidationError('Display label is required.')
+    return label
+
+  def validate_supported_currencies(self, value):
+    if not isinstance(value, list):
+      raise serializers.ValidationError('Supported currencies must be a list of currency codes.')
+    codes = []
+    for code in value:
+      normalized = str(code).strip().upper()
+      if normalized not in ISO_4217_CODES:
+        raise serializers.ValidationError(f'{code} is not a supported currency code.')
+      if normalized not in codes:
+        codes.append(normalized)
+    return codes
+
+  def validate_qr_code(self, value):
+    if value is None:
+      return value
+    content_type = getattr(value, 'content_type', '')
+    if content_type not in PAYMENT_QR_CONTENT_TYPES:
+      raise serializers.ValidationError('QR code must be a PNG, JPG, or WEBP image.')
+    if value.size > PAYMENT_QR_MAX_BYTES:
+      raise serializers.ValidationError('QR code image must be under 2MB.')
+    return value
+
+  def validate(self, attrs):
+    category = attrs.get('category') or (self.instance.category if self.instance else None)
+    client_fields = attrs.get('client_visible_fields')
+    if client_fields is None:
+      client_fields = self.instance.client_visible_fields if self.instance else {}
+
+    if not isinstance(client_fields, dict):
+      raise serializers.ValidationError({'client_visible_fields': 'Client-visible fields must be an object.'})
+
+    required_keys = CATEGORY_REQUIRED_CLIENT_FIELDS.get(category, [])
+    missing = [key for key in required_keys if not str(client_fields.get(key) or '').strip()]
+    if missing:
+      labels = ', '.join(key.replace('_', ' ') for key in missing)
+      raise serializers.ValidationError(
+        {'client_visible_fields': f'This payment category needs: {labels}.'}
+      )
+
+    private_fields = attrs.get('private_fields')
+    if private_fields is not None and not isinstance(private_fields, dict):
+      raise serializers.ValidationError({'private_fields': 'Private fields must be an object.'})
+
+    return attrs
+
+
+class ManualPaymentProfileClientSerializer(serializers.ModelSerializer):
+  """What a client is allowed to see about a shared payment method. Keep this
+  list tight: name, private_fields, and internal_notes must NEVER appear."""
+
+  class Meta:
+    model = ManualPaymentProfile
+    fields = [
+      'id',
+      'category',
+      'display_label',
+      'supported_currencies',
+      'client_visible_fields',
+      'qr_code',
+      'client_instructions',
+    ]
+    read_only_fields = fields
+
+
+class PaymentRequestSerializer(serializers.ModelSerializer):
+  client_name = serializers.SerializerMethodField()
+  allowed_method_labels = serializers.SerializerMethodField()
+
+  class Meta:
+    model = PaymentRequest
+    fields = [
+      'id',
+      'request_id',
+      'client',
+      'client_name',
+      'payment_plan',
+      'title',
+      'description',
+      'requested_amount',
+      'requested_currency',
+      'due_date',
+      'payment_type',
+      'status',
+      'client_visibility',
+      'notes',
+      'allowed_method_labels',
+      'created_at',
+      'sent_at',
+      'viewed_at',
+      'completed_at',
+      'updated_at',
+    ]
+    read_only_fields = [
+      'id', 'request_id', 'client', 'client_name', 'status', 'allowed_method_labels',
+      'created_at', 'sent_at', 'viewed_at', 'completed_at', 'updated_at',
+    ]
+
+  def get_client_name(self, obj):
+    return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+  def get_allowed_method_labels(self, obj):
+    return [
+      allowed.manual_payment_profile.display_label
+      for allowed in obj.allowed_methods.select_related('manual_payment_profile')
+      if allowed.manual_payment_profile
+    ]
+
+  def validate_title(self, value):
+    title = value.strip()
+    if not title:
+      raise serializers.ValidationError('Payment title is required.')
+    return title
+
+  def validate_requested_amount(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Requested amount must be greater than zero.')
+    return value
+
+  def validate_requested_currency(self, value):
+    code = value.strip().upper()
+    if code not in ISO_4217_CODES:
+      raise serializers.ValidationError('Choose a supported ISO currency code.')
+    return code
+
+
+class ClientPaymentRequestSerializer(serializers.ModelSerializer):
+  """Client-facing projection of a payment request. Professional notes and
+  internal linkage fields are deliberately absent."""
+
+  professional_name = serializers.SerializerMethodField()
+  available_methods = serializers.SerializerMethodField()
+  proofs = serializers.SerializerMethodField()
+
+  class Meta:
+    model = PaymentRequest
+    fields = [
+      'request_id',
+      'professional_name',
+      'title',
+      'description',
+      'requested_amount',
+      'requested_currency',
+      'due_date',
+      'payment_type',
+      'status',
+      'available_methods',
+      'proofs',
+      'created_at',
+      'sent_at',
+    ]
+    read_only_fields = fields
+
+  def get_professional_name(self, obj):
+    professional = obj.professional
+    return f'{professional.first_name} {professional.last_name}'.strip() or professional.username
+
+  def get_available_methods(self, obj):
+    methods = [
+      allowed.manual_payment_profile
+      for allowed in obj.allowed_methods.select_related('manual_payment_profile')
+      if allowed.manual_payment_profile and allowed.manual_payment_profile.status == 'active'
+    ]
+    return ManualPaymentProfileClientSerializer(methods, many=True).data
+
+  def get_proofs(self, obj):
+    # The client's own submission history for this request, including any
+    # rejection reason — without this, a rejected proof silently resets the
+    # request to "viewed" with no visible trace of what happened.
+    return PaymentProofSerializer(obj.proofs.order_by('-submitted_at'), many=True).data
+
+
+class PaymentProofSubmitSerializer(serializers.ModelSerializer):
+  """Client-submitted proof of an external payment. Requires a transaction
+  reference OR a proof file, plus an explicit accuracy confirmation."""
+
+  confirmed_accurate = serializers.BooleanField()
+
+  class Meta:
+    model = PaymentProof
+    fields = [
+      'transaction_reference',
+      'reported_amount',
+      'reported_currency',
+      'reported_payment_date',
+      'payment_method',
+      'proof_file',
+      'note',
+      'confirmed_accurate',
+    ]
+
+  def validate_reported_amount(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Amount paid must be greater than zero.')
+    return value
+
+  def validate_reported_currency(self, value):
+    code = value.strip().upper()
+    if code not in ISO_4217_CODES:
+      raise serializers.ValidationError('Choose a supported ISO currency code.')
+    return code
+
+  def validate_reported_payment_date(self, value):
+    from django.utils import timezone as dj_timezone
+    if value > dj_timezone.now().date():
+      raise serializers.ValidationError('Payment date cannot be in the future.')
+    return value
+
+  def validate_proof_file(self, value):
+    if value is None:
+      return value
+    content_type = getattr(value, 'content_type', '')
+    if content_type not in PAYMENT_PROOF_CONTENT_TYPES:
+      raise serializers.ValidationError('Use a JPG, PNG, WEBP, or PDF file.')
+    if value.size > PAYMENT_PROOF_MAX_BYTES:
+      raise serializers.ValidationError('Proof file must be under 5MB.')
+    return value
+
+  def validate_confirmed_accurate(self, value):
+    if not value:
+      raise serializers.ValidationError('Confirm the submitted information is accurate.')
+    return value
+
+  def validate(self, attrs):
+    if not str(attrs.get('transaction_reference') or '').strip() and not attrs.get('proof_file'):
+      raise serializers.ValidationError('Enter a transaction ID or attach a proof file before submitting.')
+    return attrs
+
+
+class PaymentProofSerializer(serializers.ModelSerializer):
+  """Professional-facing review projection of a submitted proof."""
+
+  payment_method_label = serializers.SerializerMethodField()
+  has_file = serializers.SerializerMethodField()
+
+  class Meta:
+    model = PaymentProof
+    fields = [
+      'id',
+      'transaction_reference',
+      'reported_amount',
+      'reported_currency',
+      'reported_payment_date',
+      'payment_method',
+      'payment_method_label',
+      'has_file',
+      'note',
+      'status',
+      'review_note',
+      'submitted_by',
+      'submitted_at',
+      'reviewed_at',
+    ]
+    read_only_fields = fields
+
+  def get_payment_method_label(self, obj):
+    return obj.payment_method.display_label if obj.payment_method else ''
+
+  def get_has_file(self, obj):
+    return bool(obj.proof_file)
+
+
+class PaymentRecordSerializer(serializers.ModelSerializer):
+  client_name = serializers.SerializerMethodField()
+  payment_method_label = serializers.SerializerMethodField()
+  request_reference = serializers.SerializerMethodField()
+
+  class Meta:
+    model = PaymentRecord
+    fields = [
+      'id',
+      'payment_record_id',
+      'client',
+      'client_name',
+      'request_reference',
+      'original_amount',
+      'original_currency',
+      'reporting_amount',
+      'reporting_currency',
+      'exchange_rate_reference',
+      'exchange_rate_source',
+      'payment_method',
+      'payment_method_label',
+      'transaction_reference',
+      'received_date',
+      'status',
+      'client_visibility',
+      'internal_note',
+      'client_note',
+      'verified_at',
+      'created_at',
+      'updated_at',
+    ]
+    read_only_fields = [
+      'id', 'payment_record_id', 'client', 'client_name', 'request_reference',
+      'payment_method_label', 'verified_at', 'created_at', 'updated_at',
+    ]
+
+  def get_client_name(self, obj):
+    return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
+
+  def get_payment_method_label(self, obj):
+    return obj.payment_method.display_label if obj.payment_method else ''
+
+  def get_request_reference(self, obj):
+    return obj.payment_request.request_id if obj.payment_request else ''
+
+  def validate_original_amount(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Amount must be greater than zero.')
+    return value
+
+  def validate_reporting_amount(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Reporting amount must be greater than zero.')
+    return value
+
+  def validate_original_currency(self, value):
+    code = value.strip().upper()
+    if code not in ISO_4217_CODES:
+      raise serializers.ValidationError('Choose a supported ISO currency code.')
+    return code
+
+  def validate_reporting_currency(self, value):
+    code = value.strip().upper()
+    if code not in ISO_4217_CODES:
+      raise serializers.ValidationError('Choose a supported ISO currency code.')
+    return code
+
+  def validate_received_date(self, value):
+    from django.utils import timezone as dj_timezone
+    if value > dj_timezone.now().date():
+      raise serializers.ValidationError('Received date cannot be in the future.')
+    return value
+
+
+class ClientPaymentRecordSerializer(serializers.ModelSerializer):
+  """Client-facing record projection - internal notes are never included."""
+
+  payment_method_label = serializers.SerializerMethodField()
+  request_reference = serializers.SerializerMethodField()
+
+  class Meta:
+    model = PaymentRecord
+    fields = [
+      'payment_record_id',
+      'request_reference',
+      'original_amount',
+      'original_currency',
+      'payment_method_label',
+      'transaction_reference',
+      'received_date',
+      'status',
+      'client_note',
+    ]
+    read_only_fields = fields
+
+  def get_payment_method_label(self, obj):
+    return obj.payment_method.display_label if obj.payment_method else ''
+
+  def get_request_reference(self, obj):
+    return obj.payment_request.request_id if obj.payment_request else ''
+
+
+class PaymentConfirmationSerializer(serializers.Serializer):
+  """Read-only 'Payment Confirmation' document - explicitly NOT a bank or
+  provider receipt. Denormalizes everything needed to render it standalone,
+  for both the professional's and the client's view of the same record."""
+
+  payment_record_id = serializers.CharField()
+  request_reference = serializers.CharField()
+  professional_name = serializers.CharField()
+  client_name = serializers.CharField()
+  amount_recorded = serializers.DecimalField(max_digits=12, decimal_places=2, source='original_amount')
+  original_currency = serializers.CharField()
+  reporting_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+  reporting_currency = serializers.CharField()
+  payment_method_label = serializers.CharField()
+  transaction_reference = serializers.CharField()
+  received_date = serializers.DateField()
+  confirmed_date = serializers.DateTimeField(source='verified_at')
+  status = serializers.CharField()
+  professional_note = serializers.CharField(source='client_note')

@@ -3,34 +3,36 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
-import { ClientApiService, ClientMeResponse } from '../../../core/api/client-api.service';
+import { ClientApiService, ClientMeResponse } from '@core/api/client-api.service';
 import {
   AdditionalInfoItem,
   ClientAccessRecord,
   ClientDetailChangeRequest,
   DynamicField,
   ProgressEntry
-} from '../../../core/api/forms-groups-api.service';
+} from '@core/api/forms-groups-api.service';
 import {
   TemplateField,
   TrackingEntryRecord,
   TrackingTemplateRecord
-} from '../../../core/api/templates-api.service';
-import { ChatPanelComponent } from '../../../shared/chat-panel/chat-panel.component';
-import { ChartSpec } from '../../../shared/analytics/analytics.types';
-import { ChartRendererComponent } from '../../../shared/analytics/chart-renderer.component';
-import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '../../../shared/analytics/graph-engine';
-import { ReferencesAccordionComponent } from '../../../shared/references-accordion/references-accordion.component';
-import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
-import { ClientPageShellComponent } from '../../../shared/client-page-shell/client-page-shell.component';
-import { PasswordInputComponent } from '../../../shared/password-input/password-input.component';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
-import { SupportIncidentsComponent } from '../../../shared/support-incidents/support-incidents.component';
+} from '@core/api/templates-api.service';
+import { ChatPanelComponent } from '@studio-shared/chat-panel/chat-panel.component';
+import { ClientPaymentsPanelComponent } from '@studio-shared/client-payments-panel/client-payments-panel.component';
+import { ChartSpec } from '@studio-shared/analytics/analytics.types';
+import { ChartRendererComponent } from '@studio-shared/analytics/chart-renderer.component';
+import { buildFieldCharts, numericFieldStats, NumericFieldStat } from '@studio-shared/analytics/graph-engine';
+import { ReferencesAccordionComponent } from '@studio-shared/references-accordion/references-accordion.component';
+import { readImageAsDataUrl } from '@shared/utils/image-helpers';
+import { formatApiError } from '@shared/utils/ui-helpers';
+import { ClientPageShellComponent } from '@studio-shared/client-page-shell/client-page-shell.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { SupportIncidentsComponent } from '@studio-shared/support-incidents/support-incidents.component';
 
-type PortalTab = 'details' | 'trainer' | 'templates';
-type TrainerTab = 'profile' | 'chat' | 'additional-details';
+type PortalTab = 'details' | 'professional' | 'templates';
+type ProfessionalTab = 'profile' | 'chat' | 'payments' | 'additional-details';
 type TemplateTab = 'overview' | 'references' | 'data-entry' | 'progress';
+type SettingsTab = 'account' | 'security' | 'legal' | 'support' | 'danger';
 
 interface EntryDraft {
   entryDate: string;
@@ -42,7 +44,7 @@ interface EntryDraft {
 @Component({
   selector: 'app-client-profile',
   standalone: true,
-  imports: [ChartRendererComponent, ChatPanelComponent, ClientPageShellComponent, DatePipe, FormsModule, PasswordInputComponent, ReferencesAccordionComponent, RouterLink, SupportIncidentsComponent],
+  imports: [ChartRendererComponent, ChatPanelComponent, ClientPageShellComponent, ClientPaymentsPanelComponent, DatePipe, FormsModule, PasswordInputComponent, ReferencesAccordionComponent, RouterLink, SupportIncidentsComponent],
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
@@ -59,14 +61,15 @@ export class ClientProfileComponent implements OnInit {
   progressEntries: ProgressEntry[] = [];
   drafts: Record<number, EntryDraft> = {};
   activeTab: PortalTab = 'details';
-  trainerTab: TrainerTab = 'profile';
+  professionalTab: ProfessionalTab = 'profile';
   templateTab: TemplateTab = 'overview';
+  settingsTab: SettingsTab = 'account';
   selectedTemplateId: number | null = null;
   areTemplatesExpanded = true;
   message = '';
   messageType: 'success' | 'error' = 'success';
   savingTemplateId = 0;
-  trainerPhotoFailed = false;
+  professionalPhotoFailed = false;
 
   changeRequest: ClientDetailChangeRequest | null = null;
   isEditingDetails = false;
@@ -81,12 +84,20 @@ export class ClientProfileComponent implements OnInit {
 
   readonly tabs: { id: PortalTab; label: string }[] = [
     { id: 'details', label: 'Settings' },
-    { id: 'trainer', label: 'Trainer' },
+    { id: 'professional', label: 'Professional' },
     { id: 'templates', label: 'Templates' }
   ];
-  readonly trainerTabs: { id: TrainerTab; label: string }[] = [
+  readonly professionalTabs: { id: ProfessionalTab; label: string }[] = [
     { id: 'profile', label: 'Profile' },
-    { id: 'chat', label: 'Chat' }
+    { id: 'chat', label: 'Chat' },
+    { id: 'payments', label: 'Payments' }
+  ];
+  readonly settingsTabs: { id: SettingsTab; label: string }[] = [
+    { id: 'account', label: 'Account' },
+    { id: 'security', label: 'Security' },
+    { id: 'legal', label: 'Privacy & Legal' },
+    { id: 'support', label: 'Support' },
+    { id: 'danger', label: 'Danger Zone' }
   ];
   readonly templateTabs: { id: TemplateTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -95,8 +106,8 @@ export class ClientProfileComponent implements OnInit {
     { id: 'progress', label: 'Progress' }
   ];
 
-  get trainerProfile() {
-    return this.me?.trainer_profile || null;
+  get professionalProfile() {
+    return this.me?.professional_profile || null;
   }
 
   get sharedAdditionalInfo() {
@@ -113,13 +124,13 @@ export class ClientProfileComponent implements OnInit {
 
     this.route.queryParamMap.subscribe((params) => {
       const tab = params.get('tab') as PortalTab | null;
-      const trainerTab = params.get('trainerTab') as TrainerTab | null;
+      const professionalTab = params.get('professionalTab') as ProfessionalTab | null;
 
       if (tab && this.tabs.some((item) => item.id === tab)) {
         this.setTab(tab);
       }
-      if (trainerTab && this.trainerTabs.some((item) => item.id === trainerTab)) {
-        this.setTrainerTab(trainerTab);
+      if (professionalTab && this.professionalTabs.some((item) => item.id === professionalTab)) {
+        this.setProfessionalTab(professionalTab);
       }
     });
   }
@@ -143,8 +154,12 @@ export class ClientProfileComponent implements OnInit {
     }
   }
 
-  setTrainerTab(tab: TrainerTab): void {
-    this.trainerTab = tab;
+  setProfessionalTab(tab: ProfessionalTab): void {
+    this.professionalTab = tab;
+  }
+
+  setSettingsTab(tab: SettingsTab): void {
+    this.settingsTab = tab;
   }
 
   setTemplateTab(tab: TemplateTab): void {
@@ -354,8 +369,8 @@ export class ClientProfileComponent implements OnInit {
     });
   }
 
-  onTrainerPhotoError(): void {
-    this.trainerPhotoFailed = true;
+  onProfessionalPhotoError(): void {
+    this.professionalPhotoFailed = true;
   }
 
   otherRegistrationAnswers(): { label: string; value: string }[] {
@@ -449,7 +464,7 @@ export class ClientProfileComponent implements OnInit {
       kind: 'delete',
       title: 'Request account deletion for',
       target: this.client ? `${this.client.first_name} ${this.client.last_name}` : 'this account',
-      impact: 'Your trainer must approve this request. Approval disables login and preserves coaching records for audit and continuity.',
+      impact: 'Your professional must approve this request. Approval disables login and preserves coaching records for audit and continuity.',
       confirmLabel: 'Send Request'
     });
     if (!confirmed) return;
@@ -521,7 +536,7 @@ export class ClientProfileComponent implements OnInit {
       next: (response) => {
         this.me = response;
         this.client = response.client;
-        this.trainerPhotoFailed = false;
+        this.professionalPhotoFailed = false;
         window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
       },
       error: (error: unknown) => {

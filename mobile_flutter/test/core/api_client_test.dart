@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:coachflow/core/api/api_client.dart';
-import 'package:coachflow/core/api/models/client_models.dart';
-import 'package:coachflow/core/api/models/trainer_models.dart';
-import 'package:coachflow/core/config/env.dart';
-import 'package:coachflow/core/session/session_store.dart';
+import 'package:reproot/core/api/api_client.dart';
+import 'package:reproot/core/api/models/client_models.dart';
+import 'package:reproot/core/api/models/professional_models.dart';
+import 'package:reproot/core/config/env.dart';
+import 'package:reproot/core/session/session_store.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,18 +69,18 @@ SessionStore _storeWith(Map<String, String> values) {
 
 void main() {
   group('auth interceptor', () {
-    test('attaches "Token <t>" for trainer-scoped requests', () async {
-      final session = _storeWith({SessionKeys.trainerToken: 'trainer-abc'});
+    test('attaches "Token <t>" for professional-scoped requests', () async {
+      final session = _storeWith({SessionKeys.professionalToken: 'professional-abc'});
       final dio = buildDio(session);
       final adapter = _MockAdapter(statusCode: 200, body: {'ok': true});
       dio.httpClientAdapter = adapter;
 
       await dio.get<Map<String, dynamic>>(
-        '/trainer/profile/',
-        options: authOptions(AuthScheme.trainer),
+        '/professional/profile/',
+        options: authOptions(AuthScheme.professional),
       );
 
-      expect(adapter.captured!.headers['Authorization'], 'Token trainer-abc');
+      expect(adapter.captured!.headers['Authorization'], 'Token professional-abc');
     });
 
     test('attaches "ClientToken <t>" for client-scoped requests', () async {
@@ -98,21 +98,21 @@ void main() {
     });
 
     test('sends no Authorization header on unauthenticated requests', () async {
-      final session = _storeWith({SessionKeys.trainerToken: 'trainer-abc'});
+      final session = _storeWith({SessionKeys.professionalToken: 'professional-abc'});
       final dio = buildDio(session);
       final adapter = _MockAdapter(statusCode: 200, body: {'ok': true});
       dio.httpClientAdapter = adapter;
 
-      await dio.post<Map<String, dynamic>>('/trainer/login/', data: const {});
+      await dio.post<Map<String, dynamic>>('/professional/login/', data: const {});
 
       expect(adapter.captured!.headers.containsKey('Authorization'), isFalse);
     });
 
-    test('does not attach a trainer token to a client request', () async {
+    test('does not attach a professional token to a client request', () async {
       // Both roles can have sessions on one device; crossing them would
       // silently authenticate as the wrong user.
       final session = _storeWith({
-        SessionKeys.trainerToken: 'trainer-abc',
+        SessionKeys.professionalToken: 'professional-abc',
         SessionKeys.clientToken: 'client-xyz',
       });
       final dio = buildDio(session);
@@ -220,11 +220,11 @@ void main() {
   });
 
   group('model parsing', () {
-    test('TrainerProfile reads the backend field names', () {
-      final profile = TrainerProfile.fromJson(const {
+    test('ProfessionalProfile reads the backend field names', () {
+      final profile = ProfessionalProfile.fromJson(const {
         'first_name': 'Nolan',
         'last_name': 'Perez',
-        'trainer_code': 'nolan',
+        'professional_code': 'nolan',
         'profile_setup_completed': true,
         'birth_month': 4,
         'profile_visibility': {'about': true, 'images': false},
@@ -234,7 +234,7 @@ void main() {
       });
 
       expect(profile.displayName, 'Nolan Perez');
-      expect(profile.trainerCode, 'nolan');
+      expect(profile.professionalCode, 'nolan');
       expect(profile.profileSetupCompleted, isTrue);
       expect(profile.birthMonth, 4);
       expect(profile.birthYear, isNull);
@@ -243,8 +243,8 @@ void main() {
       expect(profile.profileLinks.single.url, 'https://x.dev');
     });
 
-    test('TrainerProfile tolerates a missing/empty payload', () {
-      final profile = TrainerProfile.fromJson(const {});
+    test('ProfessionalProfile tolerates a missing/empty payload', () {
+      final profile = ProfessionalProfile.fromJson(const {});
       expect(profile.displayName, '');
       expect(profile.profileSetupCompleted, isFalse);
       expect(profile.profileImages, isEmpty);
@@ -255,7 +255,7 @@ void main() {
         'id': 63,
         'group': 5,
         'group_name': 'Scale',
-        'trainer_name': 'Nolan',
+        'professional_name': 'Nolan',
         'reference_id': 'CF-63',
         'onboarding_method': 'manual',
         'first_name': 'Ava',
@@ -286,10 +286,10 @@ void main() {
 
   group('SessionStore', () {
     test('reports sessions per role independently', () {
-      final store = _storeWith({SessionKeys.trainerToken: 'abc'});
-      expect(store.hasTrainerSession, isTrue);
+      final store = _storeWith({SessionKeys.professionalToken: 'abc'});
+      expect(store.hasProfessionalSession, isTrue);
       expect(store.hasClientSession, isFalse);
-      expect(store.trainerToken, 'abc');
+      expect(store.professionalToken, 'abc');
       expect(store.read('missing'), '');
     });
   });

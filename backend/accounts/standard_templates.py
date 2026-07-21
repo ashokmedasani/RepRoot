@@ -1,8 +1,8 @@
-"""Standard tracking templates offered to every trainer.
+"""Standard tracking templates offered to every professional.
 
-A trainer can adopt any of these with one click instead of building a
-template from scratch. Adopting creates a trainer-owned copy (which counts
-toward the 5-template limit) that the trainer can rename or customize.
+A professional can adopt any of these with one click instead of building a
+template from scratch. Adopting creates a professional-owned copy (which counts
+toward the 5-template limit) that the professional can rename or customize.
 Template fields are never mandatory for clients.
 """
 
@@ -10,7 +10,7 @@ STANDARD_TEMPLATES = [
   {
     'key': 'nutrition_details',
     'name': 'Nutrition Details',
-    'purpose': 'Track daily meals, water intake, and calories so the trainer can review nutrition habits.',
+    'purpose': 'Track daily meals, water intake, and calories so the professional can review nutrition habits.',
     'cadence': 'daily',
     'accent': 'green',
     'fields': [
@@ -43,7 +43,7 @@ STANDARD_TEMPLATES = [
       {'key': 'weight', 'label': 'Current weight (kg)', 'field_type': 'number', 'placeholder': '78.4'},
       {'key': 'energy_rating', 'label': 'Energy level', 'field_type': 'rating', 'scale': 5, 'placeholder': ''},
       {'key': 'energy_mood', 'label': 'Energy / mood today', 'field_type': 'short_text', 'placeholder': 'Energetic, tired, motivated'},
-      {'key': 'progress_notes', 'label': 'How are you feeling?', 'field_type': 'long_text', 'placeholder': 'Anything your trainer should know'},
+      {'key': 'progress_notes', 'label': 'How are you feeling?', 'field_type': 'long_text', 'placeholder': 'Anything your professional should know'},
     ],
   },
 ]

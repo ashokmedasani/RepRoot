@@ -1,7 +1,7 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Dashboard"
-  eyebrow="Trainer dashboard"
-  subtitle="A quick look at your groups, clients, requests, and templates."
+  eyebrow="Professional dashboard"
+  subtitle="Activity, payments, and schedules that need your attention."
   activeSection="dashboard"
   titleId="dashboard-title"
 >
@@ -13,175 +13,353 @@
     <section class="panel">
       <p>Loading dashboard...</p>
     </section>
-  } @else if (overview) {
-    <section class="kpi-row" aria-label="Key stats">
-      <article class="kpi-card">
-        <span class="kpi-icon clients" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 19a5 5 0 0 0-3-4.6"/></svg>
-        </span>
-        <div class="kpi-copy">
-          <span>Total Clients</span>
-          <strong>{{ overview.approved_forms.length }}</strong>
-          @if (clientsThisWeek > 0) {
-            <small class="up">&uarr; {{ clientsThisWeek }} this week</small>
-          } @else {
-            <small>With portal access</small>
-          }
-        </div>
-      </article>
+  } @else {
+    <nav class="dash-tabs" aria-label="Dashboard sections">
+      <button type="button" class="dash-tab" [class.active]="activeTab === 'activity'" (click)="selectTab('activity')">
+        <span>Activity</span>
+        @if (activityActionCount > 0) { <span class="tab-badge">{{ activityActionCount }}</span> }
+      </button>
+      @if (paymentsEnabled) {
+        <button type="button" class="dash-tab" [class.active]="activeTab === 'payments'" (click)="selectTab('payments')">
+          <span>Payments</span>
+          @if (paymentsActionCount > 0) { <span class="tab-badge">{{ paymentsActionCount }}</span> }
+        </button>
+      }
+      <button type="button" class="dash-tab" [class.active]="activeTab === 'schedules'" (click)="selectTab('schedules')">
+        <span>Schedules</span>
+        @if (scheduleActionCount > 0) { <span class="tab-badge">{{ scheduleActionCount }}</span> }
+      </button>
+    </nav>
 
-      <article class="kpi-card">
-        <span class="kpi-icon groups" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3.5 18a4.5 4.5 0 0 1 9 0M12 18a4.5 4.5 0 0 1 8.5-2"/></svg>
-        </span>
-        <div class="kpi-copy">
-          <span>Total Groups</span>
-          <strong>{{ overview.groups.length }}</strong>
-          @if (groupsThisWeek > 0) {
-            <small class="up">&uarr; {{ groupsThisWeek }} this week</small>
-          } @else {
-            <small>Client groups</small>
-          }
-        </div>
-      </article>
-
-      <article class="kpi-card">
-        <span class="kpi-icon templates" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5V6h6V3.5M8.5 11h7M8.5 15h5"/></svg>
-        </span>
-        <div class="kpi-copy">
-          <span>Total Templates</span>
-          <strong>{{ templates.length }}</strong>
-          @if (templatesThisWeek > 0) {
-            <small class="up">&uarr; {{ templatesThisWeek }} this week</small>
-          } @else {
-            <small>Tracking templates</small>
-          }
-        </div>
-      </article>
-
-      <article class="kpi-card">
-        <span class="kpi-icon requests" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 3.5h9l3.5 3.5V20.5H6z"/><path d="M15 3.5V7h3.5M9 12h6M9 16h4"/></svg>
-        </span>
-        <div class="kpi-copy">
-          <span>Pending Requests</span>
-          <strong>{{ overview.pending_forms.length }}</strong>
-          <small>Lead submissions to review</small>
-        </div>
-      </article>
-
-      <article class="kpi-card">
-        <span class="kpi-icon programs" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V5M4 19h16M8 15l3.5-4 3 2.5L20 8"/></svg>
-        </span>
-        <div class="kpi-copy">
-          <span>Active Programs</span>
-          <strong>{{ activePrograms }}</strong>
-          <small>Template assignments</small>
-        </div>
-      </article>
-    </section>
-
-    <!-- Pending requests lead the activity area: they are the trainer's top priority. -->
-    <section class="activity-card pending-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>Pending Requests</h2>
-          <p>New applicants waiting for your review.</p>
-        </div>
-        <a routerLink="/trainer/forms-groups" class="ghost-action compact">View All</a>
-      </div>
-      <app-fixed-height-list [visibleRows]="5">
-        <div class="mini-list">
-          @for (submission of pendingRequests; track submission.id) {
-            <a routerLink="/trainer/forms-groups">
-              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
-              <span>
-                <strong>{{ submission.applicant_name }}</strong>
-                <small>{{ submission.email }} - {{ submission.submitted_at | date: 'mediumDate' }}</small>
-              </span>
-            </a>
-          } @empty {
-            <p class="empty-note">No pending requests right now.</p>
-          }
-        </div>
-      </app-fixed-height-list>
-    </section>
-
-    <section class="overview-panel">
-      <div class="overview-head">
-        <div class="overview-title">
-          <span class="overview-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9h17M8 3.5v3M16 3.5v3"/></svg>
-          </span>
-          <div>
-            <h2>Client Tracking Center</h2>
-            <p>
-              @if (scheduleSummary.overdue) {
-                {{ scheduleSummary.overdue }} overdue {{ scheduleSummary.overdue === 1 ? 'schedule needs' : 'schedules need' }} attention
-              } @else if (scheduleSummary.pending_profile_edits) {
-                {{ scheduleSummary.pending_profile_edits }} client {{ scheduleSummary.pending_profile_edits === 1 ? 'request needs' : 'requests need' }} review
-              } @else if (scheduleSummary.nearest_date) {
-                Next follow-up on {{ scheduleSummary.nearest_date | date: 'mediumDate' }}
-              } @else {
-                No client actions need attention
-              }
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="tracking-visuals" aria-label="Client tracking overview">
-        <app-chart-renderer [spec]="clientAttentionChart" />
-        <app-chart-renderer [spec]="scheduleStatusChart" />
-      </div>
-
-      <div class="attention-row-heading">
-        <span>Needs attention</span>
-        <strong>{{ scheduleSummary.overdue + scheduleSummary.due_24_hours + scheduleSummary.pending_profile_edits }} open</strong>
-      </div>
-      <div class="attention-kpi-row" aria-label="Immediate client actions">
-        <article class="attention-kpi overdue" [class.clear]="scheduleSummary.overdue === 0">
-          <span>Past due</span>
-          <strong>{{ scheduleSummary.overdue }}</strong>
-          <small>Overdue schedules</small>
+    @if (activeTab === 'activity') {
+      <div class="attention-kpi-row" aria-label="Activity needing action">
+        <article class="attention-kpi review" [class.clear]="unreadMessagesTotal === 0">
+          <span>Messages</span>
+          <strong>{{ unreadMessagesTotal }}</strong>
+          <small>Unread messages</small>
         </article>
-        <article class="attention-kpi urgent" [class.clear]="scheduleSummary.due_24_hours === 0">
-          <span>Immediate</span>
-          <strong>{{ scheduleSummary.due_24_hours }}</strong>
-          <small>Due within 24 hours</small>
+        <article class="attention-kpi review" [class.clear]="pendingRequests.length === 0">
+          <span>Requests</span>
+          <strong>{{ pendingRequests.length }}</strong>
+          <small>Pending lead requests</small>
         </article>
-        <article class="attention-kpi review" [class.clear]="scheduleSummary.pending_profile_edits === 0">
-          <span>Client updates</span>
-          <strong>{{ scheduleSummary.pending_profile_edits }}</strong>
-          <small>Client requests to review</small>
+        <article class="attention-kpi review" [class.clear]="pendingProfileEdits.length === 0">
+          <span>Account</span>
+          <strong>{{ pendingProfileEdits.length }}</strong>
+          <small>Client account requests</small>
         </article>
         <article class="attention-kpi completed">
-          <span>Recent progress</span>
-          <strong>{{ scheduleSummary.completed_last_7_days }}</strong>
-          <small>Completed in last 7 days</small>
+          <span>Total</span>
+          <strong>{{ activityActionCount }}</strong>
+          <small>Items waiting on you</small>
         </article>
       </div>
 
-      <button type="button" class="upcoming-trigger" (click)="toggleSchedules()" [attr.aria-expanded]="isSchedulesOpen">
-        <span>Client Activity Queue ({{ organizedScheduleReminders.length + pendingProfileEdits.length }})</span>
-        <span class="caret" [class.open]="isSchedulesOpen" aria-hidden="true">&#9662;</span>
-      </button>
+      <div class="dash-chart-row">
+        <app-chart-renderer [spec]="activityChart" />
+      </div>
 
-      @if (isSchedulesOpen) {
-        <div class="activity-queue-tabs" role="group" aria-label="Client activity type">
-          <button type="button" [class.active]="activityQueueView === 'schedules'" (click)="showActivityQueue('schedules')">
-            Schedules <span>{{ organizedScheduleReminders.length }}</span>
-          </button>
-          <button type="button" [class.active]="activityQueueView === 'profile-edits'" (click)="showActivityQueue('profile-edits')">
-            Client Requests <span>{{ pendingProfileEdits.length }}</span>
-          </button>
+      <section class="activity-card">
+        <div class="panel-heading">
+          <div>
+            <h2>Messages</h2>
+            <p>Clients with unread messages, most recent first.</p>
+          </div>
+        </div>
+        <app-fixed-height-list [visibleRows]="5">
+          <div class="mini-list">
+            @for (row of messageRows; track row.clientId) {
+              <a [routerLink]="['/professional/clients', row.clientId]" [queryParams]="{ tab: 'chat' }">
+                <span class="avatar">{{ initialsForName(row.clientName) }}</span>
+                <span>
+                  <strong>{{ row.clientName }}</strong>
+                  <small>{{ row.lastAt | date: 'MMM d, h:mm a' }}</small>
+                </span>
+                <span class="row-badge">{{ row.unreadCount > 99 ? '99+' : row.unreadCount }}</span>
+              </a>
+            } @empty {
+              <p class="empty-note">No unread messages.</p>
+            }
+          </div>
+        </app-fixed-height-list>
+      </section>
+
+      <section class="activity-card">
+        <div class="panel-heading">
+          <div>
+            <h2>Pending Requests</h2>
+            <p>New applicants waiting for your review.</p>
+          </div>
+          <a routerLink="/professional/forms-groups" class="ghost-action compact">View All</a>
+        </div>
+        <app-fixed-height-list [visibleRows]="5">
+          <div class="mini-list">
+            @for (submission of pendingRequests; track submission.id) {
+              <a routerLink="/professional/forms-groups">
+                <span class="avatar">{{ initialsForSubmission(submission) }}</span>
+                <span>
+                  <strong>{{ submission.applicant_name }}</strong>
+                  <small>{{ submission.email }} - {{ submission.submitted_at | date: 'mediumDate' }}</small>
+                </span>
+              </a>
+            } @empty {
+              <p class="empty-note">No pending requests right now.</p>
+            }
+          </div>
+        </app-fixed-height-list>
+      </section>
+
+      <section class="activity-card">
+        <div class="panel-heading">
+          <div>
+            <h2>Client Account Requests</h2>
+            <p>Profile edits and account deletions waiting for review.</p>
+          </div>
+        </div>
+        <app-fixed-height-list [visibleRows]="6">
+          <div class="sched-table-wrap">
+            @if (pendingProfileEdits.length) {
+              <table class="sched-table edit-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Group</th>
+                    <th>Requested</th>
+                    <th>Request</th>
+                    <th>Client Note</th>
+                    <th class="actions-col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (edit of pendingProfileEdits; track edit.id) {
+                    <tr>
+                      <td data-label="Client"><strong>{{ edit.client_name }}</strong></td>
+                      <td data-label="Group">{{ edit.group_name }}</td>
+                      <td data-label="Requested">{{ edit.created_at | date: 'dd MMM yyyy, h:mm a' }}</td>
+                      <td data-label="Request"><span class="status-chip edit-chip">{{ edit.request_type === 'account_deletion' ? 'Delete account' : edit.proposed_field_count + ' profile fields' }}</span></td>
+                      <td data-label="Client Note" class="note-cell">{{ edit.client_note || 'No note added' }}</td>
+                      <td data-label="Action" class="actions-col">
+                        @if (edit.request_type === 'account_deletion') {
+                          <button type="button" class="primary-action compact" (click)="reviewClientRequest(edit, 'approve')">Approve</button>
+                          <button type="button" class="ghost-action compact" (click)="reviewClientRequest(edit, 'reject')">Keep Account</button>
+                        } @else {
+                          <a class="primary-action compact" [routerLink]="['/professional/clients', edit.client]">Review Edit</a>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="empty-note">No client account requests are waiting for review.</p>
+            }
+          </div>
+        </app-fixed-height-list>
+      </section>
+    }
+
+    @if (activeTab === 'payments' && paymentsEnabled) {
+      @if (revenueUnlocked && revenue; as rev) {
+        <section class="activity-card">
+          <div class="panel-heading">
+            <div>
+              <h2>Revenue</h2>
+              <p>Across every client, in {{ rev.reporting_currency }} — counted on the date each payment was actually received.</p>
+            </div>
+            <label class="revenue-period-picker">
+              <span class="field-label">Period</span>
+              <select [ngModel]="revenuePeriod" (ngModelChange)="onRevenuePeriodChange($event)">
+                @for (option of revenuePeriodOptions; track option.id) {
+                  <option [value]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          @if (revenuePeriod === 'custom') {
+            <div class="custom-range-row">
+              <label>
+                <span class="field-label">From</span>
+                <input type="date" [(ngModel)]="revenueCustomStart" [max]="revenueCustomEnd">
+              </label>
+              <label>
+                <span class="field-label">To</span>
+                <input type="date" [(ngModel)]="revenueCustomEnd" [min]="revenueCustomStart">
+              </label>
+              <button type="button" class="secondary-action" [disabled]="!revenueCustomStart || !revenueCustomEnd" (click)="applyCustomRevenueRange()">
+                Apply
+              </button>
+            </div>
+          }
+
+          <div class="attention-kpi-row revenue-kpi-row" aria-label="Revenue totals">
+            <article class="attention-kpi clear">
+              <span>This month</span>
+              <strong>{{ rev.this_month_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
+              <small>Resets on the 1st</small>
+            </article>
+            <article class="attention-kpi clear">
+              <span>Total Revenue</span>
+              <strong>{{ rev.total_revenue | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
+              <small>{{ rev.period_start | date: 'MMM d' }} &ndash; {{ rev.period_end | date: 'MMM d, y' }}</small>
+            </article>
+          </div>
+
+          <div class="dash-chart-row">
+            <app-chart-renderer [spec]="revenueChart" />
+          </div>
+
+          <div class="panel-heading">
+            <div>
+              <h2>Recent Transactions</h2>
+              <p>Most recent first, across every client.</p>
+            </div>
+          </div>
+
+          <app-fixed-height-list [visibleRows]="5">
+            <div class="sched-table-wrap">
+              @if (rev.recent_transactions.length) {
+                <table class="sched-table">
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th>Amount</th>
+                      <th>Received</th>
+                      <th>Status</th>
+                      <th class="actions-col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (txn of rev.recent_transactions; track txn.payment_record_id) {
+                      <tr>
+                        <td data-label="Client"><strong>{{ txn.client_name }}</strong></td>
+                        <td data-label="Amount">{{ txn.amount }} {{ txn.currency }}</td>
+                        <td data-label="Received">{{ txn.received_date | date: 'dd MMM yyyy' }}</td>
+                        <td data-label="Status"><span class="status-chip" [attr.data-status]="txn.status">{{ txn.status === 'partially_paid' ? 'Partial' : (txn.status === 'refunded' ? 'Refunded' : 'Completed') }}</span></td>
+                        <td data-label="Actions" class="actions-col">
+                          <a class="primary-action compact" [routerLink]="['/professional/clients', txn.client_id]" [queryParams]="{ tab: 'payments' }">View</a>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              } @else {
+                <p class="empty-note">No payments recorded yet.</p>
+              }
+            </div>
+          </app-fixed-height-list>
+        </section>
+      } @else if (!revenueUnlocked) {
+        <section class="activity-card">
+          <div class="panel-heading">
+            <div>
+              <h2>Revenue</h2>
+              <p>Unlock your payments dashboard and pick a reporting currency in Settings &rarr; Payments to see earnings totals here.</p>
+            </div>
+          </div>
+        </section>
+      }
+
+      <section class="activity-card">
+        <div class="attention-kpi-row" aria-label="Payments needing action">
+          <article class="attention-kpi review" [class.clear]="paymentReviewCount === 0">
+            <span>Awaiting review</span>
+            <strong>{{ paymentReviewCount }}</strong>
+            <small>Proofs submitted by clients</small>
+          </article>
+          <article class="attention-kpi overdue" [class.clear]="paymentOverdueCount === 0">
+            <span>Overdue</span>
+            <strong>{{ paymentOverdueCount }}</strong>
+            <small>Past their due date</small>
+          </article>
         </div>
 
-        @if (activityQueueView === 'schedules') {
-          <app-fixed-height-list [visibleRows]="6">
-            <div class="sched-table-wrap">
+        <div class="dash-chart-row">
+          <app-chart-renderer [spec]="paymentsChart" />
+        </div>
+
+        <div class="panel-heading">
+          <div>
+            <h2>Needs Action</h2>
+            <p>Payment requests waiting on you, most recently updated first.</p>
+          </div>
+        </div>
+
+        <app-fixed-height-list [visibleRows]="6">
+          <div class="sched-table-wrap">
+            @if (paymentActions.length) {
+              <table class="sched-table">
+                <thead>
+                  <tr>
+                    <th>Client</th>
+                    <th>Title</th>
+                    <th>Amount</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th class="actions-col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of paymentActions; track item.request_id) {
+                    <tr>
+                      <td data-label="Client"><strong>{{ item.client_name }}</strong></td>
+                      <td data-label="Title">{{ item.title }}</td>
+                      <td data-label="Amount">{{ item.requested_amount }} {{ item.requested_currency }}</td>
+                      <td data-label="Due">{{ item.due_date ? (item.due_date | date: 'dd MMM yyyy') : 'No due date' }}</td>
+                      <td data-label="Status"><span class="status-chip" [attr.data-status]="item.status">{{ paymentStatusLabel(item.status) }}</span></td>
+                      <td data-label="Actions" class="actions-col">
+                        <a class="primary-action compact" [routerLink]="['/professional/clients', item.client_id]" [queryParams]="{ tab: 'payments' }">Review</a>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <p class="empty-note">No payments need action right now.</p>
+            }
+          </div>
+        </app-fixed-height-list>
+      </section>
+    }
+
+    @if (activeTab === 'schedules') {
+      <section class="activity-card">
+        <div class="attention-kpi-row" aria-label="Schedules needing action">
+          <article class="attention-kpi overdue" [class.clear]="scheduleSummary.overdue === 0">
+            <span>Past due</span>
+            <strong>{{ scheduleSummary.overdue }}</strong>
+            <small>Overdue schedules</small>
+          </article>
+          <article class="attention-kpi urgent" [class.clear]="scheduleSummary.due_24_hours === 0">
+            <span>Immediate</span>
+            <strong>{{ scheduleSummary.due_24_hours }}</strong>
+            <small>Due within 24 hours</small>
+          </article>
+          <article class="attention-kpi review" [class.clear]="scheduleSummary.due_7_days === 0">
+            <span>This week</span>
+            <strong>{{ scheduleSummary.due_7_days }}</strong>
+            <small>Due within 7 days</small>
+          </article>
+          <article class="attention-kpi completed">
+            <span>Recent progress</span>
+            <strong>{{ scheduleSummary.completed_last_7_days }}</strong>
+            <small>Completed in last 7 days</small>
+          </article>
+        </div>
+
+        <div class="dash-chart-row">
+          <app-chart-renderer [spec]="scheduleChart" />
+        </div>
+
+        <div class="panel-heading">
+          <div>
+            <h2>Schedules</h2>
+            <p>Overdue schedules surface first, then everything upcoming.</p>
+          </div>
+        </div>
+
+        <app-fixed-height-list [visibleRows]="8">
+          <div class="sched-table-wrap">
             @if (organizedScheduleReminders.length) {
               <table class="sched-table">
                 <thead>
@@ -215,7 +393,7 @@
                       </td>
                       <td data-label="Status"><span class="status-chip">{{ reminder.status }}</span></td>
                       <td data-label="Actions" class="actions-col">
-                        <a class="ghost-action compact" [routerLink]="['/trainer/clients', reminder.client]">Open Client</a>
+                        <a class="ghost-action compact" [routerLink]="['/professional/clients', reminder.client]">Open Client</a>
                         <button type="button" class="ghost-action compact" (click)="completeReminder(reminder)">Mark Complete</button>
                       </td>
                     </tr>
@@ -225,116 +403,9 @@
             } @else {
               <p class="empty-note">No pending schedules.</p>
             }
-            </div>
-          </app-fixed-height-list>
-        } @else {
-          <app-fixed-height-list [visibleRows]="6">
-            <div class="sched-table-wrap">
-            @if (pendingProfileEdits.length) {
-              <table class="sched-table edit-table">
-                <thead>
-                  <tr>
-                    <th>Client</th>
-                    <th>Group</th>
-                    <th>Requested</th>
-                    <th>Request</th>
-                    <th>Client Note</th>
-                    <th class="actions-col">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (edit of pendingProfileEdits; track edit.id) {
-                    <tr>
-                      <td data-label="Client"><strong>{{ edit.client_name }}</strong></td>
-                      <td data-label="Group">{{ edit.group_name }}</td>
-                      <td data-label="Requested">{{ edit.created_at | date: 'dd MMM yyyy, h:mm a' }}</td>
-                      <td data-label="Request"><span class="status-chip edit-chip">{{ edit.request_type === 'account_deletion' ? 'Delete account' : edit.proposed_field_count + ' profile fields' }}</span></td>
-                      <td data-label="Client Note" class="note-cell">{{ edit.client_note || 'No note added' }}</td>
-                      <td data-label="Action" class="actions-col">
-                        @if (edit.request_type === 'account_deletion') {
-                          <button type="button" class="primary-action compact" (click)="reviewClientRequest(edit, 'approve')">Approve</button>
-                          <button type="button" class="ghost-action compact" (click)="reviewClientRequest(edit, 'reject')">Keep Account</button>
-                        } @else {
-                          <a class="primary-action compact" [routerLink]="['/trainer/clients', edit.client]">Review Edit</a>
-                        }
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            } @else {
-              <p class="empty-note">No client account requests are waiting for review.</p>
-            }
-            </div>
-          </app-fixed-height-list>
-        }
-      }
-    </section>
-
-    <section class="accordion-panel">
-      <button type="button" class="accordion-trigger" (click)="toggleActivity()" [attr.aria-expanded]="isActivityOpen">
-        <span class="trigger-copy">
-          <strong>Recent Activity</strong>
-          <small>{{ allRecentClients.length }} clients &middot; {{ templates.length }} templates</small>
-        </span>
-        <span class="trigger-side">
-          <span class="caret" [class.open]="isActivityOpen" aria-hidden="true">&#9662;</span>
-        </span>
-      </button>
-
-      @if (isActivityOpen) {
-        <div class="accordion-body dashboard-grid two-col">
-          <article class="activity-card">
-        <div class="panel-heading">
-          <div>
-            <h2>Recent Clients</h2>
-            <p>Latest approved clients across all groups.</p>
           </div>
-          <a routerLink="/trainer/clients" class="ghost-action compact">View All</a>
-        </div>
-        <app-fixed-height-list [visibleRows]="5">
-        <div class="mini-list">
-          @for (submission of recentClients; track submission.id) {
-            <a [routerLink]="['/trainer/clients', submission.client_access?.id]">
-              <span class="avatar">{{ initialsForSubmission(submission) }}</span>
-              <span>
-                <strong>{{ submission.applicant_name }}</strong>
-                <small>{{ submission.client_access?.group_name }}</small>
-              </span>
-            </a>
-          } @empty {
-            <p class="empty-note">No approved clients yet.</p>
-          }
-        </div>
         </app-fixed-height-list>
-          </article>
-
-          <article class="activity-card">
-        <div class="panel-heading">
-          <div>
-            <h2>Recent Templates</h2>
-            <p>Your shared tracking templates.</p>
-          </div>
-          <a routerLink="/trainer/templates" class="ghost-action compact">Manage</a>
-        </div>
-        <app-fixed-height-list [visibleRows]="5">
-        <div class="mini-list">
-          @for (template of recentTemplates; track template.id) {
-            <a [routerLink]="['/trainer/templates', template.id, 'edit']">
-              <span class="avatar template-avatar" [class.green]="template.accent === 'green'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">{{ template.name.charAt(0) }}</span>
-              <span>
-                <strong>{{ template.name }}</strong>
-                <small>{{ template.cadence }} - {{ template.fields.length }} fields - {{ template.assigned_count }} clients</small>
-              </span>
-            </a>
-          } @empty {
-            <p class="empty-note">No templates yet. Adopt a standard template to get started.</p>
-          }
-        </div>
-        </app-fixed-height-list>
-          </article>
-        </div>
-      }
-    </section>
+      </section>
+    }
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

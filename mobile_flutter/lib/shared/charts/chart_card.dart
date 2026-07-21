@@ -332,12 +332,7 @@ class _LineChart extends StatelessWidget {
       LineChartData(
         minY: bounds.min,
         maxY: bounds.max,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: tokens.border, strokeWidth: 1),
-        ),
+        gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(),
@@ -456,12 +451,7 @@ class _BarChart extends StatelessWidget {
 
     return BarChart(
       BarChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: tokens.border, strokeWidth: 1),
-        ),
+        gridData: const FlGridData(show: false),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(),

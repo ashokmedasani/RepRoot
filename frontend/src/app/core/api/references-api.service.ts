@@ -16,7 +16,7 @@ export interface ReferenceCategoryRecord {
   updated_at: string;
 }
 
-export interface TrainerReferenceRecord {
+export interface ProfessionalReferenceRecord {
   id: number;
   category: number;
   category_name: string;
@@ -50,7 +50,7 @@ export class ReferencesApiService {
   constructor(private readonly http: HttpClient) {}
 
   getCategories(): Observable<{ categories: ReferenceCategoryRecord[] }> {
-    return this.http.get<{ categories: ReferenceCategoryRecord[] }>(`${this.apiBaseUrl}/trainer/references/categories/`, {
+    return this.http.get<{ categories: ReferenceCategoryRecord[] }>(`${this.apiBaseUrl}/professional/references/categories/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -61,7 +61,7 @@ export class ReferencesApiService {
     subcategories: string[]
   ): Observable<{ category: ReferenceCategoryRecord; message: string }> {
     return this.http.post<{ category: ReferenceCategoryRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/references/categories/`,
+      `${this.apiBaseUrl}/professional/references/categories/`,
       { name, description, subcategories },
       { headers: this.getAuthHeaders() }
     );
@@ -74,27 +74,27 @@ export class ReferencesApiService {
     subcategories: string[]
   ): Observable<{ category: ReferenceCategoryRecord; message: string }> {
     return this.http.put<{ category: ReferenceCategoryRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/references/categories/${categoryId}/`,
+      `${this.apiBaseUrl}/professional/references/categories/${categoryId}/`,
       { name, description, subcategories },
       { headers: this.getAuthHeaders() }
     );
   }
 
   deleteCategory(categoryId: number): Observable<MessageResponse> {
-    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/trainer/references/categories/${categoryId}/`, {
+    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/professional/references/categories/${categoryId}/`, {
       headers: this.getAuthHeaders()
     });
   }
 
-  getReferences(): Observable<{ references: TrainerReferenceRecord[]; usage: { used: number; limit: number | null } }> {
-    return this.http.get<{ references: TrainerReferenceRecord[]; usage: { used: number; limit: number | null } }>(`${this.apiBaseUrl}/trainer/references/`, {
+  getReferences(): Observable<{ references: ProfessionalReferenceRecord[]; usage: { used: number; limit: number | null } }> {
+    return this.http.get<{ references: ProfessionalReferenceRecord[]; usage: { used: number; limit: number | null } }>(`${this.apiBaseUrl}/professional/references/`, {
       headers: this.getAuthHeaders()
     });
   }
 
-  createReference(payload: ReferencePayload): Observable<{ reference: TrainerReferenceRecord; message: string }> {
-    return this.http.post<{ reference: TrainerReferenceRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/references/`,
+  createReference(payload: ReferencePayload): Observable<{ reference: ProfessionalReferenceRecord; message: string }> {
+    return this.http.post<{ reference: ProfessionalReferenceRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/references/`,
       this.buildFormData(payload),
       { headers: this.getAuthHeaders() }
     );
@@ -103,16 +103,16 @@ export class ReferencesApiService {
   updateReference(
     referenceId: number,
     payload: ReferencePayload
-  ): Observable<{ reference: TrainerReferenceRecord; message: string }> {
-    return this.http.put<{ reference: TrainerReferenceRecord; message: string }>(
-      `${this.apiBaseUrl}/trainer/references/${referenceId}/`,
+  ): Observable<{ reference: ProfessionalReferenceRecord; message: string }> {
+    return this.http.put<{ reference: ProfessionalReferenceRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/references/${referenceId}/`,
       this.buildFormData(payload),
       { headers: this.getAuthHeaders() }
     );
   }
 
   deleteReference(referenceId: number): Observable<MessageResponse> {
-    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/trainer/references/${referenceId}/`, {
+    return this.http.delete<MessageResponse>(`${this.apiBaseUrl}/professional/references/${referenceId}/`, {
       headers: this.getAuthHeaders()
     });
   }
@@ -135,7 +135,7 @@ export class ReferencesApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('trainer-auth-token') || '';
+    const token = window.localStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 

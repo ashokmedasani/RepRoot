@@ -3,23 +3,23 @@ import { FormsModule } from '@angular/forms';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Country, State } from 'country-state-city';
 
-import { TrainerAuthApiService, TrainerProfile, TrainerProfileVisibility } from '../../core/api/trainer-auth-api.service';
-import { formatApiError } from '../utils/ui-helpers';
+import { ProfessionalAuthApiService, ProfessionalProfile, ProfessionalProfileVisibility } from '@core/api/professional-auth-api.service';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 /**
- * Editable trainer profile form. Embedded inside Settings -> My Account.
+ * Editable professional profile form. Embedded inside Settings -> My Account.
  * Self-contained: loads the profile, edits it, and saves via the profile API.
  */
 @Component({
-  selector: 'app-trainer-profile-form',
+  selector: 'app-professional-profile-form',
   standalone: true,
   imports: [FormsModule, ReactiveFormsModule],
-  templateUrl: './trainer-profile-form.component.html',
-  styleUrl: './trainer-profile-form.component.scss'
+  templateUrl: './professional-profile-form.component.html',
+  styleUrl: './professional-profile-form.component.scss'
 })
-export class TrainerProfileFormComponent implements OnInit {
+export class ProfessionalProfileFormComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
-  private readonly trainerAuthApi = inject(TrainerAuthApiService);
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
 
   readonly months = [
     { value: 1, label: 'January' },
@@ -43,7 +43,7 @@ export class TrainerProfileFormComponent implements OnInit {
   isLoading = true;
   isSaving = false;
   profileMessage = '';
-  loadedProfile: TrainerProfile | null = null;
+  loadedProfile: ProfessionalProfile | null = null;
   selectedFiles: Record<string, File | null> = {
     profile_photo: null,
     certification_file: null,
@@ -54,7 +54,7 @@ export class TrainerProfileFormComponent implements OnInit {
   selectedProfilePhotoPreview = '';
   profileImages: { category: string; title: string; url: string }[] = [];
   profileLinks: { title: string; url: string }[] = [];
-  profileVisibility: TrainerProfileVisibility = this.defaultVisibility();
+  profileVisibility: ProfessionalProfileVisibility = this.defaultVisibility();
   readonly imageCategories = ['Certificates', 'Transformation Photos', 'Achievements', 'Body Physique', 'Other Images'];
   private isPatchingProfile = false;
 
@@ -69,7 +69,7 @@ export class TrainerProfileFormComponent implements OnInit {
     state: ['', Validators.required],
     professional_headline: [''],
     about_me: [''],
-    trainer_type: [''],
+    professional_type: [''],
     years_experience: [''],
     specializations: [''],
     training_style: [''],
@@ -90,11 +90,11 @@ export class TrainerProfileFormComponent implements OnInit {
 
   get previewName(): string {
     const value = this.profileForm.getRawValue();
-    return `${value.first_name} ${value.last_name}`.trim() || 'Trainer name';
+    return `${value.first_name} ${value.last_name}`.trim() || 'Professional name';
   }
 
   ngOnInit(): void {
-    this.trainerAuthApi.getProfile().subscribe({
+    this.professionalAuthApi.getProfile().subscribe({
       next: (profile) => {
         this.loadedProfile = profile;
         this.profileImages = (profile.profile_images || []).map((image) => ({ ...image }));
@@ -112,7 +112,7 @@ export class TrainerProfileFormComponent implements OnInit {
           state: profile.state || '',
           professional_headline: profile.professional_headline || '',
           about_me: profile.about_me || '',
-          trainer_type: profile.trainer_type || '',
+          professional_type: profile.professional_type || '',
           years_experience: profile.years_experience ? String(profile.years_experience) : '',
           specializations: profile.specializations || '',
           training_style: profile.training_style || '',
@@ -129,7 +129,7 @@ export class TrainerProfileFormComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error: unknown) => {
-        this.profileMessage = formatApiError(error, 'Could not load trainer profile.');
+        this.profileMessage = formatApiError(error, 'Could not load professional profile.');
         this.isLoading = false;
       }
     });
@@ -199,7 +199,7 @@ export class TrainerProfileFormComponent implements OnInit {
     }
 
     this.isSaving = true;
-    this.trainerAuthApi.saveProfile(this.buildProfileFormData()).subscribe({
+    this.professionalAuthApi.saveProfile(this.buildProfileFormData()).subscribe({
       next: (response) => {
         this.loadedProfile = response.profile;
         this.selectedProfilePhotoPreview = '';
@@ -218,21 +218,21 @@ export class TrainerProfileFormComponent implements OnInit {
     return control.invalid && (control.dirty || control.touched);
   }
 
-  setVisibility(section: keyof TrainerProfileVisibility, isPublic: boolean): void {
+  setVisibility(section: keyof ProfessionalProfileVisibility, isPublic: boolean): void {
     this.profileVisibility = { ...this.profileVisibility, [section]: isPublic };
   }
 
-  visibilityLabel(section: keyof TrainerProfileVisibility): string {
+  visibilityLabel(section: keyof ProfessionalProfileVisibility): string {
     return this.profileVisibility[section] ? 'Public' : 'Private';
   }
 
   private buildProfileFormData(): FormData {
     const formData = new FormData();
     const optionalNumberFields = new Set(['years_experience', 'certification_year']);
-    const trainerId = this.loadedProfile?.trainer_id || this.loadedProfile?.trainer_code || '';
+    const professionalId = this.loadedProfile?.professional_id || this.loadedProfile?.professional_code || '';
 
-    if (trainerId) {
-      formData.append('trainer_id', trainerId);
+    if (professionalId) {
+      formData.append('professional_id', professionalId);
     }
 
     Object.entries(this.profileForm.getRawValue()).forEach(([key, value]) => {
@@ -255,7 +255,7 @@ export class TrainerProfileFormComponent implements OnInit {
     return formData;
   }
 
-  private defaultVisibility(): TrainerProfileVisibility {
+  private defaultVisibility(): ProfessionalProfileVisibility {
     return {
       professional_headline: false,
       about: false,

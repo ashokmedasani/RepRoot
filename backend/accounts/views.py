@@ -1,20 +1,29 @@
+import random
 from datetime import datetime, time, timedelta
 
+import stripe
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import Count, ProtectedError, Q
+from django.db.models import Count, Max, ProtectedError, Q
+from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import permissions, status
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from admin_portal.models import ErrorLog, FinanceLedgerEntry, record_error
+
+from . import account_lifecycle, billing, feature_access, recycle_bin
 from .models import (
   default_client_registration_fields,
   ChatMessage,
@@ -26,17 +35,18 @@ from .models import (
   GroupRegistrationSubmission,
   LeadSubmission,
   ProgressEntry,
-  RecycledTrainerAccount,
+  RecycledProfessionalAccount,
+  RecycleBinItem,
   ReferenceCategory,
   SupportIncident,
   SupportIncidentMessage,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
-  TrainerGroup,
-  TrainerLeadForm,
-  TrainerProfile,
-  TrainerReference,
+  ProfessionalGroup,
+  ProfessionalLeadForm,
+  ProfessionalProfile,
+  ProfessionalReference,
 )
 from .serializers import (
   ChatMessageSerializer,
@@ -45,14 +55,16 @@ from .serializers import (
   ClientPhotoUpdateSerializer,
   ClientDetailChangeRequestSerializer,
   ClientLoginSerializer,
-  ClientTrainerLookupSerializer,
+  ClientProfessionalLookupSerializer,
   ClientAccessSerializer,
   ClientPasswordChangeSerializer,
   ClientRegistrationFormSerializer,
   ClientReminderSerializer,
   ClientTrackingEntrySubmitSerializer,
   EmailAvailabilitySerializer,
+  ErrorReportSerializer,
   ProgressEntrySerializer,
+  RecycleBinItemSerializer,
   EmailOtpRequestSerializer,
   EmailOtpVerifySerializer,
   LeadSubmissionSerializer,
@@ -70,23 +82,23 @@ from .serializers import (
   TrackingEntrySerializer,
   TrackingTemplateReferenceSerializer,
   TrackingTemplateSerializer,
-  TrainerAccountSerializer,
-  TrainerGroupSerializer,
-  TrainerLeadFormSerializer,
-  TrainerLoginSerializer,
-  TrainerPasswordChangeSerializer,
-  TrainerProfileSerializer,
+  ProfessionalAccountSerializer,
+  ProfessionalGroupSerializer,
+  ProfessionalLeadFormSerializer,
+  ProfessionalLoginSerializer,
+  ProfessionalPasswordChangeSerializer,
+  ProfessionalProfileSerializer,
   normalize_profile_visibility,
-  TrainerProfileStatusSerializer,
-  TrainerReferenceSerializer,
-  TrainerSignupSerializer,
+  ProfessionalProfileStatusSerializer,
+  ProfessionalReferenceSerializer,
+  ProfessionalSignupSerializer,
   UsernameAvailabilitySerializer,
 )
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
-from .data_usage import calculate_trainer_data_usage
+from .data_usage import calculate_professional_data_usage
 from .email_verification import OtpCooldownError, send_email_otp, verify_email_otp
 from .standard_templates import STANDARD_TEMPLATES, get_standard_template
-from .plan_limits import plan_limit, trainer_plan
+from .plan_limits import plan_limit, professional_plan
 
 User = get_user_model()
 
@@ -97,10 +109,10 @@ def generate_temporary_password():
 
 def send_client_credentials(client_access, temporary_password):
   send_mail(
-    subject='Your CoachFlow client access',
+    subject='Your RepRoot client access',
     message=(
       f'Your client access has been created.\n\n'
-      f'Trainer code: {client_access.trainer.trainer_profile.trainer_id}\n'
+      f'Professional code: {client_access.professional.professional_profile.professional_id}\n'
       f'Username: {client_access.username}\n'
       f'Temporary password: {temporary_password}\n\n'
       f'You will be asked to choose a new password after your first login.'
@@ -119,7 +131,7 @@ def generate_unique_slug():
   while True:
     slug = get_random_string(12).lower()
 
-    if not TrainerLeadForm.objects.filter(public_slug=slug).exists():
+    if not ProfessionalLeadForm.objects.filter(public_slug=slug).exists():
       return slug
 
 
@@ -145,8 +157,8 @@ def local_debug_otp_payload(otp: str) -> dict:
   return {}
 
 
-def build_trainer_account_snapshot(user):
-  profile = getattr(user, 'trainer_profile', None)
+def build_professional_account_snapshot(user):
+  profile = getattr(user, 'professional_profile', None)
   snapshot = {
     'user': {
       'id': user.id,
@@ -160,13 +172,13 @@ def build_trainer_account_snapshot(user):
       'date_joined': serialize_datetime(user.date_joined),
       'last_login': serialize_datetime(user.last_login),
     },
-    'trainer_profile': None,
+    'professional_profile': None,
   }
 
   if profile:
-    snapshot['trainer_profile'] = {
+    snapshot['professional_profile'] = {
       'id': profile.id,
-      'trainer_id': profile.trainer_id,
+      'professional_id': profile.professional_id,
       'profile_setup_completed': profile.profile_setup_completed,
       'profile_photo': profile.profile_photo.name,
       'middle_name': profile.middle_name,
@@ -177,7 +189,7 @@ def build_trainer_account_snapshot(user):
       'birth_year': profile.birth_year,
       'professional_headline': profile.professional_headline,
       'about_me': profile.about_me,
-      'trainer_type': profile.trainer_type,
+      'professional_type': profile.professional_type,
       'years_experience': profile.years_experience,
       'specializations': profile.specializations,
       'training_style': profile.training_style,
@@ -203,8 +215,8 @@ def build_trainer_account_snapshot(user):
   return snapshot
 
 
-def build_public_trainer_profile(user, request=None):
-  profile = getattr(user, 'trainer_profile', None)
+def build_public_professional_profile(user, request=None):
+  profile = getattr(user, 'professional_profile', None)
 
   if profile is None:
     return None
@@ -243,7 +255,7 @@ def build_public_trainer_profile(user, request=None):
         public_links.append({'title': title, 'url': url})
 
   payload = {
-    'trainer_name': user.get_full_name() or user.username,
+    'professional_name': user.get_full_name() or user.username,
     'profile_photo_url': file_url(profile.profile_photo),
     'professional_headline': profile.professional_headline if visibility.get('professional_headline') else '',
     'location': ', '.join(item for item in [profile.state, profile.country] if item),
@@ -260,7 +272,7 @@ def build_public_trainer_profile(user, request=None):
     for key in ('professional_summary', 'specializations', 'experience', 'languages')
   ):
     payload['professional_summary'] = {
-      'trainer_type': profile.trainer_type if visibility.get('professional_summary') else '',
+      'professional_type': profile.professional_type if visibility.get('professional_summary') else '',
       'years_experience': (
         profile.years_experience if visibility.get('experience', visibility.get('professional_summary')) else None
       ),
@@ -283,6 +295,27 @@ def build_public_trainer_profile(user, request=None):
   return payload
 
 
+def _username_suggestions(base: str, limit: int = 3) -> list[str]:
+  """A handful of available variations on a taken username, checked in one query."""
+  candidates = []
+  seen_candidates = set()
+  for suffix in random.sample(range(1, 100), 8):
+    candidate = f'{base[:10 - len(str(suffix))]}{suffix}'
+    if candidate not in seen_candidates:
+      seen_candidates.add(candidate)
+      candidates.append(candidate)
+
+  if not candidates:
+    return []
+
+  taken_query = Q()
+  for candidate in candidates:
+    taken_query |= Q(username__iexact=candidate)
+  taken_lower = {name.lower() for name in User.objects.filter(taken_query).values_list('username', flat=True)}
+
+  return [candidate for candidate in candidates if candidate.lower() not in taken_lower][:limit]
+
+
 class UsernameAvailabilityView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
@@ -299,61 +332,62 @@ class UsernameAvailabilityView(APIView):
         'username': username,
         'available': is_available,
         'message': 'Username is available.' if is_available else 'Username is already taken.',
+        'suggestions': [] if is_available else _username_suggestions(username),
       }
     )
 
 
-class TrainerCodeAvailabilityView(APIView):
+class ProfessionalCodeAvailabilityView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'directory'
 
   def post(self, request):
-    code = str(request.data.get('trainer_code', '')).strip().lower()
+    code = str(request.data.get('professional_code', '')).strip().lower()
 
     if len(code) < 4 or len(code) > 32:
-      return Response({'available': False, 'message': 'Trainer code must be 4 to 32 characters.'})
+      return Response({'available': False, 'message': 'Professional code must be 4 to 32 characters.'})
 
     if not code.replace('-', '').replace('_', '').isalnum():
-      return Response({'available': False, 'message': 'Trainer code can only use letters, numbers, hyphens, and underscores.'})
+      return Response({'available': False, 'message': 'Professional code can only use letters, numbers, hyphens, and underscores.'})
 
-    is_available = not TrainerProfile.objects.filter(trainer_id__iexact=code).exists()
+    is_available = not ProfessionalProfile.objects.filter(professional_id__iexact=code).exists()
 
     return Response(
       {
-        'trainer_code': code,
+        'professional_code': code,
         'available': is_available,
-        'message': 'Trainer code is available.' if is_available else 'Trainer code is already taken.',
+        'message': 'Professional code is available.' if is_available else 'Professional code is already taken.',
       }
     )
 
 
-class TrainerCodeUpdateView(APIView):
+class ProfessionalCodeUpdateView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    return Response({'trainer_code': request.user.trainer_profile.trainer_id or ''})
+    return Response({'professional_code': request.user.professional_profile.professional_id or ''})
 
   def put(self, request):
-    profile = request.user.trainer_profile
-    code = str(request.data.get('trainer_code', '')).strip().lower()
+    profile = request.user.professional_profile
+    code = str(request.data.get('professional_code', '')).strip().lower()
 
     if len(code) < 4 or len(code) > 32:
-      return Response({'message': 'Trainer code must be 4 to 32 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'Professional code must be 4 to 32 characters.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if not code.replace('-', '').replace('_', '').isalnum():
       return Response(
-        {'message': 'Trainer code can only use letters, numbers, hyphens, and underscores.'},
+        {'message': 'Professional code can only use letters, numbers, hyphens, and underscores.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
-    if TrainerProfile.objects.filter(trainer_id__iexact=code).exclude(pk=profile.pk).exists():
-      return Response({'message': 'Trainer code is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+    if ProfessionalProfile.objects.filter(professional_id__iexact=code).exclude(pk=profile.pk).exists():
+      return Response({'message': 'Professional code is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    profile.trainer_id = code
-    profile.save(update_fields=['trainer_id', 'updated_at'])
+    profile.professional_id = code
+    profile.save(update_fields=['professional_id', 'updated_at'])
 
-    return Response({'trainer_code': profile.trainer_id, 'message': 'Trainer code saved.'})
+    return Response({'professional_code': profile.professional_id, 'message': 'Professional code saved.'})
 
 
 class EmailAvailabilityView(APIView):
@@ -435,13 +469,13 @@ class EmailOtpVerifyView(APIView):
     )
 
 
-class TrainerSignupView(APIView):
+class ProfessionalSignupView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'auth'
 
   def post(self, request):
-    serializer = TrainerSignupSerializer(data=request.data)
+    serializer = ProfessionalSignupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.save()
     token, _created = Token.objects.get_or_create(user=user)
@@ -449,20 +483,20 @@ class TrainerSignupView(APIView):
     return Response(
       {
         'token': token.key,
-        'trainer': TrainerAccountSerializer(user).data,
-        'message': 'Trainer account created successfully.',
+        'professional': ProfessionalAccountSerializer(user).data,
+        'message': 'Professional account created successfully.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
-class TrainerLoginView(APIView):
+class ProfessionalLoginView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'auth'
 
   def post(self, request):
-    serializer = TrainerLoginSerializer(data=request.data)
+    serializer = ProfessionalLoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     token, _created = Token.objects.get_or_create(user=user)
@@ -470,8 +504,8 @@ class TrainerLoginView(APIView):
     return Response(
       {
         'token': token.key,
-        'trainer': TrainerAccountSerializer(user).data,
-        'message': 'Trainer login successful.',
+        'professional': ProfessionalAccountSerializer(user).data,
+        'message': 'Professional login successful.',
       }
     )
 
@@ -506,12 +540,12 @@ class PasswordResetOtpRequestView(APIView):
     serializer.is_valid(raise_exception=True)
     email = serializer.validated_data['email']
 
-    if not User.objects.filter(email__iexact=email, trainer_profile__isnull=False).exists():
+    if not User.objects.filter(email__iexact=email, professional_profile__isnull=False).exists():
       return Response(
         {
           'email': email,
           'available': True,
-          'message': 'No trainer account found. Try Sign up or Login.',
+          'message': 'No professional account found. Try Sign up or Login.',
         }
       )
 
@@ -568,32 +602,271 @@ class PasswordResetConfirmView(APIView):
     return Response({'message': 'Password reset successfully. You can now login.'})
 
 
-class TrainerProfileStatusView(APIView):
+class ProfessionalProfileStatusView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    profile = request.user.trainer_profile
-    return Response(TrainerProfileStatusSerializer(profile).data)
+    profile = request.user.professional_profile
+    return Response(ProfessionalProfileStatusSerializer(profile).data)
 
 
-class TrainerDataUsageView(APIView):
+class ProfessionalDataUsageView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    return Response(calculate_trainer_data_usage(request.user))
+    return Response(calculate_professional_data_usage(request.user))
 
 
-class TrainerProfileView(APIView):
+class RecycleBinListView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    items = RecycleBinItem.objects.filter(professional=request.user)
+    return Response({'items': RecycleBinItemSerializer(items, many=True).data})
+
+
+class RecycleBinRestoreView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request, item_id):
+    item = RecycleBinItem.objects.filter(id=item_id, professional=request.user).first()
+    if item is None:
+      return Response({'message': 'Recycle Bin item not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+      recycle_bin.restore_item(item)
+    except recycle_bin.RestoreError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_409_CONFLICT)
+
+    cache.delete(f'professional-data-usage:v5:{request.user.pk}')
+    return Response({'message': 'Restored.'})
+
+
+class RecycleBinPermanentDeleteView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def delete(self, request, item_id):
+    item = RecycleBinItem.objects.filter(id=item_id, professional=request.user).first()
+    if item is None:
+      return Response({'message': 'Recycle Bin item not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    recycle_bin.delete_permanently(item)
+    return Response({'message': 'Permanently deleted.'})
+
+
+class ProfessionalBillingStatusView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def get(self, request):
+    profile = request.user.professional_profile
+    return Response(
+      {
+        'plan': professional_plan(request.user),
+        'plan_renews_at': profile.plan_renews_at,
+        'has_billing_account': bool(profile.stripe_customer_id),
+        'billing_configured': bool(settings.STRIPE_SECRET_KEY) or settings.REPROOT_BILLING_TEST_MODE,
+        'test_mode': settings.REPROOT_BILLING_TEST_MODE,
+        # A tier is offered once it either has a real Stripe price configured,
+        # or test mode is on (which applies the tier directly with no charge).
+        'available_upgrades': {
+          tier: bool(price_id) or settings.REPROOT_BILLING_TEST_MODE
+          for tier, price_id in billing.TARGET_TIER_PRICE_IDS.items()
+        },
+      }
+    )
+
+
+class ProfessionalBillingCheckoutView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    target_tier = str(request.data.get('target_tier', '')).strip().lower()
+    if target_tier not in billing.TARGET_TIER_PRICE_IDS:
+      return Response(
+        {'message': 'target_tier must be one of: ' + ', '.join(billing.TARGET_TIER_PRICE_IDS)},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
+    profile = request.user.professional_profile
+    if profile.plan_tier == target_tier:
+      return Response({'message': f'This professional is already on {target_tier}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    has_real_price = bool(billing.price_id_for_tier(target_tier))
+
+    if not has_real_price:
+      if not settings.REPROOT_BILLING_TEST_MODE:
+        return Response({'message': f'The {target_tier} plan is not open for upgrades yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+      # No real Stripe price for this tier yet — apply it directly so the
+      # rest of the lifecycle (limits, storage quota, unlocking) can be
+      # exercised without a payment provider. No FinanceLedgerEntry is
+      # written since no money moved.
+      profile.plan_tier = target_tier
+      profile.save(update_fields=['plan_tier'])
+      account_lifecycle.reactivate_on_upgrade(profile)
+      return Response({'checkout_url': f'{settings.REPROOT_BILLING_SUCCESS_URL}&test_mode=1', 'test_mode': True})
+
+    if not settings.STRIPE_SECRET_KEY:
+      return Response({'message': 'Billing is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    try:
+      checkout_url = billing.create_checkout_session(profile, target_tier)
+    except stripe.StripeError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({'checkout_url': checkout_url})
+
+
+class ProfessionalBillingCancelView(APIView):
+  """Self-serve 'cancel plan' — the missing piece that left professionals
+  stuck once they'd been moved off Starter Free with no way back."""
+
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    profile = request.user.professional_profile
+    if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
+      return Response({'message': 'This professional is already on Starter Free.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if profile.stripe_subscription_id and settings.STRIPE_SECRET_KEY:
+      try:
+        billing.cancel_subscription(profile)
+      except stripe.StripeError as exc:
+        return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+      # The subscription.deleted webhook finishes the job (process_downgrade)
+      # once Stripe confirms the cancellation — nothing more to do here.
+    else:
+      # Test-mode tiers (and anything else with no real subscription behind
+      # it) have nothing for Stripe to cancel, so apply the downgrade directly.
+      account_lifecycle.downgrade_to_starter_free_voluntarily(profile)
+
+    return Response({'message': 'Plan cancelled — moving to Starter Free.'})
+
+
+class ProfessionalBillingPortalView(APIView):
+  permission_classes = [permissions.IsAuthenticated]
+
+  def post(self, request):
+    if not settings.STRIPE_SECRET_KEY:
+      return Response({'message': 'Billing is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    profile = request.user.professional_profile
+    if not profile.stripe_customer_id:
+      return Response({'message': 'Upgrade to Premium first to manage billing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      portal_url = billing.create_portal_session(profile)
+    except stripe.StripeError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({'portal_url': portal_url})
+
+
+@csrf_exempt
+def stripe_webhook(request):
+  """Stripe -> us. The only writer of ProfessionalProfile.plan_tier.
+
+  Not a DRF view: needs the raw request body for signature verification,
+  and Stripe is not one of our authenticated callers.
+  """
+  if request.method != 'POST':
+    return HttpResponse(status=405)
+
+  if not settings.STRIPE_WEBHOOK_SECRET:
+    return HttpResponse(status=503)
+
+  sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+  try:
+    event = stripe.Webhook.construct_event(request.body, sig_header, settings.STRIPE_WEBHOOK_SECRET)
+  except (ValueError, stripe.SignatureVerificationError):
+    return HttpResponse(status=400)
+
+  event_type = event['type']
+  data = event['data']['object']
+
+  if event_type == 'checkout.session.completed':
+    professional_user_id = (data.get('metadata') or {}).get('professional_user_id') or data.get('client_reference_id')
+    target_tier = (data.get('metadata') or {}).get('target_tier')
+    customer_id = data.get('customer')
+    profile = ProfessionalProfile.objects.filter(user_id=professional_user_id).first() if professional_user_id else None
+    if profile is None and customer_id:
+      profile = ProfessionalProfile.objects.filter(stripe_customer_id=customer_id).first()
+    if profile is not None:
+      profile.plan_tier = target_tier if target_tier in dict(ProfessionalProfile.PLAN_CHOICES) else ProfessionalProfile.PLAN_PREMIUM
+      profile.stripe_customer_id = customer_id or profile.stripe_customer_id
+      profile.stripe_subscription_id = data.get('subscription') or profile.stripe_subscription_id
+      profile.save(update_fields=['plan_tier', 'stripe_customer_id', 'stripe_subscription_id'])
+      account_lifecycle.reactivate_on_upgrade(profile)
+      FinanceLedgerEntry.objects.create(
+        entry_type=FinanceLedgerEntry.TYPE_SUBSCRIPTION,
+        status=FinanceLedgerEntry.STATUS_COMPLETED,
+        amount=(data.get('amount_total') or 0) / 100,
+        currency=(data.get('currency') or 'usd').upper(),
+        professional=profile.user,
+        description=f'{profile.get_plan_tier_display()} subscription started',
+        external_reference=data.get('id', ''),
+        occurred_at=timezone.now(),
+      )
+
+  elif event_type == 'customer.subscription.updated':
+    customer_id = data.get('customer')
+    profile = ProfessionalProfile.objects.filter(stripe_customer_id=customer_id).first()
+    if profile is not None:
+      sub_status = data.get('status')
+      period_end = data.get('current_period_end')
+      if period_end:
+        profile.plan_renews_at = datetime.fromtimestamp(period_end, tz=timezone.get_current_timezone())
+        profile.save(update_fields=['plan_renews_at'])
+      if sub_status in ('canceled', 'unpaid', 'incomplete_expired'):
+        # Route through the lifecycle service, not a direct plan_tier write —
+        # this starts the 7-day grace period and sends the downgrade email
+        # instead of silently dropping the professional to Starter Free.
+        account_lifecycle.process_downgrade(profile)
+      elif sub_status in ('active', 'trialing'):
+        price_id = ((data.get('items') or {}).get('data') or [{}])[0].get('price', {}).get('id', '')
+        resolved_tier = billing.resolve_tier_from_price(price_id)
+        if resolved_tier:
+          profile.plan_tier = resolved_tier
+          profile.save(update_fields=['plan_tier'])
+          account_lifecycle.reactivate_on_upgrade(profile)
+
+  elif event_type == 'customer.subscription.deleted':
+    customer_id = data.get('customer')
+    profile = ProfessionalProfile.objects.filter(stripe_customer_id=customer_id).first()
+    if profile is not None:
+      profile.plan_renews_at = None
+      profile.save(update_fields=['plan_renews_at'])
+      account_lifecycle.process_downgrade(profile)
+
+  elif event_type == 'invoice.payment_failed':
+    customer_id = data.get('customer')
+    profile = ProfessionalProfile.objects.filter(stripe_customer_id=customer_id).first()
+    if profile is not None:
+      FinanceLedgerEntry.objects.create(
+        entry_type=FinanceLedgerEntry.TYPE_SUBSCRIPTION,
+        status=FinanceLedgerEntry.STATUS_FAILED,
+        amount=(data.get('amount_due') or 0) / 100,
+        currency=(data.get('currency') or 'usd').upper(),
+        professional=profile.user,
+        description='Premium subscription payment failed',
+        external_reference=data.get('id', ''),
+        occurred_at=timezone.now(),
+      )
+
+  return HttpResponse(status=200)
+
+
+class ProfessionalProfileView(APIView):
   permission_classes = [permissions.IsAuthenticated]
   parser_classes = [MultiPartParser, FormParser]
 
   def get(self, request):
-    profile = request.user.trainer_profile
-    return Response(TrainerProfileSerializer(profile, context={'request': request}).data)
+    profile = request.user.professional_profile
+    return Response(ProfessionalProfileSerializer(profile, context={'request': request}).data)
 
   def post(self, request):
-    profile = request.user.trainer_profile
-    serializer = TrainerProfileSerializer(
+    profile = request.user.professional_profile
+    serializer = ProfessionalProfileSerializer(
       profile,
       data=request.data,
       partial=True,
@@ -603,8 +876,8 @@ class TrainerProfileView(APIView):
     serializer.save()
     return Response(
       {
-        'profile': TrainerProfileSerializer(profile, context={'request': request}).data,
-        'message': 'Trainer profile saved successfully.',
+        'profile': ProfessionalProfileSerializer(profile, context={'request': request}).data,
+        'message': 'Professional profile saved successfully.',
       }
     )
 
@@ -612,11 +885,11 @@ class TrainerProfileView(APIView):
     return self.post(request)
 
 
-class TrainerProfileVisibilityView(APIView):
+class ProfessionalProfileVisibilityView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request):
-    profile = request.user.trainer_profile
+    profile = request.user.professional_profile
     visibility = request.data.get('visibility', {})
 
     if not isinstance(visibility, dict):
@@ -630,7 +903,7 @@ class TrainerProfileVisibilityView(APIView):
     )
 
 
-class TrainerLogoutView(APIView):
+class ProfessionalLogoutView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request):
@@ -638,34 +911,34 @@ class TrainerLogoutView(APIView):
     return Response({'message': 'Logged out successfully.'})
 
 
-class TrainerAccountView(APIView):
+class ProfessionalAccountView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def delete(self, request):
-    user = User.objects.select_related('trainer_profile').get(pk=request.user.pk)
+    user = User.objects.select_related('professional_profile').get(pk=request.user.pk)
 
-    if not isinstance(getattr(user, 'trainer_profile', None), TrainerProfile):
-      return Response({'message': 'Trainer account not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if not isinstance(getattr(user, 'professional_profile', None), ProfessionalProfile):
+      return Response({'message': 'Professional account not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     with transaction.atomic():
-      RecycledTrainerAccount.objects.create(
+      RecycledProfessionalAccount.objects.create(
         original_user_id=user.id,
         email=user.email,
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
-        account_snapshot=build_trainer_account_snapshot(user),
+        account_snapshot=build_professional_account_snapshot(user),
       )
       user.delete()
 
-    return Response({'message': 'Trainer account deleted and moved to recycle space.'})
+    return Response({'message': 'Professional account deleted and moved to recycle space.'})
 
 
-class TrainerPasswordChangeView(APIView):
+class ProfessionalPasswordChangeView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request):
-    serializer = TrainerPasswordChangeSerializer(data=request.data, context={'user': request.user})
+    serializer = ProfessionalPasswordChangeSerializer(data=request.data, context={'user': request.user})
     serializer.is_valid(raise_exception=True)
     serializer.save(request.user)
     Token.objects.filter(user=request.user).delete()
@@ -676,9 +949,9 @@ class FormsGroupsOverviewView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    lead_form = TrainerLeadForm.objects.filter(trainer=request.user, is_active=True).first()
-    groups = TrainerGroup.objects.filter(trainer=request.user, is_active=True).select_related('client_registration_form')
-    submissions = LeadSubmission.objects.filter(lead_form__trainer=request.user).select_related('client_access__group')
+    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    groups = ProfessionalGroup.objects.filter(professional=request.user, is_active=True).select_related('client_registration_form')
+    submissions = LeadSubmission.objects.filter(lead_form__professional=request.user).select_related('client_access__group')
     pending_submissions = submissions.filter(status=LeadSubmission.STATUS_PENDING)
     approved_submissions = submissions.filter(status=LeadSubmission.STATUS_APPROVED)
     deleted_submissions = submissions.filter(status=LeadSubmission.STATUS_DELETED)
@@ -686,23 +959,23 @@ class FormsGroupsOverviewView(APIView):
     return Response(
       {
         'has_lead_form': lead_form is not None,
-        'lead_form': TrainerLeadFormSerializer(lead_form, context={'request': request}).data if lead_form else None,
-        'groups': TrainerGroupSerializer(groups, many=True).data,
+        'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data if lead_form else None,
+        'groups': ProfessionalGroupSerializer(groups, many=True).data,
         'pending_forms': LeadSubmissionSerializer(pending_submissions, many=True).data,
         'approved_forms': LeadSubmissionSerializer(approved_submissions, many=True).data,
         'deleted_forms': LeadSubmissionSerializer(deleted_submissions, many=True).data,
         'max_groups': plan_limit(request.user, 'groups'),
-        'plan': trainer_plan(request.user),
+        'plan': professional_plan(request.user),
       }
     )
 
 
-class TrainerLeadFormView(APIView):
+class ProfessionalLeadFormView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request):
-    lead_form = TrainerLeadForm.objects.filter(trainer=request.user, is_active=True).first()
-    serializer = TrainerLeadFormSerializer(
+    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    serializer = ProfessionalLeadFormSerializer(
       lead_form,
       data=request.data,
       partial=lead_form is not None,
@@ -713,11 +986,11 @@ class TrainerLeadFormView(APIView):
     if lead_form:
       serializer.save()
     else:
-      serializer.save(trainer=request.user, public_slug=generate_unique_slug())
+      serializer.save(professional=request.user, public_slug=generate_unique_slug())
 
     return Response(
       {
-        'lead_form': TrainerLeadFormSerializer(serializer.instance, context={'request': request}).data,
+        'lead_form': ProfessionalLeadFormSerializer(serializer.instance, context={'request': request}).data,
         'message': 'Public lead form saved successfully.',
       },
       status=status.HTTP_201_CREATED if lead_form is None else status.HTTP_200_OK,
@@ -727,41 +1000,41 @@ class TrainerLeadFormView(APIView):
     return self.post(request)
 
 
-class TrainerGroupListView(APIView):
+class ProfessionalGroupListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request):
     group_limit = plan_limit(request.user, 'groups')
-    if group_limit is not None and TrainerGroup.objects.filter(trainer=request.user, is_active=True).count() >= group_limit:
+    if group_limit is not None and ProfessionalGroup.objects.filter(professional=request.user, is_active=True).count() >= group_limit:
       return Response({'message': 'Maximum groups limit reached.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = TrainerGroupSerializer(data=request.data)
+    serializer = ProfessionalGroupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
     try:
-      group = serializer.save(trainer=request.user)
+      group = serializer.save(professional=request.user)
     except IntegrityError:
-      return Response({'message': 'Group Name must be unique for this trainer.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'Group Name must be unique for this professional.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Seed the universal client creation form so every group has one from the
     # start. A registration form is mandatory before a lead can be converted
-    # into a client; the trainer can still customise these fields afterwards.
+    # into a client; the professional can still customise these fields afterwards.
     ClientRegistrationForm.objects.create(group=group, fields=default_client_registration_fields())
 
     return Response(
       {
-        'group': TrainerGroupSerializer(group).data,
+        'group': ProfessionalGroupSerializer(group).data,
         'message': 'Group saved successfully.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
-class TrainerGroupDetailView(APIView):
+class ProfessionalGroupDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_group(self, request, group_id):
-    return TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+    return ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
 
   def get(self, request, group_id):
     group = self.get_group(request, group_id)
@@ -769,7 +1042,7 @@ class TrainerGroupDetailView(APIView):
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({'group': TrainerGroupSerializer(group).data})
+    return Response({'group': ProfessionalGroupSerializer(group).data})
 
   def put(self, request, group_id):
     group = self.get_group(request, group_id)
@@ -777,22 +1050,22 @@ class TrainerGroupDetailView(APIView):
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = TrainerGroupSerializer(group, data=request.data, partial=True)
+    serializer = ProfessionalGroupSerializer(group, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
 
     try:
       serializer.save()
     except IntegrityError:
-      return Response({'message': 'Group Name must be unique for this trainer.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'Group Name must be unique for this professional.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'group': TrainerGroupSerializer(group).data, 'message': 'Group updated successfully.'})
+    return Response({'group': ProfessionalGroupSerializer(group).data, 'message': 'Group updated successfully.'})
 
 
 class ClientRegistrationFormView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request, group_id):
-    group = TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+    group = ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
 
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -824,7 +1097,7 @@ class PublicLeadFormView(APIView):
   throttle_scope = 'public_registration'
 
   def get(self, request, public_slug):
-    lead_form = TrainerLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('trainer').first()
+    lead_form = ProfessionalLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('professional').first()
 
     if lead_form is None:
       return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -832,7 +1105,7 @@ class PublicLeadFormView(APIView):
     return Response(PublicLeadFormSerializer(lead_form).data)
 
   def post(self, request, public_slug):
-    lead_form = TrainerLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('trainer').first()
+    lead_form = ProfessionalLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('professional').first()
 
     if lead_form is None:
       return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -850,7 +1123,7 @@ class PublicLeadFormView(APIView):
     )
 
     send_mail(
-      subject='Your CoachFlow form reference ID',
+      subject='Your RepRoot form reference ID',
       message=f'Your form has been submitted successfully. Your reference ID is {submission.reference_id}. Please save this for future communication.',
       from_email=None,
       recipient_list=[submission.email],
@@ -872,7 +1145,7 @@ class PendingLeadSubmissionView(APIView):
   def delete(self, request, submission_id):
     submission = LeadSubmission.objects.filter(
       id=submission_id,
-      lead_form__trainer=request.user,
+      lead_form__professional=request.user,
       status=LeadSubmission.STATUS_PENDING,
       is_active=True,
     ).first()
@@ -892,12 +1165,12 @@ class ClientAccessCreateView(APIView):
 
   def post(self, request, submission_id):
     client_limit = plan_limit(request.user, 'clients')
-    if client_limit is not None and ClientAccess.objects.filter(trainer=request.user, is_active=True).count() >= client_limit:
-      return Response({'message': f'Your {trainer_plan(request.user)["name"]} plan allows up to {client_limit} active clients.'}, status=status.HTTP_400_BAD_REQUEST)
+    if client_limit is not None and ClientAccess.objects.filter(professional=request.user, is_active=True).count() >= client_limit:
+      return Response({'message': f'Your {professional_plan(request.user)["name"]} plan allows up to {client_limit} active clients.'}, status=status.HTTP_400_BAD_REQUEST)
 
     submission = LeadSubmission.objects.filter(
       id=submission_id,
-      lead_form__trainer=request.user,
+      lead_form__professional=request.user,
       status=LeadSubmission.STATUS_PENDING,
       is_active=True,
     ).first()
@@ -905,9 +1178,9 @@ class ClientAccessCreateView(APIView):
     if submission is None:
       return Response({'message': 'Pending form request not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = ClientAccessCreateSerializer(data=request.data, context={'trainer': request.user})
+    serializer = ClientAccessCreateSerializer(data=request.data, context={'professional': request.user})
     serializer.is_valid(raise_exception=True)
-    group = TrainerGroup.objects.filter(id=serializer.validated_data['group_id'], trainer=request.user, is_active=True).first()
+    group = ProfessionalGroup.objects.filter(id=serializer.validated_data['group_id'], professional=request.user, is_active=True).first()
 
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -923,7 +1196,7 @@ class ClientAccessCreateView(APIView):
     registration_answers['email'] = submission.email
 
     # Required fields are mandatory for the CLIENT to complete (from their
-    # account, via an edit request the trainer approves) - not for the trainer
+    # account, via an edit request the professional approves) - not for the professional
     # to fill in at creation time. So no required-answer validation here.
 
     client_password = serializer.validated_data['password']
@@ -931,7 +1204,7 @@ class ClientAccessCreateView(APIView):
     try:
       with transaction.atomic():
         client_access = ClientAccess.objects.create(
-          trainer=request.user,
+          professional=request.user,
           group=group,
           lead_submission=submission,
           reference_id=submission.reference_id,
@@ -950,7 +1223,7 @@ class ClientAccessCreateView(APIView):
         submission.save(update_fields=['status', 'converted_at', 'updated_at'])
     except IntegrityError:
       return Response(
-        {'message': 'Same email or username already exists under this trainer.'},
+        {'message': 'Same email or username already exists under this professional.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
@@ -970,13 +1243,13 @@ class ManualClientAccessCreateView(APIView):
 
   def post(self, request):
     client_limit = plan_limit(request.user, 'clients')
-    if client_limit is not None and ClientAccess.objects.filter(trainer=request.user, is_active=True).count() >= client_limit:
-      return Response({'message': f'Your {trainer_plan(request.user)["name"]} plan allows up to {client_limit} active clients.'}, status=status.HTTP_400_BAD_REQUEST)
+    if client_limit is not None and ClientAccess.objects.filter(professional=request.user, is_active=True).count() >= client_limit:
+      return Response({'message': f'Your {professional_plan(request.user)["name"]} plan allows up to {client_limit} active clients.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = ClientAccessCreateSerializer(data=request.data, context={'trainer': request.user})
+    serializer = ClientAccessCreateSerializer(data=request.data, context={'professional': request.user})
     serializer.is_valid(raise_exception=True)
-    group = TrainerGroup.objects.filter(
-      id=serializer.validated_data['group_id'], trainer=request.user, is_active=True
+    group = ProfessionalGroup.objects.filter(
+      id=serializer.validated_data['group_id'], professional=request.user, is_active=True
     ).select_related('client_registration_form').first()
 
     if group is None:
@@ -1023,7 +1296,7 @@ class ManualClientAccessCreateView(APIView):
     try:
       with transaction.atomic():
         client_kwargs = {
-          'trainer': request.user,
+          'professional': request.user,
           'group': group,
           'registration_submission': registration_submission,
           'onboarding_method': onboarding_method,
@@ -1050,7 +1323,7 @@ class ManualClientAccessCreateView(APIView):
           registration_submission.save(update_fields=['status', 'converted_at', 'updated_at'])
     except IntegrityError:
       return Response(
-        {'message': 'The email or username already exists under this trainer.'},
+        {'message': 'The email or username already exists under this professional.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
@@ -1084,7 +1357,7 @@ class PublicGroupRegistrationView(APIView):
       public_slug=public_slug,
       is_active=True,
       group__is_active=True,
-    ).select_related('group', 'group__trainer').first()
+    ).select_related('group', 'group__professional').first()
 
   def get(self, request, public_slug):
     registration_form = self._form(public_slug)
@@ -1095,7 +1368,7 @@ class PublicGroupRegistrationView(APIView):
     return Response(
       {
         'group': {'id': registration_form.group_id, 'name': registration_form.group.name},
-        'trainer_name': registration_form.group.trainer.get_full_name() or registration_form.group.trainer.username,
+        'professional_name': registration_form.group.professional.get_full_name() or registration_form.group.professional.username,
         'fields': registration_form.fields,
       }
     )
@@ -1122,9 +1395,9 @@ class PublicGroupRegistrationView(APIView):
     send_mail(
       subject=f'Your {registration_form.group.name} registration',
       message=(
-        f'Your registration was submitted for trainer review.\n\n'
+        f'Your registration was submitted for professional review.\n\n'
         f'Reference ID: {submission.reference_id}\n\n'
-        f'Your trainer will send account credentials after review.'
+        f'Your professional will send account credentials after review.'
       ),
       from_email=None,
       recipient_list=[submission.email],
@@ -1132,7 +1405,7 @@ class PublicGroupRegistrationView(APIView):
     )
 
     return Response(
-      {'reference_id': submission.reference_id, 'message': 'Registration submitted for trainer review.'},
+      {'reference_id': submission.reference_id, 'message': 'Registration submitted for professional review.'},
       status=status.HTTP_201_CREATED,
     )
 
@@ -1141,20 +1414,20 @@ class GroupClientAccessListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request, group_id):
-    group = TrainerGroup.objects.filter(id=group_id, trainer=request.user, is_active=True).first()
+    group = ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
 
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Include suspended clients too so the trainer can see status and reactivate.
-    clients = ClientAccess.objects.filter(trainer=request.user, group=group).order_by('-is_active', '-created_at')
+    # Include suspended clients too so the professional can see status and reactivate.
+    clients = ClientAccess.objects.filter(professional=request.user, group=group).order_by('-is_active', '-created_at')
     registration_submissions = group.registration_submissions.filter(
       status=GroupRegistrationSubmission.STATUS_PENDING
     )
 
     return Response(
       {
-        'group': TrainerGroupSerializer(group).data,
+        'group': ProfessionalGroupSerializer(group).data,
         'clients': ClientAccessSerializer(clients, many=True).data,
         'registration_submissions': GroupRegistrationSubmissionSerializer(registration_submissions, many=True).data,
       }
@@ -1165,11 +1438,11 @@ class ClientAccessDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_client(self, request, client_id):
-    # No is_active filter: the trainer can open a suspended client to reactivate.
+    # No is_active filter: the professional can open a suspended client to reactivate.
     return ClientAccess.objects.filter(
       id=client_id,
-      trainer=request.user,
-    ).select_related('group', 'lead_submission', 'trainer').first()
+      professional=request.user,
+    ).select_related('group', 'lead_submission', 'professional').first()
 
   def get(self, request, client_id):
     client_access = self.get_client(request, client_id)
@@ -1188,15 +1461,15 @@ class ClientAccessDetailView(APIView):
       {
         'client': {
           **ClientAccessSerializer(client_access).data,
-          'trainer_notes': client_access.trainer_notes,
+          'professional_notes': client_access.professional_notes,
         },
-        'group': TrainerGroupSerializer(group).data,
+        'group': ProfessionalGroupSerializer(group).data,
         'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
         'lead_submission': (
           LeadSubmissionSerializer(client_access.lead_submission).data if client_access.lead_submission else None
         ),
-        'trainer_notes': client_access.trainer_notes,
-        'trainer_notes_updated_at': serialize_datetime(client_access.trainer_notes_updated_at),
+        'professional_notes': client_access.professional_notes,
+        'professional_notes_updated_at': serialize_datetime(client_access.professional_notes_updated_at),
         'pending_change_request': (
           ClientDetailChangeRequestSerializer(pending_change_request).data if pending_change_request else None
         ),
@@ -1225,10 +1498,10 @@ class ClientAccessDetailView(APIView):
     if not first_name or not last_name or not email or not username:
       return Response({'message': 'First name, last name, email, and username are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if ClientAccess.objects.filter(trainer=request.user, username=username).exclude(id=client_access.id).exists():
+    if ClientAccess.objects.filter(professional=request.user, username=username).exclude(id=client_access.id).exists():
       return Response({'message': 'Username is already used by another client.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if ClientAccess.objects.filter(trainer=request.user, email=email).exclude(id=client_access.id).exists():
+    if ClientAccess.objects.filter(professional=request.user, email=email).exclude(id=client_access.id).exists():
       return Response({'message': 'Email is already used by another client.'}, status=status.HTTP_400_BAD_REQUEST)
 
     client_access.first_name = first_name
@@ -1247,24 +1520,24 @@ class ClientAccessDetailView(APIView):
     return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Client information updated.'})
 
 
-class ClientTrainerNotesView(APIView):
+class ClientProfessionalNotesView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    client_access.trainer_notes = str(request.data.get('notes', '')).strip()
-    client_access.trainer_notes_updated_at = timezone.now()
-    client_access.save(update_fields=['trainer_notes', 'trainer_notes_updated_at', 'updated_at'])
+    client_access.professional_notes = str(request.data.get('notes', '')).strip()
+    client_access.professional_notes_updated_at = timezone.now()
+    client_access.save(update_fields=['professional_notes', 'professional_notes_updated_at', 'updated_at'])
 
     return Response(
       {
-        'trainer_notes': client_access.trainer_notes,
-        'trainer_notes_updated_at': serialize_datetime(client_access.trainer_notes_updated_at),
-        'message': 'Trainer notes saved.',
+        'professional_notes': client_access.professional_notes,
+        'professional_notes_updated_at': serialize_datetime(client_access.professional_notes_updated_at),
+        'message': 'Professional notes saved.',
       }
     )
 
@@ -1272,7 +1545,7 @@ class ClientAccessPhotoView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1289,7 +1562,7 @@ class ClientAdditionalInfoView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1310,7 +1583,7 @@ class ClientReminderListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def _client(self, request, client_id):
-    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
   def get(self, request, client_id):
     client = self._client(request, client_id)
@@ -1328,7 +1601,7 @@ class ClientReminderListView(APIView):
 
     serializer = ClientReminderSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    reminder = serializer.save(trainer=request.user, client=client)
+    reminder = serializer.save(professional=request.user, client=client)
 
     return Response(
       {'reminder': ClientReminderSerializer(reminder).data, 'message': 'Reminder scheduled.'},
@@ -1340,7 +1613,7 @@ class ClientReminderDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def _reminder(self, request, reminder_id):
-    return ClientReminder.objects.filter(id=reminder_id, trainer=request.user).select_related('client').first()
+    return ClientReminder.objects.filter(id=reminder_id, professional=request.user).select_related('client').first()
 
   def put(self, request, reminder_id):
     reminder = self._reminder(request, reminder_id)
@@ -1364,15 +1637,15 @@ class ClientReminderDetailView(APIView):
     return Response({'message': 'Reminder deleted.'})
 
 
-class TrainerUpcomingRemindersView(APIView):
+class ProfessionalUpcomingRemindersView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    reminders_queryset = ClientReminder.objects.filter(trainer=request.user).select_related('client')
+    reminders_queryset = ClientReminder.objects.filter(professional=request.user).select_related('client')
     pending = list(reminders_queryset.filter(status=ClientReminder.STATUS_PENDING))
     completed = reminders_queryset.filter(status=ClientReminder.STATUS_DONE)
     pending_profile_edits_queryset = ClientDetailChangeRequest.objects.filter(
-      client__trainer=request.user,
+      client__professional=request.user,
       status=ClientDetailChangeRequest.STATUS_PENDING,
     ).select_related('client', 'client__group').order_by('-created_at')
     pending_profile_edit_count = pending_profile_edits_queryset.count()
@@ -1442,7 +1715,7 @@ class ClientProgressListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def _client(self, request, client_id):
-    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
   def get(self, request, client_id):
     client = self._client(request, client_id)
@@ -1461,7 +1734,7 @@ class ClientProgressListView(APIView):
     serializer = ProgressEntrySerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     entry = serializer.save(
-      trainer=request.user,
+      professional=request.user,
       client=client,
       created_by=request.user.get_full_name() or request.user.username,
     )
@@ -1476,7 +1749,7 @@ class ClientProgressDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, entry_id):
-    entry = ProgressEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+    entry = ProgressEntry.objects.filter(id=entry_id, client__professional=request.user).first()
 
     if entry is None:
       return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1488,7 +1761,7 @@ class ClientProgressDetailView(APIView):
     return Response({'progress': ProgressEntrySerializer(entry).data, 'message': 'Progress record updated.'})
 
   def delete(self, request, entry_id):
-    entry = ProgressEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+    entry = ProgressEntry.objects.filter(id=entry_id, client__professional=request.user).first()
 
     if entry is None:
       return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1497,14 +1770,14 @@ class ClientProgressDetailView(APIView):
     return Response({'message': 'Progress record deleted.'})
 
 
-class TrainerClientChangeRequestActionView(APIView):
+class ProfessionalClientChangeRequestActionView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request, client_id, request_id):
     change_request = ClientDetailChangeRequest.objects.filter(
       id=request_id,
       client_id=client_id,
-      client__trainer=request.user,
+      client__professional=request.user,
       status=ClientDetailChangeRequest.STATUS_PENDING,
     ).select_related('client').first()
 
@@ -1538,9 +1811,9 @@ class TrainerClientChangeRequestActionView(APIView):
     else:
       change_request.status = ClientDetailChangeRequest.STATUS_REJECTED
 
-    change_request.trainer_note = note
+    change_request.professional_note = note
     change_request.reviewed_at = timezone.now()
-    change_request.save(update_fields=['status', 'trainer_note', 'reviewed_at'])
+    change_request.save(update_fields=['status', 'professional_note', 'reviewed_at'])
 
     return Response(
       {
@@ -1551,30 +1824,30 @@ class TrainerClientChangeRequestActionView(APIView):
     )
 
 
-class ClientTrainerLookupView(APIView):
+class ClientProfessionalLookupView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'directory'
 
   def post(self, request):
-    serializer = ClientTrainerLookupSerializer(data=request.data)
+    serializer = ClientProfessionalLookupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
-    trainer_id = serializer.validated_data['trainer_id']
-    profile = TrainerProfile.objects.select_related('user').filter(trainer_id__iexact=trainer_id).first()
+    professional_id = serializer.validated_data['professional_id']
+    profile = ProfessionalProfile.objects.select_related('user').filter(professional_id__iexact=professional_id).first()
 
     if profile is None:
-      return Response({'message': 'Trainer ID not found.'}, status=status.HTTP_404_NOT_FOUND)
+      return Response({'message': 'Professional ID not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     return Response(
       {
-        'trainer_id': profile.trainer_id,
-        'trainer_name': profile.user.get_full_name() or profile.user.username,
-        'message': 'Trainer ID found.',
+        'professional_id': profile.professional_id,
+        'professional_name': profile.user.get_full_name() or profile.user.username,
+        'message': 'Professional ID found.',
       }
     )
 
 
-class TrainerDirectoryView(APIView):
+class ProfessionalDirectoryView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'directory'
@@ -1582,36 +1855,36 @@ class TrainerDirectoryView(APIView):
   def get(self, request):
     search = str(request.query_params.get('search', '')).strip()
     profiles = (
-      TrainerProfile.objects.select_related('user')
-      .exclude(trainer_id__isnull=True)
-      .exclude(trainer_id__exact='')
+      ProfessionalProfile.objects.select_related('user')
+      .exclude(professional_id__isnull=True)
+      .exclude(professional_id__exact='')
     )
 
     if search:
       profiles = profiles.filter(
-        Q(trainer_id__icontains=search)
+        Q(professional_id__icontains=search)
         | Q(user__first_name__icontains=search)
         | Q(user__last_name__icontains=search)
       )
 
     profiles = profiles.order_by('user__first_name', 'user__last_name')[:100]
 
-    trainers = [
+    professionals = [
       {
-        'trainer_id': profile.trainer_id,
-        'trainer_name': profile.user.get_full_name() or profile.user.username,
+        'professional_id': profile.professional_id,
+        'professional_name': profile.user.get_full_name() or profile.user.username,
       }
       for profile in profiles
     ]
 
-    return Response({'trainers': trainers})
+    return Response({'professionals': professionals})
 
 
 class ClientAccessStatusView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1627,12 +1900,12 @@ class ClientAccessPasswordResetView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    # Consistent with manual client creation (Option A): the trainer defines
+    # Consistent with manual client creation (Option A): the professional defines
     # the temporary password. A generated one is used only when none is sent.
     temporary_password = str(request.data.get('password', '') or '').strip()
 
@@ -1653,9 +1926,9 @@ class ClientAccessPasswordResetView(APIView):
     client_access.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
 
     send_mail(
-      subject='Your CoachFlow client password reset',
+      subject='Your RepRoot client password reset',
       message=(
-        f'Your trainer reset your CoachFlow client password.\n\n'
+        f'Your professional reset your RepRoot client password.\n\n'
         f'Username: {client_access.username}\n'
         f'Temporary password: {temporary_password}\n\n'
         f'Please log in and change your password.'
@@ -1680,7 +1953,7 @@ class ClientAccessResetView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def post(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1695,14 +1968,14 @@ class ClientAccessResetView(APIView):
 
       client_access.additional_info = []
       client_access.additional_info_shared = False
-      client_access.trainer_notes = ''
-      client_access.trainer_notes_updated_at = None
+      client_access.professional_notes = ''
+      client_access.professional_notes_updated_at = None
       client_access.save(
         update_fields=[
           'additional_info',
           'additional_info_shared',
-          'trainer_notes',
-          'trainer_notes_updated_at',
+          'professional_notes',
+          'professional_notes_updated_at',
           'updated_at',
         ]
       )
@@ -1716,12 +1989,15 @@ class ClientAccessResetView(APIView):
 
 
 class ClientAccessDeleteView(APIView):
-  """Permanently delete a client account and every record tied to it."""
+  """Delete a client account, moving the client plus their chat/tracking/progress/
+  reminders/template assignments into the Recycle Bin as one bundled entry —
+  deleting a whole client is consequential enough that it should always be
+  fully restorable, unlike smaller individual deletes."""
 
   permission_classes = [permissions.IsAuthenticated]
 
   def delete(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1742,23 +2018,22 @@ class ClientAccessDeleteView(APIView):
         registration_submission.status = GroupRegistrationSubmission.STATUS_DELETED
         registration_submission.save(update_fields=['status', 'updated_at'])
 
-      # Cascades assignments, entries, chat, reminders, progress, change requests, token.
-      client_access.delete()
+      recycle_bin.soft_delete_client_account(client_access)
 
-    return Response({'message': 'Client account permanently deleted.'})
+    return Response({'message': 'Client account moved to Recycle Bin.'})
 
 
-class TrainerReferenceCategoryListView(APIView):
+class ProfessionalReferenceCategoryListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    categories = ReferenceCategory.objects.filter(trainer=request.user)
+    categories = ReferenceCategory.objects.filter(professional=request.user)
     return Response({'categories': ReferenceCategorySerializer(categories, many=True).data})
 
   def post(self, request):
     category_limit = plan_limit(request.user, 'categories')
 
-    if category_limit is not None and ReferenceCategory.objects.filter(trainer=request.user).count() >= category_limit:
+    if category_limit is not None and ReferenceCategory.objects.filter(professional=request.user).count() >= category_limit:
       return Response({'message': 'The Version 1 category limit has been reached.'}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = ReferenceCategorySerializer(data=request.data)
@@ -1770,7 +2045,7 @@ class TrainerReferenceCategoryListView(APIView):
       return Response({'message': f'Each category can contain up to {subcategory_limit} subcategories.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-      category = serializer.save(trainer=request.user)
+      category = serializer.save(professional=request.user)
     except IntegrityError:
       return Response({'message': 'Category name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1783,11 +2058,11 @@ class TrainerReferenceCategoryListView(APIView):
     )
 
 
-class TrainerReferenceCategoryDetailView(APIView):
+class ProfessionalReferenceCategoryDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_category(self, request, category_id):
-    return ReferenceCategory.objects.filter(id=category_id, trainer=request.user).first()
+    return ReferenceCategory.objects.filter(id=category_id, professional=request.user).first()
 
   def put(self, request, category_id):
     category = self.get_category(request, category_id)
@@ -1828,16 +2103,16 @@ class TrainerReferenceCategoryDetailView(APIView):
     return Response({'message': 'Category deleted.'})
 
 
-class TrainerReferenceListView(APIView):
+class ProfessionalReferenceListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
   def get(self, request):
-    references = TrainerReference.objects.filter(trainer=request.user).select_related('category')
+    references = ProfessionalReference.objects.filter(professional=request.user).select_related('category')
     reference_limit = plan_limit(request.user, 'references')
     return Response(
       {
-        'references': TrainerReferenceSerializer(references, many=True, context={'request': request}).data,
+        'references': ProfessionalReferenceSerializer(references, many=True, context={'request': request}).data,
         'usage': {'used': references.count(), 'limit': reference_limit},
       }
     )
@@ -1845,36 +2120,36 @@ class TrainerReferenceListView(APIView):
   def post(self, request):
     reference_limit = plan_limit(request.user, 'references')
 
-    if reference_limit is not None and TrainerReference.objects.filter(trainer=request.user).count() >= reference_limit:
+    if reference_limit is not None and ProfessionalReference.objects.filter(professional=request.user).count() >= reference_limit:
       return Response(
         {'message': 'You have reached the Version 1 reference limit.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
-    serializer = TrainerReferenceSerializer(data=request.data, context={'request': request})
+    serializer = ProfessionalReferenceSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     category = serializer.validated_data.get('category')
 
-    if category is None or category.trainer_id != request.user.id:
+    if category is None or category.professional_id != request.user.id:
       return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    reference = serializer.save(trainer=request.user)
+    reference = serializer.save(professional=request.user)
 
     return Response(
       {
-        'reference': TrainerReferenceSerializer(reference, context={'request': request}).data,
+        'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data,
         'message': 'Reference saved successfully.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
-class TrainerReferenceDetailView(APIView):
+class ProfessionalReferenceDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
   def get_reference(self, request, reference_id):
-    return TrainerReference.objects.filter(id=reference_id, trainer=request.user).select_related('category').first()
+    return ProfessionalReference.objects.filter(id=reference_id, professional=request.user).select_related('category').first()
 
   def get(self, request, reference_id):
     reference = self.get_reference(request, reference_id)
@@ -1882,7 +2157,7 @@ class TrainerReferenceDetailView(APIView):
     if reference is None:
       return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({'reference': TrainerReferenceSerializer(reference, context={'request': request}).data})
+    return Response({'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data})
 
   def put(self, request, reference_id):
     reference = self.get_reference(request, reference_id)
@@ -1890,18 +2165,18 @@ class TrainerReferenceDetailView(APIView):
     if reference is None:
       return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = TrainerReferenceSerializer(reference, data=request.data, partial=True, context={'request': request})
+    serializer = ProfessionalReferenceSerializer(reference, data=request.data, partial=True, context={'request': request})
     serializer.is_valid(raise_exception=True)
     category = serializer.validated_data.get('category')
 
-    if category is not None and category.trainer_id != request.user.id:
+    if category is not None and category.professional_id != request.user.id:
       return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer.save()
 
     return Response(
       {
-        'reference': TrainerReferenceSerializer(reference, context={'request': request}).data,
+        'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data,
         'message': 'Reference updated successfully.',
       }
     )
@@ -1912,8 +2187,8 @@ class TrainerReferenceDetailView(APIView):
     if reference is None:
       return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    reference.delete()
-    return Response({'message': 'Reference deleted.'})
+    recycle_bin.soft_delete_reference(reference)
+    return Response({'message': 'Reference moved to Recycle Bin.'})
 
 
 class StandardTemplateListView(APIView):
@@ -1921,7 +2196,7 @@ class StandardTemplateListView(APIView):
 
   def get(self, request):
     adopted_keys = set(
-      TrackingTemplate.objects.filter(trainer=request.user, is_active=True)
+      TrackingTemplate.objects.filter(professional=request.user, is_active=True)
       .exclude(standard_key='')
       .values_list('standard_key', flat=True)
     )
@@ -1940,12 +2215,12 @@ class StandardTemplateAdoptView(APIView):
       return Response({'message': 'Standard template not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     template_limit = plan_limit(request.user, 'templates')
-    if template_limit is not None and TrackingTemplate.objects.filter(trainer=request.user, is_active=True).count() >= template_limit:
+    if template_limit is not None and TrackingTemplate.objects.filter(professional=request.user, is_active=True).count() >= template_limit:
       return Response({'message': f'Maximum of {template_limit} templates reached.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
       template = TrackingTemplate.objects.create(
-        trainer=request.user,
+        professional=request.user,
         name=standard_template['name'],
         purpose=standard_template['purpose'],
         cadence=standard_template['cadence'],
@@ -1969,25 +2244,25 @@ class TrackingTemplateListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
-    templates = TrackingTemplate.objects.filter(trainer=request.user, is_active=True).prefetch_related('assignments')
+    templates = TrackingTemplate.objects.filter(professional=request.user, is_active=True).prefetch_related('assignments')
     return Response(
       {
         'templates': TrackingTemplateSerializer(templates, many=True, context={'request': request}).data,
         'max_templates': plan_limit(request.user, 'templates'),
-        'plan': trainer_plan(request.user),
+        'plan': professional_plan(request.user),
       }
     )
 
   def post(self, request):
     template_limit = plan_limit(request.user, 'templates')
-    if template_limit is not None and TrackingTemplate.objects.filter(trainer=request.user, is_active=True).count() >= template_limit:
+    if template_limit is not None and TrackingTemplate.objects.filter(professional=request.user, is_active=True).count() >= template_limit:
       return Response({'message': f'Maximum of {template_limit} templates reached.'}, status=status.HTTP_400_BAD_REQUEST)
 
     serializer = TrackingTemplateSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
 
     try:
-      template = serializer.save(trainer=request.user)
+      template = serializer.save(professional=request.user)
     except IntegrityError:
       return Response({'message': 'Template name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2004,7 +2279,7 @@ class TrackingTemplateDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_template(self, request, template_id):
-    return TrackingTemplate.objects.filter(id=template_id, trainer=request.user, is_active=True).first()
+    return TrackingTemplate.objects.filter(id=template_id, professional=request.user, is_active=True).first()
 
   def get(self, request, template_id):
     template = self.get_template(request, template_id)
@@ -2041,7 +2316,7 @@ class TrackingTemplateDetailView(APIView):
     if template is None:
       return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    # A template still assigned to clients cannot be deleted: the trainer must
+    # A template still assigned to clients cannot be deleted: the professional must
     # unassign it from each client first. TemplateAssignment cascades on this
     # FK, so without this check the delete would silently strip the template
     # from every client who is actively logging against it.
@@ -2068,7 +2343,7 @@ class ClientTemplateAssignmentListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get_client(self, request, client_id):
-    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
   def get(self, request, client_id):
     client_access = self.get_client(request, client_id)
@@ -2091,7 +2366,7 @@ class ClientTemplateAssignmentListView(APIView):
 
     template = TrackingTemplate.objects.filter(
       id=request.data.get('template_id'),
-      trainer=request.user,
+      professional=request.user,
       is_active=True,
     ).first()
 
@@ -2114,11 +2389,11 @@ class ClientTemplateAssignmentListView(APIView):
     )
 
 
-def set_assignment_references(assignment, trainer, reference_ids):
+def set_assignment_references(assignment, professional, reference_ids):
   if reference_ids is None or not isinstance(reference_ids, list):
     return
 
-  references = TrainerReference.objects.filter(trainer=trainer, id__in=reference_ids)
+  references = ProfessionalReference.objects.filter(professional=professional, id__in=reference_ids)
   assignment.references.set(references)
 
 
@@ -2129,7 +2404,7 @@ class ClientTemplateAssignmentDetailView(APIView):
     return TemplateAssignment.objects.filter(
       id=assignment_id,
       client_id=client_id,
-      client__trainer=request.user,
+      client__professional=request.user,
     ).select_related('template', 'client').first()
 
   def put(self, request, client_id, assignment_id):
@@ -2161,7 +2436,7 @@ class ClientTrackingEntryListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -2183,7 +2458,7 @@ class ClientTrackingEntryListView(APIView):
     return Response({'entries': TrackingEntrySerializer(entries, many=True).data})
 
   def post(self, request, client_id):
-    client_access = ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -2192,7 +2467,7 @@ class ClientTrackingEntryListView(APIView):
     serializer.is_valid(raise_exception=True)
     template = TrackingTemplate.objects.filter(
       id=serializer.validated_data['template_id'],
-      trainer=request.user,
+      professional=request.user,
       is_active=True,
       assignments__client=client_access,
     ).first()
@@ -2208,7 +2483,7 @@ class ClientTrackingEntryListView(APIView):
         'template_name': template.name,
         'answers': serializer.validated_data['answers'],
         'note': serializer.validated_data['note'],
-        'edited_by_trainer': True,
+        'edited_by_professional': True,
       },
     )
 
@@ -2229,11 +2504,11 @@ def entry_editable(entry):
   return timezone.now() - entry.created_at <= ENTRY_EDIT_WINDOW
 
 
-class TrainerTrackingEntryDetailView(APIView):
+class ProfessionalTrackingEntryDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def put(self, request, entry_id):
-    entry = TrackingEntry.objects.filter(id=entry_id, client__trainer=request.user).first()
+    entry = TrackingEntry.objects.filter(id=entry_id, client__professional=request.user).first()
 
     if entry is None:
       return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -2246,7 +2521,7 @@ class TrainerTrackingEntryDetailView(APIView):
 
     serializer = TrackingEntrySerializer(entry, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    serializer.save(edited_by_trainer=True)
+    serializer.save(edited_by_professional=True)
 
     return Response(
       {
@@ -2256,11 +2531,12 @@ class TrainerTrackingEntryDetailView(APIView):
     )
 
 
-class TrainerClientChatView(APIView):
+class ProfessionalClientChatView(APIView):
   permission_classes = [permissions.IsAuthenticated]
+  parser_classes = [JSONParser, FormParser, MultiPartParser]
 
   def get_client(self, request, client_id):
-    return ClientAccess.objects.filter(id=client_id, trainer=request.user, is_active=True).first()
+    return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
 
   def get(self, request, client_id):
     client_access = self.get_client(request, client_id)
@@ -2268,20 +2544,20 @@ class TrainerClientChatView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    messages = ChatMessage.objects.filter(trainer=request.user, client=client_access)
+    messages = ChatMessage.objects.filter(professional=request.user, client=client_access)
     after_id = request.query_params.get('after')
 
     if after_id:
       messages = messages.filter(id__gt=after_id)
 
     ChatMessage.objects.filter(
-      trainer=request.user,
+      professional=request.user,
       client=client_access,
       sender=ChatMessage.SENDER_CLIENT,
       is_read=False,
     ).update(is_read=True)
 
-    return Response({'messages': ChatMessageSerializer(messages, many=True).data})
+    return Response({'messages': ChatMessageSerializer(messages, many=True, context={'request': request}).data})
 
   def post(self, request, client_id):
     client_access = self.get_client(request, client_id)
@@ -2289,33 +2565,51 @@ class TrainerClientChatView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = ChatMessageSerializer(data=request.data)
+    try:
+      feature_access.assert_can_use_chat(request.user.professional_profile)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ChatMessageSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
-    message = serializer.save(trainer=request.user, client=client_access, sender=ChatMessage.SENDER_TRAINER)
+    message = serializer.save(professional=request.user, client=client_access, sender=ChatMessage.SENDER_PROFESSIONAL)
 
-    return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)
+    return Response(
+      {'chat_message': ChatMessageSerializer(message, context={'request': request}).data}, status=status.HTTP_201_CREATED
+    )
 
 
-class TrainerChatUnreadView(APIView):
+class ProfessionalChatUnreadView(APIView):
   permission_classes = [permissions.IsAuthenticated]
 
   def get(self, request):
     unread_rows = (
       ChatMessage.objects.filter(
-        trainer=request.user,
+        professional=request.user,
         client__is_active=True,
         sender=ChatMessage.SENDER_CLIENT,
         is_read=False,
       )
       .values('client_id')
-      .annotate(unread_count=Count('id'))
+      .annotate(unread_count=Count('id'), last_unread_at=Max('created_at'))
     )
-    by_client = {str(row['client_id']): row['unread_count'] for row in unread_rows}
+    by_client = {}
+    last_unread_at = {}
+
+    for row in unread_rows:
+      client_id = str(row['client_id'])
+      by_client[client_id] = row['unread_count']
+      # Lets a client list float waiting chats to the top, newest first. It's the
+      # newest *unread* message rather than the newest message in the thread: the
+      # professional's own reply shouldn't push a chat up, and once they read it the
+      # row drops out of here entirely and the list settles back down.
+      last_unread_at[client_id] = row['last_unread_at'].isoformat()
 
     return Response(
       {
         'unread_count': sum(by_client.values()),
         'by_client': by_client,
+        'last_unread_at': last_unread_at,
       }
     )
 
@@ -2337,7 +2631,7 @@ class ClientPasswordChangeView(APIView):
     return Response(
       {
         'token': token.key,
-        'client': ClientAccessSerializer(client_access, context={'include_trainer_notes': True}).data,
+        'client': ClientAccessSerializer(client_access, context={'include_professional_notes': True}).data,
         'message': 'Password changed successfully.',
       }
     )
@@ -2425,12 +2719,12 @@ class ClientMeView(APIView):
     return Response(
       {
         'client': ClientAccessSerializer(client_access).data,
-        'group': TrainerGroupSerializer(client_access.group).data,
+        'group': ProfessionalGroupSerializer(client_access.group).data,
         'registration_fields': registration_form.fields if registration_form and registration_form.is_active else [],
         'lead_submission': (
           LeadSubmissionSerializer(client_access.lead_submission).data if client_access.lead_submission else None
         ),
-        'trainer_profile': build_public_trainer_profile(client_access.trainer, request),
+        'professional_profile': build_public_professional_profile(client_access.professional, request),
         'additional_info_shared': client_access.additional_info_shared,
         'shared_additional_info': client_access.additional_info if client_access.additional_info_shared else [],
       }
@@ -2473,7 +2767,7 @@ class ClientDetailChangeRequestView(APIView):
 
     if client_access.detail_change_requests.filter(status=ClientDetailChangeRequest.STATUS_PENDING).exists():
       return Response(
-        {'message': 'You already have an edit request awaiting your trainer\'s approval.'},
+        {'message': 'You already have an edit request awaiting your professional\'s approval.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
@@ -2503,7 +2797,7 @@ class ClientDetailChangeRequestView(APIView):
     return Response(
       {
         'change_request': ClientDetailChangeRequestSerializer(change_request).data,
-        'message': 'Edit request submitted. Your trainer will review it.',
+        'message': 'Edit request submitted. Your professional will review it.',
       },
       status=status.HTTP_201_CREATED,
     )
@@ -2546,7 +2840,7 @@ class ClientAccountDeletionRequestView(APIView):
       status=ClientDetailChangeRequest.STATUS_PENDING,
     ).exists():
       return Response(
-        {'message': 'An account deletion request is already awaiting trainer review.'},
+        {'message': 'An account deletion request is already awaiting professional review.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
@@ -2559,7 +2853,7 @@ class ClientAccountDeletionRequestView(APIView):
     return Response(
       {
         'deletion_request': ClientDetailChangeRequestSerializer(deletion_request).data,
-        'message': 'Account deletion request sent to your trainer for review.',
+        'message': 'Account deletion request sent to your professional for review.',
       },
       status=status.HTTP_201_CREATED,
     )
@@ -2633,7 +2927,7 @@ class ClientTrackingEntryView(APIView):
     client_access = request.auth
     template = TrackingTemplate.objects.filter(
       id=serializer.validated_data['template_id'],
-      trainer=client_access.trainer,
+      professional=client_access.professional,
       is_active=True,
       assignments__client=client_access,
     ).first()
@@ -2652,7 +2946,7 @@ class ClientTrackingEntryView(APIView):
       entry_time=entry_time,
       answers=serializer.validated_data['answers'],
       note=serializer.validated_data['note'],
-      edited_by_trainer=False,
+      edited_by_professional=False,
     )
 
     return Response(
@@ -2690,7 +2984,7 @@ class ClientTrackingEntryDetailView(APIView):
 
     serializer = TrackingEntrySerializer(entry, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    serializer.save(edited_by_trainer=False)
+    serializer.save(edited_by_professional=False)
 
     return Response(
       {
@@ -2703,31 +2997,40 @@ class ClientTrackingEntryDetailView(APIView):
 class ClientChatView(APIView):
   authentication_classes = [ClientTokenAuthentication]
   permission_classes = [IsAuthenticatedClient]
+  parser_classes = [JSONParser, FormParser, MultiPartParser]
 
   def get(self, request):
     client_access = request.auth
-    messages = ChatMessage.objects.filter(trainer=client_access.trainer, client=client_access)
+    messages = ChatMessage.objects.filter(professional=client_access.professional, client=client_access)
     after_id = request.query_params.get('after')
 
     if after_id:
       messages = messages.filter(id__gt=after_id)
 
     ChatMessage.objects.filter(
-      trainer=client_access.trainer,
+      professional=client_access.professional,
       client=client_access,
-      sender=ChatMessage.SENDER_TRAINER,
+      sender=ChatMessage.SENDER_PROFESSIONAL,
       is_read=False,
     ).update(is_read=True)
 
-    return Response({'messages': ChatMessageSerializer(messages, many=True).data})
+    return Response({'messages': ChatMessageSerializer(messages, many=True, context={'request': request}).data})
 
   def post(self, request):
     client_access = request.auth
-    serializer = ChatMessageSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    message = serializer.save(trainer=client_access.trainer, client=client_access, sender=ChatMessage.SENDER_CLIENT)
 
-    return Response({'chat_message': ChatMessageSerializer(message).data}, status=status.HTTP_201_CREATED)
+    try:
+      feature_access.assert_can_use_chat(client_access.professional.professional_profile)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ChatMessageSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    message = serializer.save(professional=client_access.professional, client=client_access, sender=ChatMessage.SENDER_CLIENT)
+
+    return Response(
+      {'chat_message': ChatMessageSerializer(message, context={'request': request}).data}, status=status.HTTP_201_CREATED
+    )
 
 
 class ClientChatUnreadView(APIView):
@@ -2736,9 +3039,9 @@ class ClientChatUnreadView(APIView):
 
   def get(self, request):
     unread_count = ChatMessage.objects.filter(
-      trainer=request.auth.trainer,
+      professional=request.auth.professional,
       client=request.auth,
-      sender=ChatMessage.SENDER_TRAINER,
+      sender=ChatMessage.SENDER_PROFESSIONAL,
       is_read=False,
     ).count()
 
@@ -2746,13 +3049,13 @@ class ClientChatUnreadView(APIView):
 
 
 def _support_reporter_filter(role, reporter):
-  if role == SupportIncident.ROLE_TRAINER:
-    return {'reporter_trainer': reporter, 'reporter_role': role}
+  if role == SupportIncident.ROLE_PROFESSIONAL:
+    return {'reporter_professional': reporter, 'reporter_role': role}
   return {'reporter_client': reporter, 'reporter_role': role}
 
 
 def _support_reporter_identity(role, reporter):
-  if role == SupportIncident.ROLE_TRAINER:
+  if role == SupportIncident.ROLE_PROFESSIONAL:
     return reporter.get_full_name() or reporter.username, reporter.email
   return f'{reporter.first_name} {reporter.last_name}'.strip() or reporter.username, reporter.email
 
@@ -2849,34 +3152,34 @@ def _support_incident_action(request, role, reporter, incident_id):
   })
 
 
-class TrainerSupportIncidentListView(APIView):
+class ProfessionalSupportIncidentListView(APIView):
   permission_classes = [permissions.IsAuthenticated]
   parser_classes = [JSONParser, FormParser, MultiPartParser]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'support'
 
   def get(self, request):
-    return _support_incident_list(request, SupportIncident.ROLE_TRAINER, request.user)
+    return _support_incident_list(request, SupportIncident.ROLE_PROFESSIONAL, request.user)
 
   def post(self, request):
-    return _support_incident_create(request, SupportIncident.ROLE_TRAINER, request.user)
+    return _support_incident_create(request, SupportIncident.ROLE_PROFESSIONAL, request.user)
 
 
-class TrainerSupportIncidentDetailView(APIView):
+class ProfessionalSupportIncidentDetailView(APIView):
   permission_classes = [permissions.IsAuthenticated]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'support'
 
   def get(self, request, incident_id):
     incident = SupportIncident.objects.filter(
-      incident_id=incident_id, reporter_trainer=request.user, reporter_role=SupportIncident.ROLE_TRAINER
+      incident_id=incident_id, reporter_professional=request.user, reporter_role=SupportIncident.ROLE_PROFESSIONAL
     ).prefetch_related('messages').first()
     if incident is None:
       return Response({'message': 'Support request not found.'}, status=status.HTTP_404_NOT_FOUND)
     return Response({'incident': SupportIncidentSerializer(incident, context={'request': request}).data})
 
   def post(self, request, incident_id):
-    return _support_incident_action(request, SupportIncident.ROLE_TRAINER, request.user, incident_id)
+    return _support_incident_action(request, SupportIncident.ROLE_PROFESSIONAL, request.user, incident_id)
 
 
 class ClientSupportIncidentListView(APIView):
@@ -2909,3 +3212,45 @@ class ClientSupportIncidentDetailView(APIView):
 
   def post(self, request, incident_id):
     return _support_incident_action(request, SupportIncident.ROLE_CLIENT, request.auth, incident_id)
+
+
+class ErrorReportView(APIView):
+  """Automatic crash/error beacon from the running web or mobile app.
+
+  Accepts a professional token, a client token, or no credentials at all — a
+  crash can happen before login (e.g. on the login screen itself), and this
+  must never itself fail hard, so identity resolution is best-effort.
+  """
+  authentication_classes = [TokenAuthentication, ClientTokenAuthentication]
+  permission_classes = [permissions.AllowAny]
+  throttle_classes = [ScopedRateThrottle]
+  throttle_scope = 'errors'
+
+  def post(self, request):
+    serializer = ErrorReportSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    professional = None
+    client = None
+    if isinstance(request.auth, ClientAccess):
+      client = request.auth
+    elif request.user and request.user.is_authenticated:
+      professional = request.user
+
+    log, deduped = record_error(
+      platform=data['platform'],
+      message=data['message'],
+      level=data.get('level', ErrorLog.LEVEL_ERROR),
+      professional=professional,
+      client=client,
+      stack_trace=data.get('stack_trace', ''),
+      context=data.get('context'),
+      app_version=data.get('app_version', ''),
+      device_info=data.get('device_info', ''),
+      request_path=data.get('request_path', ''),
+    )
+    return Response(
+      {'error_id': log.error_id, 'deduped': deduped},
+      status=status.HTTP_202_ACCEPTED if deduped else status.HTTP_201_CREATED,
+    )

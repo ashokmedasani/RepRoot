@@ -4,10 +4,12 @@ import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 
 import { ErrorNavigationService } from './error-navigation.service';
+import { ErrorReportService } from './error-report.service';
 
 /** Routes only page-level HTTP failures to the global error experience. */
 export const appErrorInterceptor: HttpInterceptorFn = (request, next) => {
   const errorNavigation = inject(ErrorNavigationService);
+  const errorReport = inject(ErrorReportService);
   const router = inject(Router);
 
   return next(request).pipe(
@@ -26,6 +28,22 @@ export const appErrorInterceptor: HttpInterceptorFn = (request, next) => {
         window.sessionStorage.setItem('client-login-notice', 'Your session expired. Please log in again.');
         void router.navigate(['/client/login']);
         return throwError(() => error);
+      }
+
+      // Only genuine failures (unreachable service / 5xx) count as a "bug"
+      // worth a crash-log entry — routine 4xx (validation, not-found, auth)
+      // is expected app behavior, not something to page anyone about. Skip
+      // the error-report endpoint itself so a broken reporter can't loop.
+      if (
+        error instanceof HttpErrorResponse &&
+        (error.status === 0 || error.status >= 500) &&
+        !request.url.includes('/errors/report/')
+      ) {
+        errorReport.report(`HTTP ${error.status} on ${request.method} ${request.url}`, {
+          stackTrace: JSON.stringify(error.error ?? {}).slice(0, 2000),
+          level: 'error',
+          requestPath: request.url
+        });
       }
 
       if (

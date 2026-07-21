@@ -1,0 +1,80 @@
+<app-client-page-shell
+  title="Meetings"
+  eyebrow="Client Portal"
+  subtitle="Review your scheduled sessions and let your professional know if you're coming."
+  activeSection="meetings"
+  titleId="client-meetings-title">
+
+  @if (isLoading) {
+    <p class="state-note">Loading your meetings...</p>
+  } @else if (loadError) {
+    <p class="message error-message">{{ loadError }}</p>
+  } @else {
+    <section class="meetings-section">
+      <h2>Upcoming</h2>
+      @if (upcomingMeetings.length) {
+        <div class="meeting-list">
+          @for (meeting of upcomingMeetings; track meeting.id) {
+            <article class="meeting-card">
+              <div class="meeting-main">
+                <strong>{{ meeting.title }}</strong>
+                @if (meeting.is_group_meeting) {
+                  <small>Group session with {{ meeting.client_name }}@for (guest of meeting.guests; track guest.id) {, {{ guest.client_name }}}</small>
+                }
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} &ndash; {{ meeting.end_at | date: 'h:mm a' }}</small>
+                @if (meeting.notes) {
+                  <small class="notes">{{ meeting.notes }}</small>
+                }
+                <span class="response-pill" [attr.data-response]="meeting.my_response_status">
+                  {{ meeting.my_response_status === 'accepted' ? "You're going" : meeting.my_response_status === 'declined' ? 'You declined' : 'Awaiting your response' }}
+                </span>
+              </div>
+              <div class="meeting-actions">
+                @if (meeting.meeting_url) {
+                  <a class="ghost-action" [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer">Join Link</a>
+                }
+                <button
+                  type="button"
+                  class="primary-action"
+                  [disabled]="respondingMeetingId === meeting.id || meeting.my_response_status === 'accepted'"
+                  (click)="acceptMeeting(meeting)">
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  class="ghost-action danger"
+                  [disabled]="respondingMeetingId === meeting.id || meeting.my_response_status === 'declined'"
+                  (click)="declineMeeting(meeting)">
+                  Decline
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No upcoming meetings scheduled.</p>
+      }
+    </section>
+
+    @if (pastMeetings.length) {
+      <section class="meetings-section">
+        <h2>Past &amp; Cancelled</h2>
+        <div class="meeting-list">
+          @for (meeting of pastMeetings; track meeting.id) {
+            <article class="meeting-card muted">
+              <div class="meeting-main">
+                <strong>{{ meeting.title }}</strong>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }}</small>
+              </div>
+              <span class="status-pill" [attr.data-status]="meeting.status">{{ meeting.status }}</span>
+            </article>
+          }
+        </div>
+      </section>
+    }
+  }
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+</app-client-page-shell>

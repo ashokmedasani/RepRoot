@@ -4,14 +4,16 @@ import { Observable } from 'rxjs';
 
 export interface ChatMessageRecord {
   id: number;
-  sender: 'trainer' | 'client';
+  sender: 'professional' | 'client';
   text: string;
+  image_url: string;
   created_at: string;
 }
 
-export interface TrainerUnreadSummary {
+export interface ProfessionalUnreadSummary {
   unread_count: number;
   by_client: Record<string, number>;
+  last_unread_at: Record<string, string>;
 }
 
 export interface ClientUnreadSummary {
@@ -24,24 +26,24 @@ export class ChatApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getTrainerMessages(clientId: number, afterId?: number): Observable<{ messages: ChatMessageRecord[] }> {
-    return this.http.get<{ messages: ChatMessageRecord[] }>(`${this.apiBaseUrl}/trainer/clients/${clientId}/chat/`, {
-      headers: this.getTrainerAuthHeaders(),
+  getProfessionalMessages(clientId: number, afterId?: number): Observable<{ messages: ChatMessageRecord[] }> {
+    return this.http.get<{ messages: ChatMessageRecord[] }>(`${this.apiBaseUrl}/professional/clients/${clientId}/chat/`, {
+      headers: this.getProfessionalAuthHeaders(),
       params: this.buildAfterParams(afterId)
     });
   }
 
-  sendTrainerMessage(clientId: number, text: string): Observable<{ chat_message: ChatMessageRecord }> {
+  sendProfessionalMessage(clientId: number, text: string, image?: File | null): Observable<{ chat_message: ChatMessageRecord }> {
     return this.http.post<{ chat_message: ChatMessageRecord }>(
-      `${this.apiBaseUrl}/trainer/clients/${clientId}/chat/`,
-      { text },
-      { headers: this.getTrainerAuthHeaders() }
+      `${this.apiBaseUrl}/professional/clients/${clientId}/chat/`,
+      this.buildMessageBody(text, image),
+      { headers: this.getProfessionalAuthHeaders() }
     );
   }
 
-  getTrainerUnreadCounts(): Observable<TrainerUnreadSummary> {
-    return this.http.get<TrainerUnreadSummary>(`${this.apiBaseUrl}/trainer/chat/unread/`, {
-      headers: this.getTrainerAuthHeaders()
+  getProfessionalUnreadCounts(): Observable<ProfessionalUnreadSummary> {
+    return this.http.get<ProfessionalUnreadSummary>(`${this.apiBaseUrl}/professional/chat/unread/`, {
+      headers: this.getProfessionalAuthHeaders()
     });
   }
 
@@ -52,10 +54,10 @@ export class ChatApiService {
     });
   }
 
-  sendClientMessage(text: string): Observable<{ chat_message: ChatMessageRecord }> {
+  sendClientMessage(text: string, image?: File | null): Observable<{ chat_message: ChatMessageRecord }> {
     return this.http.post<{ chat_message: ChatMessageRecord }>(
       `${this.apiBaseUrl}/client/chat/`,
-      { text },
+      this.buildMessageBody(text, image),
       { headers: this.getClientAuthHeaders() }
     );
   }
@@ -64,6 +66,17 @@ export class ChatApiService {
     return this.http.get<ClientUnreadSummary>(`${this.apiBaseUrl}/client/chat/unread/`, {
       headers: this.getClientAuthHeaders()
     });
+  }
+
+  private buildMessageBody(text: string, image?: File | null): FormData | { text: string } {
+    if (!image) {
+      return { text };
+    }
+
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('image', image);
+    return formData;
   }
 
   private buildAfterParams(afterId?: number): HttpParams {
@@ -76,8 +89,8 @@ export class ChatApiService {
     return params;
   }
 
-  private getTrainerAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('trainer-auth-token') || '';
+  private getProfessionalAuthHeaders(): HttpHeaders {
+    const token = window.localStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 

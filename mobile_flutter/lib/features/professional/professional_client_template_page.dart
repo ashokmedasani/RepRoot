@@ -12,13 +12,13 @@ import '../../shared/charts/analytics_types.dart';
 import '../../shared/charts/chart_card.dart';
 import '../../shared/charts/graph_engine.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 /// Template analytics for one client: KPI cards, the charts the graph engine
 /// decides, an entry logger, and the recent entry list.
-/// Replica of mobile/src/app/pages/trainer/client-template/client-template.page.ts.
-class TrainerClientTemplatePage extends ConsumerStatefulWidget {
-  const TrainerClientTemplatePage({
+/// Replica of mobile/src/app/pages/professional/client-template/client-template.page.ts.
+class ProfessionalClientTemplatePage extends ConsumerStatefulWidget {
+  const ProfessionalClientTemplatePage({
     super.key,
     required this.clientId,
     required this.assignmentId,
@@ -28,12 +28,12 @@ class TrainerClientTemplatePage extends ConsumerStatefulWidget {
   final int assignmentId;
 
   @override
-  ConsumerState<TrainerClientTemplatePage> createState() =>
-      _TrainerClientTemplatePageState();
+  ConsumerState<ProfessionalClientTemplatePage> createState() =>
+      _ProfessionalClientTemplatePageState();
 }
 
-class _TrainerClientTemplatePageState
-    extends ConsumerState<TrainerClientTemplatePage> {
+class _ProfessionalClientTemplatePageState
+    extends ConsumerState<ProfessionalClientTemplatePage> {
   String _clientName = '';
   TemplateAssignmentRecord? _assignment;
   TrackingTemplateRecord? _template;
@@ -212,7 +212,7 @@ class _TrainerClientTemplatePageState
       await ref
           .read(templatesApiProvider)
           .unassignTemplate(widget.clientId, widget.assignmentId);
-      if (mounted) context.go('${Routes.trainerClients}/${widget.clientId}');
+      if (mounted) context.go('${Routes.professionalClients}/${widget.clientId}');
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -238,7 +238,7 @@ class _TrainerClientTemplatePageState
       appBar: AppBar(
         title: Text(template?.name ?? 'Template'),
         leading: BackButton(
-          onPressed: () => context.go('${Routes.trainerClients}/${widget.clientId}'),
+          onPressed: () => context.go('${Routes.professionalClients}/${widget.clientId}'),
         ),
         actions: [
           IconButton(
@@ -323,7 +323,7 @@ class _TrainerClientTemplatePageState
                     RowItem(
                       title: shortDate(entry.entryDate),
                       subtitle: _entrySummary(entry),
-                      trailing: entry.editedByTrainer
+                      trailing: entry.editedByProfessional
                           ? const StatusPill(label: 'Edited', tone: PillTone.info)
                           : null,
                     ),
@@ -377,7 +377,7 @@ class _TrainerClientTemplatePageState
     );
   }
 
-  /// One input per field type — the trainer logs on the client's behalf.
+  /// One input per field type — the professional logs on the client's behalf.
   Widget _answerField(TemplateField field) {
     final key = field.answerKey;
     final value = _entryAnswers[key] ?? '';

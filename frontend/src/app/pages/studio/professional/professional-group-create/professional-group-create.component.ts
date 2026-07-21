@@ -3,17 +3,17 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
-import { FormsGroupsApiService } from '../../../core/api/forms-groups-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
+import { FormsGroupsApiService } from '@core/api/forms-groups-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 
 @Component({
-  selector: 'app-trainer-group-create',
+  selector: 'app-professional-group-create',
   standalone: true,
-  imports: [FormsModule, RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-group-create.component.html',
-  styleUrl: './trainer-group-create.component.scss'
+  imports: [FormsModule, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-group-create.component.html',
+  styleUrl: './professional-group-create.component.scss'
 })
-export class TrainerGroupCreateComponent implements OnInit {
+export class ProfessionalGroupCreateComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly router = inject(Router);
 
@@ -28,7 +28,7 @@ export class TrainerGroupCreateComponent implements OnInit {
     this.formsGroupsApi.getOverview().subscribe({
       next: (overview) => {
         if (!overview.has_lead_form) {
-          void this.router.navigate(['/trainer/forms-groups']);
+          void this.router.navigate(['/professional/forms-groups']);
           return;
         }
 
@@ -52,8 +52,8 @@ export class TrainerGroupCreateComponent implements OnInit {
         this.message = 'Group created successfully. Review and confirm the client creation form for this group.';
         // Each path piece must be its own segment - a combined
         // 'client-form/create' string gets URL-encoded and never matches the
-        // route, which stranded trainers on this page until they refreshed.
-        void this.router.navigate(['/trainer/groups', response.group.id, 'client-form', 'create'], {
+        // route, which stranded professionals on this page until they refreshed.
+        void this.router.navigate(['/professional/groups', response.group.id, 'client-form', 'create'], {
           queryParams: { from: 'group-create' }
         });
       },

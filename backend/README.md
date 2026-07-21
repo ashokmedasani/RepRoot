@@ -34,14 +34,14 @@ docker compose up -d postgres
 Direct PostgreSQL install path:
 
 ```sql
-CREATE DATABASE trainer_platform;
+CREATE DATABASE professional_platform;
 ```
 
 You can also run the SQL from `backend/database/create_database.sql` using your preferred PostgreSQL client.
 
 The default local credentials are:
 
-- Database: `trainer_platform`
+- Database: `professional_platform`
 - User: `postgres`
 - Password: `postgres`
 - Host: `localhost`
@@ -83,7 +83,7 @@ $env:EMAIL_PORT="587"
 $env:EMAIL_HOST_USER="your-email@gmail.com"
 $env:EMAIL_HOST_PASSWORD="your-app-password"
 $env:EMAIL_USE_TLS="True"
-$env:DEFAULT_FROM_EMAIL="CoachFlow Studio <your-email@gmail.com>"
+$env:DEFAULT_FROM_EMAIL="RepRoot Studio <your-email@gmail.com>"
 python manage.py runserver 127.0.0.1:8000
 ```
 
@@ -92,8 +92,8 @@ For Gmail, use a Google App Password instead of your normal account password. In
 ## Current API Endpoints
 
 - `GET /api/health/`
-- `POST /api/accounts/trainer/check-username/`
-- `POST /api/accounts/trainer/signup/`
-- `POST /api/accounts/trainer/login/`
+- `POST /api/accounts/professional/check-username/`
+- `POST /api/accounts/professional/signup/`
+- `POST /api/accounts/professional/login/`
 
-Trainer signup and login are connected to Django auth, DRF token auth, and the `trainer_profiles` table.
+Professional signup and login are connected to Django auth, DRF token auth, and the `professional_profiles` table.

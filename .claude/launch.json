@@ -9,13 +9,6 @@
       "port": 4300
     },
     {
-      "name": "mobile",
-      "cwd": "mobile",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start", "--", "--port", "4401"],
-      "port": 4401
-    },
-    {
       "name": "backend",
       "cwd": "backend",
       "runtimeExecutable": ".venv\\Scripts\\python.exe",

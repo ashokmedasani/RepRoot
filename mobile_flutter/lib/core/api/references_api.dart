@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client.dart';
 
-/// Trainer reference library (categories + references).
+/// Professional reference library (categories + references).
 /// 1:1 port of mobile/src/app/core/api/references-api.service.ts.
 
 /// 'video_link' | 'pdf' | 'image' | 'text_note'
@@ -59,8 +59,8 @@ class ReferenceCategoryRecord {
       );
 }
 
-class TrainerReferenceRecord {
-  const TrainerReferenceRecord({
+class ProfessionalReferenceRecord {
+  const ProfessionalReferenceRecord({
     required this.id,
     required this.category,
     required this.categoryName,
@@ -90,8 +90,8 @@ class TrainerReferenceRecord {
   final String createdAt;
   final String updatedAt;
 
-  factory TrainerReferenceRecord.fromJson(Map<String, dynamic> json) =>
-      TrainerReferenceRecord(
+  factory ProfessionalReferenceRecord.fromJson(Map<String, dynamic> json) =>
+      ProfessionalReferenceRecord(
         id: json['id'] as int? ?? 0,
         category: json['category'] as int? ?? 0,
         categoryName: json['category_name'] as String? ?? '',
@@ -127,7 +127,7 @@ class ReferenceUsage {
 class ReferenceListResponse {
   const ReferenceListResponse({required this.references, required this.usage});
 
-  final List<TrainerReferenceRecord> references;
+  final List<ProfessionalReferenceRecord> references;
   final ReferenceUsage usage;
 }
 
@@ -179,12 +179,12 @@ class ReferencesApi {
 
   final Dio _dio;
 
-  static final _auth = authOptions(AuthScheme.trainer);
+  static final _auth = authOptions(AuthScheme.professional);
 
   Future<List<ReferenceCategoryRecord>> getCategories() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/references/categories/',
+        '/professional/references/categories/',
         options: _auth,
       );
       return (res.data?['categories'] as List<dynamic>? ?? [])
@@ -201,7 +201,7 @@ class ReferencesApi {
   ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/references/categories/',
+        '/professional/references/categories/',
         data: {
           'name': name,
           'description': description,
@@ -223,7 +223,7 @@ class ReferencesApi {
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/references/categories/$categoryId/',
+        '/professional/references/categories/$categoryId/',
         data: {
           'name': name,
           'description': description,
@@ -240,7 +240,7 @@ class ReferencesApi {
   Future<String> deleteCategory(int categoryId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/references/categories/$categoryId/',
+        '/professional/references/categories/$categoryId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -250,13 +250,13 @@ class ReferencesApi {
   Future<ReferenceListResponse> getReferences() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
-        '/trainer/references/',
+        '/professional/references/',
         options: _auth,
       );
       return ReferenceListResponse(
         references: (res.data?['references'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
-            .map(TrainerReferenceRecord.fromJson)
+            .map(ProfessionalReferenceRecord.fromJson)
             .toList(),
         usage: ReferenceUsage.fromJson(
           res.data?['usage'] as Map<String, dynamic>? ?? {},
@@ -265,30 +265,30 @@ class ReferencesApi {
     });
   }
 
-  Future<TrainerReferenceRecord> createReference(ReferencePayload payload) {
+  Future<ProfessionalReferenceRecord> createReference(ReferencePayload payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
-        '/trainer/references/',
+        '/professional/references/',
         data: await payload.toFormData(),
         options: _auth,
       );
-      return TrainerReferenceRecord.fromJson(
+      return ProfessionalReferenceRecord.fromJson(
         res.data?['reference'] as Map<String, dynamic>? ?? {},
       );
     });
   }
 
-  Future<TrainerReferenceRecord> updateReference(
+  Future<ProfessionalReferenceRecord> updateReference(
     int referenceId,
     ReferencePayload payload,
   ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
-        '/trainer/references/$referenceId/',
+        '/professional/references/$referenceId/',
         data: await payload.toFormData(),
         options: _auth,
       );
-      return TrainerReferenceRecord.fromJson(
+      return ProfessionalReferenceRecord.fromJson(
         res.data?['reference'] as Map<String, dynamic>? ?? {},
       );
     });
@@ -297,7 +297,7 @@ class ReferencesApi {
   Future<String> deleteReference(int referenceId) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
-        '/trainer/references/$referenceId/',
+        '/professional/references/$referenceId/',
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';

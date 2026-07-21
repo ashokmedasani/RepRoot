@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-type EntryMode = 'trainer' | 'client';
+type EntryMode = 'professional' | 'client';
 
 @Component({
   selector: 'app-access-entry-placeholder',

@@ -7,22 +7,22 @@ import {
   TemplateField,
   TemplateFieldType,
   TemplatesApiService
-} from '../../../core/api/templates-api.service';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { formatApiError } from '../../../shared/utils/ui-helpers';
+} from '@core/api/templates-api.service';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
 
 interface BuilderField extends TemplateField {
   localId: string;
 }
 
 @Component({
-  selector: 'app-trainer-tracking-template-create',
+  selector: 'app-professional-tracking-template-create',
   standalone: true,
-  imports: [FormsModule, RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-tracking-template-create.component.html',
-  styleUrl: './trainer-tracking-template-create.component.scss'
+  imports: [FormsModule, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-tracking-template-create.component.html',
+  styleUrl: './professional-tracking-template-create.component.scss'
 })
-export class TrainerTrackingTemplateCreateComponent implements OnInit {
+export class ProfessionalTrackingTemplateCreateComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -163,7 +163,7 @@ export class TrainerTrackingTemplateCreateComponent implements OnInit {
     request.subscribe({
       next: () => {
         this.isSaving = false;
-        void this.router.navigate(['/trainer/templates']);
+        void this.router.navigate(['/professional/templates']);
       },
       error: (error: unknown) => {
         this.messageType = 'error';

@@ -1,13 +1,13 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Forms & Groups"
-  eyebrow="Trainer workspace"
+  eyebrow="Professional workspace"
   subtitle="Manage enquiries, registration forms, groups, and client onboarding."
   activeSection="forms-groups"
   titleId="forms-title"
 >
   <button page-actions type="button" class="ghost-action" (click)="loadOverview()">Refresh</button>
   @if (overview?.groups?.length) {
-    <a page-actions routerLink="/trainer/clients/add" class="primary-action">Add Client</a>
+    <a page-actions routerLink="/professional/clients/add" class="primary-action">Add Client</a>
   }
 
     @if (message) {
@@ -22,7 +22,7 @@
       @if (!overview.has_lead_form) {
         <section class="empty-state" aria-labelledby="empty-form-title">
           <h2 id="empty-form-title">You haven't created a form yet.</h2>
-          <p>Please create your trainer lead form to view Forms & Groups.</p>
+          <p>Please create your professional lead form to view Forms & Groups.</p>
           <div class="setup-note">
             <p>This setup may take around 10-15 minutes. You will create:</p>
             <ol>
@@ -31,7 +31,7 @@
               <li>Client creation form for that group</li>
             </ol>
           </div>
-          <a routerLink="/trainer/forms/create" class="primary-action">Create Form</a>
+          <a routerLink="/professional/forms/create" class="primary-action">Create Form</a>
         </section>
       } @else {
         <section class="panel lead-panel" aria-labelledby="lead-form-title">
@@ -90,7 +90,7 @@
             }
           </aside>
 
-          <a routerLink="/trainer/forms/create" class="secondary-action edit-form-action">Edit Form</a>
+          <a routerLink="/professional/forms/create" class="secondary-action edit-form-action">Edit Form</a>
         </section>
 
         <section class="panel requests-panel" aria-labelledby="requests-title">
@@ -146,9 +146,9 @@
                     </td>
                     <td class="action-cell">
                       @if (submission.client_access) {
-                        <a [routerLink]="['/trainer/clients', submission.client_access.id]" class="icon-action">View Profile</a>
+                        <a [routerLink]="['/professional/clients', submission.client_access.id]" class="icon-action">View Profile</a>
                       } @else {
-                        <a [routerLink]="['/trainer/forms-groups/requests', submission.id]" class="icon-action" title="View details">View</a>
+                        <a [routerLink]="['/professional/forms-groups/requests', submission.id]" class="icon-action" title="View details">View</a>
                       }
                       @if (selectedSubmissionView === 'pending') {
                         <button type="button" class="icon-action danger-action" [disabled]="isSaving" title="Delete request" (click)="deletePending(submission)">Delete</button>
@@ -172,7 +172,7 @@
               <h2 id="groups-title">Groups</h2>
               <p>Organize clients and share group registration forms with known or already accepted clients.</p>
             </div>
-            <a routerLink="/trainer/groups/create" class="primary-action group-create-action">Create Group</a>
+            <a routerLink="/professional/groups/create" class="primary-action group-create-action">Create Group</a>
           </div>
 
           <div class="group-list">
@@ -188,8 +188,8 @@
                 </div>
                 <div class="group-actions">
                   <span>{{ group.has_registration_form ? 'Group registration form ready' : 'Group registration form needed' }}</span>
-                  <a [routerLink]="['/trainer/groups', group.id]" class="ghost-action">Open group</a>
-                  <a [routerLink]="['/trainer/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
+                  <a [routerLink]="['/professional/groups', group.id]" class="ghost-action">Open group</a>
+                  <a [routerLink]="['/professional/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
                 </div>
               </article>
             } @empty {
@@ -204,4 +204,4 @@
         </section>
       }
     }
-</app-trainer-page-shell>
+</app-professional-page-shell>

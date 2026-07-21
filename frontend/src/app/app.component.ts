@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { SubdomainRedirectService } from './core/routing/subdomain-redirect.service';
 import { ThemeService } from './core/theme/theme.service';
 import { ConfirmationDialogComponent } from './shared/confirmation-dialog/confirmation-dialog.component';
 
@@ -12,7 +13,11 @@ import { ConfirmationDialogComponent } from './shared/confirmation-dialog/confir
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  constructor(private readonly themeService: ThemeService) {
+  constructor(
+    private readonly themeService: ThemeService,
+    private readonly subdomainRedirect: SubdomainRedirectService
+  ) {
     this.themeService.initializeTheme();
+    this.subdomainRedirect.redirectRootForSubdomain();
   }
 }

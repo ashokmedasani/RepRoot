@@ -1,11 +1,11 @@
-<app-trainer-page-shell
+<app-professional-page-shell
   title="Add Client"
   eyebrow="Manual client onboarding"
   subtitle="Create access for a known client without generating a public lead request."
   activeSection="forms-groups"
   titleId="manual-client-title"
 >
-  <a page-actions [routerLink]="selectedGroup ? ['/trainer/groups', selectedGroup.id] : ['/trainer/forms-groups']" class="secondary-action">Cancel</a>
+  <a page-actions [routerLink]="selectedGroup ? ['/professional/groups', selectedGroup.id] : ['/professional/forms-groups']" class="secondary-action">Cancel</a>
 
   @if (message) {
     <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
@@ -17,7 +17,7 @@
     <section class="manual-panel empty-state">
       <h2>A client registration form is required.</h2>
       <p>Create a group registration form before adding a client manually.</p>
-      <a routerLink="/trainer/forms-groups" class="primary-action">Open Forms &amp; Groups</a>
+      <a routerLink="/professional/forms-groups" class="primary-action">Open Forms &amp; Groups</a>
     </section>
   } @else {
     <form class="manual-panel" (ngSubmit)="createClient()">
@@ -60,7 +60,7 @@
 
       <div class="access-section">
         <div class="section-heading">
-          <div><h2>Account access</h2><p>Username uniqueness is scoped to your trainer account.</p></div>
+          <div><h2>Account access</h2><p>Username uniqueness is scoped to your professional account.</p></div>
         </div>
         <div class="form-grid">
           <label>
@@ -87,7 +87,7 @@
 
       <div class="form-actions">
         @if (createdClientId) {
-          <a [routerLink]="['/trainer/clients', createdClientId]" class="secondary-action">Open Client</a>
+          <a [routerLink]="['/professional/clients', createdClientId]" class="secondary-action">Open Client</a>
         }
         <button type="submit" class="primary-action" [disabled]="isSaving || createdClientId > 0">
           {{ isSaving ? 'Creating...' : 'Create Client Account' }}
@@ -95,4 +95,4 @@
       </div>
     </form>
   }
-</app-trainer-page-shell>
+</app-professional-page-shell>

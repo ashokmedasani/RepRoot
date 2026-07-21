@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "trainer-management-platform": {
+    "professional-management-platform": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -65,10 +65,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "trainer-management-platform:build:production"
+              "buildTarget": "professional-management-platform:build:production"
             },
             "development": {
-              "buildTarget": "trainer-management-platform:build:development"
+              "buildTarget": "professional-management-platform:build:development"
             }
           },
           "defaultConfiguration": "development"

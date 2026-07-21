@@ -9,18 +9,18 @@ import '../../core/api/models/template_models.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 /// Manage hub — quick actions + recent items + pending review.
-/// Replica of mobile/src/app/pages/trainer/manage/trainer-manage.page.ts.
-class TrainerManagePage extends ConsumerStatefulWidget {
-  const TrainerManagePage({super.key});
+/// Replica of mobile/src/app/pages/professional/manage/professional-manage.page.ts.
+class ProfessionalManagePage extends ConsumerStatefulWidget {
+  const ProfessionalManagePage({super.key});
 
   @override
-  ConsumerState<TrainerManagePage> createState() => _TrainerManagePageState();
+  ConsumerState<ProfessionalManagePage> createState() => _ProfessionalManagePageState();
 }
 
-class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
+class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage> {
   FormsGroupsOverview? _overview;
   List<TrackingTemplateRecord> _templates = [];
   bool _loading = true;
@@ -55,7 +55,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
   Widget build(BuildContext context) {
     final overview = _overview;
     final leadForm = overview?.leadForm;
-    final groups = overview?.groups ?? const <TrainerGroup>[];
+    final groups = overview?.groups ?? const <ProfessionalGroup>[];
     final pending = overview?.pendingForms ?? const <LeadSubmission>[];
     final tokens = context.tokens;
 
@@ -78,12 +78,12 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
           const SizedBox(height: AppSpacing.sm),
           _QuickGrid(
             actions: [
-              (Icons.description_outlined, 'Forms', Routes.trainerFormsGroups),
-              (Icons.people_outline, 'Groups', '${Routes.trainerFormsGroups}?tab=groups'),
-              (Icons.layers_outlined, 'Templates', Routes.trainerTemplates),
-              (Icons.folder_open_outlined, 'References', Routes.trainerReferences),
-              (Icons.calendar_today_outlined, 'Schedule', Routes.trainerSchedule),
-              (Icons.add_circle_outline, 'New client', Routes.trainerClientCreate),
+              (Icons.description_outlined, 'Forms', Routes.professionalFormsGroups),
+              (Icons.people_outline, 'Groups', '${Routes.professionalFormsGroups}?tab=groups'),
+              (Icons.layers_outlined, 'Templates', Routes.professionalTemplates),
+              (Icons.folder_open_outlined, 'References', Routes.professionalReferences),
+              (Icons.calendar_today_outlined, 'Schedule', Routes.professionalSchedule),
+              (Icons.add_circle_outline, 'New client', Routes.professionalClientCreate),
             ],
           ),
 
@@ -105,7 +105,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
                   size: 22,
                 ),
                 trailing: const StatusPill(label: 'Form', tone: PillTone.info),
-                onTap: () => context.go(Routes.trainerFormsGroups),
+                onTap: () => context.go(Routes.professionalFormsGroups),
               ),
             for (final template in _templates.take(2))
               RowItem(
@@ -117,7 +117,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
                   size: 22,
                 ),
                 trailing: const StatusPill(label: 'Template', tone: PillTone.info),
-                onTap: () => context.go(Routes.trainerTemplates),
+                onTap: () => context.go(Routes.professionalTemplates),
               ),
             for (final group in groups.take(2))
               RowItem(
@@ -127,7 +127,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
                     : 'Group',
                 leading: Icon(Icons.people_outline, color: tokens.accent, size: 22),
                 trailing: const StatusPill(label: 'Group', tone: PillTone.info),
-                onTap: () => context.go('${Routes.trainerGroups}/${group.id}'),
+                onTap: () => context.go('${Routes.professionalGroups}/${group.id}'),
               ),
           ],
 
@@ -136,7 +136,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
               title: 'Waiting for review',
               actionLabel: 'Open',
               onAction: () =>
-                  context.go('${Routes.trainerFormsGroups}?tab=requests'),
+                  context.go('${Routes.professionalFormsGroups}?tab=requests'),
             ),
             for (final submission in pending.take(3))
               RowItem(
@@ -144,7 +144,7 @@ class _TrainerManagePageState extends ConsumerState<TrainerManagePage> {
                 subtitle: 'Submitted ${shortDate(submission.submittedAt)}',
                 trailing: const StatusPill(label: 'Pending', tone: PillTone.warn),
                 onTap: () =>
-                    context.go('${Routes.trainerFormsGroups}?tab=requests'),
+                    context.go('${Routes.professionalFormsGroups}?tab=requests'),
               ),
           ],
         ],

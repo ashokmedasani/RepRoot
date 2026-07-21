@@ -38,6 +38,41 @@ def process_downgrade(professional_profile):
     send_downgrade_email(professional_profile)
 
 
+def downgrade_to_starter_free_voluntarily(professional_profile):
+    """
+    Self-serve "cancel plan" / "back to Starter Free" — the professional chose
+    this, so it should not look or behave like the involuntary-lapse path in
+    process_downgrade(): no grace-period banner, no lock, unless their current
+    usage genuinely doesn't fit in Starter Free's quota. In that case they get
+    the same 7-day grace period an involuntary downgrade would give them, since
+    the problem (too much data for the new quota) is identical either way.
+    """
+    professional_profile.plan_tier = ProfessionalProfile.PLAN_STARTER_FREE
+    professional_profile.stripe_subscription_id = ''
+    professional_profile.plan_renews_at = None
+    professional_profile.is_locked = False
+    professional_profile.locked_at = None
+    professional_profile.lock_reason = ''
+    professional_profile.downgraded_at = None
+    professional_profile.grace_period_ends_at = None
+    professional_profile.save(update_fields=[
+        'plan_tier', 'stripe_subscription_id', 'plan_renews_at',
+        'is_locked', 'locked_at', 'lock_reason', 'downgraded_at', 'grace_period_ends_at',
+    ])
+
+    from django.core.cache import cache
+    cache.delete(f'professional-data-usage:v5:{professional_profile.user_id}')
+
+    usage = calculate_professional_data_usage(professional_profile.user)
+    if usage['is_over_quota']:
+        professional_profile.downgraded_at = timezone.now()
+        professional_profile.grace_period_ends_at = timezone.now() + timedelta(
+            days=settings.REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS
+        )
+        professional_profile.save(update_fields=['downgraded_at', 'grace_period_ends_at'])
+        send_downgrade_email(professional_profile)
+
+
 def reactivate_on_upgrade(professional_profile):
     """
     Clear lock flags when user upgrades to a paid tier or comes below quota.

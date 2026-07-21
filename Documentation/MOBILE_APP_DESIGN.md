@@ -1,9 +1,14 @@
-# CoachFlow Mobile — Design Blueprint (Android + iOS)
+# RepRoot Mobile — Design Blueprint (Android + iOS)
+
+> **Superseded.** This was the design blueprint for the original Ionic/Capacitor
+> mobile app, which has since been replaced by a Flutter rewrite and removed from
+> the repo entirely. Kept as historical record of the original screen/flow design;
+> see `FLUTTER_MIGRATION_PLAN.md` and `FLUTTER_PARITY_REPORT.md` for what came after.
 
 **Date:** 2026-07-10
 **Stack:** Ionic 8 + Capacitor 7 on Angular 20 (standalone components) — one codebase, native Android + iOS builds.
-**Backend:** the existing Django REST API at `/api/accounts/` is used **unchanged**. Trainer auth = `Token <key>`, client auth = `ClientToken <key>` — identical to the web app.
-**App model:** ONE app in both stores, role-based entry. Trainer and Client experiences are fully separated — separate logins, separate navigation shells, separate screens. No mixed pages.
+**Backend:** the existing Django REST API at `/api/accounts/` is used **unchanged**. Professional auth = `Token <key>`, client auth = `ClientToken <key>` — identical to the web app.
+**App model:** ONE app in both stores, role-based entry. Professional and Client experiences are fully separated — separate logins, separate navigation shells, separate screens. No mixed pages.
 
 ---
 
@@ -21,7 +26,7 @@ mobile/
   package.json            Angular 20 + @ionic/angular 8 + @capacitor 7
   angular.json            @angular/build application builder
   ionic.config.json       Ionic project marker
-  capacitor.config.ts     appId com.coachflow.app, webDir www
+  capacitor.config.ts     appId com.reproot.app, webDir www
   src/
     main.ts               bootstrap + provideIonicAngular + provideHttpClient
     index.html
@@ -30,13 +35,13 @@ mobile/
     environments/         apiBaseUrl per environment
     app/
       app.component.ts    <ion-app><ion-router-outlet/>
-      app.routes.ts       role chooser + trainer shell + client shell
+      app.routes.ts       role chooser + professional shell + client shell
       core/
         config/api-config.ts      resolves apiBaseUrl (emulator/device/prod)
         api/                      six services copied from the web app
       pages/
         role-chooser/
-        trainer/   login, tabs shell, dashboard, clients, client-detail, + stubs
+        professional/   login, tabs shell, dashboard, clients, client-detail, + stubs
         client/    login, tabs shell, templates, + stubs
         shared/    stub-page component
 ```
@@ -57,34 +62,34 @@ Set in `src/environments/environment.ts`. Sessions use localStorage (persists in
 
 ```
 Splash (Ionic default)
-  └─ Role Chooser  ──────────────  "I'm a Trainer"  →  Trainer Login → Trainer Shell
+  └─ Role Chooser  ──────────────  "I'm a Professional"  →  Professional Login → Professional Shell
         │                          "I'm a Client"   →  Client Login  → Client Shell
         └─ stored token found → skip straight to that role's shell
 ```
 
 ---
 
-## 4. TRAINER experience — 5 bottom tabs
+## 4. PROFESSIONAL experience — 5 bottom tabs
 
 Every screen is separate; tabs hold stacks (push/pop navigation).
 
 ### Tab 1 — Dashboard
 | Screen | Purpose | API |
 | --- | --- | --- |
-| **Dashboard** | KPI cards (Groups, Clients, Pending, Templates); Upcoming Schedules expandable list (Open Client / Mark Complete); Activity expandable | `GET trainer/forms-groups/` · `GET trainer/reminders/upcoming/` · `PUT trainer/reminders/<id>/` |
+| **Dashboard** | KPI cards (Groups, Clients, Pending, Templates); Upcoming Schedules expandable list (Open Client / Mark Complete); Activity expandable | `GET professional/forms-groups/` · `GET professional/reminders/upcoming/` · `PUT professional/reminders/<id>/` |
 
 ### Tab 2 — Clients
 | Screen | Purpose | API |
 | --- | --- | --- |
-| **Client List** | All clients grouped by group, search | `GET trainer/forms-groups/` · `GET .../groups/<id>/clients/` |
+| **Client List** | All clients grouped by group, search | `GET professional/forms-groups/` · `GET .../groups/<id>/clients/` |
 | **Client Workspace** | Segmented: Info (compact rows + Edit Profile + Password) / Notes / Scheduler / Templates / Additional Info; pending change-request approve/reject | `GET .../clients/<id>/` · notes, reminders, additional-info, change-request endpoints |
-| **Client Template Detail** | Segmented: Overview (numeric stats + charts) · References (accordion) · Data Entries (filter/export/edit≤72h) · Progress (trainer timeline) | assignments, entries, progress endpoints |
-| **Client Chat** | Full-screen chat with this client | `GET/POST trainer/clients/<id>/chat/` |
+| **Client Template Detail** | Segmented: Overview (numeric stats + charts) · References (accordion) · Data Entries (filter/export/edit≤72h) · Progress (professional timeline) | assignments, entries, progress endpoints |
+| **Client Chat** | Full-screen chat with this client | `GET/POST professional/clients/<id>/chat/` |
 
 ### Tab 3 — Forms & Groups
 | Screen | Purpose | API |
 | --- | --- | --- |
-| **Forms & Groups Overview** | Lead form card + link share (native share sheet), request tabs (Pending/Approved/Deleted), groups list | `GET trainer/forms-groups/` |
+| **Forms & Groups Overview** | Lead form card + link share (native share sheet), request tabs (Pending/Approved/Deleted), groups list | `GET professional/forms-groups/` |
 | **Lead Form Builder** | Suggested-field chips + custom fields | `POST .../lead-form/` |
 | **Form Request Detail** | Full submission + assign-to-group + create client access (auto-fill) | `POST .../pending/<id>/create-client-access/` |
 | **Group Create / Group Detail / Client Form Builder** | Same flows as web, one screen each | groups + registration-form endpoints |
@@ -92,16 +97,16 @@ Every screen is separate; tabs hold stacks (push/pop navigation).
 ### Tab 4 — Templates
 | Screen | Purpose | API |
 | --- | --- | --- |
-| **Template Library** | My templates (max 5) + adopt standard | `GET trainer/templates/` · standard endpoints |
-| **Template Builder** | Fields N/8, dropdown/rating editors | `POST/PUT trainer/templates/` |
+| **Template Library** | My templates (max 5) + adopt standard | `GET professional/templates/` · standard endpoints |
+| **Template Builder** | Fields N/8, dropdown/rating editors | `POST/PUT professional/templates/` |
 
 ### Tab 5 — More
 | Screen | Purpose | API |
 | --- | --- | --- |
-| **Profile** | Read-only portfolio, per-section Public/Private, Preview as Client | `GET trainer/profile/` · `PUT trainer/profile/visibility/` |
+| **Profile** | Read-only portfolio, per-section Public/Private, Preview as Client | `GET professional/profile/` · `PUT professional/profile/visibility/` |
 | **References** | Category accordion → inline reference expand | references endpoints |
-| **Settings** | Account (trainer code, delete) / My Account (edit profile form) / Change Password | account endpoints |
-| **Logout** | clear token → role chooser | `POST trainer/logout/` |
+| **Settings** | Account (professional code, delete) / My Account (edit profile form) / Change Password | account endpoints |
+| **Logout** | clear token → role chooser | `POST professional/logout/` |
 
 ---
 
@@ -115,16 +120,16 @@ Every screen is separate; tabs hold stacks (push/pop navigation).
 | **Template References** | Accordion (YouTube inline, PDF open, text, image) | data from templates payload |
 | **Add Entry** | Date+time + dynamic fields (number/dropdown/rating/yes-no/text) | `POST client/entries/` |
 | **Previous Entries** | Per-day grouped history; edit ≤72h | `GET client/entries/` · `PUT client/entries/<id>/` |
-| **Progress** | Shared trainer progress notes | `GET client/progress/` |
+| **Progress** | Shared professional progress notes | `GET client/progress/` |
 
-### Tab 2 — Trainer
-Public trainer profile: photo, headline, and only sections the trainer marked Public. `GET client/me/` (`trainer_profile`).
+### Tab 2 — Professional
+Public professional profile: photo, headline, and only sections the professional marked Public. `GET client/me/` (`professional_profile`).
 
 ### Tab 3 — Chat
-Full-screen trainer chat. `GET/POST client/chat/`.
+Full-screen professional chat. `GET/POST client/chat/`.
 
 ### Tab 4 — My Details
-Account rows, registration details (read-only + "Request an edit" → trainer approval), shared Additional Information, photo upload, change password. `client/me/`, `client/detail-change-request/`, `client/photo/`, `client/change-password/`.
+Account rows, registration details (read-only + "Request an edit" → professional approval), shared Additional Information, photo upload, change password. `client/me/`, `client/detail-change-request/`, `client/photo/`, `client/change-password/`.
 
 > The **public lead form** stays web-only — it is shared by URL with people who don't have the app.
 
@@ -138,9 +143,9 @@ Account rows, registration details (read-only + "Request an edit" → trainer ap
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| **1. Scaffold** | Project, theme, API services, role chooser, both logins, trainer Dashboard + Clients (live data), client Templates + Add Entry (live data), stubs for every other screen | ✅ this delivery |
-| **Trainer screens** | Forms & Groups flows, client workspace details, template detail, references, profile, settings, and support requests | Android release scope |
-| **3. Client screens** | Trainer profile tab, chat, My Details incl. edit requests | you / next sessions |
+| **1. Scaffold** | Project, theme, API services, role chooser, both logins, professional Dashboard + Clients (live data), client Templates + Add Entry (live data), stubs for every other screen | ✅ this delivery |
+| **Professional screens** | Forms & Groups flows, client workspace details, template detail, references, profile, settings, and support requests | Android release scope |
+| **3. Client screens** | Professional profile tab, chat, My Details incl. edit requests | you / next sessions |
 | **4. Native polish** | `@capacitor/preferences` token storage, push notifications for reminders/chat, camera plugin for photos, app icons/splash, store builds | later |
 
 ## 8. Running it

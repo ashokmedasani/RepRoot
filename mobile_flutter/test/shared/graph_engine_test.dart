@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:coachflow/shared/charts/analytics_types.dart';
-import 'package:coachflow/shared/charts/graph_engine.dart';
+import 'package:reproot/shared/charts/analytics_types.dart';
+import 'package:reproot/shared/charts/graph_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Verifies the Dart graph engine against fixtures generated from the REAL

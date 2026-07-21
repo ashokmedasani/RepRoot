@@ -14,21 +14,21 @@ import '../../core/api/models/forms_groups_models.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
-import 'trainer_format.dart';
+import 'professional_format.dart';
 
 enum GroupTab { members, registrations, settings }
 
 /// Group detail — members, group registrations, and the group's settings +
 /// registration form.
-/// Replica of mobile/src/app/pages/trainer/group-detail/group-detail.page.ts.
-class TrainerGroupDetailPage extends ConsumerStatefulWidget {
-  const TrainerGroupDetailPage({super.key, required this.groupId});
+/// Replica of mobile/src/app/pages/professional/group-detail/group-detail.page.ts.
+class ProfessionalGroupDetailPage extends ConsumerStatefulWidget {
+  const ProfessionalGroupDetailPage({super.key, required this.groupId});
 
   final int groupId;
 
   @override
-  ConsumerState<TrainerGroupDetailPage> createState() =>
-      _TrainerGroupDetailPageState();
+  ConsumerState<ProfessionalGroupDetailPage> createState() =>
+      _ProfessionalGroupDetailPageState();
 }
 
 /// Mutable field row for the builder — DynamicField is immutable.
@@ -61,11 +61,11 @@ class _DraftField {
       );
 }
 
-class _TrainerGroupDetailPageState
-    extends ConsumerState<TrainerGroupDetailPage> {
+class _ProfessionalGroupDetailPageState
+    extends ConsumerState<ProfessionalGroupDetailPage> {
   GroupTab _tab = GroupTab.members;
   GroupUsersResponse? _data;
-  TrainerGroup? _group;
+  ProfessionalGroup? _group;
   String _message = '';
   bool _loading = true;
   String _registrationLinkBase = '';
@@ -343,7 +343,7 @@ class _TrainerGroupDetailPageState
       appBar: AppBar(
         title: Text(_group?.name ?? 'Group'),
         leading: BackButton(
-          onPressed: () => context.go('${Routes.trainerFormsGroups}?tab=groups'),
+          onPressed: () => context.go('${Routes.professionalFormsGroups}?tab=groups'),
         ),
       ),
       body: Column(
@@ -414,7 +414,7 @@ class _TrainerGroupDetailPageState
               trailing: client.isActive
                   ? null
                   : const StatusPill(label: 'Inactive', tone: PillTone.bad),
-              onTap: () => context.go('${Routes.trainerClients}/${client.id}'),
+              onTap: () => context.go('${Routes.professionalClients}/${client.id}'),
             ),
       ],
     );

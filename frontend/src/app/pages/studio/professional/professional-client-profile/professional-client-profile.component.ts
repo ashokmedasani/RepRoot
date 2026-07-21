@@ -11,29 +11,32 @@ import {
   ClientAccessRecord,
   ClientReminder,
   FormsGroupsApiService
-} from '../../../core/api/forms-groups-api.service';
-import { ReferencesApiService, TrainerReferenceRecord } from '../../../core/api/references-api.service';
+} from '@core/api/forms-groups-api.service';
+import { ReferencesApiService, ProfessionalReferenceRecord } from '@core/api/references-api.service';
 import {
   TemplateAssignmentRecord,
   TemplatesApiService,
   TrackingEntryRecord,
   TrackingTemplateRecord
-} from '../../../core/api/templates-api.service';
-import { ChatPanelComponent } from '../../../shared/chat-panel/chat-panel.component';
-import { TrainerPageShellComponent } from '../../../shared/trainer-page-shell/trainer-page-shell.component';
-import { readImageAsDataUrl } from '../../../shared/utils/image-helpers';
-import { formatApiError, initialsFor } from '../../../shared/utils/ui-helpers';
-import { ConfirmationDialogService } from '../../../shared/confirmation-dialog/confirmation-dialog.service';
-import { ChatApiService } from '../../../core/api/chat-api.service';
+} from '@core/api/templates-api.service';
+import { ChatPanelComponent } from '@studio-shared/chat-panel/chat-panel.component';
+import { ClientPaymentsTabComponent } from '@studio-shared/client-payments-tab/client-payments-tab.component';
+import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { readImageAsDataUrl } from '@shared/utils/image-helpers';
+import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { ChatApiService } from '@core/api/chat-api.service';
+import { PaymentsApiService } from '@core/api/payments-api.service';
+import { ScheduledMeetingRecord, SchedulingApiService } from '@core/api/scheduling-api.service';
 
 @Component({
-  selector: 'app-trainer-client-profile',
+  selector: 'app-professional-client-profile',
   standalone: true,
-  imports: [ChatPanelComponent, DatePipe, FormsModule, RouterLink, TrainerPageShellComponent],
-  templateUrl: './trainer-client-profile.component.html',
-  styleUrl: './trainer-client-profile.component.scss'
+  imports: [ChatPanelComponent, ClientPaymentsTabComponent, DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-client-profile.component.html',
+  styleUrl: './professional-client-profile.component.scss'
 })
-export class TrainerClientProfileComponent implements OnInit, OnDestroy {
+export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
@@ -42,7 +45,12 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly chatApi = inject(ChatApiService);
+  private readonly paymentsApi = inject(PaymentsApiService);
+  private readonly schedulingApi = inject(SchedulingApiService);
 
+  meetings: ScheduledMeetingRecord[] = [];
+
+  paymentsEnabled = true;
   clientId = 0;
   profile: ClientAccessDetailResponse | null = null;
   isLoading = true;
@@ -61,7 +69,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     registration_answers: {} as Record<string, string>
   };
 
-  trainerNotes = '';
+  professionalNotes = '';
   notesUpdatedAt: string | null = null;
   isEditingNotes = false;
   notesDraft = '';
@@ -77,7 +85,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
   changeReviewNote = '';
   isReviewingChange = false;
 
-  referenceLibrary: TrainerReferenceRecord[] = [];
+  referenceLibrary: ProfessionalReferenceRecord[] = [];
   isSavingAdditional = false;
   newInfo: {
     title: string;
@@ -95,20 +103,40 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     reference_id: ''
   };
 
-  workspaceTab: 'workspace' | 'chat' | 'actions' = 'workspace';
+  workspaceTab: 'workspace' | 'chat' | 'payments' | 'actions' = 'workspace';
   chatUnreadCount = 0;
   private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   reminders: ClientReminder[] = [];
   isSavingReminder = false;
-  reminderDraft = { title: '', date: '', time: '', notes: '', notify_trainer: true };
+  reminderDraft = { title: '', date: '', time: '', notes: '', notify_professional: true };
+  // Set while the scheduler form is editing an existing reminder rather than
+  // creating a new one — null means "creating". The same form/fields are
+  // reused for both so there is exactly one place time-clearing has to work.
+  editingReminderId: number | null = null;
 
   ngOnInit(): void {
     this.clientId = Number(this.route.snapshot.paramMap.get('clientId'));
     this.loadProfile();
     this.loadReminders();
+    this.loadMeetings();
     this.loadUnreadMessages();
     this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+
+    const requestedTab = this.route.snapshot.queryParamMap.get('tab');
+    if (requestedTab === 'payments' || requestedTab === 'chat' || requestedTab === 'actions') {
+      this.workspaceTab = requestedTab;
+    }
+
+    this.paymentsApi.getPaymentSettings().subscribe({
+      next: (response) => {
+        this.paymentsEnabled = response.settings.payment_tracking_enabled;
+        if (!this.paymentsEnabled && this.workspaceTab === 'payments') {
+          this.workspaceTab = 'workspace';
+        }
+      },
+      error: () => (this.paymentsEnabled = true)
+    });
   }
 
   ngOnDestroy(): void {
@@ -117,7 +145,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     }
   }
 
-  selectWorkspaceTab(tab: 'workspace' | 'chat' | 'actions'): void {
+  selectWorkspaceTab(tab: 'workspace' | 'chat' | 'payments' | 'actions'): void {
     this.workspaceTab = tab;
     if (tab === 'chat') {
       this.chatUnreadCount = 0;
@@ -129,7 +157,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
   }
 
   private loadUnreadMessages(): void {
-    this.chatApi.getTrainerUnreadCounts().subscribe({
+    this.chatApi.getProfessionalUnreadCounts().subscribe({
       next: (summary) => (this.chatUnreadCount = summary.by_client[String(this.clientId)] || 0),
       error: () => (this.chatUnreadCount = 0)
     });
@@ -141,6 +169,49 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     this.formsGroupsApi.getClientReminders(this.clientId).subscribe({
       next: (response) => (this.reminders = response.reminders),
       error: () => (this.reminders = [])
+    });
+  }
+
+  // ----- scheduled meetings (video, booked via Cal.com) -----
+  // Distinct from the reminders above: a meeting has a real join link and
+  // lives in the professional's Cal.com account too. Both show up together
+  // here, but "Schedule Meeting" hands off to the main Schedule page's
+  // booking flow (pick-a-slot UI) rather than duplicating it inline.
+
+  get upcomingMeetings(): ScheduledMeetingRecord[] {
+    const now = Date.now();
+    return this.meetings
+      .filter((m) => m.status === 'scheduled' && new Date(m.start_at).getTime() >= now)
+      .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+  }
+
+  loadMeetings(): void {
+    this.schedulingApi.getMeetings(this.clientId).subscribe({
+      next: (response) => (this.meetings = response.meetings),
+      error: () => (this.meetings = [])
+    });
+  }
+
+  async cancelMeeting(meeting: ScheduledMeetingRecord): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Cancel meeting',
+      target: meeting.title,
+      impact: 'The client will be notified this meeting is cancelled.',
+      confirmLabel: 'Cancel Meeting'
+    });
+    if (!confirmed) return;
+
+    this.schedulingApi.cancelMeeting(meeting.id).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.loadMeetings();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not cancel the meeting.');
+      }
     });
   }
 
@@ -158,19 +229,72 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
         date: this.reminderDraft.date,
         time: this.reminderDraft.time || null,
         notes: this.reminderDraft.notes.trim(),
-        notify_trainer: this.reminderDraft.notify_trainer
+        notify_professional: this.reminderDraft.notify_professional
       })
       .subscribe({
         next: (response) => {
           this.messageType = 'success';
           this.message = response.message;
           this.isSavingReminder = false;
-          this.reminderDraft = { title: '', date: '', time: '', notes: '', notify_trainer: true };
+          this.reminderDraft = { title: '', date: '', time: '', notes: '', notify_professional: true };
           this.loadReminders();
         },
         error: (error: unknown) => {
           this.messageType = 'error';
           this.message = formatApiError(error, 'Reminder could not be saved.');
+          this.isSavingReminder = false;
+        }
+      });
+  }
+
+  /** Populates the scheduler form from an existing reminder instead of a blank draft. */
+  startEditReminder(reminder: ClientReminder): void {
+    this.editingReminderId = reminder.id;
+    this.reminderDraft = {
+      title: reminder.title,
+      date: reminder.date,
+      // reminder.time comes back as "HH:MM:SS"; the <input type="time"> needs "HH:MM".
+      time: reminder.time ? reminder.time.slice(0, 5) : '',
+      notes: reminder.notes || '',
+      notify_professional: reminder.notify_professional
+    };
+  }
+
+  cancelReminderEdit(): void {
+    this.editingReminderId = null;
+    this.reminderDraft = { title: '', date: '', time: '', notes: '', notify_professional: true };
+  }
+
+  saveReminderEdit(): void {
+    if (this.editingReminderId === null) return;
+    if (!this.reminderDraft.title.trim() || !this.reminderDraft.date || this.isSavingReminder) {
+      this.messageType = 'error';
+      this.message = 'A reminder needs a title and date.';
+      return;
+    }
+
+    this.isSavingReminder = true;
+    this.formsGroupsApi
+      .updateReminder(this.editingReminderId, {
+        title: this.reminderDraft.title.trim(),
+        date: this.reminderDraft.date,
+        // Explicitly null (not omitted) so clearing the time field actually
+        // clears it server-side rather than leaving the old value untouched.
+        time: this.reminderDraft.time || null,
+        notes: this.reminderDraft.notes.trim(),
+        notify_professional: this.reminderDraft.notify_professional
+      })
+      .subscribe({
+        next: (response) => {
+          this.messageType = 'success';
+          this.message = response.message;
+          this.isSavingReminder = false;
+          this.cancelReminderEdit();
+          this.loadReminders();
+        },
+        error: (error: unknown) => {
+          this.messageType = 'error';
+          this.message = formatApiError(error, 'Reminder could not be updated.');
           this.isSavingReminder = false;
         }
       });
@@ -206,7 +330,10 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     if (!confirmed) return;
 
     this.formsGroupsApi.deleteReminder(reminder.id).subscribe({
-      next: () => this.loadReminders(),
+      next: () => {
+        if (this.editingReminderId === reminder.id) this.cancelReminderEdit();
+        this.loadReminders();
+      },
       error: () => this.loadReminders()
     });
   }
@@ -317,7 +444,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
       { label: 'Last Name', value: client.last_name },
       { label: 'Email Address', value: client.email },
       { label: 'Username', value: client.username },
-      { label: 'Trainer Code', value: client.trainer_name },
+      { label: 'Professional Code', value: client.professional_name },
       { label: 'Group', value: client.group_name },
       { label: 'Client Status', value: client.is_active ? 'Active' : 'Inactive' },
       { label: 'Joined Date', value: new Date(client.created_at).toLocaleDateString(), readonly: true },
@@ -575,7 +702,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
       kind: 'warning',
       title: 'Reset client data for',
       target: `${client.first_name} ${client.last_name}`,
-      impact: 'Assignments, entries, chat, schedules, progress, additional information, and trainer notes will be cleared. Identity and registration details remain.',
+      impact: 'Assignments, entries, chat, schedules, progress, additional information, and professional notes will be cleared. Identity and registration details remain.',
       confirmLabel: 'Reset Client Data'
     });
 
@@ -587,7 +714,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     this.formsGroupsApi.resetClient(client.id).subscribe({
       next: (response) => {
         this.replaceClient(response.client);
-        this.trainerNotes = '';
+        this.professionalNotes = '';
         this.notesUpdatedAt = null;
         this.messageType = 'success';
         this.message = response.message;
@@ -625,7 +752,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     this.isDeletingClient = true;
     this.formsGroupsApi.deleteClient(client.id).subscribe({
       next: () => {
-        void this.router.navigate(['/trainer/clients']);
+        void this.router.navigate(['/professional/clients']);
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -768,7 +895,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Option A: the trainer defines the temporary password, exactly like
+    // Option A: the professional defines the temporary password, exactly like
     // manual client creation. A generated suggestion is offered as default.
     const suggested = this.generateTemporaryPassword();
     const entered = window.prompt(
@@ -805,10 +932,10 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     return `${value.slice(0, 8)}!${value.slice(8)}`;
   }
 
-  // ----- trainer notes -----
+  // ----- professional notes -----
 
   startEditNotes(): void {
-    this.notesDraft = this.trainerNotes;
+    this.notesDraft = this.professionalNotes;
     this.isEditingNotes = true;
   }
 
@@ -822,10 +949,10 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     }
 
     this.isSavingNotes = true;
-    this.formsGroupsApi.saveTrainerNotes(this.clientId, this.notesDraft.trim()).subscribe({
+    this.formsGroupsApi.saveProfessionalNotes(this.clientId, this.notesDraft.trim()).subscribe({
       next: (response) => {
-        this.trainerNotes = response.trainer_notes;
-        this.notesUpdatedAt = response.trainer_notes_updated_at;
+        this.professionalNotes = response.professional_notes;
+        this.notesUpdatedAt = response.professional_notes_updated_at;
         this.isEditingNotes = false;
         this.isSavingNotes = false;
       },
@@ -840,7 +967,7 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
   // ----- assignments -----
 
   openTemplatePage(assignment: TemplateAssignmentRecord, extras: Record<string, string> = {}): void {
-    void this.router.navigate(['/trainer/clients', this.clientId, 'templates', assignment.id], {
+    void this.router.navigate(['/professional/clients', this.clientId, 'templates', assignment.id], {
       queryParams: extras
     });
   }
@@ -950,8 +1077,8 @@ export class TrainerClientProfileComponent implements OnInit, OnDestroy {
     this.formsGroupsApi.getClientProfile(this.clientId).subscribe({
       next: (profile) => {
         this.profile = profile;
-        this.trainerNotes = profile.trainer_notes || '';
-        this.notesUpdatedAt = profile.trainer_notes_updated_at;
+        this.professionalNotes = profile.professional_notes || '';
+        this.notesUpdatedAt = profile.professional_notes_updated_at;
         this.isLoading = false;
       },
       error: (error: unknown) => {

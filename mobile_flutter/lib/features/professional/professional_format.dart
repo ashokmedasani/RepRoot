@@ -1,4 +1,4 @@
-/// Date/number formatting shared across the trainer screens — the Flutter
+/// Date/number formatting shared across the professional screens — the Flutter
 /// equivalents of the Angular `date:` pipes used in the Ionic templates.
 ///
 /// These parse date-only strings as local, deliberately: see FIX #2 in
