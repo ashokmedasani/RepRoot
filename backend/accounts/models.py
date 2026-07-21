@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone
 import uuid
 
 
@@ -35,9 +36,9 @@ UNIVERSAL_CORE_FIELDS = [
 
 
 # Universal client creation form template.
-# Every trainer group is seeded with these personal-information fields so a
+# Every professional group is seeded with these personal-information fields so a
 # client creation form always exists (it is mandatory before a lead can be
-# converted into a client). Trainers can customise, reorder, or remove any of
+# converted into a client). Professionals can customise, reorder, or remove any of
 # these afterwards - they are a starting point, not fixed like the core fields.
 UNIVERSAL_CLIENT_FORM_FIELDS = [
   {
@@ -105,28 +106,54 @@ def generate_client_reference_id():
   return f'CL-{uuid.uuid4().hex[:10].upper()}'
 
 
-def generate_trainer_internal_reference():
-  """Generate an immutable, support-safe identifier for trainer audit history."""
+def generate_professional_internal_reference():
+  """Generate an immutable, support-safe identifier for professional audit history."""
   return f'TRN-{uuid.uuid4().hex[:10].upper()}'
 
 
-class TrainerProfile(models.Model):
+class ProfessionalProfile(models.Model):
+  # Legacy plan choices (for backward compatibility during migration)
   PLAN_STARTER = 'starter'
   PLAN_PREMIUM = 'premium'
-  PLAN_CHOICES = [(PLAN_STARTER, 'Starter'), (PLAN_PREMIUM, 'Premium')]
 
-  user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_profile')
+  # New 3-tier plan choices
+  PLAN_STARTER_FREE = 'starter_free'
+  PLAN_PRO = 'pro'
+  PLAN_PREMIUM_UNLIMITED = 'premium_unlimited'
+
+  PLAN_CHOICES = [
+    (PLAN_STARTER_FREE, 'Starter Free'),
+    (PLAN_PRO, 'Pro'),
+    (PLAN_PREMIUM_UNLIMITED, 'Premium Unlimited'),
+    # Keep legacy for backward compatibility during migration
+    (PLAN_STARTER, 'Starter (Legacy)'),
+    (PLAN_PREMIUM, 'Premium (Legacy)'),
+  ]
+
+  user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='professional_profile')
   internal_reference_code = models.CharField(
     max_length=24,
     unique=True,
-    default=generate_trainer_internal_reference,
+    default=generate_professional_internal_reference,
     editable=False,
     db_index=True,
   )
-  trainer_id = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
-  plan_tier = models.CharField(max_length=20, choices=PLAN_CHOICES, default=PLAN_STARTER, db_index=True)
+  professional_id = models.CharField(max_length=32, unique=True, null=True, blank=True, db_index=True)
+  plan_tier = models.CharField(max_length=20, choices=PLAN_CHOICES, default=PLAN_STARTER_FREE, db_index=True)
+  stripe_customer_id = models.CharField(max_length=64, blank=True, db_index=True)
+  stripe_subscription_id = models.CharField(max_length=64, blank=True, db_index=True)
+  plan_renews_at = models.DateTimeField(null=True, blank=True)
+
+  # NEW: Account lifecycle fields
+  is_locked = models.BooleanField(default=False, db_index=True)
+  locked_at = models.DateTimeField(null=True, blank=True)
+  lock_reason = models.CharField(max_length=100, blank=True, help_text="'overage' or 'downgrade_grace_expired'")
+  downgraded_at = models.DateTimeField(null=True, blank=True)
+  grace_period_ends_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  usage_warning_acknowledged_at = models.DateTimeField(null=True, blank=True)
+  last_overage_notification_sent_at = models.DateTimeField(null=True, blank=True)
   profile_setup_completed = models.BooleanField(default=False)
-  profile_photo = models.FileField(upload_to='trainer-profiles/photos/', blank=True)
+  profile_photo = models.FileField(upload_to='professional-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
   phone = models.CharField(max_length=40, blank=True)
   gender = models.CharField(max_length=40, blank=True)
@@ -136,7 +163,7 @@ class TrainerProfile(models.Model):
   birth_year = models.PositiveSmallIntegerField(null=True, blank=True)
   professional_headline = models.CharField(max_length=180, blank=True)
   about_me = models.TextField(blank=True)
-  trainer_type = models.CharField(max_length=120, blank=True)
+  professional_type = models.CharField(max_length=120, blank=True)
   years_experience = models.PositiveSmallIntegerField(null=True, blank=True)
   specializations = models.TextField(blank=True)
   training_style = models.TextField(blank=True)
@@ -144,9 +171,9 @@ class TrainerProfile(models.Model):
   certification_name = models.CharField(max_length=180, blank=True)
   certification_issued_by = models.CharField(max_length=180, blank=True)
   certification_year = models.PositiveSmallIntegerField(null=True, blank=True)
-  certification_file = models.FileField(upload_to='trainer-profiles/certifications/', blank=True)
-  transformation_photo = models.FileField(upload_to='trainer-profiles/transformations/', blank=True)
-  training_photo = models.FileField(upload_to='trainer-profiles/training/', blank=True)
+  certification_file = models.FileField(upload_to='professional-profiles/certifications/', blank=True)
+  transformation_photo = models.FileField(upload_to='professional-profiles/transformations/', blank=True)
+  training_photo = models.FileField(upload_to='professional-profiles/training/', blank=True)
   intro_video_url = models.URLField(blank=True)
   instagram_url = models.URLField(blank=True)
   youtube_url = models.URLField(blank=True)
@@ -160,30 +187,30 @@ class TrainerProfile(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'trainer_profiles'
+    db_table = 'professional_profiles'
 
   def __str__(self) -> str:
     return f'{self.user.get_full_name()} ({self.user.username})'
 
 
-class TrainerLeadForm(models.Model):
-  trainer = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lead_form')
+class ProfessionalLeadForm(models.Model):
+  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lead_form')
   public_slug = models.SlugField(max_length=64, unique=True)
-  title = models.CharField(max_length=160, default='Trainer Lead Form')
+  title = models.CharField(max_length=160, default='Professional Lead Form')
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'trainer_lead_forms'
+    db_table = 'professional_lead_forms'
 
   def __str__(self) -> str:
-    return f'{self.trainer.username} lead form'
+    return f'{self.professional.username} lead form'
 
 
-class TrainerGroup(models.Model):
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_groups')
+class ProfessionalGroup(models.Model):
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='professional_groups')
   name = models.CharField(max_length=120)
   description = models.TextField(blank=True)
   is_active = models.BooleanField(default=True, db_index=True)
@@ -191,16 +218,16 @@ class TrainerGroup(models.Model):
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'trainer_groups'
+    db_table = 'professional_groups'
     ordering = ['created_at']
-    unique_together = ('trainer', 'name')
+    unique_together = ('professional', 'name')
 
   def __str__(self) -> str:
-    return f'{self.name} ({self.trainer.username})'
+    return f'{self.name} ({self.professional.username})'
 
 
 class ClientRegistrationForm(models.Model):
-  group = models.OneToOneField(TrainerGroup, on_delete=models.CASCADE, related_name='client_registration_form')
+  group = models.OneToOneField(ProfessionalGroup, on_delete=models.CASCADE, related_name='client_registration_form')
   public_slug = models.SlugField(max_length=64, unique=True, null=True, blank=True, db_index=True)
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
@@ -230,7 +257,7 @@ class LeadSubmission(models.Model):
     (STATUS_DELETED, 'Deleted'),
   ]
 
-  lead_form = models.ForeignKey(TrainerLeadForm, on_delete=models.CASCADE, related_name='submissions')
+  lead_form = models.ForeignKey(ProfessionalLeadForm, on_delete=models.CASCADE, related_name='submissions')
   first_name = models.CharField(max_length=150)
   last_name = models.CharField(max_length=150)
   email = models.EmailField()
@@ -262,7 +289,7 @@ class GroupRegistrationSubmission(models.Model):
     (STATUS_DELETED, 'Deleted'),
   ]
 
-  group = models.ForeignKey(TrainerGroup, on_delete=models.CASCADE, related_name='registration_submissions')
+  group = models.ForeignKey(ProfessionalGroup, on_delete=models.CASCADE, related_name='registration_submissions')
   first_name = models.CharField(max_length=150)
   last_name = models.CharField(max_length=150)
   email = models.EmailField()
@@ -291,8 +318,8 @@ class ClientAccess(models.Model):
     (ONBOARDING_GROUP_REGISTRATION, 'Group registration'),
   ]
 
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_access_records')
-  group = models.ForeignKey(TrainerGroup, on_delete=models.PROTECT, related_name='client_access_records')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_access_records')
+  group = models.ForeignKey(ProfessionalGroup, on_delete=models.PROTECT, related_name='client_access_records')
   lead_submission = models.OneToOneField(
     LeadSubmission,
     on_delete=models.PROTECT,
@@ -318,8 +345,8 @@ class ClientAccess(models.Model):
   registration_answers = models.JSONField(default=dict)
   additional_info = models.JSONField(default=list)
   additional_info_shared = models.BooleanField(default=False)
-  trainer_notes = models.TextField(blank=True)
-  trainer_notes_updated_at = models.DateTimeField(null=True, blank=True)
+  professional_notes = models.TextField(blank=True)
+  professional_notes_updated_at = models.DateTimeField(null=True, blank=True)
   must_change_password = models.BooleanField(default=True)
   is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -327,11 +354,11 @@ class ClientAccess(models.Model):
 
   class Meta:
     db_table = 'client_access'
-    unique_together = [('trainer', 'email'), ('trainer', 'username')]
+    unique_together = [('professional', 'email'), ('professional', 'username')]
     ordering = ['-created_at']
 
   def __str__(self) -> str:
-    return f'{self.username} for {self.trainer.username}'
+    return f'{self.username} for {self.professional.username}'
 
 
 class ClientDetailChangeRequest(models.Model):
@@ -361,7 +388,7 @@ class ClientDetailChangeRequest(models.Model):
   proposed_answers = models.JSONField(default=dict)
   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
   client_note = models.TextField(blank=True)
-  trainer_note = models.TextField(blank=True)
+  professional_note = models.TextField(blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
   reviewed_at = models.DateTimeField(null=True, blank=True)
   archived_at = models.DateTimeField(null=True, blank=True)
@@ -379,9 +406,9 @@ def support_incident_reference():
 
 
 class SupportIncident(models.Model):
-  ROLE_TRAINER = 'trainer'
+  ROLE_PROFESSIONAL = 'professional'
   ROLE_CLIENT = 'client'
-  ROLE_CHOICES = [(ROLE_TRAINER, 'Trainer'), (ROLE_CLIENT, 'Client')]
+  ROLE_CHOICES = [(ROLE_PROFESSIONAL, 'Professional'), (ROLE_CLIENT, 'Client')]
 
   CATEGORY_FEEDBACK = 'feedback'
   CATEGORY_BUG = 'bug_report'
@@ -431,7 +458,7 @@ class SupportIncident(models.Model):
 
   incident_id = models.CharField(max_length=24, unique=True, default=support_incident_reference, editable=False, db_index=True)
   reporter_role = models.CharField(max_length=12, choices=ROLE_CHOICES, db_index=True)
-  reporter_trainer = models.ForeignKey(
+  reporter_professional = models.ForeignKey(
     settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='support_incidents'
   )
   reporter_client = models.ForeignKey(
@@ -502,14 +529,14 @@ class ClientReminder(models.Model):
     (STATUS_DONE, 'Done'),
   ]
 
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_reminders')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='client_reminders')
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='reminders')
   title = models.CharField(max_length=180)
   date = models.DateField()
   time = models.TimeField(null=True, blank=True)
   notes = models.TextField(blank=True)
   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
-  notify_trainer = models.BooleanField(default=True)
+  notify_professional = models.BooleanField(default=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -523,7 +550,7 @@ class ClientReminder(models.Model):
 
 class ProgressEntry(models.Model):
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='progress_entries')
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='progress_entries')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='progress_entries')
   title = models.CharField(max_length=180)
   date = models.DateField()
   notes = models.TextField(blank=True)
@@ -542,7 +569,7 @@ class ProgressEntry(models.Model):
 
 
 class ReferenceCategory(models.Model):
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reference_categories')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reference_categories')
   name = models.CharField(max_length=120)
   description = models.TextField(blank=True)
   subcategories = models.JSONField(default=list)
@@ -552,13 +579,13 @@ class ReferenceCategory(models.Model):
   class Meta:
     db_table = 'reference_categories'
     ordering = ['created_at']
-    unique_together = ('trainer', 'name')
+    unique_together = ('professional', 'name')
 
   def __str__(self) -> str:
-    return f'{self.name} ({self.trainer.username})'
+    return f'{self.name} ({self.professional.username})'
 
 
-class TrainerReference(models.Model):
+class ProfessionalReference(models.Model):
   TYPE_VIDEO_LINK = 'video_link'
   TYPE_PDF = 'pdf'
   TYPE_IMAGE = 'image'
@@ -571,24 +598,24 @@ class TrainerReference(models.Model):
     (TYPE_IMAGE, 'Image'),
   ]
 
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='trainer_references')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='professional_references')
   category = models.ForeignKey(ReferenceCategory, on_delete=models.PROTECT, related_name='references')
   subcategory = models.CharField(max_length=120, blank=True)
   title = models.CharField(max_length=180)
   reference_type = models.CharField(max_length=20, choices=REFERENCE_TYPE_CHOICES)
   description = models.TextField(blank=True)
   link = models.URLField(blank=True)
-  file = models.FileField(upload_to='trainer-references/', blank=True)
+  file = models.FileField(upload_to='professional-references/', blank=True)
   tags = models.JSONField(default=list)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'trainer_references'
+    db_table = 'professional_references'
     ordering = ['-created_at']
 
   def __str__(self) -> str:
-    return f'{self.title} ({self.trainer.username})'
+    return f'{self.title} ({self.professional.username})'
 
 
 class TrackingTemplate(models.Model):
@@ -602,7 +629,7 @@ class TrackingTemplate(models.Model):
     (CADENCE_MONTHLY, 'Monthly'),
   ]
 
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tracking_templates')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tracking_templates')
   name = models.CharField(max_length=120)
   purpose = models.TextField(blank=True)
   cadence = models.CharField(max_length=10, choices=CADENCE_CHOICES, default=CADENCE_DAILY)
@@ -616,16 +643,16 @@ class TrackingTemplate(models.Model):
   class Meta:
     db_table = 'tracking_templates'
     ordering = ['created_at']
-    unique_together = ('trainer', 'name')
+    unique_together = ('professional', 'name')
 
   def __str__(self) -> str:
-    return f'{self.name} ({self.trainer.username})'
+    return f'{self.name} ({self.professional.username})'
 
 
 class TemplateAssignment(models.Model):
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='template_assignments')
   template = models.ForeignKey(TrackingTemplate, on_delete=models.CASCADE, related_name='assignments')
-  references = models.ManyToManyField(TrainerReference, blank=True, related_name='template_assignments')
+  references = models.ManyToManyField(ProfessionalReference, blank=True, related_name='template_assignments')
   assigned_at = models.DateTimeField(auto_now_add=True)
 
   class Meta:
@@ -645,7 +672,7 @@ class TrackingEntry(models.Model):
   entry_time = models.TimeField(null=True, blank=True)
   answers = models.JSONField(default=dict)
   note = models.TextField(blank=True)
-  edited_by_trainer = models.BooleanField(default=False)
+  edited_by_professional = models.BooleanField(default=False)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -660,17 +687,17 @@ class TrackingEntry(models.Model):
 
 
 class ChatMessage(models.Model):
-  SENDER_TRAINER = 'trainer'
+  SENDER_PROFESSIONAL = 'professional'
   SENDER_CLIENT = 'client'
 
   SENDER_CHOICES = [
-    (SENDER_TRAINER, 'Trainer'),
+    (SENDER_PROFESSIONAL, 'Professional'),
     (SENDER_CLIENT, 'Client'),
   ]
 
-  trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_messages')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_messages')
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='chat_messages')
-  sender = models.CharField(max_length=10, choices=SENDER_CHOICES)
+  sender = models.CharField(max_length=20, choices=SENDER_CHOICES)
   text = models.TextField()
   is_read = models.BooleanField(default=False)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -696,7 +723,7 @@ class ClientAuthToken(models.Model):
     return f'Token for {self.client.username}'
 
 
-class RecycledTrainerAccount(models.Model):
+class RecycledProfessionalAccount(models.Model):
   original_user_id = models.PositiveIntegerField(db_index=True)
   email = models.EmailField(db_index=True)
   username = models.CharField(max_length=150, db_index=True)
@@ -706,8 +733,433 @@ class RecycledTrainerAccount(models.Model):
   deleted_at = models.DateTimeField(auto_now_add=True)
 
   class Meta:
-    db_table = 'recycled_trainer_accounts'
+    db_table = 'recycled_professional_accounts'
     ordering = ['-deleted_at']
 
   def __str__(self) -> str:
     return f'{self.email} recycled at {self.deleted_at:%Y-%m-%d %H:%M}'
+
+
+# ---------------------------------------------------------------------------
+# Client Payments
+#
+# Money professionals collect FROM their clients. Fully separate from RepRoot
+# Studio Billing (professionals paying RepRoot for their subscription tier).
+# For manual payment methods RepRoot never receives, holds, or transfers the
+# money - these models only track what the professional and client report.
+# ---------------------------------------------------------------------------
+
+
+def generate_payment_record_id():
+  return f'PMT-{uuid.uuid4().hex[:10].upper()}'
+
+
+class PaymentSequence(models.Model):
+  """Year-scoped counter backing PAY-RRS request ids. Locked with
+  select_for_update so concurrent request creation can't collide."""
+
+  year = models.PositiveIntegerField(unique=True)
+  last_number = models.PositiveIntegerField(default=0)
+
+  class Meta:
+    db_table = 'payment_sequences'
+
+  @classmethod
+  def next_request_id(cls):
+    with transaction.atomic():
+      year = timezone.now().year
+      sequence, _ = cls.objects.select_for_update().get_or_create(year=year)
+      sequence.last_number += 1
+      sequence.save(update_fields=['last_number'])
+      return f'PAY-RRS-{year}-{sequence.last_number:06d}'
+
+
+class ProfessionalPaymentSettings(models.Model):
+  VISIBILITY_PRIVATE = 'private'
+  VISIBILITY_VISIBLE = 'visible'
+  VISIBILITY_CHOICES = [(VISIBILITY_PRIVATE, 'Private'), (VISIBILITY_VISIBLE, 'Visible to client')]
+
+  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payment_settings')
+  # Master opt-in: a professional who does not want to track money at all can
+  # turn this off, which hides every payments surface. Payments are never forced.
+  payment_tracking_enabled = models.BooleanField(default=True)
+  reporting_currency = models.CharField(max_length=3, default='USD')
+  client_payment_history_enabled = models.BooleanField(default=True)
+  default_payment_visibility = models.CharField(max_length=12, choices=VISIBILITY_CHOICES, default=VISIBILITY_PRIVATE)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'professional_payment_settings'
+
+  def __str__(self) -> str:
+    return f'Payment settings for {self.professional.username} ({self.reporting_currency})'
+
+
+class ManualPaymentProfile(models.Model):
+  CATEGORY_CHOICES = [
+    ('upi', 'UPI'),
+    ('google_pay', 'Google Pay'),
+    ('phonepe', 'PhonePe'),
+    ('paytm', 'Paytm'),
+    ('bank_transfer', 'Bank Transfer'),
+    ('zelle', 'Zelle'),
+    ('venmo', 'Venmo'),
+    ('cash_app', 'Cash App'),
+    ('paypal_manual', 'PayPal (manual transfer)'),
+    ('cash', 'Cash'),
+    ('other', 'Other'),
+  ]
+  STATUS_ACTIVE = 'active'
+  STATUS_INACTIVE = 'inactive'
+  STATUS_CHOICES = [(STATUS_ACTIVE, 'Active'), (STATUS_INACTIVE, 'Inactive')]
+  MAX_ACTIVE_PROFILES = 5
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='manual_payment_profiles')
+  name = models.CharField(max_length=120)
+  category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+  display_label = models.CharField(max_length=120)
+  supported_currencies = models.JSONField(default=list, blank=True)
+  country = models.CharField(max_length=80, blank=True)
+  # JSON blobs keep category-specific shapes flexible without per-category
+  # migrations. private_fields never leaves professional-facing serializers.
+  private_fields = models.JSONField(default=dict, blank=True)
+  client_visible_fields = models.JSONField(default=dict, blank=True)
+  qr_code = models.FileField(upload_to='payments/qr-codes/%Y/%m/', null=True, blank=True)
+  internal_notes = models.TextField(blank=True)
+  client_instructions = models.TextField(blank=True)
+  status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'manual_payment_profiles'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.display_label} ({self.professional.username})'
+
+
+class IntegratedPaymentAccount(models.Model):
+  """Provider-connection shell. Deliberately has no field capable of holding
+  a secret - only opaque provider-issued references are ever stored."""
+
+  PROVIDER_CHOICES = [('stripe', 'Stripe'), ('paypal', 'PayPal'), ('razorpay', 'Razorpay')]
+  CONNECTION_CHOICES = [
+    ('not_connected', 'Not Connected'),
+    ('setup_required', 'Setup Required'),
+    ('verification_pending', 'Verification Pending'),
+    ('connected', 'Connected'),
+    ('restricted', 'Restricted'),
+    ('disconnected', 'Disconnected'),
+  ]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='integrated_payment_accounts')
+  provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, db_index=True)
+  provider_account_reference = models.CharField(max_length=120, blank=True)
+  connection_status = models.CharField(max_length=20, choices=CONNECTION_CHOICES, default='not_connected', db_index=True)
+  verification_status = models.CharField(max_length=40, blank=True)
+  account_type = models.CharField(max_length=40, blank=True)
+  country = models.CharField(max_length=80, blank=True)
+  supported_currencies = models.JSONField(default=list, blank=True)
+  last_connection_check = models.DateTimeField(null=True, blank=True)
+  is_active = models.BooleanField(default=False, db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'integrated_payment_accounts'
+    constraints = [models.UniqueConstraint(fields=['professional', 'provider'], name='one_account_per_provider')]
+
+  def __str__(self) -> str:
+    return f'{self.provider} for {self.professional.username} ({self.connection_status})'
+
+
+class ClientPaymentMethodAccess(models.Model):
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='payment_method_access')
+  payment_profile = models.ForeignKey(ManualPaymentProfile, on_delete=models.CASCADE, related_name='client_access_grants')
+  is_visible = models.BooleanField(default=True, db_index=True)
+  enabled_at = models.DateTimeField(auto_now_add=True)
+  disabled_at = models.DateTimeField(null=True, blank=True)
+
+  class Meta:
+    db_table = 'client_payment_method_access'
+    constraints = [models.UniqueConstraint(fields=['client', 'payment_profile'], name='one_grant_per_client_method')]
+
+  def __str__(self) -> str:
+    return f'{self.payment_profile.display_label} -> {self.client.username}'
+
+
+class PaymentPlan(models.Model):
+  """Reusable payment-plan template (e.g. a monthly coaching package).
+
+  Schema groundwork only for now: future plan features (auto-generated
+  recurring requests, client assignment) attach here so nothing about
+  PaymentRequest needs restructuring later."""
+
+  CYCLE_CHOICES = [
+    ('one_time', 'One time'),
+    ('weekly', 'Weekly'),
+    ('monthly', 'Monthly'),
+    ('quarterly', 'Quarterly'),
+    ('custom', 'Custom'),
+  ]
+  STATUS_CHOICES = [('active', 'Active'), ('inactive', 'Inactive'), ('archived', 'Archived')]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payment_plans')
+  name = models.CharField(max_length=120)
+  description = models.TextField(blank=True)
+  amount = models.DecimalField(max_digits=12, decimal_places=2)
+  currency = models.CharField(max_length=3)
+  billing_cycle = models.CharField(max_length=12, choices=CYCLE_CHOICES, default='monthly')
+  installment_count = models.PositiveIntegerField(null=True, blank=True)
+  status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active', db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'payment_plans'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.name} ({self.amount} {self.currency} / {self.billing_cycle})'
+
+
+class PaymentRequest(models.Model):
+  TYPE_CHOICES = [('manual', 'Manual'), ('integrated', 'Integrated'), ('both', 'Both')]
+
+  STATUS_DRAFT = 'draft'
+  STATUS_SENT = 'sent'
+  STATUS_VIEWED = 'viewed'
+  STATUS_PROOF_SUBMITTED = 'proof_submitted'
+  STATUS_UNDER_REVIEW = 'under_review'
+  STATUS_COMPLETED = 'completed'
+  STATUS_PARTIALLY_PAID = 'partially_paid'
+  STATUS_REJECTED = 'rejected'
+  STATUS_CANCELLED = 'cancelled'
+  STATUS_OVERDUE = 'overdue'
+  STATUS_REFUNDED = 'refunded'
+  STATUS_CHOICES = [
+    (STATUS_DRAFT, 'Draft'),
+    (STATUS_SENT, 'Sent'),
+    (STATUS_VIEWED, 'Viewed'),
+    (STATUS_PROOF_SUBMITTED, 'Proof Submitted'),
+    (STATUS_UNDER_REVIEW, 'Under Review'),
+    (STATUS_COMPLETED, 'Completed'),
+    (STATUS_PARTIALLY_PAID, 'Partially Paid'),
+    (STATUS_REJECTED, 'Rejected'),
+    (STATUS_CANCELLED, 'Cancelled'),
+    (STATUS_OVERDUE, 'Overdue'),
+    (STATUS_REFUNDED, 'Refunded'),
+  ]
+  OPEN_STATUSES = (STATUS_SENT, STATUS_VIEWED, STATUS_PROOF_SUBMITTED, STATUS_UNDER_REVIEW, STATUS_OVERDUE, STATUS_PARTIALLY_PAID)
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payment_requests')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='payment_requests')
+  payment_plan = models.ForeignKey(PaymentPlan, on_delete=models.SET_NULL, null=True, blank=True, related_name='requests')
+  request_id = models.CharField(max_length=32, unique=True, editable=False, db_index=True)
+  title = models.CharField(max_length=180)
+  description = models.TextField(blank=True)
+  requested_amount = models.DecimalField(max_digits=12, decimal_places=2)
+  requested_currency = models.CharField(max_length=3)
+  due_date = models.DateField(null=True, blank=True, db_index=True)
+  payment_type = models.CharField(max_length=12, choices=TYPE_CHOICES, default='manual')
+  status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+  client_visibility = models.CharField(
+    max_length=12,
+    choices=ProfessionalPaymentSettings.VISIBILITY_CHOICES,
+    default=ProfessionalPaymentSettings.VISIBILITY_VISIBLE,
+  )
+  notes = models.TextField(blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  sent_at = models.DateTimeField(null=True, blank=True)
+  viewed_at = models.DateTimeField(null=True, blank=True)
+  completed_at = models.DateTimeField(null=True, blank=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'payment_requests'
+    ordering = ['-created_at']
+    indexes = [
+      models.Index(fields=['professional', 'status'], name='pay_req_prof_status_idx'),
+      models.Index(fields=['client', 'status'], name='pay_req_client_status_idx'),
+    ]
+
+  def save(self, *args, **kwargs):
+    if not self.request_id:
+      self.request_id = PaymentSequence.next_request_id()
+    return super().save(*args, **kwargs)
+
+  def __str__(self) -> str:
+    return f'{self.request_id} ({self.status})'
+
+
+class PaymentRequestAllowedMethod(models.Model):
+  payment_request = models.ForeignKey(PaymentRequest, on_delete=models.CASCADE, related_name='allowed_methods')
+  manual_payment_profile = models.ForeignKey(ManualPaymentProfile, on_delete=models.CASCADE, null=True, blank=True, related_name='allowed_on_requests')
+  integrated_payment_account = models.ForeignKey(IntegratedPaymentAccount, on_delete=models.CASCADE, null=True, blank=True, related_name='allowed_on_requests')
+
+  class Meta:
+    db_table = 'payment_request_allowed_methods'
+    constraints = [
+      models.CheckConstraint(
+        check=(
+          models.Q(manual_payment_profile__isnull=False, integrated_payment_account__isnull=True)
+          | models.Q(manual_payment_profile__isnull=True, integrated_payment_account__isnull=False)
+        ),
+        name='payment_allowed_method_one_target',
+      )
+    ]
+
+
+class PaymentProof(models.Model):
+  STATUS_SUBMITTED = 'submitted'
+  STATUS_UNDER_REVIEW = 'under_review'
+  STATUS_ACCEPTED = 'accepted'
+  STATUS_REJECTED = 'rejected'
+  STATUS_CHOICES = [
+    (STATUS_SUBMITTED, 'Submitted'),
+    (STATUS_UNDER_REVIEW, 'Under Review'),
+    (STATUS_ACCEPTED, 'Accepted'),
+    (STATUS_REJECTED, 'Rejected'),
+  ]
+
+  payment_request = models.ForeignKey(PaymentRequest, on_delete=models.CASCADE, related_name='proofs')
+  submitted_by = models.CharField(max_length=150, blank=True)
+  transaction_reference = models.CharField(max_length=120, blank=True)
+  reported_amount = models.DecimalField(max_digits=12, decimal_places=2)
+  reported_currency = models.CharField(max_length=3)
+  reported_payment_date = models.DateField()
+  payment_method = models.ForeignKey(ManualPaymentProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='proofs')
+  proof_file = models.FileField(upload_to='payments/proofs/%Y/%m/', null=True, blank=True)
+  note = models.TextField(blank=True)
+  confirmed_accurate = models.BooleanField(default=False)
+  status = models.CharField(max_length=14, choices=STATUS_CHOICES, default=STATUS_SUBMITTED, db_index=True)
+  review_note = models.TextField(blank=True)
+  submitted_at = models.DateTimeField(auto_now_add=True)
+  reviewed_at = models.DateTimeField(null=True, blank=True)
+
+  class Meta:
+    db_table = 'payment_proofs'
+    ordering = ['-submitted_at']
+
+  def __str__(self) -> str:
+    return f'Proof for {self.payment_request.request_id} ({self.status})'
+
+
+class PaymentRecord(models.Model):
+  STATUS_COMPLETED = 'completed'
+  STATUS_PARTIALLY_PAID = 'partially_paid'
+  STATUS_REFUNDED = 'refunded'
+  STATUS_CHOICES = [
+    (STATUS_COMPLETED, 'Completed'),
+    (STATUS_PARTIALLY_PAID, 'Partially Paid'),
+    (STATUS_REFUNDED, 'Refunded'),
+  ]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payment_records')
+  client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='payment_records')
+  payment_request = models.ForeignKey(PaymentRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='records')
+  payment_record_id = models.CharField(max_length=32, unique=True, default=generate_payment_record_id, editable=False, db_index=True)
+  original_amount = models.DecimalField(max_digits=12, decimal_places=2)
+  original_currency = models.CharField(max_length=3)
+  reporting_amount = models.DecimalField(max_digits=12, decimal_places=2)
+  reporting_currency = models.CharField(max_length=3)
+  exchange_rate_reference = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True)
+  exchange_rate_source = models.CharField(max_length=40, blank=True, default='manual')
+  payment_method = models.ForeignKey(ManualPaymentProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='records')
+  transaction_reference = models.CharField(max_length=120, blank=True)
+  received_date = models.DateField(db_index=True)
+  status = models.CharField(max_length=14, choices=STATUS_CHOICES, default=STATUS_COMPLETED, db_index=True)
+  client_visibility = models.CharField(
+    max_length=12,
+    choices=ProfessionalPaymentSettings.VISIBILITY_CHOICES,
+    default=ProfessionalPaymentSettings.VISIBILITY_VISIBLE,
+  )
+  internal_note = models.TextField(blank=True)
+  client_note = models.TextField(blank=True)
+  proof_file = models.FileField(upload_to='payments/records/%Y/%m/', null=True, blank=True)
+  verified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_payment_records')
+  verified_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'payment_records'
+    ordering = ['-received_date', '-created_at']
+    indexes = [
+      models.Index(fields=['professional', 'received_date'], name='pay_rec_prof_date_idx'),
+      models.Index(fields=['client', 'status'], name='pay_rec_client_status_idx'),
+    ]
+
+  def __str__(self) -> str:
+    return f'{self.payment_record_id} ({self.status})'
+
+
+class PaymentAuditLog(models.Model):
+  """Immutable insert-only log of payment actions, mirroring the shape of
+  admin_portal.AdminAuditLog but scoped to professional/client activity."""
+
+  ACTION_CHOICES = [
+    ('method_created', 'Method created'),
+    ('method_updated', 'Method updated'),
+    ('method_shared', 'Method shared'),
+    ('method_unshared', 'Method unshared'),
+    ('request_created', 'Request created'),
+    ('request_cancelled', 'Request cancelled'),
+    ('proof_submitted', 'Proof submitted'),
+    ('proof_rejected', 'Proof rejected'),
+    ('info_requested', 'More info requested'),
+    ('payment_verified', 'Payment verified'),
+    ('payment_recorded', 'Payment recorded'),
+    ('payment_edited', 'Payment edited'),
+    ('payment_deleted', 'Payment deleted'),
+  ]
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_audit_logs')
+  client = models.ForeignKey(ClientAccess, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_audit_logs')
+  payment_request = models.ForeignKey(PaymentRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
+  payment_record = models.ForeignKey(PaymentRecord, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
+  action = models.CharField(max_length=32, choices=ACTION_CHOICES, db_index=True)
+  previous_values = models.JSONField(default=dict, blank=True)
+  new_values = models.JSONField(default=dict, blank=True)
+  changed_by = models.CharField(max_length=180, blank=True)
+  reason = models.TextField(blank=True)
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+  class Meta:
+    db_table = 'payment_audit_logs'
+    ordering = ['-created_at']
+    indexes = [models.Index(fields=['professional', 'created_at'], name='pay_audit_prof_created_idx')]
+
+  def save(self, *args, **kwargs):
+    if self.pk:
+      raise ValueError('Payment audit logs are immutable.')
+    return super().save(*args, **kwargs)
+
+  def __str__(self) -> str:
+    return f'{self.action} @ {self.created_at:%Y-%m-%d %H:%M}'
+
+
+class PaymentNotification(models.Model):
+  """Minimal in-app notification row backing the payments nav badge. There is
+  no app-wide notification system yet; this stays payments-scoped."""
+
+  RECIPIENT_CHOICES = [('professional', 'Professional'), ('client', 'Client')]
+
+  recipient_type = models.CharField(max_length=12, choices=RECIPIENT_CHOICES, db_index=True)
+  recipient_professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='payment_notifications')
+  recipient_client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, null=True, blank=True, related_name='payment_notifications')
+  notif_type = models.CharField(max_length=40, db_index=True)
+  title = models.CharField(max_length=200)
+  body = models.TextField(blank=True)
+  payload = models.JSONField(default=dict, blank=True)
+  is_read = models.BooleanField(default=False, db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+  class Meta:
+    db_table = 'payment_notifications'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.notif_type} ({self.recipient_type})'

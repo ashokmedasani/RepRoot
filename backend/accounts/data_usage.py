@@ -19,12 +19,12 @@ from .models import (
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
-  TrainerGroup,
-  TrainerLeadForm,
-  TrainerProfile,
-  TrainerReference,
+  ProfessionalGroup,
+  ProfessionalLeadForm,
+  ProfessionalProfile,
+  ProfessionalReference,
 )
-from .plan_limits import trainer_plan
+from .plan_limits import professional_plan
 
 
 def _serialized_size(value) -> int:
@@ -42,7 +42,7 @@ def _file_size(file_field) -> int:
   try:
     return int(file_field.size)
   # Remote storage backends can raise provider-specific errors for a missing
-  # object; one unavailable upload must not break navigation for the trainer.
+  # object; one unavailable upload must not break navigation for the professional.
   except Exception:
     return 0
 
@@ -100,20 +100,20 @@ def _client_usage(client) -> dict:
   }
 
 
-def calculate_trainer_data_usage(trainer) -> dict:
-  """Estimate trainer-owned storage, broken down by product section and client."""
-  cache_key = f'trainer-data-usage:v4:{trainer.pk}'
+def calculate_professional_data_usage(professional) -> dict:
+  """Estimate professional-owned storage, broken down by product section and client."""
+  cache_key = f'professional-data-usage:v4:{professional.pk}'
   cached = cache.get(cache_key)
   if cached is not None:
     return cached
 
-  profile = TrainerProfile.objects.filter(user=trainer).first()
-  trainer_data = model_to_dict(trainer)
+  profile = ProfessionalProfile.objects.filter(user=professional).first()
+  professional_data = model_to_dict(professional)
   # Authentication timestamps change during normal navigation and do not
   # represent user-created content.
-  trainer_data.pop('last_login', None)
+  professional_data.pop('last_login', None)
 
-  profile_values = [trainer_data]
+  profile_values = [professional_data]
   profile_files = []
   if profile:
     profile_values.append(model_to_dict(profile))
@@ -124,60 +124,60 @@ def calculate_trainer_data_usage(trainer) -> dict:
       profile.training_photo,
     ]
 
-  assignments = TemplateAssignment.objects.filter(client__trainer=trainer)
+  assignments = TemplateAssignment.objects.filter(client__professional=professional)
   assignment_links = TemplateAssignment.references.through.objects.filter(
-    templateassignment__client__trainer=trainer
+    templateassignment__client__professional=professional
   )
-  references = TrainerReference.objects.filter(trainer=trainer)
+  references = ProfessionalReference.objects.filter(professional=professional)
   sections = {
-    'trainer_profile': _section_usage(values=profile_values, files=profile_files),
+    'professional_profile': _section_usage(values=profile_values, files=profile_files),
     'forms_groups': _section_usage(
       querysets=[
-        TrainerLeadForm.objects.filter(trainer=trainer),
-        TrainerGroup.objects.filter(trainer=trainer),
-        ClientRegistrationForm.objects.filter(group__trainer=trainer),
-        LeadSubmission.objects.filter(lead_form__trainer=trainer),
-        GroupRegistrationSubmission.objects.filter(group__trainer=trainer),
+        ProfessionalLeadForm.objects.filter(professional=professional),
+        ProfessionalGroup.objects.filter(professional=professional),
+        ClientRegistrationForm.objects.filter(group__professional=professional),
+        LeadSubmission.objects.filter(lead_form__professional=professional),
+        GroupRegistrationSubmission.objects.filter(group__professional=professional),
       ]
     ),
     'clients': _section_usage(
       querysets=[
-        ClientAccess.objects.filter(trainer=trainer),
-        ClientDetailChangeRequest.objects.filter(client__trainer=trainer),
-        ClientAuthToken.objects.filter(client__trainer=trainer),
+        ClientAccess.objects.filter(professional=professional),
+        ClientDetailChangeRequest.objects.filter(client__professional=professional),
+        ClientAuthToken.objects.filter(client__professional=professional),
       ]
     ),
     'schedules_progress': _section_usage(
       querysets=[
-        ClientReminder.objects.filter(trainer=trainer),
-        ProgressEntry.objects.filter(trainer=trainer),
+        ClientReminder.objects.filter(professional=professional),
+        ProgressEntry.objects.filter(professional=professional),
       ]
     ),
     'references': _section_usage(
-      querysets=[ReferenceCategory.objects.filter(trainer=trainer), references],
+      querysets=[ReferenceCategory.objects.filter(professional=professional), references],
       files=[reference.file for reference in references.only('file')],
     ),
     'templates_tracking': _section_usage(
       querysets=[
-        TrackingTemplate.objects.filter(trainer=trainer),
+        TrackingTemplate.objects.filter(professional=professional),
         assignments,
         assignment_links,
-        TrackingEntry.objects.filter(client__trainer=trainer),
+        TrackingEntry.objects.filter(client__professional=professional),
       ]
     ),
-    'messages': _section_usage(querysets=[ChatMessage.objects.filter(trainer=trainer)]),
+    'messages': _section_usage(querysets=[ChatMessage.objects.filter(professional=professional)]),
   }
 
   database_bytes = sum(section['database_bytes'] for section in sections.values())
   file_bytes = sum(section['file_bytes'] for section in sections.values())
   total_bytes = database_bytes + file_bytes
-  plan = trainer_plan(trainer)
-  quota_bytes = max(1, int(plan.get('trainer_storage_bytes') or 1))
+  plan = professional_plan(professional)
+  quota_bytes = max(1, int(plan.get('professional_storage_bytes') or 1))
 
   # The most active client is the most useful single-client storage example;
   # detailed histories naturally sort above profile-only clients.
   featured_client = (
-    ClientAccess.objects.filter(trainer=trainer)
+    ClientAccess.objects.filter(professional=professional)
     .annotate(
       activity_count=(
         Count('tracking_entries', distinct=True)
@@ -189,6 +189,17 @@ def calculate_trainer_data_usage(trainer) -> dict:
     .first()
   )
 
+  usage_percent = min(100, round((total_bytes / quota_bytes) * 100, 2))
+  warning_threshold = settings.REPROOT_DATA_USAGE_WARNING_PERCENT
+  danger_threshold = settings.REPROOT_DATA_USAGE_DANGER_PERCENT
+
+  # Get professional profile for account lock status
+  profile = ProfessionalProfile.objects.filter(user=professional).first()
+  is_locked = profile.is_locked if profile else False
+  lock_reason = profile.lock_reason if profile else None
+  grace_period_ends_at = profile.grace_period_ends_at if profile else None
+  locked_at = profile.locked_at if profile else None
+
   result = {
     'plan_code': plan['code'],
     'plan_name': plan['name'],
@@ -197,10 +208,21 @@ def calculate_trainer_data_usage(trainer) -> dict:
     'database_bytes': database_bytes,
     'file_bytes': file_bytes,
     'quota_bytes': quota_bytes,
-    'usage_percent': min(100, round((total_bytes / quota_bytes) * 100, 2)),
+    'usage_percent': usage_percent,
     'record_count': sum(section['record_count'] for section in sections.values()),
     'sections': sections,
     'featured_client': _client_usage(featured_client) if featured_client else None,
+
+    # NEW: Warning & account lifecycle fields
+    'warning_threshold_percent': warning_threshold,
+    'danger_threshold_percent': danger_threshold,
+    'is_warning': usage_percent >= warning_threshold,
+    'is_danger': usage_percent >= danger_threshold,
+    'is_over_quota': usage_percent > 100,
+    'is_locked': is_locked,
+    'lock_reason': lock_reason,
+    'grace_period_ends_at': grace_period_ends_at.isoformat() if grace_period_ends_at else None,
+    'locked_at': locked_at.isoformat() if locked_at else None,
   }
-  cache.set(cache_key, result, timeout=settings.COACHFLOW_DATA_USAGE_CACHE_SECONDS)
+  cache.set(cache_key, result, timeout=settings.REPROOT_DATA_USAGE_CACHE_SECONDS)
   return result

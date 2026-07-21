@@ -50,6 +50,7 @@ MIDDLEWARE = [
   'django.contrib.auth.middleware.AuthenticationMiddleware',
   'django.contrib.messages.middleware.MessageMiddleware',
   'django.middleware.clickjacking.XFrameOptionsMiddleware',
+  'admin_portal.middleware.ErrorCaptureMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -85,7 +86,7 @@ else:
   DATABASES = {
     'default': {
       'ENGINE': 'django.db.backends.postgresql',
-      'NAME': os.environ.get('POSTGRES_DB', 'trainer_platform'),
+      'NAME': os.environ.get('POSTGRES_DB', 'professional_platform'),
       'USER': os.environ.get('POSTGRES_USER', 'postgres'),
       'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
       'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
@@ -155,7 +156,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@coachflow.local')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
 
 if not DEBUG and EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
   raise ImproperlyConfigured('Configure a production EMAIL_BACKEND and EMAIL_HOST before deployment.')
@@ -173,20 +174,29 @@ else:
   CACHES = {
     'default': {
       'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-      'LOCATION': 'coachflow-local-cache',
+      'LOCATION': 'reproot-local-cache',
     }
   }
 
-# 4300 = web frontend. 4400 = mobile app browser preview (only while you run it).
-# http://localhost + capacitor://localhost = the native Android app's WebView origin.
+# 4300 = web frontend. The Flutter app talks to the backend natively (Dio),
+# not through a browser origin, so it isn't subject to CORS at all.
 CORS_ALLOWED_ORIGINS = [
   origin.strip()
   for origin in os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:4300,http://127.0.0.1:4300,http://localhost:4400,http://127.0.0.1:4400,http://localhost:4401,http://127.0.0.1:4401,http://localhost,https://localhost,capacitor://localhost',
+    'http://localhost:4300,http://127.0.0.1:4300',
   ).split(',')
   if origin.strip()
 ]
+
+# django-cors-headers' default allow-list doesn't include this custom header;
+# the web app and mobile app both send it on every request so backend-caught
+# exceptions (admin_portal.middleware.ErrorCaptureMiddleware) know which
+# platform hit them. Without this, every cross-origin request carrying the
+# header fails CORS preflight — not just the error-report endpoint.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = [*default_headers, 'x-client-platform']
 
 CSRF_TRUSTED_ORIGINS = [
   origin.strip()
@@ -220,38 +230,93 @@ REST_FRAMEWORK = {
     'directory': os.environ.get('THROTTLE_DIRECTORY_RATE', '60/min'),
       'public_registration': os.environ.get('THROTTLE_PUBLIC_REGISTRATION_RATE', '30/hour'),
       'support': os.environ.get('THROTTLE_SUPPORT_RATE', '30/hour'),
+      'errors': os.environ.get('THROTTLE_ERRORS_RATE', '60/min'),
+      'payments': os.environ.get('THROTTLE_PAYMENTS_RATE', '30/hour'),
   },
 }
 
 # Limits are tier-aware so premium capacity can change without rewriting API
-# views or Angular pages. Existing trainers remain on Starter unless an admin
-# explicitly changes their TrainerProfile.plan_tier.
-COACHFLOW_DEFAULT_PLAN = os.environ.get('COACHFLOW_DEFAULT_PLAN', 'starter').strip().lower()
-COACHFLOW_PLAN_TIERS = {
+# views or Angular pages. Existing professionals remain on Starter unless an admin
+# explicitly changes their ProfessionalProfile.plan_tier.
+REPROOT_DEFAULT_PLAN = os.environ.get('REPROOT_DEFAULT_PLAN', 'starter_free').strip().lower()
+
+# 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
+REPROOT_PLAN_TIERS = {
+  'starter_free': {
+    'name': 'Starter Free',
+    'lead_forms': int(os.environ.get('REPROOT_STARTER_FREE_LEAD_FORM_LIMIT', '1')),
+    'groups': int(os.environ.get('REPROOT_STARTER_FREE_GROUP_LIMIT', '3')),
+    'clients': int(os.environ.get('REPROOT_STARTER_FREE_CLIENT_LIMIT', '50')),
+    'templates': int(os.environ.get('REPROOT_STARTER_FREE_TEMPLATE_LIMIT', '3')),
+    'references': int(os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT', '25')),
+    'categories': int(os.environ.get('REPROOT_STARTER_FREE_CATEGORY_LIMIT', '5')),
+    'subcategories_per_category': int(os.environ.get('REPROOT_STARTER_FREE_SUBCATEGORY_LIMIT', '3')),
+    'professional_storage_bytes': int(os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(30 * 1024 * 1024))),
+  },
+  'pro': {
+    'name': 'Pro',
+    'lead_forms': int(os.environ.get('REPROOT_PRO_LEAD_FORM_LIMIT', '2')),
+    'groups': int(os.environ.get('REPROOT_PRO_GROUP_LIMIT', '10')),
+    'clients': int(os.environ.get('REPROOT_PRO_CLIENT_LIMIT', '250')),
+    'templates': int(os.environ.get('REPROOT_PRO_TEMPLATE_LIMIT', '15')),
+    'references': int(os.environ.get('REPROOT_PRO_REFERENCE_LIMIT', '100')),
+    'categories': int(os.environ.get('REPROOT_PRO_CATEGORY_LIMIT', '20')),
+    'subcategories_per_category': int(os.environ.get('REPROOT_PRO_SUBCATEGORY_LIMIT', '10')),
+    'professional_storage_bytes': int(os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(90 * 1024 * 1024))),
+  },
+  'premium_unlimited': {
+    'name': 'Premium Unlimited',
+    'lead_forms': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_LEAD_FORM_LIMIT', '3')),
+    'groups': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_GROUP_LIMIT', '999')),
+    'clients': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CLIENT_LIMIT', '999')),
+    'templates': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_TEMPLATE_LIMIT', '50')),
+    'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '1000')),
+    'categories': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CATEGORY_LIMIT', '50')),
+    'subcategories_per_category': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_SUBCATEGORY_LIMIT', '20')),
+    'professional_storage_bytes': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(2**31 - 1))),
+  },
+  # Legacy tiers (for backward compatibility during migration)
   'starter': {
-    'name': 'Starter',
-    'lead_forms': int(os.environ.get('COACHFLOW_STARTER_LEAD_FORM_LIMIT', '1')),
-    'groups': int(os.environ.get('COACHFLOW_STARTER_GROUP_LIMIT', '5')),
-    'clients': int(os.environ.get('COACHFLOW_STARTER_CLIENT_LIMIT', '100')),
-    'templates': int(os.environ.get('COACHFLOW_STARTER_TEMPLATE_LIMIT', '5')),
-    'references': int(os.environ.get('COACHFLOW_STARTER_REFERENCE_LIMIT', '100')),
-    'categories': int(os.environ.get('COACHFLOW_STARTER_CATEGORY_LIMIT', '10')),
-    'subcategories_per_category': int(os.environ.get('COACHFLOW_STARTER_SUBCATEGORY_LIMIT', '5')),
-    'trainer_storage_bytes': int(os.environ.get('COACHFLOW_STARTER_STORAGE_LIMIT_BYTES', str(50 * 1024 * 1024))),
+    'name': 'Starter (Legacy)',
+    'lead_forms': 1, 'groups': 5, 'clients': 100, 'templates': 5,
+    'references': 100, 'categories': 10, 'subcategories_per_category': 5,
+    'professional_storage_bytes': 50 * 1024 * 1024,
   },
   'premium': {
-    'name': 'Premium',
-    'lead_forms': int(os.environ.get('COACHFLOW_PREMIUM_LEAD_FORM_LIMIT', '3')),
-    'groups': int(os.environ.get('COACHFLOW_PREMIUM_GROUP_LIMIT', '25')),
-    'clients': int(os.environ.get('COACHFLOW_PREMIUM_CLIENT_LIMIT', '1000')),
-    'templates': int(os.environ.get('COACHFLOW_PREMIUM_TEMPLATE_LIMIT', '50')),
-    'references': int(os.environ.get('COACHFLOW_PREMIUM_REFERENCE_LIMIT', '1000')),
-    'categories': int(os.environ.get('COACHFLOW_PREMIUM_CATEGORY_LIMIT', '50')),
-    'subcategories_per_category': int(os.environ.get('COACHFLOW_PREMIUM_SUBCATEGORY_LIMIT', '20')),
-    'trainer_storage_bytes': int(os.environ.get('COACHFLOW_PREMIUM_STORAGE_LIMIT_BYTES', str(1024 * 1024 * 1024))),
+    'name': 'Premium (Legacy)',
+    'lead_forms': 3, 'groups': 25, 'clients': 1000, 'templates': 50,
+    'references': 1000, 'categories': 50, 'subcategories_per_category': 20,
+    'professional_storage_bytes': 1024 * 1024 * 1024,
   },
 }
 
+# Data usage warning & account lifecycle thresholds
+REPROOT_DATA_USAGE_WARNING_PERCENT = int(os.environ.get('REPROOT_DATA_USAGE_WARNING_PERCENT', '75'))
+REPROOT_DATA_USAGE_DANGER_PERCENT = int(os.environ.get('REPROOT_DATA_USAGE_DANGER_PERCENT', '90'))
+REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS = int(os.environ.get('REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS', '7'))
+REPROOT_DATA_DELETION_DAYS = int(os.environ.get('REPROOT_DATA_DELETION_DAYS', '30'))
+
 # Storage usage is intentionally a calm operational indicator, not a live
-# counter that changes while the trainer navigates between pages.
-COACHFLOW_DATA_USAGE_CACHE_SECONDS = int(os.environ.get('COACHFLOW_DATA_USAGE_CACHE_SECONDS', '900'))
+# counter that changes while the professional navigates between pages.
+REPROOT_DATA_USAGE_CACHE_SECONDS = int(os.environ.get('REPROOT_DATA_USAGE_CACHE_SECONDS', '900'))
+
+# Stripe Billing — self-serve upgrade support for all tiers. Test-mode keys work
+# with zero business verification; swap for live keys only when actually
+# charging real cards. plan_tier is never written by anything except the
+# webhook below, so a Checkout Session that never completes leaves the
+# professional on their current tier with no partial state to clean up.
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PRO_PRICE_ID = os.environ.get('STRIPE_PRO_PRICE_ID', '')
+STRIPE_PREMIUM_UNLIMITED_PRICE_ID = os.environ.get('STRIPE_PREMIUM_UNLIMITED_PRICE_ID', '')
+STRIPE_PREMIUM_PRICE_ID = os.environ.get('STRIPE_PREMIUM_PRICE_ID', '')  # Legacy, kept for backward compatibility
+REPROOT_BILLING_SUCCESS_URL = os.environ.get(
+  'REPROOT_BILLING_SUCCESS_URL', 'http://localhost:4300/professional/account-settings?billing=success'
+)
+REPROOT_BILLING_CANCEL_URL = os.environ.get(
+  'REPROOT_BILLING_CANCEL_URL', 'http://localhost:4300/professional/account-settings?billing=cancelled'
+)
+
+# Base URL used when building links inside notification emails (Client Payments).
+REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')
