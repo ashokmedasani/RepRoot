@@ -9,12 +9,14 @@ import '../features/auth/professional_signup_page.dart';
 import '../features/client/client_change_password_page.dart';
 import '../features/client/client_dashboard_page.dart';
 import '../features/client/client_more_page.dart';
+import '../features/client/client_meetings_page.dart';
 import '../features/client/client_programs_page.dart';
 import '../features/client/client_settings_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/client/client_template_resources_page.dart';
 import '../features/client/client_professional_page.dart';
 import '../features/support/support_incidents_page.dart';
+import '../features/shared/notifications_page.dart';
 import '../features/professional/professional_client_create_page.dart';
 import '../features/professional/professional_client_detail_page.dart';
 import '../features/professional/professional_client_template_page.dart';
@@ -49,13 +51,16 @@ class Routes {
 
   // Sub-pages that stack inside the Manage / More tabs.
   static const professionalGroups = '/professional/tabs/manage/groups';
-  static const professionalFormsGroups = '/professional/tabs/manage/forms-groups';
+  static const professionalFormsGroups =
+      '/professional/tabs/manage/forms-groups';
   static const professionalTemplates = '/professional/tabs/manage/templates';
   static const professionalReferences = '/professional/tabs/manage/references';
   static const professionalSchedule = '/professional/tabs/manage/schedule';
   static const professionalProfile = '/professional/tabs/more/profile';
   static const professionalSettings = '/professional/tabs/more/settings';
   static const professionalSupport = '/professional/tabs/more/support';
+  static const professionalNotifications =
+      '/professional/tabs/more/notifications';
 
   static const clientLogin = '/client/login';
   static const clientChangePassword = '/client/change-password';
@@ -67,6 +72,8 @@ class Routes {
   // Sub-pages that stack inside the client More tab.
   static const clientSettings = '/client/tabs/more/profile';
   static const clientSupport = '/client/tabs/more/support';
+  static const clientNotifications = '/client/tabs/more/notifications';
+  static const clientMeetings = '/client/tabs/more/meetings';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -128,20 +135,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'groups/:groupId',
                     builder: (context, state) => ProfessionalGroupDetailPage(
                       groupId:
-                          int.tryParse(state.pathParameters['groupId'] ?? '') ?? 0,
+                          int.tryParse(state.pathParameters['groupId'] ?? '') ??
+                          0,
                     ),
                   ),
                   GoRoute(
                     path: 'templates',
-                    builder: (context, state) => const ProfessionalTemplatesPage(),
+                    builder: (context, state) =>
+                        const ProfessionalTemplatesPage(),
                   ),
                   GoRoute(
                     path: 'references',
-                    builder: (context, state) => const ProfessionalReferencesPage(),
+                    builder: (context, state) =>
+                        const ProfessionalReferencesPage(),
                   ),
                   GoRoute(
                     path: 'schedule',
-                    builder: (context, state) => const ProfessionalSchedulePage(),
+                    builder: (context, state) =>
+                        const ProfessionalSchedulePage(),
                   ),
                 ],
               ),
@@ -155,24 +166,34 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'new',
-                    builder: (context, state) => const ProfessionalClientCreatePage(),
+                    builder: (context, state) =>
+                        const ProfessionalClientCreatePage(),
                   ),
                   GoRoute(
                     path: ':clientId',
                     builder: (context, state) => ProfessionalClientDetailPage(
                       clientId:
-                          int.tryParse(state.pathParameters['clientId'] ?? '') ?? 0,
+                          int.tryParse(
+                            state.pathParameters['clientId'] ?? '',
+                          ) ??
+                          0,
                     ),
                     routes: [
                       GoRoute(
                         path: 'templates/:assignmentId',
-                        builder: (context, state) => ProfessionalClientTemplatePage(
-                          clientId:
-                              int.tryParse(state.pathParameters['clientId'] ?? '') ?? 0,
-                          assignmentId: int.tryParse(
-                                  state.pathParameters['assignmentId'] ?? '') ??
-                              0,
-                        ),
+                        builder: (context, state) =>
+                            ProfessionalClientTemplatePage(
+                              clientId:
+                                  int.tryParse(
+                                    state.pathParameters['clientId'] ?? '',
+                                  ) ??
+                                  0,
+                              assignmentId:
+                                  int.tryParse(
+                                    state.pathParameters['assignmentId'] ?? '',
+                                  ) ??
+                                  0,
+                            ),
                       ),
                     ],
                   ),
@@ -188,17 +209,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'profile',
-                    builder: (context, state) => const ProfessionalProfilePage(),
+                    builder: (context, state) =>
+                        const ProfessionalProfilePage(),
                   ),
                   GoRoute(
                     path: 'settings',
-                    builder: (context, state) => const ProfessionalSettingsPage(),
+                    builder: (context, state) =>
+                        const ProfessionalSettingsPage(),
                   ),
                   GoRoute(
                     path: 'support',
                     builder: (context, state) => const SupportIncidentsPage(
                       role: SupportRole.professional,
                     ),
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) =>
+                        const NotificationsPage(professional: true),
                   ),
                 ],
               ),
@@ -232,8 +260,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: ':templateId/resources',
                     builder: (context, state) => ClientTemplateResourcesPage(
                       templateId:
-                          int.tryParse(state.pathParameters['templateId'] ?? '') ??
-                              0,
+                          int.tryParse(
+                            state.pathParameters['templateId'] ?? '',
+                          ) ??
+                          0,
                     ),
                   ),
                 ],
@@ -260,9 +290,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     path: 'support',
-                    builder: (context, state) => const SupportIncidentsPage(
-                      role: SupportRole.client,
-                    ),
+                    builder: (context, state) =>
+                        const SupportIncidentsPage(role: SupportRole.client),
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) =>
+                        const NotificationsPage(professional: false),
+                  ),
+                  GoRoute(
+                    path: 'meetings',
+                    builder: (context, state) => const ClientMeetingsPage(),
                   ),
                 ],
               ),

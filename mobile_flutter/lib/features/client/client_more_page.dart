@@ -59,7 +59,10 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
         title: const Text('Sign out?'),
         content: const Text('You will need your password to sign back in.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -125,7 +128,11 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: tokens.muted, size: AppSize.iconRow),
+                Icon(
+                  Icons.chevron_right,
+                  color: tokens.muted,
+                  size: AppSize.iconRow,
+                ),
               ],
             ),
           ),
@@ -143,6 +150,16 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
                 label: 'Help & Support',
                 onTap: () => context.go(Routes.clientSupport),
               ),
+              _MenuItem(
+                icon: Icons.event_outlined,
+                label: 'Meetings',
+                onTap: () => context.go(Routes.clientMeetings),
+              ),
+              _MenuItem(
+                icon: Icons.notifications_outlined,
+                label: 'Notifications',
+                onTap: () => context.go(Routes.clientNotifications),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -159,7 +176,11 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.logout, size: AppSize.iconRow, color: context.colors.error),
+                    Icon(
+                      Icons.logout,
+                      size: AppSize.iconRow,
+                      color: context.colors.error,
+                    ),
                     const SizedBox(width: AppSpacing.md),
                     Text(
                       _isSigningOut ? 'Signing out…' : 'Logout',
@@ -214,12 +235,23 @@ class _MenuCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(items[i].icon, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(
+                      items[i].icon,
+                      size: AppSize.iconRow,
+                      color: tokens.muted,
+                    ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: Text(items[i].label, style: context.text.bodyLarge),
+                      child: Text(
+                        items[i].label,
+                        style: context.text.bodyLarge,
+                      ),
                     ),
-                    Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(
+                      Icons.chevron_right,
+                      size: AppSize.iconRow,
+                      color: tokens.muted,
+                    ),
                   ],
                 ),
               ),

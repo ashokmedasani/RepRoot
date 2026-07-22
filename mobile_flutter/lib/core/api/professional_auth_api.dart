@@ -5,6 +5,7 @@ import '../session/session_store.dart';
 import 'api_client.dart';
 import 'models/support_models.dart';
 import 'models/professional_models.dart';
+import 'models/notification_models.dart';
 
 /// Professional auth + profile + account.
 /// 1:1 port of mobile/src/app/core/api/professional-auth-api.service.ts — same
@@ -78,6 +79,23 @@ class ProfessionalAuthApi {
     });
   }
 
+  Future<NotificationInbox> getNotifications({int limit = 50}) =>
+      runApi(() async {
+        final res = await _dio.get<Map<String, dynamic>>(
+          '/professional/notifications/',
+          queryParameters: {'limit': limit},
+          options: _auth,
+        );
+        return NotificationInbox.fromJson(res.data ?? {});
+      });
+  Future<void> markNotificationRead({int? id}) => runApi(() async {
+    await _dio.patch<Map<String, dynamic>>(
+      '/professional/notifications/',
+      data: id == null ? {'mark_all_read': true} : {'notification_id': id},
+      options: _auth,
+    );
+  });
+
   Future<ProfessionalProfile> getProfile() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
@@ -113,8 +131,11 @@ class ProfessionalAuthApi {
         data: {'visibility': visibility},
         options: _auth,
       );
-      final updated = res.data?['profile_visibility'] as Map<dynamic, dynamic>? ?? {};
-      return updated.map((key, value) => MapEntry(key.toString(), value == true));
+      final updated =
+          res.data?['profile_visibility'] as Map<dynamic, dynamic>? ?? {};
+      return updated.map(
+        (key, value) => MapEntry(key.toString(), value == true),
+      );
     });
   }
 
@@ -256,7 +277,8 @@ class ProfessionalAuthApi {
 
   // ----- session -----
 
-  Future<void> storeToken(String token) => _session.storeProfessionalToken(token);
+  Future<void> storeToken(String token) =>
+      _session.storeProfessionalToken(token);
 
   Future<void> clearSession() => _session.clearProfessionalSession();
 
@@ -264,5 +286,8 @@ class ProfessionalAuthApi {
 }
 
 final professionalAuthApiProvider = Provider<ProfessionalAuthApi>((ref) {
-  return ProfessionalAuthApi(ref.watch(dioProvider), ref.watch(sessionStoreProvider));
+  return ProfessionalAuthApi(
+    ref.watch(dioProvider),
+    ref.watch(sessionStoreProvider),
+  );
 });

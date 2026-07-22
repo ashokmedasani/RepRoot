@@ -10,6 +10,7 @@ export interface AdminStaffSession {
   role: string;
   role_slug: string;
   permissions: string[];
+  department: string; department_label: string; authority_level: number; is_owner: boolean; must_change_password: boolean; last_admin_login_at: string|null;
 }
 
 export interface AdminDashboardSummary {
@@ -18,15 +19,21 @@ export interface AdminDashboardSummary {
   clients: { total_clients: number; active_clients: number; inactive_clients: number; new_clients: number };
   users: { total_accounts: number; professional_accounts: number; client_accounts: number; internal_accounts: number };
   usage: { lead_forms: number; active_lead_forms: number; form_submissions: number; groups: number; templates: number; references: number; scheduled_followups: number };
+  storage: { total_bytes: number; total_mb: number; average_mb_per_professional: number };
+  subscriptions: Record<string, number>;
 }
 
 export interface AdminFinanceSummary {
-  currency: string;
   billing_provider: string;
   finance_tracking_status: string;
-  summary: { gross_revenue: string; completed_transactions: number; pending_transactions: number; failed_transactions: number; refund_total: string };
-  recent_entries: Array<{ entry_id: string; entry_type: string; status: string; amount: string; currency: string; professional_display: string; description: string; occurred_at: string }>;
+  summary: { revenue_by_currency: Record<string,string>; expense_by_currency: Record<string,string>; refund_by_currency: Record<string,string>; completed_transactions: number; pending_transactions: number; failed_transactions: number };
+  subscriptions: AdminFinanceEntry[]; commissions: AdminFinanceEntry[];
+  expenses: Array<{ expense_id:string; category:string; category_label:string; amount:string; currency:string; vendor:string; description:string; expense_date:string; recorded_by:string }>;
 }
+export interface AdminFinanceEntry { entry_id:string; entry_type:string; status:string; amount:string; currency:string; professional_display:string; description:string; occurred_at:string; }
+export interface AdminTeamMember extends AdminStaffSession { status:'ACTIVE'|'DISABLED'; created_at:string; }
+export interface AdminPermissionRecord { code:string; name:string; section:string; description:string; }
+export interface AdminTeamResponse { staff:AdminTeamMember[]; roles:Array<{slug:string;name:string;description:string}>; permissions:AdminPermissionRecord[]; departments:Array<{code:string;name:string}>; viewer:AdminStaffSession; }
 
 export interface AdminAuditLog {
   id: number;
@@ -119,6 +126,7 @@ export class AdminPortalApiService {
   logout(): Observable<void> {
     return this.http.post<void>(`${this.apiBaseUrl}/logout/`, {}, { headers: this.headers() });
   }
+  changePassword(current_password:string,password:string,confirm_password:string):Observable<{message:string}>{return this.http.post<{message:string}>(`${this.apiBaseUrl}/change-password/`,{current_password,password,confirm_password},{headers:this.headers()});}
 
   getMe(): Observable<AdminStaffSession> {
     return this.http.get<AdminStaffSession>(`${this.apiBaseUrl}/me/`, { headers: this.headers() }).pipe(
@@ -126,13 +134,27 @@ export class AdminPortalApiService {
     );
   }
 
-  getDashboard(range: string): Observable<AdminDashboardSummary> {
-    return this.http.get<AdminDashboardSummary>(`${this.apiBaseUrl}/dashboard/`, { headers: this.headers(), params: new HttpParams().set('range', range) });
+  getDashboard(range: string, startDate='', endDate=''): Observable<AdminDashboardSummary> {
+    return this.http.get<AdminDashboardSummary>(`${this.apiBaseUrl}/dashboard/`, { headers: this.headers(), params: this.rangeParams(range,startDate,endDate) });
   }
 
-  getFinance(range: string): Observable<AdminFinanceSummary> {
-    return this.http.get<AdminFinanceSummary>(`${this.apiBaseUrl}/finance/`, { headers: this.headers(), params: new HttpParams().set('range', range) });
+  getFinance(range: string, startDate='', endDate=''): Observable<AdminFinanceSummary> {
+    return this.http.get<AdminFinanceSummary>(`${this.apiBaseUrl}/finance/`, { headers: this.headers(), params: this.rangeParams(range,startDate,endDate) });
   }
+  getOperations(range='30d'):Observable<any>{return this.http.get<any>(`${this.apiBaseUrl}/operations/`,{headers:this.headers(),params:new HttpParams().set('range',range)});}
+  getUsers(search='',type=''):Observable<any>{let params=new HttpParams();if(search)params=params.set('search',search);if(type)params=params.set('type',type);return this.http.get<any>(`${this.apiBaseUrl}/users/`,{headers:this.headers(),params});}
+  getCommunications():Observable<any>{return this.http.get<any>(`${this.apiBaseUrl}/communications/`,{headers:this.headers()});}
+  getSystemHealth():Observable<any>{return this.http.get<any>(`${this.apiBaseUrl}/health/`,{headers:this.headers()});}
+  globalSearch(q:string):Observable<any>{return this.http.get<any>(`${this.apiBaseUrl}/search/`,{headers:this.headers(),params:new HttpParams().set('q',q)});}
+  requestSupportAccess(incidentId:string,payload:Record<string,unknown>):Observable<any>{return this.http.post<any>(`${this.apiBaseUrl}/support/incidents/${encodeURIComponent(incidentId)}/access/`,payload,{headers:this.headers()});}
+  runSupportAction(incidentId:string,payload:Record<string,unknown>):Observable<any>{return this.http.post<any>(`${this.apiBaseUrl}/support/incidents/${encodeURIComponent(incidentId)}/controlled-action/`,payload,{headers:this.headers()});}
+
+  recordExpense(payload: Record<string,string>): Observable<{expense_id:string;message:string}> { return this.http.post<{expense_id:string;message:string}>(`${this.apiBaseUrl}/finance/`,payload,{headers:this.headers()}); }
+  getTeam(): Observable<AdminTeamResponse> { return this.http.get<AdminTeamResponse>(`${this.apiBaseUrl}/team/`,{headers:this.headers()}); }
+  createTeamMember(payload:Record<string,unknown>):Observable<{staff_id:string;message:string}>{return this.http.post<{staff_id:string;message:string}>(`${this.apiBaseUrl}/team/`,payload,{headers:this.headers()});}
+  updateTeamMember(staffId:string,payload:Record<string,unknown>):Observable<{message:string;permissions:string[]}>{return this.http.put<{message:string;permissions:string[]}>(`${this.apiBaseUrl}/team/${encodeURIComponent(staffId)}/`,payload,{headers:this.headers()});}
+  getSupportIncidents(params:Record<string,string>):Observable<{results:any[];count:number;active_count:number}>{let hp=new HttpParams();for(const [key,value] of Object.entries(params)){if(value)hp=hp.set(key,value)}return this.http.get<{results:any[];count:number;active_count:number}>(`${this.apiBaseUrl}/support/incidents/`,{headers:this.headers(),params:hp});}
+  updateSupportIncident(id:string,payload:Record<string,unknown>):Observable<{incident:any;message:string}>{return this.http.post<{incident:any;message:string}>(`${this.apiBaseUrl}/support/incidents/${encodeURIComponent(id)}/action/`,payload,{headers:this.headers()});}
 
   getAuditLogs(search = ''): Observable<{ results: AdminAuditLog[]; count: number }> {
     const params = search ? new HttpParams().set('search', search) : undefined;
@@ -156,7 +178,7 @@ export class AdminPortalApiService {
     );
   }
 
-  getErrorLogs(platformGroup: 'web' | 'mobile', filters: ErrorLogFilters = {}): Observable<ErrorLogListResponse> {
+  getErrorLogs(platformGroup: 'web' | 'android' | 'ios', filters: ErrorLogFilters = {}): Observable<ErrorLogListResponse> {
     let params = new HttpParams().set('platform_group', platformGroup);
     if (filters.search) params = params.set('search', filters.search);
     if (filters.status) params = params.set('status', filters.status);
@@ -201,6 +223,8 @@ export class AdminPortalApiService {
   private headers(): HttpHeaders {
     return new HttpHeaders({ Authorization: `Token ${window.sessionStorage.getItem('admin-auth-token') || ''}` });
   }
+
+  private rangeParams(range:string,startDate:string,endDate:string):HttpParams { let params=new HttpParams().set('range',range); if(range==='custom'){if(startDate)params=params.set('start_date',startDate);if(endDate)params=params.set('end_date',endDate);} return params; }
 
   private getApiBaseUrl(): string {
     const configured = window.APP_CONFIG?.apiBaseUrl?.trim() || `http://${window.location.hostname}:8000/api/accounts`;

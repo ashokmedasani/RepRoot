@@ -13,5 +13,5 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 export class AdminLoginComponent {
   identifier=''; password=''; message=''; loading=false;
   constructor(private api:AdminPortalApiService,private router:Router){}
-  submit():void{if(!this.identifier||!this.password)return;this.loading=true;this.message='';this.api.login(this.identifier,this.password).subscribe({next:()=>void this.router.navigate(['/admin-portal/dashboard']),error:(error)=>{this.loading=false;this.message=formatApiError(error,'Sign in could not be completed.')}})}
+  submit():void{if(!this.identifier||!this.password)return;this.loading=true;this.message='';this.api.login(this.identifier,this.password).subscribe({next:(response)=>void this.router.navigate([response.staff.must_change_password?'/admin-portal/change-password':'/admin-portal/dashboard']),error:(error)=>{this.loading=false;this.message=formatApiError(error,'Sign in could not be completed.')}})}
 }

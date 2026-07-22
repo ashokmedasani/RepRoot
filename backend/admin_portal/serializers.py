@@ -38,6 +38,12 @@ def staff_payload(staff):
     'email': staff.user.email,
     'role': staff.role.name,
     'role_slug': staff.role.slug,
+    'department': staff.department,
+    'department_label': staff.get_department_display(),
+    'authority_level': staff.authority_level,
+    'is_owner': staff.is_owner,
+    'must_change_password': staff.must_change_password,
+    'last_admin_login_at': staff.last_admin_login_at,
     'permissions': permission_codes_for(staff),
   }
 

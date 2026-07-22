@@ -254,16 +254,41 @@ export const routes: Routes = [
     title: 'Admin Dashboard | RepRoot'
   },
   {
+    path: 'admin-portal/change-password',
+    canActivate: [adminAuthGuard],
+    loadComponent: () => import('./pages/admin/admin-change-password/admin-change-password.component').then((module) => module.AdminChangePasswordComponent),
+    title: 'Secure Staff Account | RepRoot'
+  },
+  {
     path: 'admin-portal/finance',
     canActivate: [adminAuthGuard],
     loadComponent: () => import('./pages/admin/admin-finance/admin-finance.component').then((module) => module.AdminFinanceComponent),
     title: 'Finance | RepRoot'
   },
+  ...['operations','users','communications','health'].map((mode) => ({
+    path: `admin-portal/${mode}`,
+    canActivate: [adminAuthGuard],
+    data: { mode },
+    loadComponent: () => import('./pages/admin/admin-operations/admin-operations.component').then((module) => module.AdminOperationsComponent),
+    title: `${mode[0].toUpperCase()}${mode.slice(1)} | RepRoot`
+  })),
   {
     path: 'admin-portal/audit-logs',
     canActivate: [adminAuthGuard],
     loadComponent: () => import('./pages/admin/admin-audit-logs/admin-audit-logs.component').then((module) => module.AdminAuditLogsComponent),
     title: 'Audit Logs | RepRoot'
+  },
+  {
+    path: 'admin-portal/team',
+    canActivate: [adminAuthGuard],
+    loadComponent: () => import('./pages/admin/admin-team/admin-team.component').then((module) => module.AdminTeamComponent),
+    title: 'Team & Access | RepRoot'
+  },
+  {
+    path: 'admin-portal/support',
+    canActivate: [adminAuthGuard],
+    loadComponent: () => import('./pages/admin/admin-support/admin-support.component').then((module) => module.AdminSupportComponent),
+    title: 'Support Center | RepRoot'
   },
   {
     path: 'admin-portal/account-lifecycle',
@@ -279,11 +304,18 @@ export const routes: Routes = [
     title: 'Error Logs · Web | RepRoot'
   },
   {
-    path: 'admin-portal/errors/mobile',
+    path: 'admin-portal/errors/android',
     canActivate: [adminAuthGuard],
-    data: { platformGroup: 'mobile' },
+    data: { platformGroup: 'android' },
     loadComponent: () => import('./pages/admin/admin-error-logs/admin-error-logs.component').then((module) => module.AdminErrorLogsComponent),
-    title: 'Error Logs · Mobile | RepRoot'
+    title: 'Error Logs · Android | RepRoot'
+  },
+  {
+    path: 'admin-portal/errors/ios',
+    canActivate: [adminAuthGuard],
+    data: { platformGroup: 'ios' },
+    loadComponent: () => import('./pages/admin/admin-error-logs/admin-error-logs.component').then((module) => module.AdminErrorLogsComponent),
+    title: 'Error Logs · iOS | RepRoot'
   },
   {
     path: 'client/dashboard',

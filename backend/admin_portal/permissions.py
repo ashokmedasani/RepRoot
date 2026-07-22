@@ -33,5 +33,8 @@ class HasAdminPermission(BasePermission):
     required = getattr(view, 'required_permission', '')
     if not staff or not required:
       return False
+    if staff.must_change_password:
+      self.message = 'You must change your temporary password before using the Admin Portal.'
+      return False
     request.admin_staff = staff
     return required in permission_codes_for(staff)

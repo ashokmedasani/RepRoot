@@ -15,8 +15,16 @@ def finance_reference():
   return f'FIN-{uuid.uuid4().hex[:12].upper()}'
 
 
+def expense_reference():
+  return f'EXP-{uuid.uuid4().hex[:12].upper()}'
+
+
 def error_log_reference():
   return f'ERR-{uuid.uuid4().hex[:10].upper()}'
+
+
+def support_access_reference():
+  return f'ACC-{uuid.uuid4().hex[:10].upper()}'
 
 
 class AdminPermission(models.Model):
@@ -58,11 +66,24 @@ class AdminStaffProfile(models.Model):
   STATUS_ACTIVE = 'ACTIVE'
   STATUS_DISABLED = 'DISABLED'
   STATUS_CHOICES = [(STATUS_ACTIVE, 'Active'), (STATUS_DISABLED, 'Disabled')]
+  DEPARTMENT_CHOICES = [
+    ('OWNER', 'Owner'), ('OPERATIONS', 'Operations'), ('SUPPORT', 'Customer Support'),
+    ('FINANCE', 'Finance'), ('TECHNICAL', 'Technical Operations'),
+    ('SECURITY', 'Security'), ('ANALYTICS', 'Analytics'),
+  ]
+  LEVEL_STAFF = 10
+  LEVEL_MANAGER = 50
+  LEVEL_OWNER = 100
 
   user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='admin_staff_profile')
   staff_id = models.CharField(max_length=24, unique=True, default=staff_reference, editable=False, db_index=True)
   role = models.ForeignKey(AdminRole, on_delete=models.PROTECT, related_name='staff_members')
   status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+  department = models.CharField(max_length=20, choices=DEPARTMENT_CHOICES, default='OPERATIONS', db_index=True)
+  authority_level = models.PositiveSmallIntegerField(default=LEVEL_STAFF, db_index=True)
+  is_owner = models.BooleanField(default=False, db_index=True)
+  must_change_password = models.BooleanField(default=True)
+  last_admin_login_at = models.DateTimeField(null=True, blank=True)
   created_by = models.ForeignKey(
     settings.AUTH_USER_MODEL,
     on_delete=models.SET_NULL,
@@ -86,6 +107,47 @@ class AdminStaffPermissionOverride(models.Model):
   class Meta:
     db_table = 'admin_staff_permission_overrides'
     constraints = [models.UniqueConstraint(fields=['staff', 'permission'], name='unique_admin_staff_override')]
+
+
+class OperationEvent(models.Model):
+  """Privacy-minimized product event. Never stores message, health, form-answer, or payment content."""
+  event_type = models.CharField(max_length=100, db_index=True)
+  module = models.CharField(max_length=40, db_index=True)
+  actor_type = models.CharField(max_length=20, choices=[('professional','Professional'),('client','Client'),('system','System')], db_index=True)
+  professional_reference = models.CharField(max_length=24, blank=True, db_index=True)
+  client_reference = models.CharField(max_length=32, blank=True, db_index=True)
+  plan_tier = models.CharField(max_length=20, blank=True, db_index=True)
+  platform = models.CharField(max_length=20, blank=True, db_index=True)
+  success = models.BooleanField(default=True, db_index=True)
+  duration_ms = models.PositiveIntegerField(null=True, blank=True)
+  metadata = models.JSONField(default=dict, blank=True)
+  occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+  class Meta:
+    db_table = 'operation_events'
+    ordering = ['-occurred_at']
+    indexes = [models.Index(fields=['module','occurred_at'], name='operation_module_time_idx')]
+
+
+class SupportAccessGrant(models.Model):
+  SCOPE_CHOICES = [('metadata','Account metadata'),('module','Specific module'),('readonly','Read-only account view')]
+  STATUS_CHOICES = [('requested','Requested'),('approved','Approved'),('revoked','Revoked'),('expired','Expired')]
+  access_id = models.CharField(max_length=24, default=support_access_reference, unique=True, editable=False)
+  incident = models.ForeignKey('accounts.SupportIncident', on_delete=models.CASCADE, related_name='access_grants')
+  requested_by = models.ForeignKey(AdminStaffProfile, on_delete=models.PROTECT, related_name='requested_support_access')
+  scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default='metadata')
+  module = models.CharField(max_length=40, blank=True)
+  reason = models.TextField()
+  status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='requested', db_index=True)
+  consent_reference = models.CharField(max_length=120, blank=True)
+  approved_at = models.DateTimeField(null=True, blank=True)
+  expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  revoked_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'support_access_grants'
+    ordering = ['-created_at']
 
 
 class AdminAuditLog(models.Model):
@@ -161,6 +223,28 @@ class FinanceLedgerEntry(models.Model):
     if self.pk:
       raise ValueError('Finance ledger entries are immutable; append a reversal or adjustment instead.')
     return super().save(*args, **kwargs)
+
+
+class PlatformExpense(models.Model):
+  CATEGORY_CHOICES = [
+    ('INFRASTRUCTURE', 'Infrastructure'), ('SOFTWARE', 'Software'),
+    ('MARKETING', 'Marketing'), ('PAYROLL', 'Payroll / contractors'),
+    ('PROFESSIONAL_SERVICES', 'Professional services'), ('OTHER', 'Other'),
+  ]
+  expense_id = models.CharField(max_length=24, unique=True, default=expense_reference, editable=False, db_index=True)
+  category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, db_index=True)
+  amount = models.DecimalField(max_digits=12, decimal_places=2)
+  currency = models.CharField(max_length=3, db_index=True)
+  vendor = models.CharField(max_length=160, blank=True)
+  description = models.CharField(max_length=300)
+  expense_date = models.DateField(db_index=True)
+  external_reference = models.CharField(max_length=120, blank=True)
+  recorded_by = models.ForeignKey(AdminStaffProfile, on_delete=models.PROTECT, related_name='recorded_expenses')
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'platform_expenses'
+    ordering = ['-expense_date', '-created_at']
 
 
 class ErrorLog(models.Model):

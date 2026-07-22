@@ -144,8 +144,13 @@ void main() {
       });
 
       test('client entries feed the graph engine end to end', () async {
-        // Ava (id 63) is the seeded client with rich chart data.
-        const avaId = 63;
+        final overview = await formsGroups.getOverview();
+        final users = await formsGroups.getGroupUsers(overview.groups.first.id);
+        if (users.clients.isEmpty) {
+          markTestSkipped('no clients in the first group');
+          return;
+        }
+        final avaId = users.clients.first.id;
         final assignments = await templates.getAssignments(avaId);
         if (assignments.isEmpty) {
           markTestSkipped('no assignments for client 63');

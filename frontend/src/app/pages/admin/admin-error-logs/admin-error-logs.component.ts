@@ -52,7 +52,7 @@ interface ErrorLogRow {
 
   <section class="log-panel">
     <div class="section-head">
-      <div><p class="eyebrow">{{ platformGroup === 'web' ? 'Web app' : 'Android / iOS app' }}</p><h2>{{ count }} distinct problems</h2></div>
+      <div><p class="eyebrow">{{ platformGroup === 'web' ? 'Web app' : platformGroup === 'android' ? 'Android app' : 'iOS app' }}</p><h2>{{ count }} distinct problems</h2></div>
       <span>{{ openCount }} open</span>
     </div>
 
@@ -108,7 +108,7 @@ interface ErrorLogRow {
         </table>
       </div>
     } @else {
-      <div class="empty">No {{ platformGroup === 'web' ? 'web' : 'mobile' }} error logs match this search.</div>
+      <div class="empty">No {{ platformGroup }} error logs match this search.</div>
     }
   </section>
 </app-admin-page-shell>`,
@@ -138,7 +138,7 @@ th{position:sticky;top:0;background:var(--app-surface);color:var(--app-muted);fo
 `]
 })
 export class AdminErrorLogsComponent implements OnInit {
-  readonly platformGroup: 'web' | 'mobile';
+  readonly platformGroup: 'web' | 'android' | 'ios';
 
   rows: ErrorLogRow[] = [];
   count = 0;
@@ -154,15 +154,15 @@ export class AdminErrorLogsComponent implements OnInit {
   resolutionNote = '';
 
   constructor(private readonly api: AdminPortalApiService, route: ActivatedRoute) {
-    this.platformGroup = route.snapshot.data['platformGroup'] === 'mobile' ? 'mobile' : 'web';
+    this.platformGroup = ['android','ios'].includes(route.snapshot.data['platformGroup']) ? route.snapshot.data['platformGroup'] : 'web';
   }
 
   get pageTitle(): string {
-    return this.platformGroup === 'web' ? 'Error Logs · Web' : 'Error Logs · Mobile';
+    return this.platformGroup === 'web' ? 'Error Logs · Web' : this.platformGroup === 'android' ? 'Error Logs · Android' : 'Error Logs · iOS';
   }
 
-  get activeSection(): 'errors-web' | 'errors-mobile' {
-    return this.platformGroup === 'web' ? 'errors-web' : 'errors-mobile';
+  get activeSection(): 'errors-web' | 'errors-android' | 'errors-ios' {
+    return this.platformGroup === 'web' ? 'errors-web' : this.platformGroup === 'android' ? 'errors-android' : 'errors-ios';
   }
 
   can(permission: string): boolean {

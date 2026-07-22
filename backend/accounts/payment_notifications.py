@@ -14,6 +14,7 @@ from django.core.mail import send_mail
 
 from .models import PaymentNotification
 from .notifications import notify_client as notify_shared_client, notify_professional as notify_shared_professional
+from . import web_routes
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def notify_professional(professional, notif_type, title, body, payload=None, ema
   )
   notify_shared_professional(professional, category='payments', event_type=notif_type,
     title=title,
-    body=body, action_url=(payload or {}).get('action_url', '/professional/payments'), payload=payload or {}, requires_action=True)
+    body=body, action_url=(payload or {}).get('action_url', web_routes.PROFESSIONAL_CLIENTS), payload=payload or {}, requires_action=True)
 
 
 def notify_client(client, notif_type, title, body, payload=None, email=True):
@@ -48,7 +49,7 @@ def notify_client(client, notif_type, title, body, payload=None, email=True):
   )
   notify_shared_client(client, category='payments', event_type=notif_type,
     title=title,
-    body=body, action_url=(payload or {}).get('action_url', '/client/payments'), payload=payload or {})
+    body=body, action_url=(payload or {}).get('action_url', web_routes.CLIENT_PAYMENTS), payload=payload or {})
 
 
 def _send(recipient, subject, body):
@@ -65,8 +66,8 @@ def _send(recipient, subject, body):
 
 
 def request_link_for_client(request_id):
-  return _frontend_link(f'/client/payments/requests/{request_id}')
+  return _frontend_link(web_routes.client_payment_request(request_id))
 
 
 def request_link_for_professional(request_id):
-  return _frontend_link(f'/professional/payments/requests/{request_id}')
+  return _frontend_link(web_routes.PROFESSIONAL_CLIENTS)

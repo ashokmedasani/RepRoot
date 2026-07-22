@@ -3,8 +3,10 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q, Sum
+from django.db import connection
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.authentication import TokenAuthentication
@@ -14,12 +16,13 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts import account_lifecycle
-from accounts.models import ActivityNotification, ClientAccess, LeadSubmission, ReferenceCategory, SupportIncident, SupportIncidentMessage, TrackingTemplate, ProfessionalGroup, ProfessionalLeadForm, ProfessionalProfile, ProfessionalReference, ClientReminder
+from accounts.data_usage import calculate_professional_data_usage
+from accounts.models import ActivityNotification, ChatMessage, ClientAccess, LeadSubmission, NotificationDeliveryAttempt, ProfessionalGroup, ProfessionalLeadForm, ProfessionalProfile, ProfessionalReference, RecycleBinItem, ScheduledMeeting, SupportIncident, SupportIncidentMessage, TemplateAssignment, TrackingEntry, TrackingTemplate, ClientReminder
 from accounts.serializers import SupportIncidentSerializer
 
 from .audit import record_admin_action
-from .models import AdminAuditLog, AdminStaffProfile, ErrorLog, FinanceLedgerEntry
-from .permissions import HasAdminPermission, active_staff_for
+from .models import AdminAuditLog, AdminPermission, AdminRole, AdminStaffPermissionOverride, AdminStaffProfile, ErrorLog, FinanceLedgerEntry, OperationEvent, PlatformExpense, SupportAccessGrant
+from .permissions import HasAdminPermission, active_staff_for, permission_codes_for
 from .serializers import (
   AdminAuditLogSerializer, AdminLoginSerializer, ErrorLogListSerializer, ErrorLogSerializer,
   FinanceLedgerEntrySerializer, staff_payload,
@@ -60,8 +63,30 @@ class AdminNotificationsView(APIView):
 def range_start(request):
   key = request.query_params.get('range', '30d')
   now = timezone.now()
-  days = {'today': 0, '7d': 7, '30d': 30, '90d': 90}.get(key, 30)
+  if key == 'lifetime':
+    return None
+  if key == 'custom':
+    value = parse_date(request.query_params.get('start_date', ''))
+    if value:
+      return timezone.make_aware(timezone.datetime.combine(value, timezone.datetime.min.time()))
+  days = {'today': 0, '7d': 7, '30d': 30, '90d': 90, '180d': 180, '365d': 365}.get(key, 30)
   return now.replace(hour=0, minute=0, second=0, microsecond=0) if days == 0 else now - timedelta(days=days)
+
+
+def range_end(request):
+  if request.query_params.get('range') != 'custom':
+    return None
+  value = parse_date(request.query_params.get('end_date', ''))
+  return timezone.make_aware(timezone.datetime.combine(value, timezone.datetime.max.time())) if value else None
+
+
+def ranged(queryset, field, start, end=None):
+  filters = {}
+  if start:
+    filters[f'{field}__gte'] = start
+  if end:
+    filters[f'{field}__lte'] = end
+  return queryset.filter(**filters)
 
 
 class AdminLoginView(APIView):
@@ -76,9 +101,35 @@ class AdminLoginView(APIView):
     staff = serializer.validated_data['staff']
     Token.objects.filter(user=user).delete()
     token = Token.objects.create(user=user)
+    staff.last_admin_login_at = timezone.now()
+    staff.save(update_fields=['last_admin_login_at', 'updated_at'])
     request.admin_staff = staff
     record_admin_action(request, permission='admin.auth.login', action='ADMIN_LOGIN', target_type='staff', target_id=staff.staff_id, target_display=f'{staff.staff_id} · {user.username}')
     return Response({'token': token.key, 'staff': staff_payload(staff)})
+
+
+class AdminPasswordChangeView(APIView):
+  authentication_classes = [TokenAuthentication]
+
+  def post(self, request):
+    staff = active_staff_for(request.user)
+    if not staff:
+      return Response({'message': 'Active staff account required.'}, status=403)
+    current_password = str(request.data.get('current_password', ''))
+    password = str(request.data.get('password', ''))
+    confirm = str(request.data.get('confirm_password', ''))
+    if not request.user.check_password(current_password):
+      return Response({'message': 'Current password is incorrect.'}, status=400)
+    if password != confirm or len(password) < 10 or password == current_password:
+      return Response({'message': 'Use a new matching password of at least 10 characters.'}, status=400)
+    request.user.set_password(password)
+    request.user.save(update_fields=['password'])
+    staff.must_change_password = False
+    staff.save(update_fields=['must_change_password', 'updated_at'])
+    request.admin_staff = staff
+    Token.objects.filter(user=request.user).delete()
+    record_admin_action(request, permission='admin.auth.password_change', action='ADMIN_PASSWORD_CHANGED', target_type='staff', target_id=staff.staff_id, target_display=request.user.username)
+    return Response({'message': 'Password changed. Sign in again with your new password.'})
 
 
 class AdminLogoutView(APIView):
@@ -109,6 +160,7 @@ class AdminDashboardView(APIView):
 
   def get(self, request):
     start = range_start(request)
+    end = range_end(request)
     professionals = User.objects.filter(professional_profile__isnull=False)
     clients = ClientAccess.objects.all()
     payload = {
@@ -117,11 +169,11 @@ class AdminDashboardView(APIView):
         'total_professionals': professionals.count(), 'active_professionals': professionals.filter(is_active=True).count(),
         'suspended_professionals': professionals.filter(is_active=False).count(),
         'pending_deletion': professionals.filter(professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_RECYCLED).count(),
-        'new_professionals': professionals.filter(date_joined__gte=start).count(),
+        'new_professionals': ranged(professionals, 'date_joined', start, end).count(),
       },
       'clients': {
         'total_clients': clients.count(), 'active_clients': clients.filter(is_active=True).count(),
-        'inactive_clients': clients.filter(is_active=False).count(), 'new_clients': clients.filter(created_at__gte=start).count(),
+        'inactive_clients': clients.filter(is_active=False).count(), 'new_clients': ranged(clients, 'created_at', start, end).count(),
       },
       'users': {
         'total_accounts': professionals.count() + clients.count() + AdminStaffProfile.objects.count(),
@@ -134,6 +186,13 @@ class AdminDashboardView(APIView):
         'scheduled_followups': ClientReminder.objects.filter(status='pending').count(),
       },
     }
+    storage_bytes = 0
+    for professional in professionals.iterator():
+      usage = calculate_professional_data_usage(professional)
+      storage_bytes += round((usage['usage_percent'] / 100) * usage['included_quota_bytes'])
+    payload['storage'] = {'total_bytes': storage_bytes, 'total_mb': round(storage_bytes / 1048576, 2), 'average_mb_per_professional': round(storage_bytes / max(1, professionals.count()) / 1048576, 2)}
+    payload['subscriptions'] = {row['plan_tier']: row['total'] for row in ProfessionalProfile.objects.values('plan_tier').annotate(total=Count('id')).order_by('plan_tier')}
+    payload['range_end'] = end
     record_admin_action(request, permission=self.required_permission, action='VIEW_ADMIN_DASHBOARD', target_type='platform', target_display='Aggregate platform dashboard')
     return Response(payload)
 
@@ -145,23 +204,248 @@ class AdminFinanceView(APIView):
 
   def get(self, request):
     start = range_start(request)
-    entries = FinanceLedgerEntry.objects.select_related('professional', 'professional__professional_profile')
-    completed = entries.filter(status=FinanceLedgerEntry.STATUS_COMPLETED, occurred_at__gte=start)
-    refunds = entries.filter(entry_type=FinanceLedgerEntry.TYPE_REFUND, occurred_at__gte=start)
+    end = range_end(request)
+    entries = FinanceLedgerEntry.objects.select_related('professional', 'professional__professional_profile').filter(source__in=['subscription', 'platform_commission', 'manual_business'])
+    period_entries = ranged(entries, 'occurred_at', start, end)
+    completed = period_entries.filter(status=FinanceLedgerEntry.STATUS_COMPLETED)
+    refunds = period_entries.filter(entry_type=FinanceLedgerEntry.TYPE_REFUND)
+    expenses = ranged(PlatformExpense.objects.select_related('recorded_by__user'), 'expense_date', start.date() if start else None, end.date() if end else None)
     payload = {
-      'currency': 'USD',
       'billing_provider': 'Not configured',
-      'finance_tracking_status': 'Ready for integration',
+      'finance_tracking_status': 'RepRoot business ledger',
       'summary': {
-        'gross_revenue': completed.aggregate(value=Sum('amount'))['value'] or Decimal('0.00'),
+        'revenue_by_currency': {row['currency']: row['total'] for row in completed.values('currency').annotate(total=Sum('amount'))},
+        'expense_by_currency': {row['currency']: row['total'] for row in expenses.values('currency').annotate(total=Sum('amount'))},
         'completed_transactions': completed.count(), 'pending_transactions': entries.filter(status='PENDING').count(),
-        'failed_transactions': entries.filter(status='FAILED', occurred_at__gte=start).count(),
-        'refund_total': refunds.aggregate(value=Sum('amount'))['value'] or Decimal('0.00'),
+        'failed_transactions': period_entries.filter(status='FAILED').count(),
+        'refund_by_currency': {row['currency']: row['total'] for row in refunds.values('currency').annotate(total=Sum('amount'))},
       },
-      'recent_entries': FinanceLedgerEntrySerializer(entries[:10], many=True).data,
+      'subscriptions': FinanceLedgerEntrySerializer(period_entries.filter(source='subscription')[:50], many=True).data,
+      'commissions': FinanceLedgerEntrySerializer(period_entries.filter(source='platform_commission')[:50], many=True).data,
+      'expenses': [{'expense_id': item.expense_id, 'category': item.category, 'category_label': item.get_category_display(), 'amount': item.amount, 'currency': item.currency, 'vendor': item.vendor, 'description': item.description, 'expense_date': item.expense_date, 'recorded_by': item.recorded_by.user.get_full_name() or item.recorded_by.user.username} for item in expenses[:100]],
     }
     record_admin_action(request, permission=self.required_permission, action='VIEW_FINANCE_SUMMARY', target_type='finance', target_display='Aggregate finance summary')
     return Response(payload)
+
+  def post(self, request):
+    if 'admin.finance.edit' not in permission_codes_for(request.admin_staff):
+      return Response({'message': 'You do not have permission to record expenses.'}, status=403)
+    try:
+      amount = Decimal(str(request.data.get('amount', '')))
+    except Exception:
+      return Response({'message': 'Enter a valid amount.'}, status=400)
+    currency = str(request.data.get('currency', '')).upper().strip()
+    expense_date = parse_date(str(request.data.get('expense_date', '')))
+    category = str(request.data.get('category', '')).upper()
+    description = str(request.data.get('description', '')).strip()
+    if amount <= 0 or len(currency) != 3 or not expense_date or not description or category not in dict(PlatformExpense.CATEGORY_CHOICES):
+      return Response({'message': 'Amount, currency, category, date and description are required.'}, status=400)
+    expense = PlatformExpense.objects.create(category=category, amount=amount, currency=currency, vendor=str(request.data.get('vendor', ''))[:160], description=description[:300], expense_date=expense_date, external_reference=str(request.data.get('external_reference', ''))[:120], recorded_by=request.admin_staff)
+    record_admin_action(request, permission='admin.finance.edit', action='CREATE_PLATFORM_EXPENSE', target_type='expense', target_id=expense.expense_id, target_display=expense.description, metadata={'amount': str(amount), 'currency': currency})
+    return Response({'expense_id': expense.expense_id, 'message': 'Expense recorded.'}, status=201)
+
+
+class AdminOperationsView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.operations.view'; permission_classes=[HasAdminPermission]
+  def get(self, request):
+    start,end=range_start(request),range_end(request)
+    modules={
+      'Forms':ProfessionalLeadForm.objects.all(),'Submissions':LeadSubmission.objects.all(),'Groups':ProfessionalGroup.objects.all(),
+      'Clients':ClientAccess.objects.all(),'Templates':TrackingTemplate.objects.all(),'Assignments':TemplateAssignment.objects.all(),
+      'Entries':TrackingEntry.objects.all(),'References':ProfessionalReference.objects.all(),'Schedules':ScheduledMeeting.objects.all(),
+      'Reminders':ClientReminder.objects.all(),'Chat':ChatMessage.objects.all(),'Notifications':ActivityNotification.objects.all(),
+    }
+    events=ranged(OperationEvent.objects.all(),'occurred_at',start,end)
+    usage=[]
+    for name,qs in modules.items():
+      usage.append({'module':name,'total_records':qs.count(),'period_events':events.filter(module__iexact=name).count(),'active_professionals':events.filter(module__iexact=name).exclude(professional_reference='').values('professional_reference').distinct().count(),'failures':events.filter(module__iexact=name,success=False).count()})
+    professionals=User.objects.filter(professional_profile__isnull=False)
+    funnel=[
+      {'stage':'Registered','count':professionals.count()},
+      {'stage':'Profile completed','count':professionals.filter(professional_profile__profile_setup_completed=True).count()},
+      {'stage':'Created form','count':professionals.filter(lead_form__isnull=False).distinct().count()},
+      {'stage':'Created group','count':professionals.filter(professional_groups__isnull=False).distinct().count()},
+      {'stage':'Added client','count':professionals.filter(client_access_records__isnull=False).distinct().count()},
+      {'stage':'Created template','count':professionals.filter(tracking_templates__isnull=False).distinct().count()},
+    ]
+    recycle_count=RecycleBinItem.objects.count()
+    payload={'modules':usage,'trainer_funnel':funnel,'events':{'total':events.count(),'failed':events.filter(success=False).count(),'average_duration_ms':events.aggregate(value=Avg('duration_ms'))['value']},'storage':{'recycle_items':recycle_count,'database_measurement':'Application-record estimate','file_measurement':'Tracked by professional storage calculator'},'range_start':start,'range_end':end}
+    record_admin_action(request,permission=self.required_permission,action='VIEW_OPERATIONS_ANALYTICS',target_type='operations')
+    return Response(payload)
+
+
+def directory_professional_payload(user):
+  profile=user.professional_profile
+  usage=calculate_professional_data_usage(user)
+  return {'type':'professional','reference':profile.internal_reference_code,'username':user.username,'name':user.get_full_name(),'email':user.email,'active':user.is_active,'plan':profile.plan_tier,'profile_complete':profile.profile_setup_completed,'clients':ClientAccess.objects.filter(professional=user).count(),'groups':ProfessionalGroup.objects.filter(professional=user).count(),'forms':ProfessionalLeadForm.objects.filter(professional=user).count(),'templates':TrackingTemplate.objects.filter(professional=user).count(),'storage_percent':usage['usage_percent'],'last_login':user.last_login,'open_tickets':SupportIncident.objects.filter(reporter_professional=user,status__in=SupportIncident.ACTIVE_STATUSES).count(),'recent_errors':ErrorLog.objects.filter(reporter_professional=user,status__in=ErrorLog.OPEN_STATUSES).count()}
+
+
+class AdminUserDirectoryView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.users.view'; permission_classes=[HasAdminPermission]
+  def get(self,request):
+    search=str(request.query_params.get('search','')).strip(); kind=str(request.query_params.get('type','')).strip()
+    professionals=User.objects.filter(professional_profile__isnull=False).select_related('professional_profile')
+    clients=ClientAccess.objects.select_related('professional','group')
+    if search:
+      professionals=professionals.filter(Q(username__icontains=search)|Q(email__icontains=search)|Q(first_name__icontains=search)|Q(last_name__icontains=search)|Q(professional_profile__internal_reference_code__icontains=search))
+      clients=clients.filter(Q(username__icontains=search)|Q(email__icontains=search)|Q(first_name__icontains=search)|Q(last_name__icontains=search)|Q(reference_id__icontains=search))
+    results=[]
+    if kind!='client': results.extend(directory_professional_payload(user) for user in professionals[:50])
+    if kind!='professional': results.extend({'type':'client','reference':c.reference_id,'username':c.username,'name':f'{c.first_name} {c.last_name}'.strip(),'email':c.email,'active':c.is_active,'professional':c.professional.username,'group':c.group.name if c.group else '','last_login':None,'assignments':c.template_assignments.count(),'open_tickets':SupportIncident.objects.filter(reporter_client=c,status__in=SupportIncident.ACTIVE_STATUSES).count()} for c in clients[:50])
+    record_admin_action(request,permission=self.required_permission,action='SEARCH_USER_DIRECTORY',target_type='directory',target_display=search or 'Recent accounts')
+    return Response({'results':results,'count':len(results)})
+
+
+class AdminCommunicationsView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.communications.view'; permission_classes=[HasAdminPermission]
+  def get(self,request):
+    attempts=NotificationDeliveryAttempt.objects.all(); notifications=ActivityNotification.objects.all()
+    by_channel={row['channel']:{'total':row['total'],'failed':attempts.filter(channel=row['channel'],status='failed').count()} for row in attempts.values('channel').annotate(total=Count('id'))}
+    return Response({'providers':{'smtp':{'configured':bool(getattr(settings,'EMAIL_HOST','')),'status':'ready' if getattr(settings,'EMAIL_HOST','') else 'awaiting_configuration'},'push':{'configured':False,'status':'mobile_provider_not_configured'}},'notifications':{'total':notifications.count(),'unread':notifications.filter(is_read=False).count(),'email_queued':notifications.filter(email_status='queued').count(),'email_failed':notifications.filter(email_status='failed').count(),'push_queued':notifications.filter(push_status='queued').count(),'push_failed':notifications.filter(push_status='failed').count()},'delivery_by_channel':by_channel,'recent_failures':[{'channel':a.channel,'status':a.status,'error':a.error,'attempted_at':a.attempted_at} for a in attempts.filter(status='failed')[:50]]})
+
+
+class AdminSystemHealthView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.health.view'; permission_classes=[HasAdminPermission]
+  def get(self,request):
+    db_ok=True
+    try:
+      with connection.cursor() as cursor: cursor.execute('SELECT 1'); cursor.fetchone()
+    except Exception: db_ok=False
+    open_errors=ErrorLog.objects.filter(status__in=ErrorLog.OPEN_STATUSES)
+    return Response({'services':[{'name':'API','status':'healthy'},{'name':'Database','status':'healthy' if db_ok else 'unavailable'},{'name':'SMTP','status':'configured' if getattr(settings,'EMAIL_HOST','') else 'awaiting_configuration'},{'name':'Payment provider','status':'awaiting_provider'},{'name':'Background queue','status':'not_configured'}],'errors':{'open':open_errors.count(),'fatal':open_errors.filter(level='fatal').count(),'web':open_errors.filter(platform='web').count(),'android':open_errors.filter(platform='android').count(),'ios':open_errors.filter(platform='ios').count()},'events':{'failed_last_24h':OperationEvent.objects.filter(success=False,occurred_at__gte=timezone.now()-timedelta(days=1)).count()},'note':'Host CPU, memory and uptime require deployment monitoring integration.'})
+
+
+class AdminGlobalSearchView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.search.use'; permission_classes=[HasAdminPermission]
+  def get(self,request):
+    term=str(request.query_params.get('q','')).strip()
+    if len(term)<2:return Response({'results':[]})
+    results=[]
+    for u in User.objects.filter(professional_profile__isnull=False).filter(Q(username__icontains=term)|Q(email__icontains=term)|Q(professional_profile__internal_reference_code__icontains=term)).select_related('professional_profile')[:10]: results.append({'type':'Professional','id':u.professional_profile.internal_reference_code,'title':u.get_full_name() or u.username,'subtitle':u.email,'url':'/admin-portal/users'})
+    for c in ClientAccess.objects.filter(Q(username__icontains=term)|Q(email__icontains=term)|Q(reference_id__icontains=term))[:10]: results.append({'type':'Client','id':c.reference_id,'title':f'{c.first_name} {c.last_name}'.strip() or c.username,'subtitle':c.email,'url':'/admin-portal/users'})
+    for i in SupportIncident.objects.filter(Q(incident_id__icontains=term)|Q(subject__icontains=term)|Q(reporter_email__icontains=term))[:10]: results.append({'type':'Support','id':i.incident_id,'title':i.subject,'subtitle':i.status,'url':'/admin-portal/support'})
+    for e in ErrorLog.objects.filter(Q(error_id__icontains=term)|Q(message__icontains=term))[:10]: results.append({'type':'Error','id':e.error_id,'title':e.message[:120],'subtitle':e.status,'url':f'/admin-portal/errors/{e.platform if e.platform in ("web","android","ios") else "web"}'})
+    return Response({'results':results[:30]})
+
+
+class AdminSupportAccessView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.support.access_request'; permission_classes=[HasAdminPermission]
+  def post(self,request,incident_id):
+    incident=SupportIncident.objects.filter(incident_id=incident_id).first()
+    if not incident:return Response({'message':'Support incident not found.'},status=404)
+    scope=str(request.data.get('scope','metadata')); module=str(request.data.get('module','')).strip(); reason=str(request.data.get('reason','')).strip(); consent=str(request.data.get('consent_reference','')).strip()
+    if scope not in dict(SupportAccessGrant.SCOPE_CHOICES) or not reason:return Response({'message':'Valid scope and investigation reason are required.'},status=400)
+    grant=SupportAccessGrant.objects.create(incident=incident,requested_by=request.admin_staff,scope=scope,module=module,reason=reason,consent_reference=consent,status='approved' if consent else 'requested',approved_at=timezone.now() if consent else None,expires_at=timezone.now()+timedelta(hours=1) if consent else None)
+    record_admin_action(request,permission=self.required_permission,action='REQUEST_SUPPORT_ACCESS',target_type='support_access',target_id=grant.access_id,target_display=incident.incident_id,reason=reason,metadata={'scope':scope,'module':module,'consent_reference':consent})
+    return Response({'access_id':grant.access_id,'status':grant.status,'expires_at':grant.expires_at,'message':'Consent recorded and temporary access activated.' if consent else 'Access request recorded; user consent is still required.'},status=201)
+
+
+class AdminSupportControlledActionView(APIView):
+  authentication_classes=[TokenAuthentication]; required_permission='admin.support.actions'; permission_classes=[HasAdminPermission]
+  def post(self,request,incident_id):
+    incident=SupportIncident.objects.select_related('reporter_professional','reporter_client').filter(incident_id=incident_id).first()
+    if not incident:return Response({'message':'Support incident not found.'},status=404)
+    action=str(request.data.get('action','')); reason=str(request.data.get('reason','')).strip(); access_id=str(request.data.get('access_id',''))
+    grant=SupportAccessGrant.objects.filter(access_id=access_id,incident=incident,status='approved',expires_at__gt=timezone.now()).first()
+    if not grant or not reason:return Response({'message':'An active consent grant and action reason are required.'},status=403)
+    target_user=incident.reporter_professional or (incident.reporter_client.professional if incident.reporter_client_id else None)
+    if action=='end_sessions':
+      if incident.reporter_professional_id: Token.objects.filter(user=incident.reporter_professional).delete()
+      elif incident.reporter_client_id and hasattr(incident.reporter_client,'auth_token'): incident.reporter_client.auth_token.delete()
+      message='Active application sessions ended.'
+    elif action=='unlock_account':
+      if incident.reporter_professional_id: User.objects.filter(pk=incident.reporter_professional_id).update(is_active=True)
+      elif incident.reporter_client_id: ClientAccess.objects.filter(pk=incident.reporter_client_id).update(is_active=True)
+      message='Account access restored.'
+    else:return Response({'message':'Unsupported controlled action.'},status=400)
+    record_admin_action(request,permission=self.required_permission,action=f'SUPPORT_{action.upper()}',target_type='support',target_id=incident.incident_id,target_display=incident.reporter_email,reason=reason,professional=target_user,client=incident.reporter_client,metadata={'access_id':grant.access_id,'consent_reference':grant.consent_reference})
+    return Response({'message':message})
+
+
+class AdminTeamView(APIView):
+  authentication_classes = [TokenAuthentication]
+  required_permission = 'admin.staff.list'
+  permission_classes = [HasAdminPermission]
+
+  def get(self, request):
+    visible_staff = AdminStaffProfile.objects.select_related('user', 'role')
+    if not request.admin_staff.is_owner:
+      visible_staff = visible_staff.filter(department=request.admin_staff.department, authority_level__lt=request.admin_staff.authority_level)
+    allowed_codes = set(permission_codes_for(request.admin_staff))
+    permissions = list(AdminPermission.objects.filter(code__in=allowed_codes).values('code', 'name', 'section', 'description'))
+    roles_qs = AdminRole.objects.all() if request.admin_staff.is_owner else AdminRole.objects.exclude(slug='super-admin')
+    roles = [{'slug': role.slug, 'name': role.name, 'description': role.description} for role in roles_qs]
+    staff = [{'staff_id': member.staff_id, 'username': member.user.username, 'email': member.user.email,
+      'full_name': member.user.get_full_name(), 'role': member.role.name, 'role_slug': member.role.slug,
+      'status': member.status, 'department': member.department, 'department_label': member.get_department_display(),
+      'authority_level': member.authority_level, 'is_owner': member.is_owner, 'must_change_password': member.must_change_password,
+      'last_admin_login_at': member.last_admin_login_at, 'permissions': permission_codes_for(member), 'created_at': member.created_at}
+      for member in visible_staff]
+    return Response({'staff': staff, 'roles': roles, 'permissions': permissions, 'departments': [{'code': code, 'name': name} for code, name in AdminStaffProfile.DEPARTMENT_CHOICES], 'viewer': staff_payload(request.admin_staff)})
+
+  def post(self, request):
+    if 'admin.staff.create' not in permission_codes_for(request.admin_staff):
+      return Response({'message': 'You do not have permission to create team members.'}, status=403)
+    username, email, password = (str(request.data.get(key, '')).strip() for key in ('username', 'email', 'password'))
+    role = AdminRole.objects.filter(slug=request.data.get('role_slug')).first()
+    department = str(request.data.get('department', request.admin_staff.department)).upper()
+    authority_level = int(request.data.get('authority_level', AdminStaffProfile.LEVEL_STAFF))
+    if not request.admin_staff.is_owner:
+      department = request.admin_staff.department
+      authority_level = min(authority_level, request.admin_staff.authority_level - 1)
+      if role and role.slug == 'super-admin':
+        return Response({'message': 'Only the Owner can create Super Admin access.'}, status=403)
+    if not username or not email or len(password) < 10 or not role or User.objects.filter(Q(username__iexact=username) | Q(email__iexact=email)).exists():
+      return Response({'message': 'Unique username/email, role and a password of at least 10 characters are required.'}, status=400)
+    user = User.objects.create_user(username=username.lower(), email=email.lower(), password=password, first_name=str(request.data.get('first_name', ''))[:150], last_name=str(request.data.get('last_name', ''))[:150], is_staff=True)
+    if department not in dict(AdminStaffProfile.DEPARTMENT_CHOICES) or authority_level < AdminStaffProfile.LEVEL_STAFF or authority_level >= request.admin_staff.authority_level:
+      user.delete()
+      return Response({'message': 'Invalid department or authority level.'}, status=400)
+    member = AdminStaffProfile.objects.create(user=user, role=role, department=department, authority_level=authority_level, must_change_password=True, created_by=request.user)
+    self.save_overrides(member, request.data.get('permissions'), request.admin_staff)
+    record_admin_action(request, permission='admin.staff.create', action='CREATE_ADMIN_STAFF', target_type='staff', target_id=member.staff_id, target_display=username)
+    return Response({'staff_id': member.staff_id, 'message': 'Team member created.'}, status=201)
+
+  @staticmethod
+  def save_overrides(member, selected, actor):
+    if selected is None:
+      return
+    selected = set(selected) & set(permission_codes_for(actor))
+    role_permissions = set(member.role.permission_links.filter(allowed=True).values_list('permission__code', flat=True))
+    member.permission_overrides.all().delete()
+    for permission in AdminPermission.objects.all():
+      allowed = permission.code in selected
+      if allowed != (permission.code in role_permissions):
+        AdminStaffPermissionOverride.objects.create(staff=member, permission=permission, allowed=allowed)
+
+
+class AdminTeamMemberView(APIView):
+  authentication_classes = [TokenAuthentication]
+  required_permission = 'admin.staff.create'
+  permission_classes = [HasAdminPermission]
+
+  def put(self, request, staff_id):
+    member = AdminStaffProfile.objects.select_related('user', 'role').filter(staff_id=staff_id).first()
+    if not member:
+      return Response({'message': 'Team member not found.'}, status=404)
+    if member.is_owner:
+      return Response({'message': 'The protected Owner account cannot be modified from staff management.'}, status=403)
+    if not request.admin_staff.is_owner and (member.department != request.admin_staff.department or member.authority_level >= request.admin_staff.authority_level):
+      return Response({'message': 'You can manage only lower-authority staff in your own department.'}, status=403)
+    if member.pk == request.admin_staff.pk and request.data.get('status') == AdminStaffProfile.STATUS_DISABLED:
+      return Response({'message': 'You cannot disable your own account.'}, status=400)
+    role = AdminRole.objects.filter(slug=request.data.get('role_slug', member.role.slug)).first()
+    if not request.admin_staff.is_owner and role and role.slug == 'super-admin':
+      return Response({'message': 'Only the Owner can assign Super Admin access.'}, status=403)
+    if role:
+      member.role = role
+    if request.data.get('status') in dict(AdminStaffProfile.STATUS_CHOICES):
+      member.status = request.data['status']
+      member.disabled_at = timezone.now() if member.status == AdminStaffProfile.STATUS_DISABLED else None
+    member.save(update_fields=['role', 'status', 'disabled_at', 'updated_at'])
+    AdminTeamView.save_overrides(member, request.data.get('permissions'), request.admin_staff)
+    record_admin_action(request, permission=self.required_permission, action='UPDATE_ADMIN_STAFF_ACCESS', target_type='staff', target_id=member.staff_id, target_display=member.user.username)
+    return Response({'message': 'Team access updated.', 'permissions': permission_codes_for(member)})
 
 
 class AdminAuditLogListView(APIView):
@@ -436,6 +720,8 @@ class AdminErrorLogListView(APIView):
     platform_group = request.query_params.get('platform_group', '').strip().lower()
     if platform_group == 'web':
       logs = logs.filter(platform=ErrorLog.PLATFORM_WEB)
+    elif platform_group in ('android', 'ios'):
+      logs = logs.filter(platform=platform_group)
     elif platform_group == 'mobile':
       logs = logs.filter(platform__in=ErrorLog.MOBILE_PLATFORMS)
 

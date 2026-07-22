@@ -10,6 +10,7 @@ import 'models/client_models.dart';
 import 'models/forms_groups_models.dart';
 import 'models/support_models.dart';
 import 'models/template_models.dart';
+import 'models/notification_models.dart';
 
 /// The client's own view of their account, group, and professional.
 class ClientMeResponse {
@@ -36,7 +37,9 @@ class ClientMeResponse {
       client: ClientAccessRecord.fromJson(
         json['client'] as Map<String, dynamic>? ?? {},
       ),
-      group: group is Map<String, dynamic> ? ProfessionalGroup.fromJson(group) : null,
+      group: group is Map<String, dynamic>
+          ? ProfessionalGroup.fromJson(group)
+          : null,
       professionalProfile: professional is Map<String, dynamic>
           ? ClientProfessionalProfile.fromJson(professional)
           : null,
@@ -54,7 +57,10 @@ class ClientMeResponse {
 }
 
 class ClientDashboardResponse {
-  const ClientDashboardResponse({required this.summary, required this.schedules});
+  const ClientDashboardResponse({
+    required this.summary,
+    required this.schedules,
+  });
 
   final ClientDashboardSummary summary;
   final List<ClientReminder> schedules;
@@ -142,7 +148,10 @@ class ClientApi {
 
   Future<ClientMeResponse> getMe() {
     return runApi(() async {
-      final res = await _dio.get<Map<String, dynamic>>('/client/me/', options: _auth);
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/me/',
+        options: _auth,
+      );
       return ClientMeResponse.fromJson(res.data ?? {});
     });
   }
@@ -248,8 +257,9 @@ class ClientApi {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/client/chat/',
-        queryParameters:
-            afterId != null && afterId > 0 ? {'after': '$afterId'} : null,
+        queryParameters: afterId != null && afterId > 0
+            ? {'after': '$afterId'}
+            : null,
         options: _auth,
       );
       return (res.data?['messages'] as List<dynamic>? ?? [])
@@ -271,6 +281,44 @@ class ClientApi {
       );
     });
   }
+
+  Future<NotificationInbox> getNotifications({int limit = 50}) =>
+      runApi(() async {
+        final res = await _dio.get<Map<String, dynamic>>(
+          '/client/notifications/',
+          queryParameters: {'limit': limit},
+          options: _auth,
+        );
+        return NotificationInbox.fromJson(res.data ?? {});
+      });
+  Future<void> markNotificationRead({int? id}) => runApi(() async {
+    await _dio.patch<Map<String, dynamic>>(
+      '/client/notifications/',
+      data: id == null ? {'mark_all_read': true} : {'notification_id': id},
+      options: _auth,
+    );
+  });
+  Future<List<ClientMeetingRecord>> getMeetings() => runApi(() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/client/scheduling/meetings/',
+      options: _auth,
+    );
+    return (res.data?['meetings'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(ClientMeetingRecord.fromJson)
+        .toList();
+  });
+  Future<ClientMeetingRecord> respondToMeeting(int id, String responseStatus) =>
+      runApi(() async {
+        final res = await _dio.post<Map<String, dynamic>>(
+          '/client/scheduling/meetings/$id/respond/',
+          data: {'response_status': responseStatus},
+          options: _auth,
+        );
+        return ClientMeetingRecord.fromJson(
+          res.data?['meeting'] as Map<String, dynamic>? ?? {},
+        );
+      });
 
   // ----- profile change / deletion requests -----
 

@@ -15,7 +15,8 @@ class ProfessionalMorePage extends ConsumerStatefulWidget {
   const ProfessionalMorePage({super.key});
 
   @override
-  ConsumerState<ProfessionalMorePage> createState() => _ProfessionalMorePageState();
+  ConsumerState<ProfessionalMorePage> createState() =>
+      _ProfessionalMorePageState();
 }
 
 class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
@@ -34,11 +35,15 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
     try {
       final profile = await api.getProfile();
       if (mounted) setState(() => _profile = profile);
-    } catch (_) {/* header falls back to 'Professional' */}
+    } catch (_) {
+      /* header falls back to 'Professional' */
+    }
     try {
       final usage = await api.getDataUsage();
       if (mounted) setState(() => _usage = usage);
-    } catch (_) {/* the usage row just shows 0% */}
+    } catch (_) {
+      /* the usage row just shows 0% */
+    }
   }
 
   String get _fullName {
@@ -139,7 +144,11 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: tokens.muted, size: AppSize.iconRow),
+                Icon(
+                  Icons.chevron_right,
+                  color: tokens.muted,
+                  size: AppSize.iconRow,
+                ),
               ],
             ),
           ),
@@ -178,6 +187,11 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
                 icon: Icons.help_outline,
                 label: 'Help & Support',
                 onTap: () => context.go(Routes.professionalSupport),
+              ),
+              _MenuItem(
+                icon: Icons.notifications_outlined,
+                label: 'Notifications',
+                onTap: () => context.go(Routes.professionalNotifications),
               ),
             ],
           ),
@@ -251,11 +265,14 @@ class _MenuCard extends StatelessWidget {
             InkWell(
               onTap: items[i].onTap,
               borderRadius: i == 0
-                  ? const BorderRadius.vertical(top: Radius.circular(AppRadius.md))
+                  ? const BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.md),
+                    )
                   : i == items.length - 1
-                      ? const BorderRadius.vertical(
-                          bottom: Radius.circular(AppRadius.md))
-                      : null,
+                  ? const BorderRadius.vertical(
+                      bottom: Radius.circular(AppRadius.md),
+                    )
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.card,
@@ -263,10 +280,17 @@ class _MenuCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(items[i].icon, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(
+                      items[i].icon,
+                      size: AppSize.iconRow,
+                      color: tokens.muted,
+                    ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
-                      child: Text(items[i].label, style: context.text.bodyLarge),
+                      child: Text(
+                        items[i].label,
+                        style: context.text.bodyLarge,
+                      ),
                     ),
                     if (items[i].trailingText != null)
                       Text(
