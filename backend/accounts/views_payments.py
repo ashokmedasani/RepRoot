@@ -18,6 +18,8 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
+from .access_permissions import ProfessionalAccessPermission
+from .data_retention import visible_client_data_cutoff
 from .models import (
   ClientAccess,
   ClientPaymentMethodAccess,
@@ -53,7 +55,7 @@ def _currency_options():
 
 
 class ProfessionalPaymentSettingsView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
@@ -69,6 +71,10 @@ class ProfessionalPaymentSettingsView(APIView):
     serializer = ProfessionalPaymentSettingsSerializer(settings_row, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
     serializer.save()
+    if request.data.get('confirm_reporting_currency') is True and not settings_row.reporting_currency_locked:
+      settings_row.reporting_currency_locked = True
+      settings_row.reporting_currency_locked_at = timezone.now()
+      settings_row.save(update_fields=['reporting_currency_locked', 'reporting_currency_locked_at', 'updated_at'])
     return Response(
       {
         'settings': ProfessionalPaymentSettingsSerializer(settings_row).data,
@@ -79,7 +85,7 @@ class ProfessionalPaymentSettingsView(APIView):
 
 
 class ManualPaymentProfileListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [JSONParser, FormParser, MultiPartParser]
 
   def get(self, request):
@@ -119,7 +125,7 @@ class ManualPaymentProfileListView(APIView):
 
 
 class ManualPaymentProfileDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [JSONParser, FormParser, MultiPartParser]
 
   def get_profile(self, request, method_id):
@@ -188,7 +194,7 @@ class ManualPaymentProfilePreviewView(APIView):
   redacted serializer the real client endpoints use, so the preview can never
   drift from reality."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, method_id):
     profile = ManualPaymentProfile.objects.filter(id=method_id, professional=request.user).first()
@@ -201,7 +207,7 @@ class ClientPaymentMethodAccessView(APIView):
   """Which of the professional's manual payment methods a specific client can
   see. Methods are private by default - nothing is visible until shared here."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _client(self, request, client_id):
     return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -287,7 +293,7 @@ class ClientPaymentMethodAccessView(APIView):
 class PaymentRequestListView(APIView):
   """Professional's payment requests for one client: list + create."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _client(self, request, client_id):
     return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -381,7 +387,7 @@ class PaymentRequestListView(APIView):
 
 
 class PaymentRequestDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, request_id):
     payment_request = PaymentRequest.objects.filter(request_id=request_id, professional=request.user).first()
@@ -397,7 +403,7 @@ class PaymentRequestDetailView(APIView):
 
 
 class PaymentRequestCancelView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, request_id):
     payment_request = PaymentRequest.objects.filter(request_id=request_id, professional=request.user).first()
@@ -477,14 +483,19 @@ class ClientPaymentRequestDetailView(APIView):
 
 
 class ProfessionalPaymentNotificationsView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    unread = PaymentNotification.objects.filter(recipient_professional=request.user, is_read=False).count()
+    cutoff = visible_client_data_cutoff(request.user)
+    unread = PaymentNotification.objects.filter(
+      recipient_professional=request.user, is_read=False, created_at__gte=cutoff
+    ).count()
     return Response({'unread_count': unread})
 
   def post(self, request):
-    PaymentNotification.objects.filter(recipient_professional=request.user, is_read=False).update(is_read=True)
+    PaymentNotification.objects.filter(
+      recipient_professional=request.user, is_read=False, created_at__gte=visible_client_data_cutoff(request.user)
+    ).update(is_read=True)
     return Response({'unread_count': 0})
 
 
@@ -493,11 +504,15 @@ class ClientPaymentNotificationsView(APIView):
   permission_classes = [IsAuthenticatedClient]
 
   def get(self, request):
-    unread = PaymentNotification.objects.filter(recipient_client=request.auth, is_read=False).count()
+    cutoff = visible_client_data_cutoff(request.auth.professional)
+    unread = PaymentNotification.objects.filter(recipient_client=request.auth, is_read=False, created_at__gte=cutoff).count()
     return Response({'unread_count': unread})
 
   def post(self, request):
-    PaymentNotification.objects.filter(recipient_client=request.auth, is_read=False).update(is_read=True)
+    PaymentNotification.objects.filter(
+      recipient_client=request.auth, is_read=False,
+      created_at__gte=visible_client_data_cutoff(request.auth.professional),
+    ).update(is_read=True)
     return Response({'unread_count': 0})
 
 
@@ -537,6 +552,16 @@ def _write_finance_ledger_entry(payment_record):
       professional=payment_record.professional,
       description=f'Client payment {payment_record.payment_record_id}',
       external_reference=payment_record.transaction_reference or payment_record.payment_record_id,
+      source='client_payment',
+      professional_reference=payment_record.professional.professional_profile.internal_reference_code,
+      client_reference=payment_record.client.reference_id,
+      payment_request_reference=payment_record.payment_request.request_id if payment_record.payment_request else '',
+      payment_record_reference=payment_record.payment_record_id,
+      original_amount=payment_record.original_amount,
+      original_currency=payment_record.original_currency,
+      reporting_amount=payment_record.reporting_amount,
+      reporting_currency=payment_record.reporting_currency,
+      provider='manual',
       occurred_at=timezone.now(),
     )
   except Exception:  # noqa: BLE001 - admin reporting must never block the payment flow
@@ -633,7 +658,7 @@ class PaymentProofAcknowledgeView(APIView):
   this view never asks for amount/currency/date and never creates a
   PaymentRecord itself."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, proof_id):
     proof = PaymentProof.objects.filter(
@@ -700,7 +725,7 @@ class PaymentReconciliationView(APIView):
   to the revenue ledger. Logging stays optional - this just makes the gap
   visible instead of silently losing untracked revenue."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     acknowledged_requests = PaymentRequest.objects.filter(
@@ -735,7 +760,7 @@ class PaymentReconciliationView(APIView):
 
 
 class PaymentProofRejectView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, proof_id):
     proof = PaymentProof.objects.filter(
@@ -792,7 +817,7 @@ class PaymentProofRejectView(APIView):
 
 
 class PaymentProofRequestInfoView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, proof_id):
     proof = PaymentProof.objects.filter(
@@ -849,7 +874,7 @@ class PaymentProofFileView(APIView):
   """Streams a proof file only to the owning professional. There is no public
   media URL for payment proofs - this view is the only way to fetch them."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, proof_id):
     proof = PaymentProof.objects.filter(id=proof_id, payment_request__professional=request.user).first()
@@ -878,7 +903,7 @@ class ProfessionalPaymentActionsView(APIView):
   proofs awaiting review + overdue requests. Powers the dashboard Payments
   tab and its badge. Sorted most-recently-updated first."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     needs_review = PaymentRequest.objects.filter(
@@ -917,12 +942,46 @@ class ProfessionalPaymentActionsView(APIView):
     )
 
 
+class ProfessionalTransactionLedgerView(APIView):
+  """Read-only unified history for client payments and RepRoot billing.
+
+  Ledger rows are append-only. A refund or correction is represented by a new
+  row, never by rewriting or deleting the original transaction.
+  """
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    from admin_portal.models import FinanceLedgerEntry
+
+    rows = FinanceLedgerEntry.objects.filter(professional=request.user).order_by('-occurred_at')[:500]
+    return Response({'transactions': [{
+      'entry_id': row.entry_id,
+      'entry_type': row.entry_type,
+      'source': row.source,
+      'status': row.status,
+      'amount': str(row.amount),
+      'currency': row.currency,
+      'original_amount': str(row.original_amount) if row.original_amount is not None else None,
+      'original_currency': row.original_currency,
+      'reporting_amount': str(row.reporting_amount) if row.reporting_amount is not None else None,
+      'reporting_currency': row.reporting_currency,
+      'client_reference': row.client_reference,
+      'payment_request_reference': row.payment_request_reference,
+      'payment_record_reference': row.payment_record_reference,
+      'external_reference': row.external_reference,
+      'provider': row.provider,
+      'description': row.description,
+      'occurred_at': row.occurred_at,
+    } for row in rows]})
+
+
 class PaymentRecordListView(APIView):
   """Professional payment records. POST records a received payment - either a
   standalone one (no prior request) or an installment against an existing
   request (pass payment_request_id)."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     records = PaymentRecord.objects.filter(professional=request.user).select_related('client', 'payment_request')
@@ -995,7 +1054,7 @@ class PaymentRecordListView(APIView):
 
 
 class PaymentRecordDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _record(self, request, record_id):
     return PaymentRecord.objects.filter(payment_record_id=record_id, professional=request.user).first()
@@ -1089,7 +1148,7 @@ class PaymentReportingEstimateView(APIView):
   """Rough reporting-currency estimate to pre-fill the verify/record forms.
   Non-authoritative - the professional always confirms or overrides it."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     from decimal import Decimal, InvalidOperation
@@ -1182,7 +1241,7 @@ class ProfessionalRevenueSummaryView(APIView):
   ?start=YYYY-MM-DD&end=YYYY-MM-DD (required when period=custom)
   """
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   PERIOD_DAYS = {'7': 7, '30': 30, '90': 90}
 
@@ -1298,7 +1357,7 @@ class PaymentConfirmationView(APIView):
   """The 'Payment Confirmation' document - explicitly not a bank/provider
   receipt. Professional's own view of one of their records."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, record_id):
     record = PaymentRecord.objects.filter(

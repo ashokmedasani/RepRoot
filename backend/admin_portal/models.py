@@ -139,12 +139,28 @@ class FinanceLedgerEntry(models.Model):
   professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='finance_entries')
   description = models.CharField(max_length=240, blank=True)
   external_reference = models.CharField(max_length=100, blank=True)
+  source = models.CharField(max_length=24, default='platform', db_index=True)
+  professional_reference = models.CharField(max_length=24, blank=True)
+  client_reference = models.CharField(max_length=32, blank=True)
+  payment_request_reference = models.CharField(max_length=32, blank=True)
+  payment_record_reference = models.CharField(max_length=32, blank=True)
+  original_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+  original_currency = models.CharField(max_length=3, blank=True)
+  reporting_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+  reporting_currency = models.CharField(max_length=3, blank=True)
+  provider = models.CharField(max_length=32, blank=True)
+  metadata = models.JSONField(default=dict, blank=True)
   occurred_at = models.DateTimeField(db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
 
   class Meta:
     db_table = 'finance_ledger_entries'
     ordering = ['-occurred_at']
+
+  def save(self, *args, **kwargs):
+    if self.pk:
+      raise ValueError('Finance ledger entries are immutable; append a reversal or adjustment instead.')
+    return super().save(*args, **kwargs)
 
 
 class ErrorLog(models.Model):

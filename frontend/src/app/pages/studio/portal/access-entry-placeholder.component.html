@@ -1,13 +1,18 @@
 <main class="access-shell">
-  <a routerLink="/" class="back-link">Back</a>
+  <a routerLink="/" class="back-link">Back to RepRoot</a>
+
+  <a routerLink="/portal" class="studio-brand" aria-label="RepRoot Studio portal">
+    <span class="studio-brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
+    <span><span class="studio-brand__rep">Rep</span><span class="studio-brand__root">Root</span> Studio</span>
+  </a>
 
   <header class="access-header">
-    <p class="eyebrow">Access</p>
-    <h1>Client Management</h1>
+    <p class="eyebrow">RepRoot Studio access</p>
+    <h1>Choose your workspace</h1>
     <p>Choose the correct workspace to continue.</p>
   </header>
 
-  <section class="entry-grid" aria-label="Client management access options">
+  <section class="entry-grid" aria-label="RepRoot Studio access options">
     <a class="entry-card" routerLink="/professional/login" [class.entry-card--active]="selectedEntry === 'professional'" (click)="selectEntry('professional')">
       <span class="entry-card__icon">T</span>
       <strong>Professional</strong>

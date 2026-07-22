@@ -71,6 +71,20 @@ export interface ScheduledMeetingRecord {
   updated_at: string;
 }
 
+export interface LeadFormMeetingRecord {
+  id: number;
+  reference_id: string;
+  applicant_name: string;
+  form_title: string;
+  contact_email: string;
+  contact_mobile: string;
+  requested_start: string;
+  requested_end: string;
+  status: 'accepted';
+  trainer_note: string;
+  meeting_url: string;
+}
+
 export interface CreateMeetingPayload {
   client: number;
   start: string;
@@ -121,10 +135,10 @@ export class SchedulingApiService {
     });
   }
 
-  getMeetings(clientId?: number): Observable<{ meetings: ScheduledMeetingRecord[] }> {
+  getMeetings(clientId?: number): Observable<{ meetings: ScheduledMeetingRecord[]; lead_meetings: LeadFormMeetingRecord[] }> {
     const params: Record<string, string> = {};
     if (clientId) params['client_id'] = String(clientId);
-    return this.http.get<{ meetings: ScheduledMeetingRecord[] }>(`${this.apiBaseUrl}/professional/scheduling/meetings/`, {
+    return this.http.get<{ meetings: ScheduledMeetingRecord[]; lead_meetings: LeadFormMeetingRecord[] }>(`${this.apiBaseUrl}/professional/scheduling/meetings/`, {
       headers: this.getProfessionalAuthHeaders(),
       params
     });

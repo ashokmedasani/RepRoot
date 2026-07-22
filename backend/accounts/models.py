@@ -112,6 +112,25 @@ def generate_professional_internal_reference():
 
 
 class ProfessionalProfile(models.Model):
+  LIFECYCLE_ACTIVE = 'active'
+  LIFECYCLE_OVER_QUOTA_GRACE = 'over_quota_grace'
+  LIFECYCLE_FROZEN = 'frozen'
+  LIFECYCLE_RECYCLED = 'recycled'
+  LIFECYCLE_STATUS_CHOICES = [
+    (LIFECYCLE_ACTIVE, 'Active'),
+    (LIFECYCLE_OVER_QUOTA_GRACE, 'Over quota grace'),
+    (LIFECYCLE_FROZEN, 'Frozen'),
+    (LIFECYCLE_RECYCLED, 'Recycle Bin'),
+  ]
+
+  LIFECYCLE_REASON_TRAINER_REQUESTED = 'trainer_requested'
+  LIFECYCLE_REASON_BILLING_OVERAGE = 'billing_overage'
+  LIFECYCLE_REASON_ADMIN_ACTION = 'admin_action'
+  LIFECYCLE_REASON_CHOICES = [
+    (LIFECYCLE_REASON_TRAINER_REQUESTED, 'Trainer requested'),
+    (LIFECYCLE_REASON_BILLING_OVERAGE, 'Billing storage overage'),
+    (LIFECYCLE_REASON_ADMIN_ACTION, 'Administrative action'),
+  ]
   # Legacy plan choices (for backward compatibility during migration)
   PLAN_STARTER = 'starter'
   PLAN_PREMIUM = 'premium'
@@ -152,6 +171,13 @@ class ProfessionalProfile(models.Model):
   grace_period_ends_at = models.DateTimeField(null=True, blank=True, db_index=True)
   usage_warning_acknowledged_at = models.DateTimeField(null=True, blank=True)
   last_overage_notification_sent_at = models.DateTimeField(null=True, blank=True)
+  lifecycle_status = models.CharField(
+    max_length=24, choices=LIFECYCLE_STATUS_CHOICES, default=LIFECYCLE_ACTIVE, db_index=True
+  )
+  lifecycle_reason = models.CharField(max_length=32, choices=LIFECYCLE_REASON_CHOICES, blank=True, db_index=True)
+  recycled_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  recycle_expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  recycled_by_reference = models.CharField(max_length=24, blank=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='professional-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
@@ -199,6 +225,14 @@ class ProfessionalLeadForm(models.Model):
   title = models.CharField(max_length=160, default='Professional Lead Form')
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
+  introductory_meeting_enabled = models.BooleanField(default=False)
+  introductory_meeting_title = models.CharField(max_length=180, default='15-minute introductory call')
+  introductory_meeting_duration_minutes = models.PositiveIntegerField(default=15)
+  introductory_meeting_event_type_id = models.PositiveIntegerField(null=True, blank=True)
+  introductory_meeting_min_notice_hours = models.PositiveIntegerField(default=24)
+  introductory_meeting_max_advance_days = models.PositiveIntegerField(default=30)
+  introductory_meeting_buffer_minutes = models.PositiveIntegerField(default=15)
+  introductory_meeting_requires_approval = models.BooleanField(default=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -262,6 +296,7 @@ class LeadSubmission(models.Model):
   last_name = models.CharField(max_length=150)
   email = models.EmailField()
   reference_id = models.CharField(max_length=32, unique=True)
+  booking_access_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
   answers = models.JSONField(default=dict)
   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
   is_active = models.BooleanField(default=True, db_index=True)
@@ -276,6 +311,40 @@ class LeadSubmission(models.Model):
 
   def __str__(self) -> str:
     return f'{self.reference_id} - {self.email}'
+
+
+class LeadMeetingRequest(models.Model):
+  STATUS_PENDING = 'pending'
+  STATUS_ACCEPTED = 'accepted'
+  STATUS_DECLINED = 'declined'
+  STATUS_EXPIRED = 'expired'
+  STATUS_CHOICES = [
+    (STATUS_PENDING, 'Pending'),
+    (STATUS_ACCEPTED, 'Accepted'),
+    (STATUS_DECLINED, 'Declined'),
+    (STATUS_EXPIRED, 'Expired'),
+  ]
+
+  submission = models.OneToOneField(LeadSubmission, on_delete=models.CASCADE, related_name='meeting_request')
+  requested_start = models.DateTimeField(db_index=True)
+  requested_end = models.DateTimeField()
+  contact_email = models.EmailField()
+  contact_mobile = models.CharField(max_length=32, blank=True)
+  status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+  trainer_note = models.TextField(blank=True)
+  cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
+  meeting_url = models.URLField(blank=True)
+  expires_at = models.DateTimeField(db_index=True)
+  reviewed_at = models.DateTimeField(null=True, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'lead_meeting_requests'
+    ordering = ['-created_at']
+
+  def __str__(self) -> str:
+    return f'{self.submission.reference_id} meeting request ({self.status})'
 
 
 class GroupRegistrationSubmission(models.Model):
@@ -359,6 +428,26 @@ class ClientAccess(models.Model):
 
   def __str__(self) -> str:
     return f'{self.username} for {self.professional.username}'
+
+
+class ClientResetAudit(models.Model):
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='client_reset_audits')
+  client = models.ForeignKey(ClientAccess, on_delete=models.SET_NULL, null=True, related_name='reset_audits')
+  professional_reference = models.CharField(max_length=24)
+  client_reference = models.CharField(max_length=32)
+  client_username = models.CharField(max_length=150)
+  reason = models.TextField()
+  deleted_counts = models.JSONField(default=dict)
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+  class Meta:
+    db_table = 'client_reset_audits'
+    ordering = ['-created_at']
+
+  def save(self, *args, **kwargs):
+    if self.pk:
+      raise ValueError('Client reset audit records are immutable.')
+    return super().save(*args, **kwargs)
 
 
 class ClientDetailChangeRequest(models.Model):
@@ -835,6 +924,7 @@ class RecycledProfessionalAccount(models.Model):
   last_name = models.CharField(max_length=150, blank=True)
   account_snapshot = models.JSONField()
   deleted_at = models.DateTimeField(auto_now_add=True)
+  expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
   class Meta:
     db_table = 'recycled_professional_accounts'
@@ -892,7 +982,8 @@ class ProfessionalPaymentSettings(models.Model):
   # (Zelle, UPI, etc.) is unrelated and always accessible. Locked by default;
   # the professional toggles it on whenever they're ready to start tracking,
   # and can toggle it back off any time. Not a one-way/permanent lock.
-  reporting_currency_locked = models.BooleanField(default=True)
+  reporting_currency_locked = models.BooleanField(default=False)
+  reporting_currency_locked_at = models.DateTimeField(null=True, blank=True)
   client_payment_history_enabled = models.BooleanField(default=True)
   # Deprecated: payment records are always visible to the client they belong
   # to now (there's no "private from the client" state — see PRODUCT_RULES).
@@ -1229,6 +1320,7 @@ class PaymentAuditLog(models.Model):
     ('payment_recorded', 'Payment recorded'),
     ('payment_edited', 'Payment edited'),
     ('payment_deleted', 'Payment deleted'),
+    ('proof_expired', 'Proof expired under retention policy'),
   ]
 
   professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_audit_logs')
@@ -1278,6 +1370,75 @@ class PaymentNotification(models.Model):
 
   def __str__(self) -> str:
     return f'{self.notif_type} ({self.recipient_type})'
+
+
+class ActivityNotification(models.Model):
+  """Channel-neutral notification used by web, email workers and mobile apps."""
+
+  RECIPIENT_CHOICES = [('professional', 'Professional'), ('client', 'Client'), ('admin', 'Admin')]
+  PRIORITY_CHOICES = [('info', 'Info'), ('normal', 'Normal'), ('high', 'High'), ('critical', 'Critical')]
+  DELIVERY_CHOICES = [('suppressed', 'Suppressed'), ('pending', 'Pending'), ('sent', 'Sent'), ('failed', 'Failed')]
+
+  recipient_type = models.CharField(max_length=16, choices=RECIPIENT_CHOICES, db_index=True)
+  recipient_professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='activity_notifications')
+  recipient_client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, null=True, blank=True, related_name='activity_notifications')
+  admin_scope = models.CharField(max_length=24, blank=True, db_index=True)
+  category = models.CharField(max_length=32, db_index=True)
+  event_type = models.CharField(max_length=80, db_index=True)
+  event_key = models.CharField(max_length=180, unique=True)
+  title = models.CharField(max_length=200)
+  body = models.TextField(blank=True)
+  action_url = models.CharField(max_length=300, blank=True)
+  payload = models.JSONField(default=dict, blank=True)
+  priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
+  requires_action = models.BooleanField(default=False)
+  is_read = models.BooleanField(default=False, db_index=True)
+  read_at = models.DateTimeField(null=True, blank=True)
+  acknowledged_at = models.DateTimeField(null=True, blank=True)
+  resolved_at = models.DateTimeField(null=True, blank=True)
+  email_status = models.CharField(max_length=12, choices=DELIVERY_CHOICES, default='suppressed', db_index=True)
+  push_status = models.CharField(max_length=12, choices=DELIVERY_CHOICES, default='suppressed', db_index=True)
+  created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+  updated_at = models.DateTimeField(auto_now=True)
+  expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+  class Meta:
+    db_table = 'activity_notifications'
+    ordering = ['-created_at']
+    indexes = [models.Index(fields=['recipient_type', 'is_read', 'created_at'], name='activity_recipient_unread_idx')]
+
+
+class NotificationPreference(models.Model):
+  FREQUENCY_CHOICES = [('immediate', 'Immediate'), ('daily', 'Daily'), ('weekly', 'Weekly'), ('monthly', 'Monthly'), ('none', 'None')]
+  recipient_type = models.CharField(max_length=16, choices=[('professional', 'Professional'), ('client', 'Client')])
+  recipient_professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='notification_preferences')
+  recipient_client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, null=True, blank=True, related_name='notification_preferences')
+  category = models.CharField(max_length=32)
+  in_app_enabled = models.BooleanField(default=True)
+  email_enabled = models.BooleanField(default=False)
+  push_enabled = models.BooleanField(default=True)
+  digest_frequency = models.CharField(max_length=12, choices=FREQUENCY_CHOICES, default='immediate')
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'notification_preferences'
+    constraints = [
+      models.UniqueConstraint(fields=['recipient_type', 'recipient_professional', 'category'], name='uniq_prof_notification_pref'),
+      models.UniqueConstraint(fields=['recipient_type', 'recipient_client', 'category'], name='uniq_client_notification_pref'),
+    ]
+
+
+class NotificationDeliveryAttempt(models.Model):
+  notification = models.ForeignKey(ActivityNotification, on_delete=models.CASCADE, related_name='delivery_attempts')
+  channel = models.CharField(max_length=12, choices=[('email', 'Email'), ('push', 'Push')])
+  status = models.CharField(max_length=12, choices=ActivityNotification.DELIVERY_CHOICES)
+  provider_message_id = models.CharField(max_length=200, blank=True)
+  error = models.TextField(blank=True)
+  attempted_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'notification_delivery_attempts'
+    ordering = ['-attempted_at']
 
 
 class RecycleBinItem(models.Model):

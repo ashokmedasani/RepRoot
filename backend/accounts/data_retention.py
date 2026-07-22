@@ -1,51 +1,83 @@
-"""
-Client data retention for the 3-tier billing system.
+"""Operational-data visibility and permanent-retention enforcement.
 
-Chat messages and day-to-day client activity (tracking entries, progress
-entries, reminders) are rolling operational data, not permanent records —
-each plan tier keeps only a trailing window of it:
-  - Starter Free / Pro: 60 days
-  - Premium Unlimited:  180 days (6 months)
+Plans expose a trailing history window of 60, 90, or 180 days. Hidden history
+remains stored, counts toward storage, and becomes visible again after an
+upgrade while it is still inside the universal 180-day maximum.
 
-Only file-bearing chat messages (ones with an image) go through the Recycle
-Bin when they expire — plain text messages, tracking entries, progress notes,
-and reminders are deleted outright. They're high-volume, low-value operational
-noise; the Bin is reserved for things actually worth the overhead of
-restorability (see accounts/recycle_bin.py).
-
-This is independent of account lifecycle deletion (account_lifecycle.py),
-which erases everything after a frozen account goes unresolved for 30 days —
-that stays a genuine hard delete; retention here is a rolling window, not
-account abandonment.
+After 180 days, operational records and payment proof files are permanently
+removed. Core payment records remain available for the life of the account.
+Account lifecycle deletion is handled separately by account_lifecycle.py.
 """
 
 from datetime import timedelta
 
 from django.utils import timezone
 
-from accounts import recycle_bin
-from accounts.models import ChatMessage, ClientReminder, ProfessionalProfile, ProgressEntry, RecycleBinItem, TrackingEntry
+from django.conf import settings
+from django.core.files.storage import default_storage
+
+from accounts.models import (
+  ChatMessage, ClientReminder, PaymentAuditLog, PaymentNotification, PaymentProof,
+  PaymentRecord, ProfessionalProfile, ProgressEntry, TrackingEntry,
+)
 from accounts.plan_limits import professional_plan
 
 
+def visible_client_data_cutoff(professional):
+  """Plan window controls visibility; records remain recoverable until day 180."""
+  days = professional_plan(professional).get('client_data_retention_days') or 180
+  return timezone.now() - timedelta(days=days)
+
+
 def purge_expired_client_data():
-  """Daily task: remove chat messages and client activity records older than
-  each professional's plan retention window."""
+  """Permanently remove operational data only after the universal 180-day maximum."""
   now = timezone.now()
+  cutoff = now - timedelta(days=settings.REPROOT_OPERATIONAL_DATA_MAX_DAYS)
 
   for profile in ProfessionalProfile.objects.select_related('user').iterator():
     professional = profile.user
-    retention_days = professional_plan(professional).get('client_data_retention_days')
-    if not retention_days:
-      continue
-
-    cutoff = now - timedelta(days=retention_days)
-
     stale_messages = ChatMessage.objects.filter(professional=professional, created_at__lt=cutoff)
     for message in stale_messages.exclude(image=''):
-      recycle_bin.soft_delete_chat_message(message, deleted_by=RecycleBinItem.DELETED_BY_RETENTION_POLICY)
-    stale_messages.filter(image='').delete()
+      if message.image and default_storage.exists(message.image.name):
+        default_storage.delete(message.image.name)
+    stale_messages.delete()
 
     TrackingEntry.objects.filter(client__professional=professional, created_at__lt=cutoff).delete()
     ProgressEntry.objects.filter(professional=professional, created_at__lt=cutoff).delete()
     ClientReminder.objects.filter(professional=professional, date__lt=cutoff.date()).delete()
+
+    # Core payment requests/records and immutable audits remain. Only transient
+    # notifications and proof files expire at 180 days.
+    PaymentNotification.objects.filter(
+      recipient_professional=professional, created_at__lt=cutoff
+    ).delete()
+    PaymentNotification.objects.filter(
+      recipient_client__professional=professional, created_at__lt=cutoff
+    ).delete()
+    for proof in PaymentProof.objects.filter(
+      payment_request__professional=professional, submitted_at__lt=cutoff
+    ).exclude(proof_file=''):
+      path = proof.proof_file.name
+      if path and default_storage.exists(path):
+        default_storage.delete(path)
+      proof.proof_file = None
+      proof.save(update_fields=['proof_file'])
+      PaymentAuditLog.objects.create(
+        action='proof_expired', professional=professional, client=proof.payment_request.client,
+        payment_request=proof.payment_request, changed_by='retention-policy',
+        reason='Payment proof file removed after the 180-day operational-data maximum.',
+      )
+    for record in PaymentRecord.objects.filter(
+      professional=professional, created_at__lt=cutoff
+    ).exclude(proof_file=''):
+      path = record.proof_file.name
+      if path and default_storage.exists(path):
+        default_storage.delete(path)
+      record.proof_file = None
+      record.save(update_fields=['proof_file'])
+      PaymentAuditLog.objects.create(
+        action='proof_expired', professional=professional, client=record.client,
+        payment_request=record.payment_request, payment_record=record,
+        changed_by='retention-policy',
+        reason='Payment proof file removed after the 180-day operational-data maximum.',
+      )

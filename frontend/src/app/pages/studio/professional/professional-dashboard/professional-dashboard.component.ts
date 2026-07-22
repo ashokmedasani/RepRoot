@@ -61,7 +61,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   paymentOverdueCount = 0;
 
   // Revenue dashboard — only meaningful once a reporting currency is chosen,
-  // so it stays hidden while reporting_currency_locked is on.
+  // Revenue is shown only after the professional permanently confirms a reporting currency.
   revenueUnlocked = false;
   revenue: RevenueSummaryResponse | null = null;
   revenuePeriod: RevenuePeriod = '7';
@@ -124,7 +124,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
     this.paymentsApi.getPaymentSettings().subscribe({
       next: (response) => {
         this.paymentsEnabled = response.settings.payment_tracking_enabled;
-        this.revenueUnlocked = !response.settings.reporting_currency_locked;
+        this.revenueUnlocked = response.settings.reporting_currency_locked;
         if (this.paymentsEnabled) {
           this.loadPaymentActions();
           if (this.revenueUnlocked) {
@@ -240,6 +240,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
       next: (summary) => {
         this.unreadByClient = summary.by_client;
         this.lastUnreadAtByClient = summary.last_unread_at || {};
+        Object.assign(this.clientNameById, summary.client_names || {});
       },
       error: () => {
         this.unreadByClient = {};

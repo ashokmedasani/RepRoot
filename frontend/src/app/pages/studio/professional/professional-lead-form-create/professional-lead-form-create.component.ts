@@ -1,11 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { DynamicField, FormsGroupsApiService, FormsGroupsOverview } from '@core/api/forms-groups-api.service';
 import { FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
+import { CalComConnectionRecord, CalComEventType, SchedulingApiService } from '@core/api/scheduling-api.service';
 
 @Component({
   selector: 'app-professional-lead-form-create',
@@ -17,6 +18,8 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 export class ProfessionalLeadFormCreateComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly schedulingApi = inject(SchedulingApiService);
 
   overview: FormsGroupsOverview | null = null;
   title = 'Professional Lead Form';
@@ -25,6 +28,18 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
   isSaving = false;
   message = '';
   messageType: 'success' | 'error' = 'success';
+  step: 'form' | 'meeting' = 'form';
+  connection: CalComConnectionRecord | null = null;
+  eventTypes: CalComEventType[] = [];
+  meetingSettings = {
+    introductory_meeting_enabled: false,
+    introductory_meeting_title: '15-minute introductory call',
+    introductory_meeting_duration_minutes: 15,
+    introductory_meeting_event_type_id: null as number | null,
+    introductory_meeting_min_notice_hours: 24,
+    introductory_meeting_max_advance_days: 30,
+    introductory_meeting_buffer_minutes: 15,
+  };
   private readonly defaultLeadFields: DynamicField[] = [
     {
       label: 'Phone Number',
@@ -78,6 +93,20 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
           ...field,
           options: [...(field.options || [])]
         }));
+        if (overview.lead_form) {
+          this.meetingSettings = {
+            introductory_meeting_enabled: overview.lead_form.introductory_meeting_enabled,
+            introductory_meeting_title: overview.lead_form.introductory_meeting_title,
+            introductory_meeting_duration_minutes: overview.lead_form.introductory_meeting_duration_minutes,
+            introductory_meeting_event_type_id: overview.lead_form.introductory_meeting_event_type_id,
+            introductory_meeting_min_notice_hours: overview.lead_form.introductory_meeting_min_notice_hours,
+            introductory_meeting_max_advance_days: overview.lead_form.introductory_meeting_max_advance_days,
+            introductory_meeting_buffer_minutes: overview.lead_form.introductory_meeting_buffer_minutes,
+          };
+        }
+        if (this.route.snapshot.queryParamMap.get('step') === 'meeting' && overview.lead_form) {
+          this.step = 'meeting';
+        }
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -85,6 +114,15 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
         this.message = this.formatApiError(error, 'Could not load form setup.');
         this.isLoading = false;
       }
+    });
+    this.schedulingApi.getConnection().subscribe({
+      next: ({ connection }) => {
+        this.connection = connection;
+        if (connection.is_connected) {
+          this.schedulingApi.getEventTypes().subscribe({ next: ({ event_types }) => (this.eventTypes = event_types), error: () => (this.eventTypes = []) });
+        }
+      },
+      error: () => (this.connection = null)
     });
   }
 
@@ -94,13 +132,33 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
     this.formsGroupsApi.saveLeadForm(this.title, this.customFields).subscribe({
       next: () => {
         this.messageType = 'success';
-        this.message = 'Form created successfully. Now create your first group.';
+        this.message = 'Form saved. Now choose whether applicants may request an introductory meeting.';
+        this.step = 'meeting';
+        this.isSaving = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Form could not be saved.');
+        this.isSaving = false;
+      }
+    });
+  }
+
+  saveMeetingSettings(): void {
+    this.isSaving = true;
+    this.message = '';
+    this.formsGroupsApi.saveLeadMeetingSettings(this.meetingSettings).subscribe({
+      next: () => {
+        this.messageType = 'success';
+        this.message = this.meetingSettings.introductory_meeting_enabled
+          ? 'Meeting requests enabled. Applicants will require your approval before a booking is created.'
+          : 'Meeting requests skipped for this form.';
         const nextRoute = this.overview?.groups.length ? '/professional/forms-groups' : '/professional/groups/create';
         window.setTimeout(() => void this.router.navigate([nextRoute]), 900);
       },
       error: (error: unknown) => {
         this.messageType = 'error';
-        this.message = this.formatApiError(error, 'Form could not be saved.');
+        this.message = this.formatApiError(error, 'Meeting settings could not be saved.');
         this.isSaving = false;
       }
     });

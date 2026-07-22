@@ -763,3 +763,14 @@ label {
   color: var(--app-primary-strong);
   font-weight: 700;
 }
+.reference-guide {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #b9d8d0;
+  border-left: 4px solid #147d6f;
+  border-radius: 0.75rem;
+  background: #f1faf7;
+  color: #29443f;
+}

@@ -689,7 +689,11 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   }
 
   isResettingClient = false;
+  isExportingClient = false;
   isDeletingClient = false;
+  resetCurrentPassword = '';
+  resetConfirmation = '';
+  resetReason = '';
 
   async resetClient(): Promise<void> {
     const client = this.client;
@@ -710,8 +714,18 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.resetCurrentPassword || this.resetConfirmation !== client.username || !this.resetReason.trim()) {
+      this.messageType = 'error';
+      this.message = `Enter your password, type ${client.username} exactly, and provide a reset reason.`;
+      return;
+    }
+
     this.isResettingClient = true;
-    this.formsGroupsApi.resetClient(client.id).subscribe({
+    this.formsGroupsApi.resetClient(client.id, {
+      current_password: this.resetCurrentPassword,
+      confirmation: this.resetConfirmation,
+      reason: this.resetReason.trim()
+    }).subscribe({
       next: (response) => {
         this.replaceClient(response.client);
         this.professionalNotes = '';
@@ -719,6 +733,9 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
         this.messageType = 'success';
         this.message = response.message;
         this.isResettingClient = false;
+        this.resetCurrentPassword = '';
+        this.resetConfirmation = '';
+        this.resetReason = '';
         this.loadProfile();
         this.loadReminders();
       },
@@ -726,6 +743,28 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Client could not be reset.');
         this.isResettingClient = false;
+      }
+    });
+  }
+
+  exportClientData(): void {
+    const client = this.client;
+    if (!client || this.isExportingClient) return;
+    this.isExportingClient = true;
+    this.formsGroupsApi.exportClient(client.id).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'reproot-' + client.reference_id + '-export.zip';
+        link.click();
+        URL.revokeObjectURL(url);
+        this.isExportingClient = false;
+      },
+      error: () => {
+        this.messageType = 'error';
+        this.message = 'Client data export could not be created.';
+        this.isExportingClient = false;
       }
     });
   }

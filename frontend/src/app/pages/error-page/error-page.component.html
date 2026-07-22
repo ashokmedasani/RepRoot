@@ -1,7 +1,7 @@
 <main class="error-page" aria-labelledby="error-title">
   <a class="brand" href="/" aria-label="RepRoot home">
-    <span class="brand-mark" aria-hidden="true">↔</span>
-    <span>RepRoot</span>
+    <span class="brand-mark" aria-hidden="true"><img src="/brand/reproot/mark.png" alt=""></span>
+    <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span></span>
   </a>
 
   <section class="error-panel">
@@ -19,7 +19,7 @@
         @if (error.canRetry) {
           <button type="button" class="primary-action" (click)="retry()">Try Again</button>
         }
-        <button type="button" class="secondary-action" (click)="goToSafeStart()">Go to Home</button>
+        <button type="button" class="secondary-action" (click)="goToSafeStart()">Go to a safe page</button>
         <button type="button" class="ghost-action" (click)="goBack()">Go Back</button>
       </div>
 

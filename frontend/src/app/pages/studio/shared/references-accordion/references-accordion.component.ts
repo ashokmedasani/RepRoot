@@ -180,7 +180,7 @@ export class ReferencesAccordionComponent {
   typeLabel(type: string): string {
     const labels: Record<string, string> = {
       video_link: 'YouTube Link',
-      pdf: 'PDF Link',
+      pdf: 'PDF',
       image: 'Image',
       document: 'Document',
       text_note: 'Text',

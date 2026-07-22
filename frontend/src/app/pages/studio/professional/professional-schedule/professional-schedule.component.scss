@@ -135,6 +135,22 @@ textarea {
   margin: 0;
 }
 
+.occupancy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  margin: 0 0 0.75rem;
+  color: var(--app-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.occupancy-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.occupancy-legend i { width: 0.7rem; height: 0.7rem; border: 1px solid var(--app-border); border-radius: 0.2rem; background: var(--app-surface-soft); }
+.occupancy-legend i.light { border-color: #86efac; background: #dcfce7; }
+.occupancy-legend i.moderate { border-color: #fcd34d; background: #fef3c7; }
+.occupancy-legend i.busy { border-color: #fca5a5; background: #fee2e2; }
+
 .calendar-nav {
   display: flex;
   align-items: center;
@@ -211,32 +227,16 @@ textarea {
   color: #ffffff;
 }
 
-.calendar-day.has-meetings:not(.is-selected) {
-  background: var(--app-primary-soft);
-}
+.calendar-day.occupancy-light:not(.is-selected) { border-color: #86efac; background: #dcfce7; color: #166534; }
+.calendar-day.occupancy-moderate:not(.is-selected) { border-color: #fcd34d; background: #fef3c7; color: #92400e; }
+.calendar-day.occupancy-busy:not(.is-selected) { border-color: #fca5a5; background: #fee2e2; color: #991b1b; }
 
 .calendar-day-number {
   font-weight: 700;
   font-size: 0.85rem;
 }
 
-.calendar-day-dots {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-.calendar-dot {
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.calendar-day-extra {
-  font-size: 0.65rem;
-  font-weight: 700;
-}
+.calendar-day-load { font-size: 0.62rem; font-weight: 750; line-height: 1.15; text-align: center; }
 
 .link-action {
   border: 0;
@@ -324,6 +324,11 @@ textarea {
 .meetings-section {
   margin-bottom: 1.75rem;
 }
+
+.source-note { margin: -0.35rem 0 0.9rem; }
+.lead-source-section { border-top: 1px solid var(--app-border); padding-top: 1.25rem; }
+.lead-meeting-card { border-left: 4px solid #7c3aed; }
+.source-pill { width: fit-content; border-radius: 999px; padding: 0.18rem 0.55rem; background: #ede9fe; color: #6d28d9; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; }
 
 .meeting-list {
   display: grid;

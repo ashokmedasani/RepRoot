@@ -7,6 +7,7 @@ import { RouterLink } from '@angular/router';
 import {
   FormsGroupsApiService,
   FormsGroupsOverview,
+  LeadMeetingRequest,
   LeadSubmission
 } from '@core/api/forms-groups-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
@@ -27,6 +28,8 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
   private readonly confirmation = inject(ConfirmationDialogService);
 
   overview: FormsGroupsOverview | null = null;
+  meetingRequests: LeadMeetingRequest[] = [];
+  followupDrafts: Record<number, string> = {};
   isLoading = true;
   isSaving = false;
   message = '';
@@ -37,6 +40,67 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadOverview();
+    this.loadMeetingRequests();
+  }
+
+  loadMeetingRequests(): void {
+    this.formsGroupsApi.getLeadMeetingRequests().subscribe({
+      next: ({ requests }) => (this.meetingRequests = requests),
+      error: () => (this.meetingRequests = [])
+    });
+  }
+
+  get upcomingLeadMeetings(): LeadMeetingRequest[] {
+    const now = Date.now();
+    return this.meetingRequests
+      .filter((request) => request.status === 'accepted' && new Date(request.requested_start).getTime() >= now)
+      .sort((a, b) => new Date(a.requested_start).getTime() - new Date(b.requested_start).getTime())
+      .slice(0, 5);
+  }
+
+  get overdueLeadMeetings(): LeadMeetingRequest[] {
+    const now = Date.now();
+    return this.meetingRequests
+      .filter((request) => request.status === 'accepted' && new Date(request.requested_start).getTime() < now)
+      .sort((a, b) => new Date(b.requested_start).getTime() - new Date(a.requested_start).getTime())
+      .slice(0, 5);
+  }
+
+  sendMeetingFollowup(request: LeadMeetingRequest): void {
+    const message = (this.followupDrafts[request.id] || '').trim();
+    if (!message) return;
+    this.isSaving = true;
+    this.formsGroupsApi.reviewLeadMeetingRequest(request.id, 'send_followup', message).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.followupDrafts[request.id] = '';
+        this.isSaving = false;
+        this.loadMeetingRequests();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Follow-up email could not be sent.');
+        this.isSaving = false;
+      }
+    });
+  }
+
+  reviewMeetingRequest(request: LeadMeetingRequest, action: 'accept' | 'decline'): void {
+    this.isSaving = true;
+    this.formsGroupsApi.reviewLeadMeetingRequest(request.id, action).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSaving = false;
+        this.loadMeetingRequests();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Meeting request could not be updated.');
+        this.isSaving = false;
+      }
+    });
   }
 
   get activeSubmissions(): LeadSubmission[] {

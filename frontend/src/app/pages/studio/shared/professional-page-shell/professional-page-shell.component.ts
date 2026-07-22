@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { ActivityNotification, ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
 import { ChatApiService } from '@core/api/chat-api.service';
 
 type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'schedule' | 'references' | 'settings';
@@ -28,21 +28,22 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
 
   isSigningOut = false;
   dataUsagePercent = 0;
-  isUnlimitedStorage = false;
   unreadMessages = 0;
+  unreadNotifications = 0;
+  notifications: ActivityNotification[] = [];
+  notificationsOpen = false;
   private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.loadUnreadMessages();
-    this.unreadPoll = setInterval(() => this.loadUnreadMessages(), 5000);
+    this.loadNotifications();
+    this.unreadPoll = setInterval(() => { this.loadUnreadMessages(); this.loadNotifications(); }, 10000);
     this.professionalAuthApi.getDataUsage().subscribe({
       next: (usage) => {
         this.dataUsagePercent = Math.max(0, Math.min(100, usage.usage_percent));
-        this.isUnlimitedStorage = usage.plan_code === 'premium_unlimited' || usage.plan_code === 'premium';
       },
       error: () => {
         this.dataUsagePercent = 0;
-        this.isUnlimitedStorage = false;
       }
     });
   }
@@ -64,6 +65,25 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleNotifications(): void { this.notificationsOpen = !this.notificationsOpen; }
+
+  openNotification(item: ActivityNotification): void {
+    this.professionalAuthApi.markNotificationRead(item.id).subscribe({ next: () => this.loadNotifications() });
+    this.notificationsOpen = false;
+    if (item.action_url) void this.router.navigateByUrl(item.action_url);
+  }
+
+  markAllNotificationsRead(): void {
+    this.professionalAuthApi.markNotificationRead().subscribe({ next: () => this.loadNotifications() });
+  }
+
+  private loadNotifications(): void {
+    this.professionalAuthApi.getNotifications().subscribe({
+      next: (result) => { this.notifications = result.notifications; this.unreadNotifications = result.unread_count; },
+      error: () => { this.notifications = []; this.unreadNotifications = 0; }
+    });
+  }
+
   signOut(): void {
     this.isSigningOut = true;
     this.professionalAuthApi.logout().subscribe({
@@ -76,6 +96,6 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
     window.localStorage.removeItem('professional-auth-token');
     window.localStorage.removeItem('professional-account-id');
     window.localStorage.removeItem('professional-account-username');
-    void this.router.navigate(['/']);
+    void this.router.navigate(['/portal']);
   }
 }

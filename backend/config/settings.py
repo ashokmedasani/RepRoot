@@ -145,6 +145,12 @@ if AWS_STORAGE_BUCKET_NAME:
     },
   }
 
+if not DEBUG and not AWS_STORAGE_BUCKET_NAME:
+  raise ImproperlyConfigured(
+    'Durable S3-compatible upload storage is required in production. Configure AWS_STORAGE_BUCKET_NAME '
+    'and the matching access credentials/endpoint before enabling the service.'
+  )
+
 EMAIL_HOST = os.environ.get('EMAIL_HOST', '').strip()
 EMAIL_BACKEND = os.environ.get(
   'EMAIL_BACKEND',
@@ -245,13 +251,13 @@ REPROOT_DEFAULT_PLAN = os.environ.get('REPROOT_DEFAULT_PLAN', 'starter_free').st
 # Premium Unlimited are derived as multiples of it (5x, 50x respectively —
 # i.e. Premium Unlimited is also 10x Pro) unless explicitly overridden.
 REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES = int(
-  os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(30 * 1024 * 1024))
+  os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(100 * 1024 * 1024))
 )
 REPROOT_PRO_STORAGE_LIMIT_BYTES = int(
-  os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES * 5))
+  os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(1024 * 1024 * 1024))
 )
 REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES = int(
-  os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(REPROOT_PRO_STORAGE_LIMIT_BYTES * 10))
+  os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(5 * 1024 * 1024 * 1024))
 )
 
 # 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
@@ -260,7 +266,7 @@ REPROOT_PLAN_TIERS = {
     'name': 'Starter Free',
     'lead_forms': int(os.environ.get('REPROOT_STARTER_FREE_LEAD_FORM_LIMIT', '1')),
     'groups': int(os.environ.get('REPROOT_STARTER_FREE_GROUP_LIMIT', '3')),
-    'clients': int(os.environ.get('REPROOT_STARTER_FREE_CLIENT_LIMIT', '999')),
+    'clients': None,
     'templates': int(os.environ.get('REPROOT_STARTER_FREE_TEMPLATE_LIMIT', '5')),
     'references': int(os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT', '30')),
     'categories': int(os.environ.get('REPROOT_STARTER_FREE_CATEGORY_LIMIT', '5')),
@@ -272,19 +278,19 @@ REPROOT_PLAN_TIERS = {
     'name': 'Pro',
     'lead_forms': int(os.environ.get('REPROOT_PRO_LEAD_FORM_LIMIT', '2')),
     'groups': int(os.environ.get('REPROOT_PRO_GROUP_LIMIT', '10')),
-    'clients': int(os.environ.get('REPROOT_PRO_CLIENT_LIMIT', '250')),
+    'clients': None,
     'templates': int(os.environ.get('REPROOT_PRO_TEMPLATE_LIMIT', '15')),
     'references': int(os.environ.get('REPROOT_PRO_REFERENCE_LIMIT', '100')),
     'categories': int(os.environ.get('REPROOT_PRO_CATEGORY_LIMIT', '20')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PRO_SUBCATEGORY_LIMIT', '10')),
     'professional_storage_bytes': REPROOT_PRO_STORAGE_LIMIT_BYTES,
-    'client_data_retention_days': int(os.environ.get('REPROOT_PRO_DATA_RETENTION_DAYS', '60')),
+    'client_data_retention_days': int(os.environ.get('REPROOT_PRO_DATA_RETENTION_DAYS', '90')),
   },
   'premium_unlimited': {
     'name': 'Premium Unlimited',
     'lead_forms': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_LEAD_FORM_LIMIT', '3')),
     'groups': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_GROUP_LIMIT', '999')),
-    'clients': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CLIENT_LIMIT', '999')),
+    'clients': None,
     'templates': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_TEMPLATE_LIMIT', '50')),
     'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '1000')),
     'categories': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CATEGORY_LIMIT', '50')),
@@ -295,14 +301,14 @@ REPROOT_PLAN_TIERS = {
   # Legacy tiers (for backward compatibility during migration)
   'starter': {
     'name': 'Starter (Legacy)',
-    'lead_forms': 1, 'groups': 5, 'clients': 100, 'templates': 5,
+    'lead_forms': 1, 'groups': 5, 'clients': None, 'templates': 5,
     'references': 100, 'categories': 10, 'subcategories_per_category': 5,
     'professional_storage_bytes': 50 * 1024 * 1024,
     'client_data_retention_days': 60,
   },
   'premium': {
     'name': 'Premium (Legacy)',
-    'lead_forms': 3, 'groups': 25, 'clients': 1000, 'templates': 50,
+    'lead_forms': 3, 'groups': 25, 'clients': None, 'templates': 50,
     'references': 1000, 'categories': 50, 'subcategories_per_category': 20,
     'professional_storage_bytes': 1024 * 1024 * 1024,
     'client_data_retention_days': 180,
@@ -312,12 +318,14 @@ REPROOT_PLAN_TIERS = {
 # Data usage warning & account lifecycle thresholds
 REPROOT_DATA_USAGE_WARNING_PERCENT = int(os.environ.get('REPROOT_DATA_USAGE_WARNING_PERCENT', '75'))
 REPROOT_DATA_USAGE_DANGER_PERCENT = int(os.environ.get('REPROOT_DATA_USAGE_DANGER_PERCENT', '90'))
-REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS = int(os.environ.get('REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS', '7'))
+REPROOT_STORAGE_HARD_LIMIT_PERCENT = int(os.environ.get('REPROOT_STORAGE_HARD_LIMIT_PERCENT', '120'))
+REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS = int(os.environ.get('REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS', '14'))
 REPROOT_DATA_DELETION_DAYS = int(os.environ.get('REPROOT_DATA_DELETION_DAYS', '30'))
 
 # Recycle Bin: how long a soft-deleted item (chat message, tracking/progress
 # entry, reminder, reference, template) stays restorable before permanent purge.
 REPROOT_RECYCLE_BIN_DAYS = int(os.environ.get('REPROOT_RECYCLE_BIN_DAYS', '14'))
+REPROOT_OPERATIONAL_DATA_MAX_DAYS = int(os.environ.get('REPROOT_OPERATIONAL_DATA_MAX_DAYS', '180'))
 
 # Storage usage is intentionally a calm operational indicator, not a live
 # counter that changes while the professional navigates between pages.
@@ -347,6 +355,7 @@ REPROOT_BILLING_CANCEL_URL = os.environ.get(
 # the whole lifecycle (limits, storage quota, lock/grace clearing) be exercised
 # end-to-end today. Flip this off once real prices are set for every tier.
 REPROOT_BILLING_TEST_MODE = os.environ.get('REPROOT_BILLING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
+REPROOT_SCHEDULING_TEST_MODE = os.environ.get('REPROOT_SCHEDULING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
 
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')

@@ -49,13 +49,15 @@ def get_feature_access_status(professional_profile):
     usage = calculate_professional_data_usage(professional_profile.user)
     is_locked = professional_profile.is_locked
     is_over_quota = usage.get('is_over_quota', False)
+    is_storage_blocked = usage.get('is_storage_blocked', False)
 
     return {
-        'can_manage_templates': not is_locked and not is_over_quota,
-        'can_manage_forms': not is_locked and not is_over_quota,
-        'can_add_clients': not is_locked and not is_over_quota,
-        'can_manage_references': not is_locked and not is_over_quota,
-        'can_use_chat': not is_locked and not is_over_quota,
+        'can_manage_templates': not is_locked,
+        'can_manage_forms': not is_locked,
+        'can_add_clients': not is_locked,
+        'can_manage_references': not is_locked,
+        'can_use_chat': not is_locked,
+        'can_add_storage': not is_locked and not is_storage_blocked,
         'is_locked': is_locked,
         'lock_reason': professional_profile.lock_reason or None,
         'usage_percent': usage.get('usage_percent', 0),
@@ -67,48 +69,56 @@ def can_manage_templates(professional_profile) -> bool:
     """Check if professional can create/edit templates."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return True
 
 
 def can_manage_forms(professional_profile) -> bool:
     """Check if professional can manage lead forms and client registration."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return True
 
 
 def can_add_clients(professional_profile) -> bool:
     """Check if professional can add new clients."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return True
 
 
 def can_edit_client(professional_profile) -> bool:
     """Check if professional can edit existing client profiles."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return True
 
 
 def can_manage_references(professional_profile) -> bool:
     """Check if professional can upload/manage references."""
     if professional_profile.is_locked:
         return False
-    usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return True
 
 
 def can_use_chat(professional_profile) -> bool:
     """Check if professional can send messages in chat."""
     if professional_profile.is_locked:
         return False
+    return True
+
+
+def can_add_storage(professional_profile) -> bool:
+    """Storage-heavy writes pause at 120%; text and cleanup remain available."""
+    if professional_profile.is_locked:
+        return False
     usage = calculate_professional_data_usage(professional_profile.user)
-    return not usage.get('is_over_quota', False)
+    return not usage.get('is_storage_blocked', False)
+
+
+def assert_can_add_storage(professional_profile):
+    if not can_add_storage(professional_profile):
+        reason = FeatureLockReason.ACCOUNT_LOCKED if professional_profile.is_locked else FeatureLockReason.OVER_QUOTA
+        raise FeatureAccessError(f'New uploads are paused: {reason}')
 
 
 def assert_can_manage_templates(professional_profile):

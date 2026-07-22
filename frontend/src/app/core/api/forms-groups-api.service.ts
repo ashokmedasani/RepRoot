@@ -42,6 +42,14 @@ export interface LeadForm {
   public_slug: string;
   public_link: string;
   fields: DynamicField[];
+  introductory_meeting_enabled: boolean;
+  introductory_meeting_title: string;
+  introductory_meeting_duration_minutes: number;
+  introductory_meeting_event_type_id: number | null;
+  introductory_meeting_min_notice_hours: number;
+  introductory_meeting_max_advance_days: number;
+  introductory_meeting_buffer_minutes: number;
+  introductory_meeting_requires_approval: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +60,32 @@ export interface PublicLeadForm {
   public_slug: string;
   professional_name: string;
   fields: DynamicField[];
+  meeting_offer: MeetingOffer;
+}
+
+export interface MeetingOffer {
+  enabled: boolean;
+  title: string;
+  duration_minutes: number;
+  requires_approval: boolean;
+  min_notice_hours: number;
+  max_advance_days: number;
+}
+
+export interface LeadMeetingRequest {
+  id: number;
+  reference_id: string;
+  applicant_name: string;
+  form_title: string;
+  contact_email: string;
+  contact_mobile: string;
+  requested_start: string;
+  requested_end: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  trainer_note: string;
+  meeting_url: string;
+  expires_at: string;
+  reviewed_at: string | null;
 }
 
 export interface ClientRegistrationForm {
@@ -273,6 +307,22 @@ export class FormsGroupsApiService {
       `${this.apiBaseUrl}/professional/forms-groups/lead-form/`,
       { title, custom_fields: customFields },
       { headers: this.getAuthHeaders() }
+    );
+  }
+
+  saveLeadMeetingSettings(payload: Partial<LeadForm>): Observable<{ lead_form: LeadForm; message: string }> {
+    return this.http.put<{ lead_form: LeadForm; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/lead-form/meeting-settings/`, payload, { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getLeadMeetingRequests(): Observable<{ requests: LeadMeetingRequest[] }> {
+    return this.http.get<{ requests: LeadMeetingRequest[] }>(`${this.apiBaseUrl}/professional/lead-meeting-requests/`, { headers: this.getAuthHeaders() });
+  }
+
+  reviewLeadMeetingRequest(requestId: number, action: 'accept' | 'decline' | 'send_followup', trainerNote = ''): Observable<{ request: LeadMeetingRequest; message: string }> {
+    return this.http.post<{ request: LeadMeetingRequest; message: string }>(
+      `${this.apiBaseUrl}/professional/lead-meeting-requests/${requestId}/action/`, { action, trainer_note: trainerNote }, { headers: this.getAuthHeaders() }
     );
   }
 
@@ -498,12 +548,22 @@ export class FormsGroupsApiService {
     );
   }
 
-  resetClient(clientId: number): Observable<{ client: ClientAccessRecord; message: string }> {
+  resetClient(
+    clientId: number,
+    verification: { current_password: string; confirmation: string; reason: string }
+  ): Observable<{ client: ClientAccessRecord; message: string }> {
     return this.http.post<{ client: ClientAccessRecord; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reset/`,
-      {},
+      verification,
       { headers: this.getAuthHeaders() }
     );
+  }
+
+  exportClient(clientId: number): Observable<Blob> {
+    return this.http.get(`${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/export/`, {
+      headers: this.getAuthHeaders(),
+      responseType: 'blob'
+    });
   }
 
   deleteClient(clientId: number): Observable<{ message: string }> {
@@ -525,10 +585,22 @@ export class FormsGroupsApiService {
     return this.http.get<PublicLeadForm>(`${this.apiBaseUrl}/public/forms/${publicSlug}/`);
   }
 
-  submitPublicForm(publicSlug: string, answers: Record<string, string>): Observable<{ reference_id: string; message: string }> {
-    return this.http.post<{ reference_id: string; message: string }>(
+  submitPublicForm(publicSlug: string, answers: Record<string, string>): Observable<{ reference_id: string; booking_access_token: string; meeting_offer: MeetingOffer; message: string }> {
+    return this.http.post<{ reference_id: string; booking_access_token: string; meeting_offer: MeetingOffer; message: string }>(
       `${this.apiBaseUrl}/public/forms/${publicSlug}/`,
       { answers }
+    );
+  }
+
+  getPublicMeetingSlots(publicSlug: string, token: string, start: string, end: string): Observable<{ slots: Record<string, { start: string }[]>; timezone: string }> {
+    return this.http.get<{ slots: Record<string, { start: string }[]>; timezone: string }>(
+      `${this.apiBaseUrl}/public/forms/${publicSlug}/meeting-slots/`, { params: { token, start, end } }
+    );
+  }
+
+  requestPublicMeeting(publicSlug: string, token: string, start: string, contactMobile: string): Observable<{ request: LeadMeetingRequest; message: string }> {
+    return this.http.post<{ request: LeadMeetingRequest; message: string }>(
+      `${this.apiBaseUrl}/public/forms/${publicSlug}/meeting-request/`, { token, start, contact_mobile: contactMobile }
     );
   }
 

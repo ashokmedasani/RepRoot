@@ -2,18 +2,26 @@
 Account lifecycle management service for the 3-tier billing system.
 
 Handles:
-- Downgrade grace periods (7 days)
+- Downgrade grace periods (14 days)
 - Account freezing when over quota + grace expired
 - Data deletion after 30 days frozen
 - Overage notifications during grace period
 """
 
 from datetime import timedelta
-from django.utils import timezone
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.mail import send_mail
-from accounts.models import ProfessionalProfile
+from django.core.files.storage import default_storage
+from django.db import transaction
+from django.utils import timezone
+from rest_framework.authtoken.models import Token
+
+from accounts.models import ClientAuthToken, ProfessionalProfile, RecycledProfessionalAccount
 from accounts.data_usage import calculate_professional_data_usage
+
+User = get_user_model()
 
 
 def process_downgrade(professional_profile):
@@ -23,19 +31,26 @@ def process_downgrade(professional_profile):
     """
     professional_profile.plan_tier = ProfessionalProfile.PLAN_STARTER_FREE
     professional_profile.downgraded_at = timezone.now()
-    professional_profile.grace_period_ends_at = timezone.now() + timedelta(
-        days=settings.REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS
-    )
+    professional_profile.grace_period_ends_at = None
     professional_profile.is_locked = False
     professional_profile.locked_at = None
     professional_profile.lock_reason = ''
+    professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_ACTIVE
+    professional_profile.lifecycle_reason = ''
     professional_profile.save(update_fields=[
         'plan_tier', 'downgraded_at', 'grace_period_ends_at',
-        'is_locked', 'locked_at', 'lock_reason'
+        'is_locked', 'locked_at', 'lock_reason', 'lifecycle_status', 'lifecycle_reason'
     ])
 
-    # Send downgrade notification email
-    send_downgrade_email(professional_profile)
+    cache.delete(f'professional-data-usage:v5:{professional_profile.user_id}')
+    if calculate_professional_data_usage(professional_profile.user)['is_over_quota']:
+        professional_profile.grace_period_ends_at = timezone.now() + timedelta(
+            days=settings.REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS
+        )
+        professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_OVER_QUOTA_GRACE
+        professional_profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
+        professional_profile.save(update_fields=['grace_period_ends_at', 'lifecycle_status', 'lifecycle_reason'])
+        send_downgrade_email(professional_profile)
 
 
 def downgrade_to_starter_free_voluntarily(professional_profile):
@@ -44,7 +59,7 @@ def downgrade_to_starter_free_voluntarily(professional_profile):
     this, so it should not look or behave like the involuntary-lapse path in
     process_downgrade(): no grace-period banner, no lock, unless their current
     usage genuinely doesn't fit in Starter Free's quota. In that case they get
-    the same 7-day grace period an involuntary downgrade would give them, since
+    the same 14-day grace period an involuntary downgrade would give them, since
     the problem (too much data for the new quota) is identical either way.
     """
     professional_profile.plan_tier = ProfessionalProfile.PLAN_STARTER_FREE
@@ -55,9 +70,12 @@ def downgrade_to_starter_free_voluntarily(professional_profile):
     professional_profile.lock_reason = ''
     professional_profile.downgraded_at = None
     professional_profile.grace_period_ends_at = None
+    professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_ACTIVE
+    professional_profile.lifecycle_reason = ''
     professional_profile.save(update_fields=[
         'plan_tier', 'stripe_subscription_id', 'plan_renews_at',
         'is_locked', 'locked_at', 'lock_reason', 'downgraded_at', 'grace_period_ends_at',
+        'lifecycle_status', 'lifecycle_reason',
     ])
 
     from django.core.cache import cache
@@ -70,6 +88,9 @@ def downgrade_to_starter_free_voluntarily(professional_profile):
             days=settings.REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS
         )
         professional_profile.save(update_fields=['downgraded_at', 'grace_period_ends_at'])
+        professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_OVER_QUOTA_GRACE
+        professional_profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
+        professional_profile.save(update_fields=['lifecycle_status', 'lifecycle_reason'])
         send_downgrade_email(professional_profile)
 
 
@@ -82,16 +103,25 @@ def reactivate_on_upgrade(professional_profile):
     professional_profile.lock_reason = ''
     professional_profile.downgraded_at = None
     professional_profile.grace_period_ends_at = None
+    professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_ACTIVE
+    professional_profile.lifecycle_reason = ''
+    professional_profile.recycled_at = None
+    professional_profile.recycle_expires_at = None
+    professional_profile.recycled_by_reference = ''
     professional_profile.save(update_fields=[
-        'is_locked', 'locked_at', 'lock_reason', 'downgraded_at', 'grace_period_ends_at'
+        'is_locked', 'locked_at', 'lock_reason', 'downgraded_at', 'grace_period_ends_at',
+        'lifecycle_status', 'lifecycle_reason', 'recycled_at', 'recycle_expires_at', 'recycled_by_reference'
     ])
+    if not professional_profile.user.is_active:
+        professional_profile.user.is_active = True
+        professional_profile.user.save(update_fields=['is_active'])
 
 
 def check_and_lock_overages():
     """
     Daily task: Lock accounts that are:
     1. Over 100% quota
-    2. Past their 7-day grace period
+    2. Past their 14-day grace period
     3. Not already locked
     """
     now = timezone.now()
@@ -108,16 +138,22 @@ def check_and_lock_overages():
             profile.is_locked = True
             profile.locked_at = now
             profile.lock_reason = 'overage_grace_expired'
-            profile.save(update_fields=['is_locked', 'locked_at', 'lock_reason'])
+            profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_FROZEN
+            profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
+            profile.save(update_fields=['is_locked', 'locked_at', 'lock_reason', 'lifecycle_status', 'lifecycle_reason'])
+            Token.objects.filter(user=profile.user).delete()
+            ClientAuthToken.objects.filter(client__professional=profile.user).delete()
 
             # Send account frozen email
             send_account_frozen_email(profile)
+        else:
+            reactivate_on_upgrade(profile)
 
 
 def check_and_delete_data():
     """
-    Daily task: Permanently delete data for accounts that have been locked for 30+ days.
-    CAUTION: This is irreversible.
+    Move unresolved accounts frozen for 30 days into a restorable 14-day
+    professional Recycle Bin, then purge accounts whose recycle window expired.
     """
     now = timezone.now()
     deletion_threshold = now - timedelta(days=settings.REPROOT_DATA_DELETION_DAYS)
@@ -128,14 +164,66 @@ def check_and_delete_data():
     )
 
     for profile in profiles_to_delete:
-        # Send final warning email before deletion
-        send_data_deletion_email(profile)
+        move_professional_to_recycle(
+            profile,
+            reason=ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE,
+            recycled_by_reference='SYSTEM',
+        )
 
-        # Delete associated data (clients, templates, entries, references, etc.)
+    purge_expired_professional_accounts()
+
+
+def move_professional_to_recycle(professional_profile, *, reason, recycled_by_reference=''):
+    """Soft-delete a complete professional graph without a lossy JSON copy."""
+    now = timezone.now()
+    with transaction.atomic():
+        professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_RECYCLED
+        professional_profile.lifecycle_reason = reason
+        professional_profile.recycled_at = now
+        professional_profile.recycle_expires_at = now + timedelta(days=settings.REPROOT_RECYCLE_BIN_DAYS)
+        professional_profile.recycled_by_reference = recycled_by_reference
+        professional_profile.is_locked = True
+        professional_profile.locked_at = professional_profile.locked_at or now
+        professional_profile.lock_reason = reason
+        professional_profile.save(update_fields=[
+            'lifecycle_status', 'lifecycle_reason', 'recycled_at', 'recycle_expires_at',
+            'recycled_by_reference', 'is_locked', 'locked_at', 'lock_reason',
+        ])
+        professional_profile.user.is_active = False
+        professional_profile.user.save(update_fields=['is_active'])
+        Token.objects.filter(user=professional_profile.user).delete()
+        ClientAuthToken.objects.filter(client__professional=professional_profile.user).delete()
+    cache.delete(f'professional-data-usage:v5:{professional_profile.user_id}')
+    send_data_deletion_email(professional_profile)
+
+
+def restore_professional_from_recycle(professional_profile):
+    if professional_profile.lifecycle_status != ProfessionalProfile.LIFECYCLE_RECYCLED:
+        raise ValueError('Professional account is not in the Recycle Bin.')
+    if professional_profile.recycle_expires_at and professional_profile.recycle_expires_at <= timezone.now():
+        raise ValueError('The 14-day restore window has expired.')
+    reactivate_on_upgrade(professional_profile)
+    professional_profile.user.set_unusable_password()
+    professional_profile.user.save(update_fields=['password'])
+    send_mail(
+        'Your RepRoot professional account was restored',
+        (
+            'Your complete professional workspace was restored during the 14-day recycle period. '
+            f'For security, use Forgot Password to create a new password: {settings.REPROOT_FRONTEND_URL}/professional/forgot-password'
+        ),
+        settings.DEFAULT_FROM_EMAIL,
+        [professional_profile.user.email],
+    )
+
+
+def purge_expired_professional_accounts():
+    expired = ProfessionalProfile.objects.select_related('user').filter(
+        lifecycle_status=ProfessionalProfile.LIFECYCLE_RECYCLED,
+        recycle_expires_at__lte=timezone.now(),
+    )
+    for profile in expired.iterator():
         delete_professional_data(profile)
-
-        # Mark account as data-deleted
-        profile.save(update_fields=['updated_at'])
+    RecycledProfessionalAccount.objects.filter(expires_at__lte=timezone.now()).delete()
 
 
 def send_overage_notifications():
@@ -160,6 +248,8 @@ def send_overage_notifications():
                 send_overage_notification_email(profile, usage)
                 profile.last_overage_notification_sent_at = now
                 profile.save(update_fields=['last_overage_notification_sent_at'])
+        else:
+            reactivate_on_upgrade(profile)
 
 
 def delete_professional_data(professional_profile):
@@ -167,25 +257,30 @@ def delete_professional_data(professional_profile):
     Permanently delete all data associated with a professional account.
     This is called after 30 days of being locked (non-recoverable).
     """
-    from accounts.models import ClientAccess
-    from templates.models import TrackingTemplate, TrackingEntry
-    from references.models import ReferenceCategory, Reference
-    from forms_groups.models import LeadForm, ClientGroup
+    from accounts.models import ClientAccess, ChatMessage, ManualPaymentProfile, PaymentProof, PaymentRecord, ProfessionalReference, SupportIncident
 
-    # Delete all client-related data
-    ClientAccess.objects.filter(professional=professional_profile.user).delete()
-
-    # Delete templates and entries
-    TrackingTemplate.objects.filter(professional=professional_profile.user).delete()
-    TrackingEntry.objects.filter(professional=professional_profile.user).delete()
-
-    # Delete references
-    ReferenceCategory.objects.filter(professional=professional_profile.user).delete()
-    Reference.objects.filter(professional=professional_profile.user).delete()
-
-    # Delete forms and groups
-    LeadForm.objects.filter(professional=professional_profile.user).delete()
-    ClientGroup.objects.filter(professional=professional_profile.user).delete()
+    user_id = professional_profile.user_id
+    file_names = [
+        professional_profile.profile_photo.name,
+        professional_profile.certification_file.name,
+        professional_profile.transformation_photo.name,
+        professional_profile.training_photo.name,
+    ]
+    file_names += list(ProfessionalReference.objects.filter(professional_id=user_id).exclude(file='').values_list('file', flat=True))
+    file_names += list(ChatMessage.objects.filter(professional_id=user_id).exclude(image='').values_list('image', flat=True))
+    file_names += list(ManualPaymentProfile.objects.filter(professional_id=user_id).exclude(qr_code='').values_list('qr_code', flat=True))
+    file_names += list(PaymentProof.objects.filter(payment_request__professional_id=user_id).exclude(proof_file='').values_list('proof_file', flat=True))
+    file_names += list(PaymentRecord.objects.filter(professional_id=user_id).exclude(proof_file='').values_list('proof_file', flat=True))
+    file_names += list(SupportIncident.objects.filter(reporter_professional_id=user_id).exclude(screenshot='').values_list('screenshot', flat=True))
+    for file_name in {name for name in file_names if name}:
+        if default_storage.exists(file_name):
+            default_storage.delete(file_name)
+    with transaction.atomic():
+        # ClientAccess protects its group/submission parents. Remove clients
+        # explicitly at final purge; their dependent rows cascade first.
+        ClientAccess.objects.filter(professional_id=user_id).delete()
+        User.objects.filter(pk=user_id).delete()
+    cache.delete(f'professional-data-usage:v5:{user_id}')
 
 
 # Email notification functions
@@ -199,12 +294,12 @@ Hello {professional_profile.user.first_name},
 Your RepRoot subscription has been downgraded to Starter Free tier.
 
 **What happens next:**
-- You have 7 days (grace period) to either:
+- You have 14 days (grace period) to either:
   1. Upgrade to Pro or Premium Unlimited tier
   2. Delete data to bring your usage below 100%
 
-- After 7 days, if you haven't upgraded or reduced your data, your account will be **FROZEN**.
-- All premium features (Templates, Forms, Client Management) are now locked.
+- After 14 days, if you haven't upgraded or reduced your data, your account will be **FROZEN**.
+- Your workspace remains available during the grace period so you can review, export, or reduce storage.
 
 **Grace period ends:** {professional_profile.grace_period_ends_at.strftime('%B %d, %Y at %I:%M %p')}
 
@@ -224,7 +319,7 @@ def send_account_frozen_email(professional_profile):
     message = f"""
 Hello {professional_profile.user.first_name},
 
-Your RepRoot account has been **FROZEN** because you exceeded your storage quota and the 7-day grace period has expired.
+Your RepRoot account has been **FROZEN** because you exceeded your Starter storage quota and the 14-day grace period has expired.
 
 **What this means:**
 - You cannot log in or access your account
@@ -236,7 +331,7 @@ Your RepRoot account has been **FROZEN** because you exceeded your storage quota
 2. Contact our support team to request account reactivation
 3. We will reactivate your account within 24 hours of upgrade confirmation
 
-**IMPORTANT:** If your account remains frozen for 30 days, all data will be permanently deleted (non-recoverable).
+**IMPORTANT:** After 30 frozen days, the account enters a final 14-day Recycle Bin. Support can restore it during that window; deletion after expiry is permanent.
 
 To upgrade or request support, email us at support@reproot.com or visit {settings.REPROOT_FRONTEND_URL}
 
@@ -261,8 +356,8 @@ Your RepRoot account is using {usage_percent:.1f}% of your Starter Free storage 
 **Time is running out:** Your grace period ends in {days_left} day(s) ({grace_ends.strftime('%B %d, %Y')}).
 
 **What you need to do:**
-1. **Upgrade to Pro** ($4.99/month) or **Premium Unlimited** ($14.99/month) to unlock all features
-2. **Delete unused data** (entries, clients, references, templates) to bring usage below 100%
+1. **Upgrade your storage plan** (pricing will be shown in the application when finalized)
+2. **Delete unused files or data** to bring usage below 100%
 
 After your grace period expires, your account will be **frozen** and you won't be able to log in.
 
@@ -284,15 +379,15 @@ Hello {professional_profile.user.first_name},
 
 Your RepRoot account has been frozen for 30 days without resolution.
 
-**YOUR DATA WILL BE PERMANENTLY DELETED IN 24 HOURS.**
+**YOUR DATA IS NOW IN A 14-DAY RECYCLE PERIOD.**
 
-This is not reversible. Once deleted, all your client data, templates, entries, references, and account history cannot be recovered.
+Support can restore the complete account during these 14 days. After the recycle period expires, all client data, templates, entries, references, files, and account history will be permanently deleted.
 
 **To prevent deletion, you must:**
 1. Upgrade to Pro or Premium Unlimited tier immediately
 2. Contact support@reproot.com to request emergency account recovery
 
-After 24 hours, your data will be erased automatically.
+After 14 days, your data will be erased automatically.
 
 Take action now: {settings.REPROOT_FRONTEND_URL}/professional/account-settings
 

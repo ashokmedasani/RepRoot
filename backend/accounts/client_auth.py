@@ -12,6 +12,7 @@ import os
 from rest_framework import authentication, exceptions, permissions
 
 from .models import ClientAccess, ClientAuthToken
+from .access_permissions import request_has_upload, upload_fits_storage
 
 
 def generate_client_token_key() -> str:
@@ -48,9 +49,16 @@ class ClientTokenAuthentication(authentication.BaseAuthentication):
     except UnicodeError:
       raise exceptions.AuthenticationFailed('Invalid client token header.')
 
-    token = ClientAuthToken.objects.select_related('client__professional', 'client__group', 'client__lead_submission').filter(key=key).first()
+    token = ClientAuthToken.objects.select_related(
+      'client__professional__professional_profile', 'client__group', 'client__lead_submission'
+    ).filter(key=key).first()
 
-    if token is None or not token.client.is_active:
+    if (
+      token is None
+      or not token.client.is_active
+      or not token.client.professional.is_active
+      or token.client.professional.professional_profile.lifecycle_status != 'active'
+    ):
       raise exceptions.AuthenticationFailed('Invalid or expired client token.')
 
     return (None, token.client)
@@ -63,4 +71,14 @@ class IsAuthenticatedClient(permissions.BasePermission):
   message = 'Client authentication required.'
 
   def has_permission(self, request, view):
-    return isinstance(request.auth, ClientAccess)
+    if not isinstance(request.auth, ClientAccess):
+      return False
+    professional = request.auth.professional
+    profile = professional.professional_profile
+    if not professional.is_active or profile.lifecycle_status != profile.LIFECYCLE_ACTIVE:
+      self.message = 'This client portal is unavailable while the professional account is frozen.'
+      return False
+    if request_has_upload(request) and not upload_fits_storage(professional, request):
+      self.message = 'New uploads are paused because this professional workspace reached its temporary storage ceiling.'
+      return False
+    return True

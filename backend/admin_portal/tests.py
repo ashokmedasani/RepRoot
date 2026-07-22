@@ -34,6 +34,30 @@ class AdminPortalPhaseOneTests(TestCase):
   def test_unauthorized_user_cannot_access_admin_dashboard(self):
     self.assertEqual(self.api.get('/api/admin/dashboard/').status_code, 401)
 
+  def test_super_admin_can_recycle_and_restore_verified_professional(self):
+    self.authenticate_super()
+    reference = self.profile.internal_reference_code
+    recycle = self.api.post(
+      f'/api/admin/account-lifecycle/{reference}/action/',
+      {
+        'action': 'move_to_recycle', 'reason': 'Identity and consent verified in support case.',
+        'confirmed_identity': True, 'confirmed_consent': True,
+      },
+      format='json',
+    )
+    self.assertEqual(recycle.status_code, 200)
+    self.profile.refresh_from_db()
+    self.assertEqual(self.profile.lifecycle_status, ProfessionalProfile.LIFECYCLE_RECYCLED)
+
+    restore = self.api.post(
+      f'/api/admin/account-lifecycle/{reference}/action/',
+      {'action': 'restore', 'reason': 'Trainer requested restoration inside 14 days.'},
+      format='json',
+    )
+    self.assertEqual(restore.status_code, 200)
+    self.profile.refresh_from_db()
+    self.assertEqual(self.profile.lifecycle_status, ProfessionalProfile.LIFECYCLE_ACTIVE)
+
   def test_professional_token_cannot_access_admin_dashboard(self):
     token = Token.objects.create(user=self.professional)
     self.api.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')

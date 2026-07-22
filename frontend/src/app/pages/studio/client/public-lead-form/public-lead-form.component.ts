@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -15,7 +16,7 @@ interface CountryDialCode {
 @Component({
   selector: 'app-public-lead-form',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink],
   templateUrl: './public-lead-form.component.html',
   styleUrl: './public-lead-form.component.scss'
 })
@@ -29,6 +30,14 @@ export class PublicLeadFormComponent implements OnInit {
   isSubmitting = false;
   message = '';
   referenceId = '';
+  bookingAccessToken = '';
+  meetingSlots: { start: string }[] = [];
+  selectedMeetingSlot = '';
+  meetingMobile = '';
+  isLoadingSlots = false;
+  isRequestingMeeting = false;
+  meetingRequested = false;
+  meetingMessage = '';
   messageType: 'success' | 'error' = 'success';
   readonly countries = Country.getAllCountries();
   readonly countryDialCodes = this.buildCountryDialCodes();
@@ -66,6 +75,8 @@ export class PublicLeadFormComponent implements OnInit {
     this.formsGroupsApi.submitPublicForm(this.form.public_slug, this.answers).subscribe({
       next: (response) => {
         this.referenceId = response.reference_id;
+        this.bookingAccessToken = response.booking_access_token;
+        if (response.meeting_offer?.enabled && this.bookingAccessToken) this.loadMeetingSlots();
         this.message = response.message;
         this.messageType = 'success';
         this.isSubmitting = false;
@@ -74,6 +85,46 @@ export class PublicLeadFormComponent implements OnInit {
         this.messageType = 'error';
         this.message = this.formatApiError(error, 'Form could not be submitted.');
         this.isSubmitting = false;
+      }
+    });
+  }
+
+  loadMeetingSlots(): void {
+    if (!this.form || !this.bookingAccessToken) return;
+    const start = new Date();
+    const end = new Date(start);
+    end.setDate(end.getDate() + Math.min(7, this.form.meeting_offer.max_advance_days));
+    this.isLoadingSlots = true;
+    this.formsGroupsApi.getPublicMeetingSlots(
+      this.form.public_slug,
+      this.bookingAccessToken,
+      start.toISOString().slice(0, 10),
+      end.toISOString().slice(0, 10)
+    ).subscribe({
+      next: ({ slots }) => {
+        this.meetingSlots = Object.values(slots).flat();
+        this.isLoadingSlots = false;
+      },
+      error: (error: unknown) => {
+        this.meetingMessage = this.formatApiError(error, 'Available times could not be loaded.');
+        this.isLoadingSlots = false;
+      }
+    });
+  }
+
+  requestMeeting(): void {
+    if (!this.form || !this.bookingAccessToken || !this.selectedMeetingSlot) return;
+    this.isRequestingMeeting = true;
+    this.meetingMessage = '';
+    this.formsGroupsApi.requestPublicMeeting(this.form.public_slug, this.bookingAccessToken, this.selectedMeetingSlot, this.meetingMobile).subscribe({
+      next: (response) => {
+        this.meetingRequested = true;
+        this.meetingMessage = response.message;
+        this.isRequestingMeeting = false;
+      },
+      error: (error: unknown) => {
+        this.meetingMessage = this.formatApiError(error, 'Meeting request could not be sent.');
+        this.isRequestingMeeting = false;
       }
     });
   }

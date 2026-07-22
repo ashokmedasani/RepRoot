@@ -127,6 +127,45 @@
           Your reference ID is <strong>{{ referenceId }}</strong>. Please save this for future communication.
           A copy has been sent to your email.
         </p>
+
+        @if (form?.meeting_offer?.enabled) {
+          <section class="meeting-offer" aria-labelledby="meeting-offer-title">
+            <p class="eyebrow">Optional next step</p>
+            <h2 id="meeting-offer-title">Request {{ form?.meeting_offer?.title }}</h2>
+            <p>Choose an available time. This is a request only—the professional must accept it before an invitation is sent.</p>
+
+            @if (meetingRequested) {
+              <div class="meeting-confirmation">
+                <strong>Request sent</strong>
+                <span>{{ meetingMessage }}</span>
+              </div>
+            } @else if (isLoadingSlots) {
+              <p>Loading available times...</p>
+            } @else if (meetingSlots.length) {
+              <div class="slot-grid">
+                @for (slot of meetingSlots; track slot.start) {
+                  <button type="button" class="slot-button" [class.selected]="selectedMeetingSlot === slot.start" (click)="selectedMeetingSlot = slot.start">
+                    {{ slot.start | date: 'EEE, MMM d · h:mm a' }}
+                  </button>
+                }
+              </div>
+              <label>
+                <span class="field-label">Mobile number (optional backup contact)</span>
+                <input type="tel" [(ngModel)]="meetingMobile" name="meetingMobile" placeholder="Include country code">
+              </label>
+              <p class="contact-note">Meeting updates will be sent to the email submitted with this form.</p>
+              <button type="button" class="primary-action" [disabled]="!selectedMeetingSlot || isRequestingMeeting" (click)="requestMeeting()">
+                {{ isRequestingMeeting ? 'Sending request...' : 'Request selected time' }}
+              </button>
+            } @else {
+              <p>No introductory times are currently available. Your form is safely submitted and the professional can contact you directly.</p>
+            }
+
+            @if (meetingMessage && !meetingRequested) {
+              <p class="message error-message">{{ meetingMessage }}</p>
+            }
+          </section>
+        }
       </section>
     }
 

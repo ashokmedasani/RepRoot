@@ -11,6 +11,11 @@
     <p class="message">{{ message() }}</p>
   }
 
+  <div class="reference-guide" role="note">
+    <strong>How this library is organised</strong>
+    <span><b>Category</b> is the main folder, <b>subcategory</b> narrows that folder, and <b>reference title</b> is the actual resource clients receive. Open any resource card to preview its client-facing details.</span>
+  </div>
+
   <section class="references-single" aria-label="References library">
     @if (referenceLimitReached()) {
       <p class="limit-message">You have reached the Version 1 reference limit.</p>
@@ -190,7 +195,7 @@
             <span>Optional Description</span>
             <textarea rows="3" [(ngModel)]="form.description" name="description"></textarea>
           </label>
-        } @else if (form.type === 'PDF Link') {
+        } @else if (form.type === 'PDF') {
           <label class="upload-box">
             <span>PDF Upload</span>
             <input

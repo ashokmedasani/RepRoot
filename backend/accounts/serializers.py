@@ -19,6 +19,7 @@ from .models import (
   ScheduledMeetingGuest,
   GroupRegistrationSubmission,
   LeadSubmission,
+  LeadMeetingRequest,
   ProgressEntry,
   ReferenceCategory,
   SupportIncident,
@@ -685,27 +686,52 @@ class ProfessionalLeadFormSerializer(serializers.ModelSerializer):
 
   class Meta:
     model = ProfessionalLeadForm
-    fields = ['id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
+    fields = [
+      'id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active',
+      'introductory_meeting_enabled', 'introductory_meeting_title', 'introductory_meeting_duration_minutes',
+      'introductory_meeting_event_type_id', 'introductory_meeting_min_notice_hours',
+      'introductory_meeting_max_advance_days', 'introductory_meeting_buffer_minutes',
+      'introductory_meeting_requires_approval', 'created_at', 'updated_at',
+    ]
     read_only_fields = ['public_slug', 'public_link', 'fields', 'is_active', 'created_at', 'updated_at']
 
   def get_public_link(self, obj):
     return get_public_form_link(self.context.get('request'), obj.public_slug)
 
   def validate(self, attrs):
-    attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields', []))
-    attrs['title'] = attrs.get('title', 'Professional Lead Form').strip() or 'Professional Lead Form'
+    if 'custom_fields' in attrs:
+      attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields'))
+    elif self.instance is None:
+      attrs['fields'] = normalize_dynamic_fields([])
+    if 'title' in attrs:
+      attrs['title'] = attrs['title'].strip() or 'Professional Lead Form'
+    elif self.instance is None:
+      attrs['title'] = 'Professional Lead Form'
     return attrs
 
 
 class PublicLeadFormSerializer(serializers.ModelSerializer):
   professional_name = serializers.SerializerMethodField()
+  meeting_offer = serializers.SerializerMethodField()
 
   class Meta:
     model = ProfessionalLeadForm
-    fields = ['id', 'title', 'public_slug', 'professional_name', 'fields']
+    fields = ['id', 'title', 'public_slug', 'professional_name', 'fields', 'meeting_offer']
 
   def get_professional_name(self, obj):
     return obj.professional.get_full_name() or obj.professional.username
+
+  def get_meeting_offer(self, obj):
+    connection = getattr(obj.professional, 'cal_com_connection', None)
+    enabled = bool(obj.introductory_meeting_enabled and connection and connection.is_connected)
+    return {
+      'enabled': enabled,
+      'title': obj.introductory_meeting_title,
+      'duration_minutes': obj.introductory_meeting_duration_minutes,
+      'requires_approval': obj.introductory_meeting_requires_approval,
+      'min_notice_hours': obj.introductory_meeting_min_notice_hours,
+      'max_advance_days': obj.introductory_meeting_max_advance_days,
+    }
 
 
 class ProfessionalGroupSerializer(serializers.ModelSerializer):
@@ -789,6 +815,24 @@ class LeadSubmissionSerializer(serializers.ModelSerializer):
       }
 
     return None
+
+
+class LeadMeetingRequestSerializer(serializers.ModelSerializer):
+  reference_id = serializers.CharField(source='submission.reference_id', read_only=True)
+  applicant_name = serializers.SerializerMethodField()
+  form_title = serializers.CharField(source='submission.lead_form.title', read_only=True)
+
+  class Meta:
+    model = LeadMeetingRequest
+    fields = [
+      'id', 'reference_id', 'applicant_name', 'form_title', 'contact_email', 'contact_mobile',
+      'requested_start', 'requested_end', 'status', 'trainer_note', 'meeting_url', 'expires_at',
+      'reviewed_at', 'created_at', 'updated_at',
+    ]
+    read_only_fields = fields
+
+  def get_applicant_name(self, obj):
+    return f'{obj.submission.first_name} {obj.submission.last_name}'.strip()
 
 
 class PublicLeadSubmissionSerializer(serializers.Serializer):
@@ -905,6 +949,8 @@ class ClientLoginSerializer(serializers.Serializer):
 
     access_records = ClientAccess.objects.filter(
       professional__professional_profile__professional_id__iexact=professional_id,
+      professional__is_active=True,
+      professional__professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_ACTIVE,
       username__iexact=username,
       is_active=True,
     ).select_related('professional', 'group', 'lead_submission', 'registration_submission')
@@ -1302,7 +1348,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 
 class ClientPasswordChangeSerializer(serializers.Serializer):
-  current_password = serializers.CharField(write_only=True)
+  current_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
 
@@ -1317,7 +1363,7 @@ class ClientPasswordChangeSerializer(serializers.Serializer):
 
     client_access = self.context['client_access']
 
-    if not check_password(attrs['current_password'], client_access.temporary_password):
+    if not client_access.must_change_password and not check_password(attrs.get('current_password', ''), client_access.temporary_password):
       raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
 
     return attrs
@@ -1633,16 +1679,26 @@ class ProfessionalPaymentSettingsSerializer(serializers.ModelSerializer):
       'payment_tracking_enabled',
       'reporting_currency',
       'reporting_currency_locked',
+      'reporting_currency_locked_at',
       'client_payment_history_enabled',
       'updated_at',
     ]
-    read_only_fields = ['updated_at']
+    read_only_fields = ['reporting_currency_locked', 'reporting_currency_locked_at', 'updated_at']
 
   def validate_reporting_currency(self, value):
     code = value.strip().upper()
     if code not in ISO_4217_CODES:
       raise serializers.ValidationError('Choose a supported ISO currency code.')
     return code
+
+  def validate(self, attrs):
+    if self.instance and self.instance.reporting_currency_locked:
+      requested = attrs.get('reporting_currency', self.instance.reporting_currency)
+      if requested != self.instance.reporting_currency:
+        raise serializers.ValidationError({
+          'reporting_currency': 'Reporting currency is permanently locked. Contact support to request an audited change.'
+        })
+    return attrs
 
 
 class ManualPaymentProfileSerializer(serializers.ModelSerializer):

@@ -4,7 +4,7 @@
       <span class="brand-mark" aria-hidden="true">
         <img src="/brand/studio/mark.png" alt="">
       </span>
-      <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span></span>
+      <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span> Studio</span>
     </a>
 
     <nav>
@@ -72,8 +72,8 @@
       </div>
       <span class="usage-copy">
         <small>Data usage</small>
-        <strong>{{ isUnlimitedStorage ? 'Unlimited Storage' : (dataUsagePercent | number: '1.0-1') + '%' }}</strong>
-        <em>{{ isUnlimitedStorage ? 'plan' : 'used' }}</em>
+        <strong>{{ dataUsagePercent | number: '1.0-1' }}%</strong>
+        <em>used</em>
       </span>
     </section>
 
@@ -102,6 +102,21 @@
           }
         </div>
         <div class="page-actions">
+          <div class="notification-menu">
+            <button type="button" class="notification-bell" (click)="toggleNotifications()" [attr.aria-expanded]="notificationsOpen" aria-label="Notifications">🔔
+              @if (unreadNotifications > 0) { <span>{{ badgeLabel(unreadNotifications) }}</span> }
+            </button>
+            @if (notificationsOpen) {
+              <section class="notification-panel" aria-label="Recent notifications">
+                <header><strong>Notifications</strong><button type="button" (click)="markAllNotificationsRead()">Mark all read</button></header>
+                @for (item of notifications; track item.id) {
+                  <button type="button" class="notification-row" [class.unread]="!item.is_read" (click)="openNotification(item)">
+                    <strong>{{ item.title }}</strong><span>{{ item.body }}</span><small>{{ item.category }}</small>
+                  </button>
+                } @empty { <p>No notifications yet.</p> }
+              </section>
+            }
+          </div>
           <ng-content select="[page-actions]"></ng-content>
         </div>
       </header>

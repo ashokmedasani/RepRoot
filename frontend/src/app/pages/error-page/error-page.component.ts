@@ -65,7 +65,7 @@ export class ErrorPageComponent implements OnInit {
       return '/client/dashboard';
     }
 
-    return '/';
+    return '/portal';
   }
 
   private safeInternalUrl(url: string): string {

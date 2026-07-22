@@ -460,7 +460,13 @@
           <div class="action-block warn">
             <div>
               <strong>Reset Client</strong>
-              <p>Clears templates, entries, chat, reminders, progress, and notes. Keeps profile details.</p>
+              <p>Permanently clears operational data, including currently hidden history. Profile and core payment records remain.</p>
+              <button type="button" class="link-action" [disabled]="isExportingClient" (click)="exportClientData()">
+                {{ isExportingClient ? 'Preparing export...' : 'Download client data first' }}
+              </button>
+              <label><span>Current professional password</span><input type="password" [(ngModel)]="resetCurrentPassword" autocomplete="current-password"></label>
+              <label><span>Type {{ client.username }} to confirm</span><input type="text" [(ngModel)]="resetConfirmation" autocomplete="off"></label>
+              <label><span>Reset reason</span><textarea rows="2" [(ngModel)]="resetReason"></textarea></label>
             </div>
             <button
               type="button"

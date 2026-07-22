@@ -99,7 +99,7 @@
           <section class="account-section" aria-labelledby="billing-title">
             <div>
               <h2 id="billing-title">Plan & Billing</h2>
-              <p class="section-note">Starter Free costs nothing. Pro and Premium Unlimited raise every capacity limit as your business grows.</p>
+              <p class="section-note">Every plan supports unlimited clients. Plans differ primarily by storage and visible operational history.</p>
             </div>
 
             @if (billingError) {
@@ -124,7 +124,11 @@
                   </div>
                   <div>
                     <span>Clients</span>
-                    <strong>{{ billing.plan['clients'] }}</strong>
+                    <strong aria-label="Unlimited clients">∞ Unlimited</strong>
+                  </div>
+                  <div>
+                    <span>Visible history</span>
+                    <strong>{{ billing.plan['client_data_retention_days'] }} days</strong>
                   </div>
                   <div>
                     <span>Templates</span>
@@ -228,38 +232,29 @@
           <section class="account-section" aria-labelledby="notifications-title">
             <div>
               <h2 id="notifications-title">Notifications</h2>
-              <p class="section-note">Choose what you want to be alerted about. Saved on this device.</p>
+              <p class="section-note">Choose which activity appears in RepRoot Studio and which alerts are also delivered by email.</p>
             </div>
-            <ul class="toggle-list">
-              <li>
-                <div>
-                  <strong>Form Submission</strong>
-                  <small>A new client submits your lead form.</small>
-                </div>
-                <button type="button" class="switch" role="switch" [class.on]="notifications.formSubmission" [attr.aria-checked]="notifications.formSubmission" (click)="toggleNotification('formSubmission')"><span></span></button>
-              </li>
-              <li>
-                <div>
-                  <strong>Client Message</strong>
-                  <small>A client sends you a chat message.</small>
-                </div>
-                <button type="button" class="switch" role="switch" [class.on]="notifications.clientMessage" [attr.aria-checked]="notifications.clientMessage" (click)="toggleNotification('clientMessage')"><span></span></button>
-              </li>
-              <li>
-                <div>
-                  <strong>Schedule Reminder</strong>
-                  <small>An upcoming follow-up is due.</small>
-                </div>
-                <button type="button" class="switch" role="switch" [class.on]="notifications.scheduleReminder" [attr.aria-checked]="notifications.scheduleReminder" (click)="toggleNotification('scheduleReminder')"><span></span></button>
-              </li>
-              <li>
-                <div>
-                  <strong>Email Notifications</strong>
-                  <small>Also receive the alerts above by email.</small>
-                </div>
-                <button type="button" class="switch" role="switch" [class.on]="notifications.email" [attr.aria-checked]="notifications.email" (click)="toggleNotification('email')"><span></span></button>
-              </li>
+            <div class="notification-toolbar" aria-label="Bulk notification controls">
+              <span>Quick controls</span>
+              <button type="button" (click)="setAllNotificationChannel('in_app_enabled', true)">Enable all website</button>
+              <button type="button" (click)="setAllNotificationChannel('in_app_enabled', false)">Disable optional website</button>
+              <button type="button" (click)="setAllNotificationChannel('email_enabled', true)">Enable all email</button>
+              <button type="button" (click)="setAllNotificationChannel('email_enabled', false)">Disable all email</button>
+            </div>
+            <div class="notification-heading" aria-hidden="true"><span>Category</span><span>Website</span><span>Email</span><span>Delivery</span></div>
+            <ul class="toggle-list notification-list">
+              @for (preference of notificationPreferences; track preference.category) {
+                <li>
+                  <div class="notification-name"><strong>{{ notificationLabels[preference.category] || preference.category }}</strong><small>@if (preference.mandatory_in_app) { Required service notice } @else { You can turn this off at any time }</small></div>
+                  <button type="button" class="switch" role="switch" [class.on]="preference.in_app_enabled" [disabled]="preference.mandatory_in_app" [attr.aria-checked]="preference.in_app_enabled" [attr.aria-label]="'Website notifications for ' + notificationLabels[preference.category]" (click)="preference.in_app_enabled = !preference.in_app_enabled; saveNotificationPreference(preference)"><span></span></button>
+                  <button type="button" class="switch" role="switch" [class.on]="preference.email_enabled" [attr.aria-checked]="preference.email_enabled" [attr.aria-label]="'Email notifications for ' + notificationLabels[preference.category]" (click)="preference.email_enabled = !preference.email_enabled; saveNotificationPreference(preference)"><span></span></button>
+                  <select [(ngModel)]="preference.digest_frequency" [disabled]="!preference.email_enabled" (change)="saveNotificationPreference(preference)" [attr.aria-label]="'Email delivery frequency for ' + notificationLabels[preference.category]">
+                    <option value="immediate">Immediate</option><option value="daily">Daily digest</option><option value="weekly">Weekly digest</option><option value="monthly">Monthly digest</option><option value="none">Never</option>
+                  </select>
+                </li>
+              }
             </ul>
+            @if (notificationMessage) { <p class="section-note" aria-live="polite">{{ notificationMessage }}</p> }
           </section>
         </div>
       }
@@ -283,7 +278,7 @@
           <section class="account-section" aria-labelledby="storage-title">
             <div>
               <h2 id="storage-title">Data Usage</h2>
-              <p class="section-note">How full your plan is, by the section that's using it. Shown as a percentage of your plan — not a raw file size.</p>
+              <p class="section-note">How full your plan is, by the section that's using it. Hidden operational history still counts toward storage and is permanently removed after 180 days.</p>
             </div>
 
             @if (dataUsage; as usage) {
@@ -295,7 +290,17 @@
               } @else if (usage.grace_period_ends_at) {
                 <div class="account-banner banner-warning">
                   <strong>Grace period: {{ gracePeriodDaysLeft(usage.grace_period_ends_at) }} day(s) left</strong>
-                  <p>Your account was downgraded and premium features are locked. Upgrade or reduce your data before the grace period ends to avoid a full account freeze.</p>
+                  <p>Your account was downgraded but remains available during this cleanup period. Upgrade or reduce storage before the grace period ends to avoid a full account freeze.</p>
+                </div>
+              } @else if (usage.is_storage_blocked) {
+                <div class="account-banner banner-danger">
+                  <strong>New uploads paused</strong>
+                  <p>You reached the {{ usage.hard_limit_percent }}% temporary ceiling. Existing information remains available; delete files or upgrade storage to resume uploads.</p>
+                </div>
+              } @else if (usage.is_over_quota) {
+                <div class="account-banner banner-warning">
+                  <strong>Temporary storage buffer in use</strong>
+                  <p>You're at {{ usage.usage_percent }}%. Your included allowance is {{ storageSize(usage.included_quota_bytes) }} and uploads continue temporarily up to {{ usage.hard_limit_percent }}%.</p>
                 </div>
               } @else if (usage.is_danger) {
                 <div class="account-banner banner-danger">
@@ -314,6 +319,7 @@
                   <span>{{ usage.plan_name }} plan usage</span>
                   <strong>{{ usage.usage_percent }}%</strong>
                   <small>{{ usageLabelText(usage.usage_label) }}</small>
+                  <small>{{ storageSize(usage.included_quota_bytes) }} included · {{ storageSize(usage.hard_limit_bytes) }} temporary ceiling</small>
                 </div>
                 <div>
                   <span>Stored records</span>
@@ -322,8 +328,8 @@
                 </div>
               </div>
 
-              <div class="storage-meter" role="meter" aria-label="Professional storage used" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="usage.usage_percent">
-                <span [style.width.%]="usage.usage_percent"></span>
+              <div class="storage-meter" role="meter" aria-label="Professional storage used" aria-valuemin="0" [attr.aria-valuemax]="usage.hard_limit_percent" [attr.aria-valuenow]="usage.usage_percent">
+                <span [style.width.%]="(usage.usage_percent / usage.hard_limit_percent) * 100"></span>
               </div>
 
               <div class="usage-table-wrap">

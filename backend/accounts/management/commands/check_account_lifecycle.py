@@ -1,4 +1,4 @@
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from accounts.account_lifecycle import (
     check_and_lock_overages,
     check_and_delete_data,
@@ -13,6 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS('Starting account lifecycle checks...'))
+        failures = []
 
         try:
             self.stdout.write('Checking for accounts to lock (over quota + grace expired)...')
@@ -20,6 +21,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('[OK] Lock check complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Lock check failed: {e}'))
+            failures.append(f'lock check: {e}')
 
         try:
             self.stdout.write('Sending overage notifications to accounts in grace period...')
@@ -27,13 +29,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('[OK] Notification send complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Notification send failed: {e}'))
+            failures.append(f'notifications: {e}')
 
         try:
-            self.stdout.write('Checking for accounts to delete data (locked 30+ days)...')
+            self.stdout.write('Moving 30-day frozen accounts to recycle and purging expired accounts...')
             check_and_delete_data()
             self.stdout.write(self.style.SUCCESS('[OK] Data deletion check complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Data deletion check failed: {e}'))
+            failures.append(f'professional recycle/purge: {e}')
 
         try:
             self.stdout.write('Removing client chat/activity data past plan retention window...')
@@ -41,6 +45,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('[OK] Data retention purge complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Data retention purge failed: {e}'))
+            failures.append(f'data retention: {e}')
 
         try:
             self.stdout.write('Permanently removing Recycle Bin items past their restore window...')
@@ -48,5 +53,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('[OK] Recycle Bin purge complete'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Recycle Bin purge failed: {e}'))
+            failures.append(f'item recycle purge: {e}')
 
+        if failures:
+            raise CommandError('Lifecycle processing failed: ' + '; '.join(failures))
         self.stdout.write(self.style.SUCCESS('All account lifecycle checks complete'))

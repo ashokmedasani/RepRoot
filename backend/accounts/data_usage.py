@@ -79,6 +79,8 @@ def _sanitize_sections(sections: dict, quota_bytes: int) -> dict:
 def _usage_status_label(usage_percent: float) -> str:
   """A human, non-numeric read on the percentage — the percent itself still
   ships in the response, this is just friendlier phrasing to hang it on."""
+  if usage_percent >= settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT:
+    return 'uploads_paused'
   if usage_percent > 100:
     return 'over_capacity'
   if usage_percent >= settings.REPROOT_DATA_USAGE_DANGER_PERCENT:
@@ -175,7 +177,7 @@ def calculate_professional_data_usage(professional) -> dict:
   # goes through _usage_status_label()/usage_display_percent instead, which is
   # visually capped at 100 — percentage only, never raw byte counts.
   usage_percent = round((total_bytes / quota_bytes) * 100, 2)
-  usage_display_percent = min(100, usage_percent)
+  usage_display_percent = min(settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT, usage_percent)
   warning_threshold = settings.REPROOT_DATA_USAGE_WARNING_PERCENT
   danger_threshold = settings.REPROOT_DATA_USAGE_DANGER_PERCENT
 
@@ -198,6 +200,9 @@ def calculate_professional_data_usage(professional) -> dict:
     'plan_name': plan['name'],
     'plan_limits': plan_limits,
     'usage_percent': usage_display_percent,
+    'included_quota_bytes': quota_bytes,
+    'hard_limit_percent': settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT,
+    'hard_limit_bytes': int(quota_bytes * settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT / 100),
     'usage_label': _usage_status_label(usage_percent),
     'record_count': sum(section['record_count'] for section in sections.values()),
     'sections': _sanitize_sections(sections, quota_bytes),
@@ -208,6 +213,7 @@ def calculate_professional_data_usage(professional) -> dict:
     'is_warning': usage_percent >= warning_threshold,
     'is_danger': usage_percent >= danger_threshold,
     'is_over_quota': usage_percent > 100,
+    'is_storage_blocked': usage_percent >= settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT,
     'is_locked': is_locked,
     'lock_reason': lock_reason,
     'grace_period_ends_at': grace_period_ends_at.isoformat() if grace_period_ends_at else None,

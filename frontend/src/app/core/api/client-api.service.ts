@@ -312,6 +312,14 @@ export class ClientApiService {
     );
   }
 
+  getNotifications(limit = 8): Observable<{ notifications: import('./professional-auth-api.service').ActivityNotification[]; unread_count: number; unread_by_category: Record<string, number> }> {
+    return this.http.get<any>(`${this.apiBaseUrl}/client/notifications/?limit=${limit}`, { headers: this.getAuthHeaders() });
+  }
+
+  markNotificationRead(notificationId?: number): Observable<{ unread_count: number }> {
+    return this.http.patch<{ unread_count: number }>(`${this.apiBaseUrl}/client/notifications/`, notificationId ? { notification_id: notificationId } : { mark_all_read: true }, { headers: this.getAuthHeaders() });
+  }
+
   private getAuthHeaders(): HttpHeaders {
     const token = window.sessionStorage.getItem('client-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `ClientToken ${token}` } : {});

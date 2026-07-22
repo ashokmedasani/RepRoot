@@ -15,18 +15,18 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
-type ReferenceTypeLabel = 'Video Link' | 'PDF Link' | 'Text' | 'Image';
+type ReferenceTypeLabel = 'Video Link' | 'PDF' | 'Text' | 'Image';
 
 const TYPE_LABELS: Record<ReferenceType, ReferenceTypeLabel> = {
   video_link: 'Video Link',
-  pdf: 'PDF Link',
+  pdf: 'PDF',
   image: 'Image',
   text_note: 'Text'
 };
 
 const TYPE_VALUES: Record<ReferenceTypeLabel, ReferenceType> = {
   'Video Link': 'video_link',
-  'PDF Link': 'pdf',
+  'PDF': 'pdf',
   'Image': 'image',
   'Text': 'text_note'
 };
@@ -78,7 +78,7 @@ export class ProfessionalReferencesComponent implements OnInit {
   private readonly referencesApi = inject(ReferencesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 
-  readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF Link', 'Text', 'Image'];
+  readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF', 'Text', 'Image'];
   readonly references = signal<ProfessionalReferenceView[]>([]);
   readonly categories = signal<ReferenceCategoryRecord[]>([]);
   readonly selectedCategory = signal('All References');
@@ -446,7 +446,7 @@ export class ProfessionalReferencesComponent implements OnInit {
       return;
     }
 
-    if (this.form.type === 'PDF Link') {
+    if (this.form.type === 'PDF') {
       if (file.type !== 'application/pdf') {
         this.message.set('Only PDF uploads are supported for PDF references.');
         input.value = '';
@@ -460,7 +460,7 @@ export class ProfessionalReferencesComponent implements OnInit {
 
     this.form.file = file;
     this.form.fileName = file.name;
-    if (this.form.type !== 'PDF Link') {
+    if (this.form.type !== 'PDF') {
       this.form.type = 'Image';
     }
   }
@@ -557,7 +557,7 @@ export class ProfessionalReferencesComponent implements OnInit {
       }
     }
 
-    if (this.form.type === 'PDF Link' && !this.form.link.trim() && !this.form.file && !this.form.fileName) {
+    if (this.form.type === 'PDF' && !this.form.link.trim() && !this.form.file && !this.form.fileName) {
       return 'Upload a PDF or paste a PDF URL.';
     }
 

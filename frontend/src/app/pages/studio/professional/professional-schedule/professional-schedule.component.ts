@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 
 import { ClientAccessRecord, FormsGroupsApiService } from '@core/api/forms-groups-api.service';
@@ -9,6 +9,7 @@ import {
   CalComConnectionRecord,
   CalComEventType,
   CalComSlotsByDate,
+  LeadFormMeetingRecord,
   ScheduledMeetingRecord,
   SchedulingApiService
 } from '@core/api/scheduling-api.service';
@@ -19,7 +20,7 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 @Component({
   selector: 'app-professional-schedule',
   standalone: true,
-  imports: [DatePipe, FormsModule, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent],
   templateUrl: './professional-schedule.component.html',
   styleUrl: './professional-schedule.component.scss'
 })
@@ -36,6 +37,7 @@ export class ProfessionalScheduleComponent implements OnInit {
   connection: CalComConnectionRecord | null = null;
   eventTypes: CalComEventType[] = [];
   meetings: ScheduledMeetingRecord[] = [];
+  leadMeetings: LeadFormMeetingRecord[] = [];
   clients: ClientAccessRecord[] = [];
   clientGroups: { id: number; name: string; clients: ClientAccessRecord[] }[] = [];
 
@@ -166,9 +168,27 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   loadMeetings(): void {
     this.schedulingApi.getMeetings().subscribe({
-      next: (response) => (this.meetings = response.meetings),
-      error: () => (this.meetings = [])
+      next: (response) => {
+        this.meetings = response.meetings;
+        this.leadMeetings = response.lead_meetings || [];
+      },
+      error: () => {
+        this.meetings = [];
+        this.leadMeetings = [];
+      }
     });
+  }
+
+  get upcomingLeadMeetings(): LeadFormMeetingRecord[] {
+    const now = Date.now();
+    return this.leadMeetings.filter((meeting) => new Date(meeting.requested_start).getTime() >= now)
+      .sort((a, b) => new Date(a.requested_start).getTime() - new Date(b.requested_start).getTime());
+  }
+
+  get pastLeadMeetings(): LeadFormMeetingRecord[] {
+    const now = Date.now();
+    return this.leadMeetings.filter((meeting) => new Date(meeting.requested_start).getTime() < now)
+      .sort((a, b) => new Date(b.requested_start).getTime() - new Date(a.requested_start).getTime());
   }
 
   get upcomingMeetings(): ScheduledMeetingRecord[] {
@@ -210,7 +230,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     return this.calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   }
 
-  get calendarWeeks(): { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number }[][] {
+  get calendarWeeks(): { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[][] {
     const year = this.calendarMonth.getFullYear();
     const month = this.calendarMonth.getMonth();
     const firstOfMonth = new Date(year, month, 1);
@@ -219,22 +239,26 @@ export class ProfessionalScheduleComponent implements OnInit {
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const countsByDate = this.meetingCountsByDate();
+    const minutesByDate = this.meetingMinutesByDate();
 
-    const cells: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number }[] = [];
+    const cells: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[] = [];
     for (let i = 0; i < 42; i++) {
       const cellDate = new Date(gridStart);
       cellDate.setDate(gridStart.getDate() + i);
       const iso = cellDate.toISOString().slice(0, 10);
+      const bookedMinutes = minutesByDate[iso] || 0;
       cells.push({
         iso,
         day: cellDate.getDate(),
         inMonth: cellDate.getMonth() === month,
         isToday: iso === todayIso,
-        meetingCount: countsByDate[iso] || 0
+        meetingCount: countsByDate[iso] || 0,
+        bookedMinutes,
+        occupancy: bookedMinutes === 0 ? 'open' : bookedMinutes <= 60 ? 'light' : bookedMinutes <= 180 ? 'moderate' : 'busy'
       });
     }
 
-    const weeks: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number }[][] = [];
+    const weeks: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[][] = [];
     for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
     return weeks;
   }
@@ -247,6 +271,17 @@ export class ProfessionalScheduleComponent implements OnInit {
       counts[iso] = (counts[iso] || 0) + 1;
     }
     return counts;
+  }
+
+  private meetingMinutesByDate(): Record<string, number> {
+    const minutes: Record<string, number> = {};
+    for (const meeting of this.meetings) {
+      if (meeting.status === 'cancelled') continue;
+      const iso = meeting.start_at.slice(0, 10);
+      const duration = Math.max(0, (new Date(meeting.end_at).getTime() - new Date(meeting.start_at).getTime()) / 60000);
+      minutes[iso] = (minutes[iso] || 0) + duration;
+    }
+    return minutes;
   }
 
   goToPrevMonth(): void {
@@ -268,10 +303,6 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   clearCalendarSelection(): void {
     this.selectedCalendarDate = null;
-  }
-
-  dotsArray(count: number): number[] {
-    return Array.from({ length: Math.min(count, 3) });
   }
 
   guestNames(meeting: ScheduledMeetingRecord): string {

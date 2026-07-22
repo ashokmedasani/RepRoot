@@ -5,14 +5,20 @@ from django.core import mail
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from rest_framework.authtoken.models import Token
+
+from . import account_lifecycle
+from . import data_retention
 
 from .models import (
   ChatMessage,
   ClientAccess,
+  ClientAuthToken,
   ClientDetailChangeRequest,
   ClientPaymentMethodAccess,
   ClientRegistrationForm,
   ClientReminder,
+  ClientResetAudit,
   ManualPaymentProfile,
   PaymentAuditLog,
   PaymentProof,
@@ -28,6 +34,100 @@ from .models import (
   ProfessionalProfile,
   UNIVERSAL_CORE_FIELDS,
 )
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', REPROOT_RECYCLE_BIN_DAYS=14)
+class ProfessionalLifecycleTests(APITestCase):
+  def setUp(self):
+    User = get_user_model()
+    self.user = User.objects.create_user('lifecycle', 'lifecycle@example.test', 'Strong!Pass7')
+    self.profile = ProfessionalProfile.objects.create(
+      user=self.user, professional_id='lifecycle-pro', profile_setup_completed=True
+    )
+    self.group = ProfessionalGroup.objects.create(professional=self.user, name='Lifecycle Clients')
+    self.client_record = ClientAccess.objects.create(
+      professional=self.user, group=self.group, first_name='Test', last_name='Client',
+      email='client@example.test', username='lifeclient', temporary_password='Strong!Pass7',
+    )
+    self.professional_token = Token.objects.create(user=self.user)
+    self.client_token = ClientAuthToken.objects.create(client=self.client_record, key='a' * 40)
+
+  def test_move_to_recycle_revokes_access_and_restores_exact_graph(self):
+    account_lifecycle.move_professional_to_recycle(
+      self.profile,
+      reason=ProfessionalProfile.LIFECYCLE_REASON_TRAINER_REQUESTED,
+      recycled_by_reference='STF-TEST',
+    )
+    self.user.refresh_from_db()
+    self.profile.refresh_from_db()
+    self.assertFalse(self.user.is_active)
+    self.assertEqual(self.profile.lifecycle_status, ProfessionalProfile.LIFECYCLE_RECYCLED)
+    self.assertEqual((self.profile.recycle_expires_at - self.profile.recycled_at).days, 14)
+    self.assertFalse(Token.objects.filter(pk=self.professional_token.pk).exists())
+    self.assertFalse(ClientAuthToken.objects.filter(pk=self.client_token.pk).exists())
+    self.assertTrue(ClientAccess.objects.filter(pk=self.client_record.pk).exists())
+
+    account_lifecycle.restore_professional_from_recycle(self.profile)
+    self.user.refresh_from_db()
+    self.profile.refresh_from_db()
+    self.assertTrue(self.user.is_active)
+    self.assertEqual(self.profile.lifecycle_status, ProfessionalProfile.LIFECYCLE_ACTIVE)
+    self.assertTrue(ClientAccess.objects.filter(pk=self.client_record.pk).exists())
+
+  def test_frozen_account_moves_to_recycle_then_is_permanently_deleted(self):
+    self.profile.is_locked = True
+    self.profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_FROZEN
+    self.profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
+    self.profile.locked_at = timezone.now() - timedelta(days=31)
+    self.profile.save()
+    account_lifecycle.check_and_delete_data()
+    self.profile.refresh_from_db()
+    self.assertEqual(self.profile.lifecycle_status, ProfessionalProfile.LIFECYCLE_RECYCLED)
+    self.profile.recycle_expires_at = timezone.now() - timedelta(seconds=1)
+    self.profile.save(update_fields=['recycle_expires_at'])
+    account_lifecycle.purge_expired_professional_accounts()
+    self.assertFalse(get_user_model().objects.filter(pk=self.user.pk).exists())
+
+  def test_plan_visibility_can_reveal_hidden_history_until_day_180(self):
+    message = ChatMessage.objects.create(
+      professional=self.user, client=self.client_record, sender=ChatMessage.SENDER_CLIENT, text='hidden history'
+    )
+    ChatMessage.objects.filter(pk=message.pk).update(created_at=timezone.now() - timedelta(days=70))
+    self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.professional_token.key}')
+    url = f'/api/accounts/professional/clients/{self.client_record.pk}/chat/'
+    starter = self.client.get(url)
+    self.assertEqual(starter.status_code, 200)
+    self.assertEqual(starter.data['messages'], [])
+
+    self.profile.plan_tier = ProfessionalProfile.PLAN_PREMIUM_UNLIMITED
+    self.profile.save(update_fields=['plan_tier'])
+    premium = self.client.get(url)
+    self.assertEqual(len(premium.data['messages']), 1)
+
+    ChatMessage.objects.filter(pk=message.pk).update(created_at=timezone.now() - timedelta(days=181))
+    data_retention.purge_expired_client_data()
+    self.assertFalse(ChatMessage.objects.filter(pk=message.pk).exists())
+
+  def test_client_reset_requires_password_and_username_and_writes_audit(self):
+    message = ChatMessage.objects.create(
+      professional=self.user, client=self.client_record, sender=ChatMessage.SENDER_CLIENT, text='reset me'
+    )
+    self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.professional_token.key}')
+    url = f'/api/accounts/professional/forms-groups/clients/{self.client_record.pk}/reset/'
+    rejected = self.client.post(url, {
+      'current_password': 'wrong', 'confirmation': self.client_record.username, 'reason': 'Requested cleanup.'
+    }, format='json')
+    self.assertEqual(rejected.status_code, 400)
+    self.assertTrue(ChatMessage.objects.filter(pk=message.pk).exists())
+
+    accepted = self.client.post(url, {
+      'current_password': 'Strong!Pass7', 'confirmation': self.client_record.username,
+      'reason': 'Trainer verified irreversible cleanup.',
+    }, format='json')
+    self.assertEqual(accepted.status_code, 200)
+    self.assertFalse(ChatMessage.objects.filter(pk=message.pk).exists())
+    self.assertTrue(ClientResetAudit.objects.filter(client=self.client_record).exists())
+    self.assertFalse(ClientAuthToken.objects.filter(client=self.client_record).exists())
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -435,6 +535,7 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(professional_unread.status_code, 200, professional_unread.data)
     self.assertEqual(professional_unread.data['unread_count'], 1)
     self.assertEqual(professional_unread.data['by_client'][str(client_access.id)], 1)
+    self.assertEqual(professional_unread.data['client_names'][str(client_access.id)], 'Rahul Kumar')
 
     opened_by_professional = self.client.get(f'/api/accounts/professional/clients/{client_access.id}/chat/')
     self.assertEqual(opened_by_professional.status_code, 200, opened_by_professional.data)
@@ -934,3 +1035,51 @@ class ClientPaymentsWorkflowTests(APITestCase):
     self.assertEqual(confirmation['professional_note'], 'Thanks!')
     self.assertEqual(confirmation['amount_recorded'], '75.00')
     self.assertEqual(confirmation['status'], 'completed')
+
+  def test_reporting_currency_can_be_confirmed_once_and_not_changed(self):
+    response = self.client.put(
+      '/api/accounts/professional/payments/settings/',
+      {'reporting_currency': 'INR', 'confirm_reporting_currency': True},
+      format='json',
+    )
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertTrue(response.data['settings']['reporting_currency_locked'])
+    self.assertIsNotNone(response.data['settings']['reporting_currency_locked_at'])
+
+    rejected = self.client.put(
+      '/api/accounts/professional/payments/settings/', {'reporting_currency': 'USD'}, format='json'
+    )
+    self.assertEqual(rejected.status_code, 400, rejected.data)
+    self.assertEqual(ProfessionalPaymentSettings.objects.get(professional=self.user).reporting_currency, 'INR')
+
+  def test_forced_first_password_change_does_not_repeat_temporary_password(self):
+    self.client.force_authenticate(user=None)
+    response = self.client.post(
+      '/api/accounts/client/change-password/',
+      {'password': 'NewClient!29', 'confirm_password': 'NewClient!29'},
+      format='json', HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertFalse(response.data['client']['must_change_password'])
+
+  def test_transaction_ledger_is_visible_and_immutable(self):
+    from admin_portal.models import FinanceLedgerEntry
+
+    response = self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'original_amount': '50.00', 'original_currency': 'INR',
+        'reporting_amount': '50.00', 'reporting_currency': 'INR',
+        'received_date': timezone.now().date().isoformat(), 'status': 'completed',
+      }, format='json',
+    )
+    self.assertEqual(response.status_code, 201, response.data)
+    ledger = self.client.get('/api/accounts/professional/payments/transactions/')
+    self.assertEqual(ledger.status_code, 200, ledger.data)
+    self.assertEqual(ledger.data['transactions'][0]['source'], 'client_payment')
+    row = FinanceLedgerEntry.objects.get(professional=self.user)
+    self.assertTrue(row.client_reference)
+    row.description = 'rewritten'
+    with self.assertRaises(ValueError):
+      row.save()

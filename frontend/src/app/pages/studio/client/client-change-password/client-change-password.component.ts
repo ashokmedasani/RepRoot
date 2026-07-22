@@ -30,8 +30,17 @@ export class ClientChangePasswordComponent {
     return Boolean(window.sessionStorage.getItem('client-auth-token'));
   }
 
+  get isForcedFirstChange(): boolean {
+    try {
+      return Boolean(JSON.parse(window.sessionStorage.getItem('client-access') || '{}').must_change_password);
+    } catch {
+      return false;
+    }
+  }
+
   changePassword(): void {
-    if (!this.passwordForm.currentPassword || !this.passwordForm.password || !this.passwordForm.confirmPassword) {
+    const wasForcedFirstChange = this.isForcedFirstChange;
+    if ((!this.isForcedFirstChange && !this.passwordForm.currentPassword) || !this.passwordForm.password || !this.passwordForm.confirmPassword) {
       this.message = 'All password fields are required.';
       return;
     }
@@ -55,7 +64,9 @@ export class ClientChangePasswordComponent {
 
           window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
           this.isSubmitting = false;
-          void this.router.navigate(['/client/dashboard']);
+          void this.router.navigate(wasForcedFirstChange ? ['/client/profile'] : ['/client/dashboard'], {
+            queryParams: wasForcedFirstChange ? { onboarding: '1' } : undefined
+          });
         },
         error: (error: unknown) => {
           this.message = formatApiError(error, 'Password could not be changed.');

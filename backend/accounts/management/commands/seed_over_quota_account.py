@@ -31,7 +31,7 @@ class Command(BaseCommand):
             '--days-downgraded',
             type=int,
             default=2,
-            help='Days since account was downgraded (grace period is 7 days by default)'
+            help='Days since account was downgraded (grace period is 14 days by default)'
         )
 
     def handle(self, *args, **options):

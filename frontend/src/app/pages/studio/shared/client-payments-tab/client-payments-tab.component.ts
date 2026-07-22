@@ -117,7 +117,7 @@ export class ClientPaymentsTabComponent implements OnInit {
       next: (response) => {
         this.currencyOptions = response.currency_options;
         this.reportingCurrency = response.settings.reporting_currency;
-        this.dashboardUnlocked = !response.settings.reporting_currency_locked;
+        this.dashboardUnlocked = response.settings.reporting_currency_locked;
         this.requestForm.requested_currency = response.settings.reporting_currency;
       },
       error: () => (this.currencyOptions = ['USD', 'INR', 'EUR', 'GBP', 'CAD', 'AUD'])

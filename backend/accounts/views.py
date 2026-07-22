@@ -1,15 +1,19 @@
+import json
 import random
+import tempfile
+import zipfile
 from datetime import datetime, time, timedelta
 
 import stripe
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, ProtectedError, Q
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.views.decorators.csrf import csrf_exempt
@@ -32,6 +36,7 @@ from .models import (
   ClientDetailChangeRequest,
   ClientRegistrationForm,
   ClientReminder,
+  ClientResetAudit,
   GroupRegistrationSubmission,
   LeadSubmission,
   ProgressEntry,
@@ -95,6 +100,8 @@ from .serializers import (
   UsernameAvailabilitySerializer,
 )
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
+from .access_permissions import ProfessionalAccessPermission
+from .data_retention import visible_client_data_cutoff
 from .data_usage import calculate_professional_data_usage
 from .email_verification import OtpCooldownError, send_email_otp, verify_email_otp
 from .standard_templates import STANDARD_TEMPLATES, get_standard_template
@@ -363,7 +370,7 @@ class ProfessionalCodeAvailabilityView(APIView):
 
 
 class ProfessionalCodeUpdateView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     return Response({'professional_code': request.user.professional_profile.professional_id or ''})
@@ -603,7 +610,7 @@ class PasswordResetConfirmView(APIView):
 
 
 class ProfessionalProfileStatusView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     profile = request.user.professional_profile
@@ -611,14 +618,14 @@ class ProfessionalProfileStatusView(APIView):
 
 
 class ProfessionalDataUsageView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     return Response(calculate_professional_data_usage(request.user))
 
 
 class RecycleBinListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     items = RecycleBinItem.objects.filter(professional=request.user)
@@ -626,7 +633,7 @@ class RecycleBinListView(APIView):
 
 
 class RecycleBinRestoreView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, item_id):
     item = RecycleBinItem.objects.filter(id=item_id, professional=request.user).first()
@@ -643,7 +650,7 @@ class RecycleBinRestoreView(APIView):
 
 
 class RecycleBinPermanentDeleteView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def delete(self, request, item_id):
     item = RecycleBinItem.objects.filter(id=item_id, professional=request.user).first()
@@ -655,7 +662,7 @@ class RecycleBinPermanentDeleteView(APIView):
 
 
 class ProfessionalBillingStatusView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     profile = request.user.professional_profile
@@ -677,7 +684,7 @@ class ProfessionalBillingStatusView(APIView):
 
 
 class ProfessionalBillingCheckoutView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     target_tier = str(request.data.get('target_tier', '')).strip().lower()
@@ -721,7 +728,7 @@ class ProfessionalBillingCancelView(APIView):
   """Self-serve 'cancel plan' — the missing piece that left professionals
   stuck once they'd been moved off Starter Free with no way back."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     profile = request.user.professional_profile
@@ -744,7 +751,7 @@ class ProfessionalBillingCancelView(APIView):
 
 
 class ProfessionalBillingPortalView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     if not settings.STRIPE_SECRET_KEY:
@@ -805,6 +812,14 @@ def stripe_webhook(request):
         professional=profile.user,
         description=f'{profile.get_plan_tier_display()} subscription started',
         external_reference=data.get('id', ''),
+        source='platform_subscription',
+        professional_reference=profile.internal_reference_code,
+        original_amount=(data.get('amount_total') or 0) / 100,
+        original_currency=(data.get('currency') or 'usd').upper(),
+        reporting_amount=(data.get('amount_total') or 0) / 100,
+        reporting_currency=(data.get('currency') or 'usd').upper(),
+        provider='stripe',
+        metadata={'target_tier': profile.plan_tier, 'subscription_reference': data.get('subscription') or ''},
         occurred_at=timezone.now(),
       )
 
@@ -819,7 +834,7 @@ def stripe_webhook(request):
         profile.save(update_fields=['plan_renews_at'])
       if sub_status in ('canceled', 'unpaid', 'incomplete_expired'):
         # Route through the lifecycle service, not a direct plan_tier write —
-        # this starts the 7-day grace period and sends the downgrade email
+        # this starts the 14-day grace period and sends the downgrade email
         # instead of silently dropping the professional to Starter Free.
         account_lifecycle.process_downgrade(profile)
       elif sub_status in ('active', 'trialing'):
@@ -850,6 +865,14 @@ def stripe_webhook(request):
         professional=profile.user,
         description='Premium subscription payment failed',
         external_reference=data.get('id', ''),
+        source='platform_subscription',
+        professional_reference=profile.internal_reference_code,
+        original_amount=(data.get('amount_due') or 0) / 100,
+        original_currency=(data.get('currency') or 'usd').upper(),
+        reporting_amount=(data.get('amount_due') or 0) / 100,
+        reporting_currency=(data.get('currency') or 'usd').upper(),
+        provider='stripe',
+        metadata={'invoice_reference': data.get('id', '')},
         occurred_at=timezone.now(),
       )
 
@@ -857,7 +880,7 @@ def stripe_webhook(request):
 
 
 class ProfessionalProfileView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [MultiPartParser, FormParser]
 
   def get(self, request):
@@ -886,7 +909,7 @@ class ProfessionalProfileView(APIView):
 
 
 class ProfessionalProfileVisibilityView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request):
     profile = request.user.professional_profile
@@ -904,7 +927,7 @@ class ProfessionalProfileVisibilityView(APIView):
 
 
 class ProfessionalLogoutView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     Token.objects.filter(user=request.user).delete()
@@ -912,30 +935,45 @@ class ProfessionalLogoutView(APIView):
 
 
 class ProfessionalAccountView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def delete(self, request):
-    user = User.objects.select_related('professional_profile').get(pk=request.user.pk)
+    existing = SupportIncident.objects.filter(
+      reporter_professional=request.user,
+      reporter_role=SupportIncident.ROLE_PROFESSIONAL,
+      category=SupportIncident.CATEGORY_ACCOUNT,
+      subject='Professional account deletion request',
+      status__in=SupportIncident.ACTIVE_STATUSES,
+    ).first()
+    if existing:
+      return Response({
+        'incident_id': existing.incident_id,
+        'message': 'Your account deletion request is already being reviewed by support.',
+      })
 
-    if not isinstance(getattr(user, 'professional_profile', None), ProfessionalProfile):
-      return Response({'message': 'Professional account not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    with transaction.atomic():
-      RecycledProfessionalAccount.objects.create(
-        original_user_id=user.id,
-        email=user.email,
-        username=user.username,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        account_snapshot=build_professional_account_snapshot(user),
-      )
-      user.delete()
-
-    return Response({'message': 'Professional account deleted and moved to recycle space.'})
+    incident = SupportIncident.objects.create(
+      reporter_role=SupportIncident.ROLE_PROFESSIONAL,
+      reporter_professional=request.user,
+      reporter_name=request.user.get_full_name() or request.user.username,
+      reporter_email=request.user.email,
+      category=SupportIncident.CATEGORY_ACCOUNT,
+      subject='Professional account deletion request',
+      description=(
+        'The trainer requested deletion of the complete professional account. '
+        'Support must verify identity and receive explicit confirmation before moving it to the 14-day Recycle Bin.'
+      ),
+      page_feature='Professional account settings',
+      platform='web',
+      priority=SupportIncident.PRIORITY_HIGH,
+    )
+    return Response({
+      'incident_id': incident.incident_id,
+      'message': 'Deletion request sent to support. Your account remains active until identity and consent are verified.',
+    }, status=status.HTTP_202_ACCEPTED)
 
 
 class ProfessionalPasswordChangeView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     serializer = ProfessionalPasswordChangeSerializer(data=request.data, context={'user': request.user})
@@ -946,7 +984,7 @@ class ProfessionalPasswordChangeView(APIView):
 
 
 class FormsGroupsOverviewView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
@@ -971,7 +1009,7 @@ class FormsGroupsOverviewView(APIView):
 
 
 class ProfessionalLeadFormView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
@@ -1001,7 +1039,7 @@ class ProfessionalLeadFormView(APIView):
 
 
 class ProfessionalGroupListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     group_limit = plan_limit(request.user, 'groups')
@@ -1031,7 +1069,7 @@ class ProfessionalGroupListView(APIView):
 
 
 class ProfessionalGroupDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_group(self, request, group_id):
     return ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
@@ -1062,7 +1100,7 @@ class ProfessionalGroupDetailView(APIView):
 
 
 class ClientRegistrationFormView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, group_id):
     group = ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
@@ -1097,7 +1135,10 @@ class PublicLeadFormView(APIView):
   throttle_scope = 'public_registration'
 
   def get(self, request, public_slug):
-    lead_form = ProfessionalLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('professional').first()
+    lead_form = ProfessionalLeadForm.objects.filter(
+      public_slug=public_slug, is_active=True, professional__is_active=True,
+      professional__professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_ACTIVE,
+    ).select_related('professional').first()
 
     if lead_form is None:
       return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1105,7 +1146,10 @@ class PublicLeadFormView(APIView):
     return Response(PublicLeadFormSerializer(lead_form).data)
 
   def post(self, request, public_slug):
-    lead_form = ProfessionalLeadForm.objects.filter(public_slug=public_slug, is_active=True).select_related('professional').first()
+    lead_form = ProfessionalLeadForm.objects.filter(
+      public_slug=public_slug, is_active=True, professional__is_active=True,
+      professional__professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_ACTIVE,
+    ).select_related('professional').first()
 
     if lead_form is None:
       return Response({'message': 'Public form not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1133,6 +1177,8 @@ class PublicLeadFormView(APIView):
     return Response(
       {
         'reference_id': submission.reference_id,
+        'booking_access_token': str(submission.booking_access_token) if lead_form.introductory_meeting_enabled else '',
+        'meeting_offer': PublicLeadFormSerializer(lead_form).data['meeting_offer'],
         'message': f'Your form has been submitted successfully. Your reference ID is {submission.reference_id}. Please save this for future communication. A copy has been sent to your email.',
       },
       status=status.HTTP_201_CREATED,
@@ -1140,7 +1186,7 @@ class PublicLeadFormView(APIView):
 
 
 class PendingLeadSubmissionView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def delete(self, request, submission_id):
     submission = LeadSubmission.objects.filter(
@@ -1161,7 +1207,7 @@ class PendingLeadSubmissionView(APIView):
 
 
 class ClientAccessCreateView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, submission_id):
     client_limit = plan_limit(request.user, 'clients')
@@ -1239,7 +1285,7 @@ class ClientAccessCreateView(APIView):
 
 
 class ManualClientAccessCreateView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     client_limit = plan_limit(request.user, 'clients')
@@ -1357,6 +1403,8 @@ class PublicGroupRegistrationView(APIView):
       public_slug=public_slug,
       is_active=True,
       group__is_active=True,
+      group__professional__is_active=True,
+      group__professional__professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_ACTIVE,
     ).select_related('group', 'group__professional').first()
 
   def get(self, request, public_slug):
@@ -1411,7 +1459,7 @@ class PublicGroupRegistrationView(APIView):
 
 
 class GroupClientAccessListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, group_id):
     group = ProfessionalGroup.objects.filter(id=group_id, professional=request.user, is_active=True).first()
@@ -1435,7 +1483,7 @@ class GroupClientAccessListView(APIView):
 
 
 class ClientAccessDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_client(self, request, client_id):
     # No is_active filter: the professional can open a suspended client to reactivate.
@@ -1521,7 +1569,7 @@ class ClientAccessDetailView(APIView):
 
 
 class ClientProfessionalNotesView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -1542,7 +1590,7 @@ class ClientProfessionalNotesView(APIView):
     )
 
 class ClientAccessPhotoView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -1559,7 +1607,7 @@ class ClientAccessPhotoView(APIView):
 
 
 class ClientAdditionalInfoView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -1580,7 +1628,7 @@ class ClientAdditionalInfoView(APIView):
 
 
 class ClientReminderListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _client(self, request, client_id):
     return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -1591,7 +1639,8 @@ class ClientReminderListView(APIView):
     if client is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({'reminders': ClientReminderSerializer(client.reminders.all(), many=True).data})
+    cutoff = visible_client_data_cutoff(request.user)
+    return Response({'reminders': ClientReminderSerializer(client.reminders.filter(date__gte=cutoff.date()), many=True).data})
 
   def post(self, request, client_id):
     client = self._client(request, client_id)
@@ -1610,7 +1659,7 @@ class ClientReminderListView(APIView):
 
 
 class ClientReminderDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _reminder(self, request, reminder_id):
     return ClientReminder.objects.filter(id=reminder_id, professional=request.user).select_related('client').first()
@@ -1638,10 +1687,13 @@ class ClientReminderDetailView(APIView):
 
 
 class ProfessionalUpcomingRemindersView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    reminders_queryset = ClientReminder.objects.filter(professional=request.user).select_related('client')
+    cutoff = visible_client_data_cutoff(request.user)
+    reminders_queryset = ClientReminder.objects.filter(
+      professional=request.user, date__gte=cutoff.date()
+    ).select_related('client')
     pending = list(reminders_queryset.filter(status=ClientReminder.STATUS_PENDING))
     completed = reminders_queryset.filter(status=ClientReminder.STATUS_DONE)
     pending_profile_edits_queryset = ClientDetailChangeRequest.objects.filter(
@@ -1712,7 +1764,7 @@ class ProfessionalUpcomingRemindersView(APIView):
 
 
 class ClientProgressListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def _client(self, request, client_id):
     return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -1723,7 +1775,8 @@ class ClientProgressListView(APIView):
     if client is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({'progress': ProgressEntrySerializer(client.progress_entries.all(), many=True).data})
+    cutoff = visible_client_data_cutoff(request.user)
+    return Response({'progress': ProgressEntrySerializer(client.progress_entries.filter(created_at__gte=cutoff), many=True).data})
 
   def post(self, request, client_id):
     client = self._client(request, client_id)
@@ -1746,10 +1799,12 @@ class ClientProgressListView(APIView):
 
 
 class ClientProgressDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, entry_id):
-    entry = ProgressEntry.objects.filter(id=entry_id, client__professional=request.user).first()
+    entry = ProgressEntry.objects.filter(
+      id=entry_id, client__professional=request.user, created_at__gte=visible_client_data_cutoff(request.user)
+    ).first()
 
     if entry is None:
       return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1761,7 +1816,9 @@ class ClientProgressDetailView(APIView):
     return Response({'progress': ProgressEntrySerializer(entry).data, 'message': 'Progress record updated.'})
 
   def delete(self, request, entry_id):
-    entry = ProgressEntry.objects.filter(id=entry_id, client__professional=request.user).first()
+    entry = ProgressEntry.objects.filter(
+      id=entry_id, client__professional=request.user, created_at__gte=visible_client_data_cutoff(request.user)
+    ).first()
 
     if entry is None:
       return Response({'message': 'Progress record not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -1771,7 +1828,7 @@ class ClientProgressDetailView(APIView):
 
 
 class ProfessionalClientChangeRequestActionView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, client_id, request_id):
     change_request = ClientDetailChangeRequest.objects.filter(
@@ -1881,7 +1938,7 @@ class ProfessionalDirectoryView(APIView):
 
 
 class ClientAccessStatusView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
@@ -1897,7 +1954,7 @@ class ClientAccessStatusView(APIView):
 
 
 class ClientAccessPasswordResetView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
@@ -1950,7 +2007,7 @@ class ClientAccessResetView(APIView):
   """Wipe a client's activity (templates, entries, chat, reminders, progress,
   additional info, notes) while keeping their profile / registration identity."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
@@ -1958,7 +2015,28 @@ class ClientAccessResetView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    confirmation = str(request.data.get('confirmation') or '').strip()
+    current_password = str(request.data.get('current_password') or '')
+    reason = str(request.data.get('reason') or '').strip()
+    if confirmation != client_access.username:
+      return Response({'message': f'Type {client_access.username} exactly to confirm the reset.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not check_password(current_password, request.user.password):
+      return Response({'message': 'Your current professional password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not reason:
+      return Response({'message': 'A reset reason is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    chat_file_names = list(
+      ChatMessage.objects.filter(client=client_access).exclude(image='').values_list('image', flat=True)
+    )
     with transaction.atomic():
+      deleted_counts = {
+        'assignments': TemplateAssignment.objects.filter(client=client_access).count(),
+        'tracking_entries': TrackingEntry.objects.filter(client=client_access).count(),
+        'chat_messages': ChatMessage.objects.filter(client=client_access).count(),
+        'reminders': ClientReminder.objects.filter(client=client_access).count(),
+        'progress_entries': ProgressEntry.objects.filter(client=client_access).count(),
+        'change_requests': ClientDetailChangeRequest.objects.filter(client=client_access).count(),
+      }
       TemplateAssignment.objects.filter(client=client_access).delete()
       TrackingEntry.objects.filter(client=client_access).delete()
       ChatMessage.objects.filter(client=client_access).delete()
@@ -1979,6 +2057,17 @@ class ClientAccessResetView(APIView):
           'updated_at',
         ]
       )
+      ClientAuthToken.objects.filter(client=client_access).delete()
+      ClientResetAudit.objects.create(
+        professional=request.user, client=client_access,
+        professional_reference=request.user.professional_profile.internal_reference_code,
+        client_reference=client_access.reference_id, client_username=client_access.username,
+        reason=reason, deleted_counts=deleted_counts,
+      )
+
+    for file_name in chat_file_names:
+      if file_name and default_storage.exists(file_name):
+        default_storage.delete(file_name)
 
     return Response(
       {
@@ -1988,13 +2077,53 @@ class ClientAccessResetView(APIView):
     )
 
 
+class ClientAccessExportView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request, client_id):
+    client = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
+    if client is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+    payload = {
+      'exported_at': timezone.now(),
+      'client': {
+        'reference_id': client.reference_id, 'first_name': client.first_name, 'last_name': client.last_name,
+        'email': client.email, 'username': client.username, 'group': client.group.name,
+        'registration_answers': client.registration_answers, 'additional_info': client.additional_info,
+        'professional_notes': client.professional_notes, 'created_at': client.created_at,
+      },
+      # Export includes hidden-but-still-stored operational history.
+      'tracking_entries': list(client.tracking_entries.values()),
+      'progress_entries': list(client.progress_entries.values()),
+      'reminders': list(client.reminders.values()),
+      'chat_messages': list(client.chat_messages.values('id', 'sender', 'text', 'image', 'created_at')),
+      'template_assignments': list(client.template_assignments.values('id', 'template_id', 'template__name', 'assigned_at')),
+      'payment_requests': list(client.payment_requests.values()),
+      'payment_records': list(client.payment_records.values()),
+    }
+    archive = tempfile.TemporaryFile()
+    with zipfile.ZipFile(archive, mode='w', compression=zipfile.ZIP_DEFLATED) as bundle:
+      bundle.writestr('client-data.json', json.dumps(payload, default=str, indent=2))
+      for message in client.chat_messages.exclude(image=''):
+        if not message.image or not default_storage.exists(message.image.name):
+          continue
+        with default_storage.open(message.image.name, 'rb') as stored_file:
+          safe_name = message.image.name.replace('..', '').lstrip('/\\')
+          bundle.writestr(f'chat-attachments/{message.pk}-{safe_name.split("/")[-1]}', stored_file.read())
+    archive.seek(0)
+    return FileResponse(
+      archive, as_attachment=True, filename=f'reproot-{client.reference_id}-export.zip',
+      content_type='application/zip',
+    )
+
+
 class ClientAccessDeleteView(APIView):
   """Delete a client account, moving the client plus their chat/tracking/progress/
   reminders/template assignments into the Recycle Bin as one bundled entry —
   deleting a whole client is consequential enough that it should always be
   fully restorable, unlike smaller individual deletes."""
 
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def delete(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
@@ -2024,7 +2153,7 @@ class ClientAccessDeleteView(APIView):
 
 
 class ProfessionalReferenceCategoryListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     categories = ReferenceCategory.objects.filter(professional=request.user)
@@ -2059,7 +2188,7 @@ class ProfessionalReferenceCategoryListView(APIView):
 
 
 class ProfessionalReferenceCategoryDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_category(self, request, category_id):
     return ReferenceCategory.objects.filter(id=category_id, professional=request.user).first()
@@ -2104,7 +2233,7 @@ class ProfessionalReferenceCategoryDetailView(APIView):
 
 
 class ProfessionalReferenceListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
   def get(self, request):
@@ -2145,7 +2274,7 @@ class ProfessionalReferenceListView(APIView):
 
 
 class ProfessionalReferenceDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
   def get_reference(self, request, reference_id):
@@ -2192,7 +2321,7 @@ class ProfessionalReferenceDetailView(APIView):
 
 
 class StandardTemplateListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     adopted_keys = set(
@@ -2205,7 +2334,7 @@ class StandardTemplateListView(APIView):
 
 
 class StandardTemplateAdoptView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
     key = str(request.data.get('key', '')).strip()
@@ -2241,7 +2370,7 @@ class StandardTemplateAdoptView(APIView):
 
 
 class TrackingTemplateListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     templates = TrackingTemplate.objects.filter(professional=request.user, is_active=True).prefetch_related('assignments')
@@ -2276,7 +2405,7 @@ class TrackingTemplateListView(APIView):
 
 
 class TrackingTemplateDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_template(self, request, template_id):
     return TrackingTemplate.objects.filter(id=template_id, professional=request.user, is_active=True).first()
@@ -2340,7 +2469,7 @@ class TrackingTemplateDetailView(APIView):
 
 
 class ClientTemplateAssignmentListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_client(self, request, client_id):
     return ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -2398,7 +2527,7 @@ def set_assignment_references(assignment, professional, reference_ids):
 
 
 class ClientTemplateAssignmentDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get_assignment(self, request, client_id, assignment_id):
     return TemplateAssignment.objects.filter(
@@ -2433,7 +2562,7 @@ class ClientTemplateAssignmentDetailView(APIView):
 
 
 class ClientTrackingEntryListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request, client_id):
     client_access = ClientAccess.objects.filter(id=client_id, professional=request.user, is_active=True).first()
@@ -2441,7 +2570,7 @@ class ClientTrackingEntryListView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    entries = client_access.tracking_entries.all()
+    entries = client_access.tracking_entries.filter(created_at__gte=visible_client_data_cutoff(request.user))
     template_id = request.query_params.get('template')
     month = request.query_params.get('month')
 
@@ -2505,10 +2634,12 @@ def entry_editable(entry):
 
 
 class ProfessionalTrackingEntryDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request, entry_id):
-    entry = TrackingEntry.objects.filter(id=entry_id, client__professional=request.user).first()
+    entry = TrackingEntry.objects.filter(
+      id=entry_id, client__professional=request.user, created_at__gte=visible_client_data_cutoff(request.user)
+    ).first()
 
     if entry is None:
       return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -2532,7 +2663,7 @@ class ProfessionalTrackingEntryDetailView(APIView):
 
 
 class ProfessionalClientChatView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [JSONParser, FormParser, MultiPartParser]
 
   def get_client(self, request, client_id):
@@ -2544,7 +2675,8 @@ class ProfessionalClientChatView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    messages = ChatMessage.objects.filter(professional=request.user, client=client_access)
+    cutoff = visible_client_data_cutoff(request.user)
+    messages = ChatMessage.objects.filter(professional=request.user, client=client_access, created_at__gte=cutoff)
     after_id = request.query_params.get('after')
 
     if after_id:
@@ -2580,13 +2712,14 @@ class ProfessionalClientChatView(APIView):
 
 
 class ProfessionalChatUnreadView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
     unread_rows = (
       ChatMessage.objects.filter(
         professional=request.user,
         client__is_active=True,
+        created_at__gte=visible_client_data_cutoff(request.user),
         sender=ChatMessage.SENDER_CLIENT,
         is_read=False,
       )
@@ -2595,6 +2728,7 @@ class ProfessionalChatUnreadView(APIView):
     )
     by_client = {}
     last_unread_at = {}
+    client_names = {}
 
     for row in unread_rows:
       client_id = str(row['client_id'])
@@ -2605,11 +2739,20 @@ class ProfessionalChatUnreadView(APIView):
       # row drops out of here entirely and the list settles back down.
       last_unread_at[client_id] = row['last_unread_at'].isoformat()
 
+    if by_client:
+      client_names = {
+        str(client.id): (f'{client.first_name} {client.last_name}'.strip() or client.username)
+        for client in ClientAccess.objects.filter(
+          professional=request.user, id__in=by_client.keys()
+        ).only('id', 'first_name', 'last_name', 'username')
+      }
+
     return Response(
       {
         'unread_count': sum(by_client.values()),
         'by_client': by_client,
         'last_unread_at': last_unread_at,
+        'client_names': client_names,
       }
     )
 
@@ -2905,7 +3048,9 @@ class ClientTrackingEntryView(APIView):
   permission_classes = [IsAuthenticatedClient]
 
   def get(self, request):
-    entries = request.auth.tracking_entries.all()
+    entries = request.auth.tracking_entries.filter(
+      created_at__gte=visible_client_data_cutoff(request.auth.professional)
+    )
     template_id = request.query_params.get('template')
     month = request.query_params.get('month')
 
@@ -2963,7 +3108,8 @@ class ClientPortalProgressView(APIView):
   permission_classes = [IsAuthenticatedClient]
 
   def get(self, request):
-    return Response({'progress': ProgressEntrySerializer(request.auth.progress_entries.all(), many=True).data})
+    cutoff = visible_client_data_cutoff(request.auth.professional)
+    return Response({'progress': ProgressEntrySerializer(request.auth.progress_entries.filter(created_at__gte=cutoff), many=True).data})
 
 
 class ClientTrackingEntryDetailView(APIView):
@@ -2971,7 +3117,9 @@ class ClientTrackingEntryDetailView(APIView):
   permission_classes = [IsAuthenticatedClient]
 
   def put(self, request, entry_id):
-    entry = TrackingEntry.objects.filter(id=entry_id, client=request.auth).first()
+    entry = TrackingEntry.objects.filter(
+      id=entry_id, client=request.auth, created_at__gte=visible_client_data_cutoff(request.auth.professional)
+    ).first()
 
     if entry is None:
       return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -3001,7 +3149,10 @@ class ClientChatView(APIView):
 
   def get(self, request):
     client_access = request.auth
-    messages = ChatMessage.objects.filter(professional=client_access.professional, client=client_access)
+    cutoff = visible_client_data_cutoff(client_access.professional)
+    messages = ChatMessage.objects.filter(
+      professional=client_access.professional, client=client_access, created_at__gte=cutoff
+    )
     after_id = request.query_params.get('after')
 
     if after_id:
@@ -3041,6 +3192,7 @@ class ClientChatUnreadView(APIView):
     unread_count = ChatMessage.objects.filter(
       professional=request.auth.professional,
       client=request.auth,
+      created_at__gte=visible_client_data_cutoff(request.auth.professional),
       sender=ChatMessage.SENDER_PROFESSIONAL,
       is_read=False,
     ).count()
@@ -3153,7 +3305,7 @@ def _support_incident_action(request, role, reporter, incident_id):
 
 
 class ProfessionalSupportIncidentListView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   parser_classes = [JSONParser, FormParser, MultiPartParser]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'support'
@@ -3166,7 +3318,7 @@ class ProfessionalSupportIncidentListView(APIView):
 
 
 class ProfessionalSupportIncidentDetailView(APIView):
-  permission_classes = [permissions.IsAuthenticated]
+  permission_classes = [ProfessionalAccessPermission]
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'support'
 

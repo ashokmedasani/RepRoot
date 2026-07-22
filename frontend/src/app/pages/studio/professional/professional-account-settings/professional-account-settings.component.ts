@@ -12,7 +12,8 @@ import {
   ProfessionalPlanCode,
   ProfessionalUpgradeTier,
   ProfessionalUsageLabel,
-  RecycleBinItem
+  RecycleBinItem,
+  NotificationPreference
 } from '@core/api/professional-auth-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ProfessionalProfileFormComponent } from '@studio-shared/professional-profile-form/professional-profile-form.component';
@@ -33,13 +34,6 @@ type SettingsSection =
   | 'guide'
   | 'support'
   | 'about';
-
-interface NotificationPrefs {
-  formSubmission: boolean;
-  clientMessage: boolean;
-  scheduleReminder: boolean;
-  email: boolean;
-}
 
 @Component({
   selector: 'app-professional-account-settings',
@@ -63,8 +57,6 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly confirmation = inject(ConfirmationDialogService);
-
-  private static readonly NOTIFICATION_KEY = 'professional-notification-prefs';
 
   readonly appVersion = '1.0.0';
   readonly supportEmail = 'support@rep-root.com';
@@ -138,11 +130,13 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     confirmPassword: ''
   };
 
-  notifications: NotificationPrefs = {
-    formSubmission: true,
-    clientMessage: true,
-    scheduleReminder: true,
-    email: false
+  notificationPreferences: NotificationPreference[] = [];
+  notificationMessage = '';
+  readonly notificationLabels: Record<string, string> = {
+    chat: 'Client messages', forms: 'Form submissions', meetings: 'Meetings', clients: 'Client requests',
+    templates: 'Templates', progress: 'Progress and tracking', reminders: 'Reminders', references: 'References',
+    payments: 'Payments', support: 'Support', account: 'Account lifecycle', storage: 'Storage usage',
+    security: 'Security', system: 'System notices'
   };
 
   ngOnInit(): void {
@@ -257,7 +251,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
       kind: 'warning',
       title: 'Cancel plan',
       target: 'your current plan',
-      impact: 'Your account moves to Starter Free. If your current usage is over the Starter Free limit, premium features will lock after a 7-day grace period unless you reduce your data or upgrade again.',
+      impact: 'Your account moves to Starter Free. If current storage is over the Starter allowance, a 14-day cleanup or upgrade grace period begins before the account is frozen.',
       confirmLabel: 'Cancel Plan'
     });
 
@@ -284,8 +278,8 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   }
 
   readonly upgradeTierCopy: Record<ProfessionalUpgradeTier, { name: string; blurb: string }> = {
-    pro: { name: 'Pro', blurb: '5x the storage plus higher client, template, and reference limits.' },
-    premium_unlimited: { name: 'Premium Unlimited', blurb: '50x the storage of Starter Free and every feature unlocked.' }
+    pro: { name: 'Pro', blurb: '1 GB included storage with a temporary 20% buffer.' },
+    premium_unlimited: { name: 'Premium Unlimited', blurb: '5 GB included storage with a temporary 20% buffer.' }
   };
 
   isUpdatePlanOpen = false;
@@ -363,7 +357,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     }));
   }
 
-  private readonly usageLabelCopy: Record<ProfessionalUsageLabel, string> = {
+  private readonly usageLabelCopy: Partial<Record<ProfessionalUsageLabel, string>> = {
     plenty_of_room: 'Plenty of room to grow',
     comfortable: 'Comfortable usage',
     filling_up: 'Filling up — worth a look',
@@ -373,6 +367,10 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
 
   usageLabelText(label: ProfessionalUsageLabel | undefined): string {
     return label ? this.usageLabelCopy[label] || '' : '';
+  }
+
+  storageSize(bytes: number): string {
+    return bytes >= 1024 ** 3 ? `${bytes / 1024 ** 3} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
   }
 
   /** Paid tiers that have already maxed out what an upgrade buys — Premium Unlimited plus the legacy Premium tier. */
@@ -403,22 +401,36 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   }
 
   private loadNotificationPrefs(): void {
-    try {
-      const raw = window.localStorage.getItem(ProfessionalAccountSettingsComponent.NOTIFICATION_KEY);
-      if (raw) {
-        this.notifications = { ...this.notifications, ...JSON.parse(raw) };
-      }
-    } catch {
-      // ignore malformed prefs; fall back to defaults
-    }
+    this.professionalAuthApi.getNotificationPreferences().subscribe({
+      next: ({ categories }) => (this.notificationPreferences = categories),
+      error: () => (this.notificationMessage = 'Notification preferences are temporarily unavailable.')
+    });
   }
 
-  toggleNotification(key: keyof NotificationPrefs): void {
-    this.notifications = { ...this.notifications, [key]: !this.notifications[key] };
-    window.localStorage.setItem(
-      ProfessionalAccountSettingsComponent.NOTIFICATION_KEY,
-      JSON.stringify(this.notifications)
-    );
+  saveNotificationPreference(preference: NotificationPreference): void {
+    this.notificationMessage = 'Saving…';
+    this.professionalAuthApi.updateNotificationPreference(preference).subscribe({
+      next: (saved) => {
+        this.notificationPreferences = this.notificationPreferences.map((item) => item.category === saved.category ? saved : item);
+        this.notificationMessage = 'Notification preference saved.';
+      },
+      error: () => {
+        this.notificationMessage = 'Could not save this preference.';
+        this.loadNotificationPrefs();
+      }
+    });
+  }
+
+  setAllNotificationChannel(channel: 'in_app_enabled' | 'email_enabled', enabled: boolean): void {
+    this.notificationPreferences = this.notificationPreferences.map((item) => ({ ...item, [channel]: enabled || item.mandatory_in_app && channel === 'in_app_enabled' }));
+    this.notificationMessage = 'Saving notification preferences…';
+    let remaining = this.notificationPreferences.length;
+    for (const preference of this.notificationPreferences) {
+      this.professionalAuthApi.updateNotificationPreference(preference).subscribe({
+        next: () => { if (--remaining === 0) this.notificationMessage = 'All notification preferences saved.'; },
+        error: () => { this.notificationMessage = 'Some preferences could not be saved. Please try again.'; }
+      });
+    }
   }
 
   saveProfessionalCode(): void {

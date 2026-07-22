@@ -16,21 +16,17 @@
 
 @if (activeSection === 'reporting') {
   <section class="payment-section" aria-labelledby="reporting-currency-title">
-    <h3 id="reporting-currency-title">Payments Dashboard</h3>
+    <h3 id="reporting-currency-title">Reporting Currency</h3>
     <p class="section-note">
-      Your payments dashboard and summaries are locked until you set a reporting currency — this has
-      nothing to do with your manual payment methods (Zelle, UPI, etc.), which stay set up either way.
-      You can lock or unlock this whenever you like.
+      Choose the single currency used for dashboard totals and reports. Confirm it carefully: after it is
+      locked, only support can make a correction and that change must be audited.
     </p>
 
     @if (settings) {
       <div class="dashboard-lock-row">
         <span class="lock-status" [class.unlocked]="!settings.reporting_currency_locked">
-          {{ settings.reporting_currency_locked ? '🔒 Dashboard locked' : '🔓 Dashboard unlocked' }}
+          {{ settings.reporting_currency_locked ? 'Currency permanently locked' : 'Confirmation required' }}
         </span>
-        <button type="button" class="secondary-action" [disabled]="isSaving" (click)="toggleDashboardLock()">
-          {{ isSaving ? 'Saving...' : (settings.reporting_currency_locked ? 'Unlock dashboard' : 'Lock dashboard') }}
-        </button>
       </div>
 
       @if (!settings.reporting_currency_locked) {
@@ -43,8 +39,8 @@
               }
             </select>
           </label>
-          <button type="button" class="primary-action" [disabled]="isSaving || reportingCurrencyDraft === settings.reporting_currency" (click)="saveReportingCurrency()">
-            {{ isSaving ? 'Saving...' : 'Save Currency' }}
+          <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveReportingCurrency()">
+            {{ isSaving ? 'Saving...' : 'Confirm & Lock Currency' }}
           </button>
         </div>
 
@@ -52,7 +48,32 @@
           Currency conversion values are used for reporting purposes only. They do not represent
           settlement, banking, or payment-provider exchange rates.
         </p>
+      } @else {
+        <p class="disclaimer-note">Reporting currency: <strong>{{ settings.reporting_currency }}</strong>. Contact support if a correction requires an audited change.</p>
       }
+    }
+  </section>
+}
+
+@if (activeSection === 'transactions') {
+  <section class="payment-section" aria-labelledby="transactions-title">
+    <h3 id="transactions-title">Complete Transaction History</h3>
+    <p class="section-note">Client payments and RepRoot plan purchases appear here. Entries are permanent and append-only; refunds and corrections create new entries.</p>
+    @if (!transactions.length) {
+      <div class="placeholder-card"><p>No transactions have been recorded yet.</p></div>
+    } @else {
+      <div class="method-list">
+        @for (transaction of transactions; track transaction.entry_id) {
+          <article class="method-row">
+            <div class="method-text">
+              <strong>{{ transaction.description || transaction.entry_type }}</strong>
+              <small>{{ transaction.entry_id }} · {{ transaction.source }} · {{ transaction.occurred_at | date:'medium' }}</small>
+              @if (transaction.client_reference) { <small>Client {{ transaction.client_reference }}</small> }
+            </div>
+            <div><strong>{{ transaction.amount }} {{ transaction.currency }}</strong><small>{{ transaction.status }}</small></div>
+          </article>
+        }
+      </div>
     }
   </section>
 }
@@ -253,11 +274,11 @@
       provider's own secure onboarding — RepRoot never asks for API keys or account passwords.
     </p>
     <div class="provider-grid">
-      @for (provider of ['Stripe', 'PayPal', 'Razorpay']; track provider) {
+      @for (provider of ['India Domestic Provider', 'International-to-India Provider']; track provider) {
         <article class="provider-card">
           <strong>{{ provider }}</strong>
           <span class="status-pill" data-status="not_connected">Not Connected</span>
-          <button type="button" class="ghost-action" disabled>Connect <small>(coming soon)</small></button>
+          <button type="button" class="ghost-action" disabled>Select provider <small>(coming soon)</small></button>
         </article>
       }
     </div>

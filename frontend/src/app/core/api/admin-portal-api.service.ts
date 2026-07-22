@@ -41,6 +41,22 @@ export interface AdminAuditLog {
   created_at: string;
 }
 
+export interface AdminLifecycleAccount {
+  professional_reference: string;
+  username: string;
+  name: string;
+  email: string;
+  plan: string;
+  status: 'over_quota_grace' | 'frozen' | 'recycled';
+  status_label: string;
+  reason: string;
+  grace_period_ends_at: string | null;
+  locked_at: string | null;
+  recycled_at: string | null;
+  recycle_expires_at: string | null;
+  days_remaining: number | null;
+}
+
 export type ErrorLogPlatform = 'web' | 'android' | 'ios' | 'unknown';
 export type ErrorLogSource = 'client_app' | 'backend';
 export type ErrorLogLevel = 'warning' | 'error' | 'fatal';
@@ -121,6 +137,23 @@ export class AdminPortalApiService {
   getAuditLogs(search = ''): Observable<{ results: AdminAuditLog[]; count: number }> {
     const params = search ? new HttpParams().set('search', search) : undefined;
     return this.http.get<{ results: AdminAuditLog[]; count: number }>(`${this.apiBaseUrl}/audit-logs/`, { headers: this.headers(), params });
+  }
+
+  getAccountLifecycle(): Observable<{ results: AdminLifecycleAccount[]; deletion_requests: Array<Record<string, unknown>> }> {
+    return this.http.get<{ results: AdminLifecycleAccount[]; deletion_requests: Array<Record<string, unknown>> }>(
+      `${this.apiBaseUrl}/account-lifecycle/`, { headers: this.headers() }
+    );
+  }
+
+  actOnAccountLifecycle(
+    professionalReference: string,
+    payload: { action: 'move_to_recycle' | 'restore' | 'delete_permanently'; reason: string; confirmed_identity?: boolean; confirmed_consent?: boolean }
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBaseUrl}/account-lifecycle/${encodeURIComponent(professionalReference)}/action/`,
+      payload,
+      { headers: this.headers() }
+    );
   }
 
   getErrorLogs(platformGroup: 'web' | 'mobile', filters: ErrorLogFilters = {}): Observable<ErrorLogListResponse> {

@@ -78,7 +78,7 @@ export interface ProfessionalProfileStatusResponse {
 
 export type ProfessionalPlanCode = 'starter_free' | 'pro' | 'premium_unlimited' | 'starter' | 'premium';
 
-export type ProfessionalUsageLabel = 'plenty_of_room' | 'comfortable' | 'filling_up' | 'almost_full' | 'over_capacity';
+export type ProfessionalUsageLabel = 'plenty_of_room' | 'comfortable' | 'filling_up' | 'almost_full' | 'over_capacity' | 'uploads_paused';
 
 // Percentage-only by design: the backend never returns raw byte counts to the
 // professional-facing API (see backend/accounts/data_usage.py), only
@@ -88,6 +88,9 @@ export interface ProfessionalDataUsageResponse {
   plan_name: string;
   plan_limits: Record<string, number | null>;
   usage_percent: number;
+  included_quota_bytes: number;
+  hard_limit_percent: number;
+  hard_limit_bytes: number;
   usage_label: ProfessionalUsageLabel;
   record_count: number;
   sections: Record<string, ProfessionalDataUsageSection>;
@@ -96,6 +99,7 @@ export interface ProfessionalDataUsageResponse {
   is_warning: boolean;
   is_danger: boolean;
   is_over_quota: boolean;
+  is_storage_blocked: boolean;
   is_locked: boolean;
   lock_reason: string;
   grace_period_ends_at: string | null;
@@ -246,6 +250,17 @@ export interface ProfessionalProfileSaveResponse {
   message: string;
 }
 
+export interface NotificationPreference {
+  category: string;
+  in_app_enabled: boolean;
+  email_enabled: boolean;
+  push_enabled: boolean;
+  digest_frequency: 'immediate' | 'daily' | 'weekly' | 'monthly' | 'none';
+  mandatory_in_app: boolean;
+}
+export interface ActivityNotification { id: number; category: string; event_type: string; title: string; body: string; action_url: string; priority: string; requires_action: boolean; is_read: boolean; created_at: string; payload: Record<string, unknown>; }
+export interface ActivityNotificationSummary { notifications: ActivityNotification[]; unread_count: number; unread_by_category: Record<string, number>; }
+
 @Injectable({ providedIn: 'root' })
 export class ProfessionalAuthApiService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
@@ -345,6 +360,23 @@ export class ProfessionalAuthApiService {
     }
 
     return this.dataUsageRequest$;
+  }
+
+  getNotificationPreferences(): Observable<{ categories: NotificationPreference[] }> {
+    return this.http.get<{ categories: NotificationPreference[] }>(`${this.apiBaseUrl}/professional/notification-preferences/`, { headers: this.getAuthHeaders() });
+  }
+
+  updateNotificationPreference(preference: NotificationPreference): Observable<NotificationPreference> {
+    return this.http.put<NotificationPreference>(`${this.apiBaseUrl}/professional/notification-preferences/`, preference, { headers: this.getAuthHeaders() });
+  }
+
+  getNotifications(limit = 8): Observable<ActivityNotificationSummary> {
+    return this.http.get<ActivityNotificationSummary>(`${this.apiBaseUrl}/professional/notifications/?limit=${limit}`, { headers: this.getAuthHeaders() });
+  }
+
+  markNotificationRead(notificationId?: number): Observable<{ unread_count: number }> {
+    const body = notificationId ? { notification_id: notificationId } : { mark_all_read: true };
+    return this.http.patch<{ unread_count: number }>(`${this.apiBaseUrl}/professional/notifications/`, body, { headers: this.getAuthHeaders() });
   }
 
   /** Drops the cached data-usage response so the next getDataUsage() call re-fetches — call after restore/plan changes. */

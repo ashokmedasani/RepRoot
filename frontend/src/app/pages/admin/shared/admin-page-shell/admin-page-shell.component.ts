@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { AdminPortalApiService } from '@core/api/admin-portal-api.service';
 
-type AdminSection = 'dashboard' | 'finance' | 'audit' | 'errors-web' | 'errors-mobile';
+type AdminSection = 'dashboard' | 'finance' | 'audit' | 'lifecycle' | 'errors-web' | 'errors-mobile';
 
 @Component({
   selector: 'app-admin-page-shell',
@@ -16,6 +16,7 @@ type AdminSection = 'dashboard' | 'finance' | 'audit' | 'errors-web' | 'errors-m
         <nav aria-label="Admin Portal navigation">
           <a routerLink="/admin-portal/dashboard" [class.active]="activeSection === 'dashboard'"><span>▦</span>Dashboard</a>
           @if (can('admin.finance.view')) { <a routerLink="/admin-portal/finance" [class.active]="activeSection === 'finance'"><span>$</span>Finance</a> }
+          @if (can('admin.lifecycle.view')) { <a routerLink="/admin-portal/account-lifecycle" [class.active]="activeSection === 'lifecycle'"><span>R</span>Recycle Center</a> }
           @if (can('admin.audit.view')) { <a routerLink="/admin-portal/audit-logs" [class.active]="activeSection === 'audit'"><span>≡</span>Audit Logs</a> }
           @if (can('admin.errors.list')) { <a routerLink="/admin-portal/errors/web" [class.active]="activeSection === 'errors-web'"><span>⚠</span>Error Logs · Web</a> }
           @if (can('admin.errors.list')) { <a routerLink="/admin-portal/errors/mobile" [class.active]="activeSection === 'errors-mobile'"><span>⚠</span>Error Logs · Mobile</a> }

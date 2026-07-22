@@ -266,6 +266,12 @@ export const routes: Routes = [
     title: 'Audit Logs | RepRoot'
   },
   {
+    path: 'admin-portal/account-lifecycle',
+    canActivate: [adminAuthGuard],
+    loadComponent: () => import('./pages/admin/admin-account-lifecycle/admin-account-lifecycle.component').then((module) => module.AdminAccountLifecycleComponent),
+    title: 'Recycle Center | RepRoot'
+  },
+  {
     path: 'admin-portal/errors/web',
     canActivate: [adminAuthGuard],
     data: { platformGroup: 'web' },

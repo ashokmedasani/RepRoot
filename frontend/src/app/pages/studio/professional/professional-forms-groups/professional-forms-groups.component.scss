@@ -411,6 +411,30 @@ tr:last-child td {
   color: #d92d20;
 }
 
+.meeting-request-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
+.meeting-request-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; border: 1px solid var(--app-border); border-radius: 0.75rem; padding: 1rem; background: var(--app-surface); }
+.meeting-request-row > div:first-child { display: grid; gap: 0.25rem; }
+.meeting-request-row span, .meeting-request-row small { color: var(--app-muted); }
+.meeting-request-row.resolved { opacity: 0.68; }
+.meeting-request-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.meeting-settings-summary { display: grid; gap: 1rem; }
+.meeting-rule-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.meeting-rule-grid div { display: grid; gap: 0.3rem; border: 1px solid var(--app-border); border-radius: 0.75rem; padding: 0.85rem; background: var(--app-surface-soft); }
+.meeting-rule-grid span { color: var(--app-muted); font-size: 0.76rem; font-weight: 700; text-transform: uppercase; }
+.meeting-rule-grid strong { color: var(--app-text); }
+.meeting-settings-action { width: fit-content; }
+.inactive-status { background: var(--app-surface-soft); color: var(--app-muted); }
+.lead-meeting-preview, .overdue-meetings { display: grid; gap: 0.65rem; border-top: 1px solid var(--app-border); padding-top: 1rem; }
+.preview-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+.preview-heading h3 { margin: 0; color: var(--app-text); }
+.preview-heading span, .empty-note { color: var(--app-muted); font-size: 0.82rem; }
+.preview-meeting-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.8rem; border: 1px solid var(--app-border); border-radius: 0.7rem; padding: 0.8rem; background: var(--app-surface-soft); }
+.preview-meeting-row div, .overdue-meeting-row > div { display: grid; gap: 0.2rem; }
+.preview-meeting-row small, .overdue-meeting-row small { color: var(--app-muted); }
+.preview-meeting-row time { color: var(--app-text); font-weight: 700; }
+.overdue-meeting-row { display: grid; grid-template-columns: minmax(12rem, 0.7fr) minmax(16rem, 1.3fr) auto; align-items: center; gap: 0.75rem; border: 1px solid color-mix(in srgb, #d92d20 30%, var(--app-border)); border-radius: 0.7rem; padding: 0.8rem; background: color-mix(in srgb, #d92d20 5%, var(--app-surface)); }
+
 dl {
   display: grid;
   gap: 0.65rem;
@@ -467,6 +491,7 @@ textarea {
 @media (max-width: 980px) {
   .lead-panel,
   .stats-grid,
+  .meeting-rule-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
@@ -477,7 +502,9 @@ textarea {
   }
 
   .group-row,
-  .group-actions {
+  .group-actions,
+  .preview-meeting-row,
+  .overdue-meeting-row {
     align-items: flex-start;
     flex-direction: column;
   }

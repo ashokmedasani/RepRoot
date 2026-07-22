@@ -1,4 +1,5 @@
 import { Component, OnInit, inject } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -6,12 +7,13 @@ import {
   ManualPaymentMethodClientView,
   ManualPaymentMethodRecord,
   PaymentsApiService,
-  PaymentSettingsRecord
+  PaymentSettingsRecord,
+  FinancialTransactionRecord
 } from '@core/api/payments-api.service';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
 
-type PaymentSettingsSection = 'reporting' | 'methods' | 'integrated' | 'preferences' | 'disclosures';
+type PaymentSettingsSection = 'reporting' | 'transactions' | 'methods' | 'integrated' | 'preferences' | 'disclosures';
 
 interface ClientFieldDef {
   key: string;
@@ -73,7 +75,7 @@ const CATEGORY_LABELS: Record<ManualPaymentCategory, string> = {
 @Component({
   selector: 'app-payment-settings',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, DatePipe],
   templateUrl: './professional-payment-settings.component.html',
   styleUrl: './professional-payment-settings.component.scss'
 })
@@ -83,6 +85,7 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
 
   readonly sections: { id: PaymentSettingsSection; label: string }[] = [
     { id: 'reporting', label: 'Reporting Currency' },
+    { id: 'transactions', label: 'Transactions' },
     { id: 'methods', label: 'Manual Payment Methods' },
     { id: 'integrated', label: 'Integrated Payments' },
     { id: 'preferences', label: 'Payment Preferences' },
@@ -104,6 +107,7 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
   saveMessageType: 'success' | 'error' = 'success';
 
   reportingCurrencyDraft = '';
+  transactions: FinancialTransactionRecord[] = [];
 
   methods: ManualPaymentMethodRecord[] = [];
   maxActiveMethods = 5;
@@ -132,21 +136,29 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
       }
     });
     this.loadMethods();
+    this.paymentsApi.getTransactionLedger().subscribe({
+      next: (response) => (this.transactions = response.transactions),
+      error: () => (this.transactions = [])
+    });
   }
 
   // --- Reporting currency + preferences -------------------------------------
 
-  saveReportingCurrency(): void {
+  async saveReportingCurrency(): Promise<void> {
     if (!this.reportingCurrencyDraft) {
       return;
     }
 
-    this.saveSettings({ reporting_currency: this.reportingCurrencyDraft });
-  }
-
-  toggleDashboardLock(): void {
-    if (!this.settings) return;
-    this.saveSettings({ reporting_currency_locked: !this.settings.reporting_currency_locked });
+    const confirmed = await this.confirmation.confirm({
+      kind: 'warning',
+      title: 'Permanently lock reporting currency?',
+      target: this.reportingCurrencyDraft,
+      impact: `Use ${this.reportingCurrencyDraft} for all financial reporting. Only support can make a future audited change.`,
+      confirmLabel: 'Lock currency'
+    });
+    if (confirmed) {
+      this.saveSettings({ reporting_currency: this.reportingCurrencyDraft, confirm_reporting_currency: true });
+    }
   }
 
   togglePreference(key: 'client_payment_history_enabled' | 'payment_tracking_enabled', value: boolean): void {
@@ -355,7 +367,7 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     };
   }
 
-  private saveSettings(changes: Partial<PaymentSettingsRecord>): void {
+  private saveSettings(changes: Partial<PaymentSettingsRecord> & { confirm_reporting_currency?: boolean }): void {
     this.isSaving = true;
     this.saveMessage = '';
 

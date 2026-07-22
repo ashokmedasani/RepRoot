@@ -8,6 +8,7 @@ export interface PaymentSettingsRecord {
   // Gates the payments dashboard/summary only — toggleable anytime, not a
   // one-way lock. Manual payment method setup is unaffected by this.
   reporting_currency_locked: boolean;
+  reporting_currency_locked_at: string | null;
   client_payment_history_enabled: boolean;
   updated_at: string;
 }
@@ -47,6 +48,22 @@ export interface PaymentSettingsResponse {
   settings: PaymentSettingsRecord;
   currency_options: string[];
   message?: string;
+}
+
+export interface FinancialTransactionRecord {
+  entry_id: string;
+  entry_type: string;
+  source: string;
+  status: string;
+  amount: string;
+  currency: string;
+  client_reference: string;
+  payment_request_reference: string;
+  payment_record_reference: string;
+  external_reference: string;
+  provider: string;
+  description: string;
+  occurred_at: string;
 }
 
 export type ManualPaymentCategory =
@@ -304,8 +321,14 @@ export class PaymentsApiService {
     });
   }
 
-  updatePaymentSettings(changes: Partial<PaymentSettingsRecord>): Observable<PaymentSettingsResponse> {
+  updatePaymentSettings(changes: Partial<PaymentSettingsRecord> & { confirm_reporting_currency?: boolean }): Observable<PaymentSettingsResponse> {
     return this.http.put<PaymentSettingsResponse>(`${this.apiBaseUrl}/professional/payments/settings/`, changes, {
+      headers: this.getProfessionalAuthHeaders()
+    });
+  }
+
+  getTransactionLedger(): Observable<{ transactions: FinancialTransactionRecord[] }> {
+    return this.http.get<{ transactions: FinancialTransactionRecord[] }>(`${this.apiBaseUrl}/professional/payments/transactions/`, {
       headers: this.getProfessionalAuthHeaders()
     });
   }

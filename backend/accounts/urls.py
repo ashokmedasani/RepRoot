@@ -1,5 +1,10 @@
 from django.urls import path
 
+from .views_notifications import (
+  ClientNotificationPreferencesView, ClientNotificationsView,
+  ProfessionalNotificationPreferencesView, ProfessionalNotificationsView,
+)
+
 from .views import (
   ClientAccessCreateView,
   ClientAccessDeleteView,
@@ -7,6 +12,7 @@ from .views import (
   ClientAccessPasswordResetView,
   ClientAccessPhotoView,
   ClientAccessResetView,
+  ClientAccessExportView,
   ClientAccessStatusView,
   ClientAdditionalInfoView,
   ClientChatView,
@@ -116,6 +122,7 @@ from .views_payments import (
   ProfessionalPaymentActionsView,
   ProfessionalPaymentNotificationsView,
   ProfessionalPaymentSettingsView,
+  ProfessionalTransactionLedgerView,
 )
 from .views_scheduling import (
   CalComConnectionView,
@@ -126,9 +133,18 @@ from .views_scheduling import (
   ScheduledMeetingCancelView,
   ScheduledMeetingListView,
   ScheduledMeetingRescheduleView,
+  ProfessionalLeadMeetingSettingsView,
+  PublicLeadMeetingSlotsView,
+  PublicLeadMeetingRequestView,
+  ProfessionalLeadMeetingRequestListView,
+  ProfessionalLeadMeetingRequestActionView,
 )
 
 urlpatterns = [
+  path('professional/notifications/', ProfessionalNotificationsView.as_view(), name='professional-notifications'),
+  path('professional/notification-preferences/', ProfessionalNotificationPreferencesView.as_view(), name='professional-notification-preferences'),
+  path('client/notifications/', ClientNotificationsView.as_view(), name='client-notifications'),
+  path('client/notification-preferences/', ClientNotificationPreferencesView.as_view(), name='client-notification-preferences'),
   path('professional/check-email/', EmailAvailabilityView.as_view(), name='professional-check-email'),
   path('professional/request-email-otp/', EmailOtpRequestView.as_view(), name='professional-request-email-otp'),
   path('professional/verify-email-otp/', EmailOtpVerifyView.as_view(), name='professional-verify-email-otp'),
@@ -156,6 +172,7 @@ urlpatterns = [
   path('billing/webhook/', stripe_webhook, name='stripe-webhook'),
   # --- Client Payments (professional collecting from clients) ---
   path('professional/payments/settings/', ProfessionalPaymentSettingsView.as_view(), name='professional-payment-settings'),
+  path('professional/payments/transactions/', ProfessionalTransactionLedgerView.as_view(), name='professional-payment-transactions'),
   path('professional/payments/methods/', ManualPaymentProfileListView.as_view(), name='professional-payment-methods'),
   path('professional/payments/methods/<int:method_id>/', ManualPaymentProfileDetailView.as_view(), name='professional-payment-method-detail'),
   path('professional/payments/methods/<int:method_id>/preview/', ManualPaymentProfilePreviewView.as_view(), name='professional-payment-method-preview'),
@@ -183,6 +200,9 @@ urlpatterns = [
   path('client/payments/proofs/<int:proof_id>/file/', ClientPaymentProofFileView.as_view(), name='client-payment-proof-file'),
   path('client/payments/notifications/', ClientPaymentNotificationsView.as_view(), name='client-payment-notifications'),
   path('professional/scheduling/connection/', CalComConnectionView.as_view(), name='professional-scheduling-connection'),
+  path('professional/forms-groups/lead-form/meeting-settings/', ProfessionalLeadMeetingSettingsView.as_view(), name='professional-lead-meeting-settings'),
+  path('professional/lead-meeting-requests/', ProfessionalLeadMeetingRequestListView.as_view(), name='professional-lead-meeting-requests'),
+  path('professional/lead-meeting-requests/<int:request_id>/action/', ProfessionalLeadMeetingRequestActionView.as_view(), name='professional-lead-meeting-request-action'),
   path('professional/scheduling/event-types/', CalComEventTypesView.as_view(), name='professional-scheduling-event-types'),
   path('professional/scheduling/slots/', CalComSlotsView.as_view(), name='professional-scheduling-slots'),
   path('professional/scheduling/meetings/', ScheduledMeetingListView.as_view(), name='professional-scheduling-meetings'),
@@ -205,6 +225,7 @@ urlpatterns = [
   path('professional/forms-groups/clients/<int:client_id>/reset-password/', ClientAccessPasswordResetView.as_view(), name='professional-client-reset-password'),
   path('professional/forms-groups/clients/<int:client_id>/status/', ClientAccessStatusView.as_view(), name='professional-client-status'),
   path('professional/forms-groups/clients/<int:client_id>/reset/', ClientAccessResetView.as_view(), name='professional-client-reset'),
+  path('professional/forms-groups/clients/<int:client_id>/export/', ClientAccessExportView.as_view(), name='professional-client-export'),
   path('professional/forms-groups/clients/<int:client_id>/delete/', ClientAccessDeleteView.as_view(), name='professional-client-delete'),
   path('professional/forms-groups/clients/<int:client_id>/photo/', ClientAccessPhotoView.as_view(), name='professional-client-photo'),
   path('professional/forms-groups/clients/<int:client_id>/additional-info/', ClientAdditionalInfoView.as_view(), name='professional-client-additional-info'),
@@ -216,6 +237,8 @@ urlpatterns = [
   path('professional/forms-groups/pending/<int:submission_id>/', PendingLeadSubmissionView.as_view(), name='professional-pending-form'),
   path('professional/forms-groups/pending/<int:submission_id>/create-client-access/', ClientAccessCreateView.as_view(), name='professional-create-client-access'),
   path('public/forms/<slug:public_slug>/', PublicLeadFormView.as_view(), name='public-lead-form'),
+  path('public/forms/<slug:public_slug>/meeting-slots/', PublicLeadMeetingSlotsView.as_view(), name='public-lead-meeting-slots'),
+  path('public/forms/<slug:public_slug>/meeting-request/', PublicLeadMeetingRequestView.as_view(), name='public-lead-meeting-request'),
   path('public/group-registration/<slug:public_slug>/', PublicGroupRegistrationView.as_view(), name='public-group-registration'),
   path('professional/password-reset/request-otp/', PasswordResetOtpRequestView.as_view(), name='professional-password-reset-request-otp'),
   path('professional/password-reset/verify-otp/', PasswordResetOtpVerifyView.as_view(), name='professional-password-reset-verify-otp'),

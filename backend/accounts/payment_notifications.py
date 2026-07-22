@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 
 from .models import PaymentNotification
+from .notifications import notify_client as notify_shared_client, notify_professional as notify_shared_professional
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,9 @@ def notify_professional(professional, notif_type, title, body, payload=None, ema
     body=body,
     payload=payload or {},
   )
-  if email and professional.email:
-    _send(professional.email, title, body)
+  notify_shared_professional(professional, category='payments', event_type=notif_type,
+    title=title,
+    body=body, action_url=(payload or {}).get('action_url', '/professional/payments'), payload=payload or {}, requires_action=True)
 
 
 def notify_client(client, notif_type, title, body, payload=None, email=True):
@@ -44,8 +46,9 @@ def notify_client(client, notif_type, title, body, payload=None, email=True):
     body=body,
     payload=payload or {},
   )
-  if email and client.email:
-    _send(client.email, title, body)
+  notify_shared_client(client, category='payments', event_type=notif_type,
+    title=title,
+    body=body, action_url=(payload or {}).get('action_url', '/client/payments'), payload=payload or {})
 
 
 def _send(recipient, subject, body):

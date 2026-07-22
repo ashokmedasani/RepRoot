@@ -448,6 +448,45 @@ button:disabled,
   white-space: nowrap;
 }
 
+/* Consistent web upload control. Native file inputs otherwise render as an
+   unstyled "Choose file" box that varies between browsers and operating systems. */
+input[type='file']:not(.visually-hidden) {
+  width: 100%;
+  min-height: 4.5rem;
+  box-sizing: border-box;
+  border: 1.5px dashed color-mix(in srgb, var(--app-primary) 45%, var(--app-border));
+  border-radius: var(--app-radius-lg);
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--app-primary-soft) 45%, var(--app-surface));
+  color: var(--app-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+input[type='file']:not(.visually-hidden):hover {
+  border-color: var(--app-primary);
+  background: var(--app-primary-soft);
+}
+
+input[type='file']:not(.visually-hidden):focus-visible {
+  outline: none;
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 20%, transparent);
+}
+
+input[type='file']:not(.visually-hidden)::file-selector-button {
+  margin-right: 0.8rem;
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  padding: 0.62rem 1rem;
+  background: var(--app-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @media (max-width: 680px) {
   .photo-manager,
   .photo-field {

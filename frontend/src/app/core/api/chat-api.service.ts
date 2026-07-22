@@ -14,6 +14,7 @@ export interface ProfessionalUnreadSummary {
   unread_count: number;
   by_client: Record<string, number>;
   last_unread_at: Record<string, string>;
+  client_names: Record<string, string>;
 }
 
 export interface ClientUnreadSummary {

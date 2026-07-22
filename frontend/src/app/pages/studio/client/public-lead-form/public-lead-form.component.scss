@@ -178,6 +178,23 @@ button:disabled {
   background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
 }
 
+.meeting-offer {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+  border-top: 1px solid var(--app-border);
+  padding-top: 1.5rem;
+}
+
+.meeting-offer h2,
+.meeting-offer p { margin: 0; }
+
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.6rem; }
+.slot-button { border: 1px solid var(--app-border); border-radius: 0.65rem; padding: 0.75rem; background: var(--app-surface); color: var(--app-text); font-weight: 700; cursor: pointer; }
+.slot-button.selected { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary-strong); }
+.contact-note { color: var(--app-muted); font-size: 0.86rem; }
+.meeting-confirmation { display: grid; gap: 0.35rem; border-radius: 0.75rem; padding: 1rem; background: var(--app-primary-soft); color: var(--app-primary-strong); }
+
 @media (max-width: 640px) {
   .public-form-shell {
     padding: 1rem;
