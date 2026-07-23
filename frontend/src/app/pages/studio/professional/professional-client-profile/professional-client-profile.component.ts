@@ -704,6 +704,9 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   resetCurrentPassword = '';
   resetConfirmation = '';
   resetReason = '';
+  deleteCurrentPassword = '';
+  deleteConfirmation = '';
+  deleteReason = '';
 
   async resetClient(): Promise<void> {
     const client = this.client;
@@ -788,12 +791,20 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const expectedConfirmation = client.username || client.reference_id;
+
+    if (!this.deleteCurrentPassword || this.deleteConfirmation !== expectedConfirmation || !this.deleteReason.trim()) {
+      this.messageType = 'error';
+      this.message = `Enter your password, type ${expectedConfirmation} exactly, and provide a deletion reason.`;
+      return;
+    }
+
     const confirmed = await this.confirmation.confirm({
       kind: 'delete',
-      title: 'Permanently delete',
+      title: 'Move account to Recycle Bin',
       target: `${client.first_name} ${client.last_name}`,
-      impact: 'Login, profile, templates, entries, chat, schedules, and notes will be erased. This cannot be undone.',
-      confirmLabel: 'Delete Client'
+      impact: 'Login access stops immediately. The bundled client account can be restored from the Recycle Bin during its retention period.',
+      confirmLabel: 'Move to Recycle Bin'
     });
 
     if (!confirmed) {
@@ -801,7 +812,11 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     }
 
     this.isDeletingClient = true;
-    this.formsGroupsApi.deleteClient(client.id).subscribe({
+    this.formsGroupsApi.deleteClient(client.id, {
+      current_password: this.deleteCurrentPassword,
+      confirmation: this.deleteConfirmation,
+      reason: this.deleteReason.trim()
+    }).subscribe({
       next: () => {
         void this.router.navigate(['/professional/clients']);
       },

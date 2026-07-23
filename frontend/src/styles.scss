@@ -487,7 +487,59 @@ input[type='file']:not(.visually-hidden)::file-selector-button {
   cursor: pointer;
 }
 
+.actions-card .destructive-verification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.actions-card .destructive-verification-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.42rem;
+  color: var(--app-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.actions-card .destructive-verification-grid input,
+.actions-card .destructive-verification-grid textarea {
+  width: 100%;
+  min-height: 2.8rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.7rem 0.8rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+}
+
+.actions-card .destructive-verification-grid input:hover,
+.actions-card .destructive-verification-grid textarea:hover {
+  border-color: var(--app-primary);
+}
+
+.actions-card .destructive-verification-grid input:focus,
+.actions-card .destructive-verification-grid textarea:focus {
+  outline: none;
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 16%, transparent);
+}
+
+.actions-card .destructive-verification-grid .full-width-field {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 680px) {
+  .actions-card .destructive-verification-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-card .destructive-verification-grid .full-width-field {
+    grid-column: auto;
+  }
+
   .photo-manager,
   .photo-field {
     grid-template-columns: 1fr;

@@ -36,21 +36,27 @@
       } @else {
         <section class="panel lead-panel" aria-labelledby="lead-form-title">
           <div class="lead-form-header">
-            <label class="form-toggle" [class.is-off]="!overview.lead_form?.is_active">
+            <div>
+              <p class="eyebrow">Public enquiry form</p>
+              <h2 id="lead-form-title">{{ overview.lead_form?.title }}</h2>
+              <p>{{ overview.lead_form?.is_active ? 'People with the link can submit this form.' : 'The public form is unavailable until you enable it.' }}</p>
+            </div>
+            <label class="switch-control">
               <input
                 type="checkbox"
                 [checked]="overview.lead_form?.is_active"
                 [disabled]="isSaving"
                 (change)="toggleLeadFormActive($event)"
               >
-              <span id="lead-form-title">Lead Form — {{ overview.lead_form?.is_active ? 'Enabled' : 'Disabled' }}</span>
+              <span class="switch-track" aria-hidden="true"><span></span></span>
+              <span class="switch-state">{{ overview.lead_form?.is_active ? 'Enabled' : 'Disabled' }}</span>
             </label>
           </div>
 
           @if (overview.lead_form?.is_active) {
             <div class="lead-main">
               <div class="panel-title">
-                <h2>Public Lead Form (Form 1)</h2>
+                <h2>Public Lead Form</h2>
                 <span class="status-pill">Active</span>
               </div>
 
@@ -116,14 +122,15 @@
                     <p>Applicants currently submit the form without receiving an introductory-meeting option.</p>
                   }
                 </div>
-                <label class="form-toggle" [class.is-off]="!overview.lead_form?.introductory_meeting_enabled">
+                <label class="switch-control">
                   <input
                     type="checkbox"
                     [checked]="overview.lead_form?.introductory_meeting_enabled"
                     [disabled]="isSaving"
                     (change)="toggleIntroMeetingEnabled($event)"
                   >
-                  <span>{{ overview.lead_form?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
+                  <span class="switch-track" aria-hidden="true"><span></span></span>
+                  <span class="switch-state">{{ overview.lead_form?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </label>
               </div>
 

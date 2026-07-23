@@ -84,6 +84,38 @@
             </div>
           </article>
 
+          <article class="panel pending-registration-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Pending Group Registrations</h2>
+                <p>New form responses that need your review before client access is created.</p>
+              </div>
+              <span class="pending-count" [class.has-requests]="registrationSubmissions.length > 0">
+                {{ registrationSubmissions.length }}
+              </span>
+            </div>
+            <app-fixed-height-list [visibleRows]="5">
+              <div class="registration-list">
+                @for (submission of registrationSubmissions; track submission.id) {
+                  <article>
+                    <div>
+                      <strong>{{ submission.applicant_name }}</strong>
+                      <span>{{ submission.email }}</span>
+                      <small>{{ submission.reference_id }} &middot; {{ submission.submitted_at | date: 'medium' }}</small>
+                    </div>
+                    <a
+                      [routerLink]="['/professional/groups', group.id, 'clients', 'add']"
+                      [queryParams]="{ registrationSubmissionId: submission.id }"
+                      class="primary-action compact"
+                    >Review Request</a>
+                  </article>
+                } @empty {
+                  <p class="empty-registration-message">No pending registration requests.</p>
+                }
+              </div>
+            </app-fixed-height-list>
+          </article>
+
           <article class="panel recent-approved-panel">
             <div class="panel-header">
               <div>
@@ -231,35 +263,6 @@
               </article>
             </div>
 
-            <section class="pending-registrations">
-              <div class="panel-header">
-                <div>
-                  <h3>Registrations awaiting account access</h3>
-                  <p>Review a submitted group registration, then create the client username and temporary password.</p>
-                </div>
-                <span class="status-pill">{{ registrationSubmissions.length }} pending</span>
-              </div>
-              <app-fixed-height-list [visibleRows]="5">
-                <div class="registration-list">
-                  @for (submission of registrationSubmissions; track submission.id) {
-                    <article>
-                      <div>
-                        <strong>{{ submission.applicant_name }}</strong>
-                        <span>{{ submission.email }}</span>
-                        <small>{{ submission.reference_id }} &middot; {{ submission.submitted_at | date: 'medium' }}</small>
-                      </div>
-                      <a
-                        [routerLink]="['/professional/groups', group.id, 'clients', 'add']"
-                        [queryParams]="{ registrationSubmissionId: submission.id }"
-                        class="primary-action compact"
-                      >Create Account</a>
-                    </article>
-                  } @empty {
-                    <p>No pending group registrations.</p>
-                  }
-                </div>
-              </app-fixed-height-list>
-            </section>
           </article>
         </section>
       }

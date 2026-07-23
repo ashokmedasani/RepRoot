@@ -3,7 +3,7 @@ from django.dispatch import receiver
 
 from .models import (
   ChatMessage, ClientDetailChangeRequest, ClientReminder, LeadMeetingRequest,
-  LeadSubmission, ProgressEntry, ScheduledMeeting, SupportIncident,
+  GroupRegistrationSubmission, LeadSubmission, ProgressEntry, ScheduledMeeting, SupportIncident,
   SupportIncidentMessage, TemplateAssignment, TrackingEntry,
 )
 from .notifications import notify_admin, notify_client, notify_professional
@@ -17,6 +17,23 @@ def lead_submitted(sender, instance, created, **kwargs):
     notify_professional(professional, category='forms', event_type='lead.submitted', event_key=f'lead:{instance.pk}:submitted',
       title='New lead form submission', body=f'{instance.first_name} {instance.last_name} submitted your form.',
       action_url=web_routes.professional_form_request(instance.pk), payload={'submission_id': instance.pk, 'reference_id': instance.reference_id}, requires_action=True)
+
+
+@receiver(post_save, sender=GroupRegistrationSubmission)
+def group_registration_submitted(sender, instance, created, **kwargs):
+  if created:
+    professional = instance.group.professional
+    notify_professional(
+      professional,
+      category='forms',
+      event_type='group_registration.submitted',
+      event_key=f'group-registration:{instance.pk}:submitted',
+      title='New group registration',
+      body=f'{instance.first_name} {instance.last_name} submitted the {instance.group.name} registration form.',
+      action_url=web_routes.PROFESSIONAL_FORMS_GROUPS,
+      payload={'group_id': instance.group_id, 'registration_submission_id': instance.pk, 'reference_id': instance.reference_id},
+      requires_action=True,
+    )
 
 
 @receiver(post_save, sender=LeadMeetingRequest)

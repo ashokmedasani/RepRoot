@@ -685,10 +685,13 @@ export class FormsGroupsApiService {
     });
   }
 
-  deleteClient(clientId: number): Observable<{ message: string }> {
+  deleteClient(
+    clientId: number,
+    verification: { current_password: string; confirmation: string; reason: string }
+  ): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/delete/`,
-      { headers: this.getAuthHeaders() }
+      { headers: this.getAuthHeaders(), body: verification }
     );
   }
 

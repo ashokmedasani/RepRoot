@@ -647,6 +647,35 @@ dd {
   padding-top: 1rem;
 }
 
+.pending-registration-panel {
+  border-color: color-mix(in srgb, #f59f00 34%, var(--app-border));
+  background: color-mix(in srgb, #f59f00 5%, var(--app-surface));
+}
+
+.pending-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-weight: 800;
+}
+
+.pending-count.has-requests {
+  border-color: #f59f00;
+  background: #f59f00;
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #f59f00 14%, transparent);
+}
+
+.empty-registration-message {
+  padding: 1rem;
+  color: var(--app-muted);
+}
+
 .registration-list {
   display: grid;
   gap: 0.55rem;

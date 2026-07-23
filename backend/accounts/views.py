@@ -2286,6 +2286,24 @@ class ClientAccessDeleteView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    confirmation = str(request.data.get('confirmation') or '').strip()
+    current_password = str(request.data.get('current_password') or '')
+    reason = str(request.data.get('reason') or '').strip()
+    expected_confirmation = client_access.username or client_access.reference_id
+
+    if confirmation != expected_confirmation:
+      return Response(
+        {'message': f'Type {expected_confirmation} exactly to confirm account deletion.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    if not check_password(current_password, request.user.password):
+      return Response(
+        {'message': 'Your current professional password is incorrect.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    if not reason:
+      return Response({'message': 'A deletion reason is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
     with transaction.atomic():
       lead_submission = client_access.lead_submission
 

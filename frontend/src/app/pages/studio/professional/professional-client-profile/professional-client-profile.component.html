@@ -468,7 +468,7 @@
             }
           </div>
 
-          <h4 class="action-section-heading">Access controls</h4>
+          <h4 class="action-section-heading">Everyday account controls</h4>
           <p class="action-section-hint">Reversible — none of these touch the client's data.</p>
           <div class="action-group">
             @if (client.has_portal_access) {
@@ -511,8 +511,8 @@
                 </label>
               </div>
               <div class="action-group">
-                <button type="button" class="primary-action compact" (click)="resetClientPassword()">Reset &amp; Send</button>
-                <button type="button" class="ghost-action compact" (click)="regenerateResetPassword()">Generate</button>
+                <button type="button" class="primary-action compact reset-submit-action" (click)="resetClientPassword()">Reset &amp; Send</button>
+                <button type="button" class="ghost-action compact generate-password-action" (click)="regenerateResetPassword()">Generate</button>
                 <button type="button" class="secondary-action compact" (click)="cancelResetPasswordForm()">Cancel</button>
               </div>
             </div>
@@ -521,7 +521,7 @@
             <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
           }
 
-          <h4 class="action-section-heading danger-heading">Irreversible actions</h4>
+          <h4 class="action-section-heading danger-heading">Destructive data actions</h4>
           <p class="action-section-hint">
             These permanently delete data. Deliberately separated from the reversible controls above so they can't be confused with a password reset.
           </p>
@@ -530,12 +530,15 @@
             <div>
               <strong>Clear Client History</strong>
               <p>Permanently clears operational data, including currently hidden history. Profile and core payment records remain.</p>
-              <button type="button" class="link-action" [disabled]="isExportingClient" (click)="exportClientData()">
-                {{ isExportingClient ? 'Preparing export...' : 'Download client data first' }}
+              <button type="button" class="secondary-action compact download-data-action" [disabled]="isExportingClient" (click)="exportClientData()">
+                <span aria-hidden="true">↓</span>
+                {{ isExportingClient ? 'Preparing export...' : 'Download Client Data' }}
               </button>
-              <label><span>Current professional password</span><input type="password" [(ngModel)]="resetCurrentPassword" autocomplete="current-password"></label>
-              <label><span>Type {{ client.username || client.reference_id }} to confirm</span><input type="text" [(ngModel)]="resetConfirmation" autocomplete="off"></label>
-              <label><span>Reset reason</span><textarea rows="2" [(ngModel)]="resetReason"></textarea></label>
+              <div class="destructive-verification-grid">
+                <label><span>Current professional password</span><input type="password" [(ngModel)]="resetCurrentPassword" autocomplete="current-password"></label>
+                <label><span>Type {{ client.username || client.reference_id }} to confirm</span><input type="text" [(ngModel)]="resetConfirmation" autocomplete="off"></label>
+                <label class="full-width-field"><span>Reset reason</span><textarea rows="3" [(ngModel)]="resetReason"></textarea></label>
+              </div>
             </div>
             <button
               type="button"
@@ -550,7 +553,16 @@
           <div class="action-block danger">
             <div>
               <strong>Delete Account</strong>
-              <p>Permanently erases all of this client's details. This cannot be undone.</p>
+              <p>Moves the complete client account to the Recycle Bin and stops login access immediately.</p>
+              <button type="button" class="secondary-action compact download-data-action" [disabled]="isExportingClient" (click)="exportClientData()">
+                <span aria-hidden="true">↓</span>
+                {{ isExportingClient ? 'Preparing export...' : 'Download Client Data' }}
+              </button>
+              <div class="destructive-verification-grid">
+                <label><span>Current professional password</span><input type="password" [(ngModel)]="deleteCurrentPassword" autocomplete="current-password"></label>
+                <label><span>Type {{ client.username || client.reference_id }} to confirm</span><input type="text" [(ngModel)]="deleteConfirmation" autocomplete="off"></label>
+                <label class="full-width-field"><span>Deletion reason</span><textarea rows="3" [(ngModel)]="deleteReason"></textarea></label>
+              </div>
             </div>
             <button
               type="button"
