@@ -24,7 +24,7 @@
           <h2 id="empty-form-title">You haven't created a form yet.</h2>
           <p>Please create your professional lead form to view Forms & Groups.</p>
           <div class="setup-note">
-            <p>This setup may take around 10-15 minutes. You will create:</p>
+            <p>Next, you'll set up:</p>
             <ol>
               <li>Public lead form</li>
               <li>Minimum one group</li>
@@ -35,149 +35,169 @@
         </section>
       } @else {
         <section class="panel lead-panel" aria-labelledby="lead-form-title">
-          <div class="lead-main">
-            <div class="panel-title">
-              <h2 id="lead-form-title">Public Lead Form (Form 1)</h2>
-              <span class="status-pill">Active</span>
-            </div>
-
-            <div class="form-name-block">
-              <span>Form Name</span>
-              <h3>{{ overview.lead_form?.title }}</h3>
-              <p>For unknown potential clients and initial enquiries. Approved leads move into client creation.</p>
-            </div>
-
-            <div class="form-link-box">
-              <span>Form Link</span>
-              <div>
-                <a [href]="overview.lead_form?.public_link" target="_blank" rel="noreferrer">{{ overview.lead_form?.public_link }}</a>
-                <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>
-              </div>
-            </div>
-
-            <div class="stats-grid">
-              <div class="stat-card total-stat">
-                <span>Total Requests</span>
-                <strong>{{ overview.pending_forms.length + overview.approved_forms.length + overview.deleted_forms.length }}</strong>
-              </div>
-              <div class="stat-card pending-stat">
-                <span>Pending</span>
-                <strong>{{ overview.pending_forms.length }}</strong>
-              </div>
-              <div class="stat-card approved-stat">
-                <span>Approved</span>
-                <strong>{{ overview.approved_forms.length }}</strong>
-              </div>
-              <div class="stat-card deleted-stat">
-                <span>Deleted</span>
-                <strong>{{ overview.deleted_forms.length }}</strong>
-              </div>
-            </div>
+          <div class="lead-form-header">
+            <label class="form-toggle" [class.is-off]="!overview.lead_form?.is_active">
+              <input
+                type="checkbox"
+                [checked]="overview.lead_form?.is_active"
+                [disabled]="isSaving"
+                (change)="toggleLeadFormActive($event)"
+              >
+              <span id="lead-form-title">Lead Form — {{ overview.lead_form?.is_active ? 'Enabled' : 'Disabled' }}</span>
+            </label>
           </div>
 
-          <aside class="fields-card">
-            <div class="fields-header">
-              <h3>Form Fields</h3>
-              <span>3 required</span>
-            </div>
-            <ul>
-              <li>First Name (Required)</li>
-              <li>Last Name (Required)</li>
-              <li>Email Address (Required)</li>
-            </ul>
-            @if ((overview.lead_form?.fields?.length || 0) > 3) {
-              <p>{{ (overview.lead_form?.fields?.length || 0) - 3 }} more fields</p>
-            }
-          </aside>
+          @if (overview.lead_form?.is_active) {
+            <div class="lead-main">
+              <div class="panel-title">
+                <h2>Public Lead Form (Form 1)</h2>
+                <span class="status-pill">Active</span>
+              </div>
 
-          <a routerLink="/professional/forms/create" class="secondary-action edit-form-action">Edit Form</a>
-        </section>
+              <div class="form-name-block">
+                <span>Form Name</span>
+                <h3>{{ overview.lead_form?.title }}</h3>
+                <p>For unknown potential clients and initial enquiries. Approved leads move into client creation.</p>
+              </div>
 
-        <section class="panel meeting-settings-summary" aria-labelledby="meeting-settings-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">After form submission</p>
-              <h2 id="meeting-settings-title">Introductory Meeting Settings</h2>
-              @if (overview.lead_form?.introductory_meeting_enabled) {
-                <p>Applicants can request <strong>{{ overview.lead_form?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
-              } @else {
-                <p>Applicants currently submit the form without receiving an introductory-meeting option.</p>
-              }
-            </div>
-            <span class="status-pill" [class.inactive-status]="!overview.lead_form?.introductory_meeting_enabled">
-              {{ overview.lead_form?.introductory_meeting_enabled ? 'Enabled' : 'Not enabled' }}
-            </span>
-          </div>
-
-          @if (overview.lead_form?.introductory_meeting_enabled) {
-            @if (meetingRequests.length) {
-              <div class="lead-meeting-preview" aria-labelledby="meeting-requests-title">
-                <div class="preview-heading">
-                  <div>
-                    <h3 id="meeting-requests-title">Meeting requests</h3>
-                    <span>Lead-form requests only. Accepting creates the calendar invitation.</span>
-                  </div>
-                  <span class="status-pill">{{ meetingRequests.length }} total</span>
+              <div class="form-link-box">
+                <span>Form Link</span>
+                <div>
+                  <a [href]="overview.lead_form?.public_link" target="_blank" rel="noreferrer">{{ overview.lead_form?.public_link }}</a>
+                  <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>
                 </div>
-                <div class="meeting-request-list">
-                  @for (request of meetingRequests; track request.id) {
-                    <article class="meeting-request-row" [class.resolved]="request.status !== 'pending'">
-                      <div><strong>{{ request.applicant_name }}</strong><span>{{ request.requested_start | date: 'EEE, MMM d, y · h:mm a' }}</span><small>{{ request.reference_id }} · {{ request.contact_email }}</small></div>
-                      <span class="status-pill">{{ request.status }}</span>
-                      @if (request.status === 'pending') {
-                        <div class="meeting-request-actions">
-                          <button type="button" class="primary-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'accept')">Accept &amp; send invite</button>
-                          <button type="button" class="ghost-action danger-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'decline')">Decline</button>
-                        </div>
-                      }
-                    </article>
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-card total-stat">
+                  <span>Total Requests</span>
+                  <strong>{{ overview.pending_forms.length + overview.approved_forms.length + overview.deleted_forms.length }}</strong>
+                </div>
+                <div class="stat-card pending-stat">
+                  <span>Pending</span>
+                  <strong>{{ overview.pending_forms.length }}</strong>
+                </div>
+                <div class="stat-card approved-stat">
+                  <span>Approved</span>
+                  <strong>{{ overview.approved_forms.length }}</strong>
+                </div>
+                <div class="stat-card deleted-stat">
+                  <span>Deleted</span>
+                  <strong>{{ overview.deleted_forms.length }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <aside class="fields-card">
+              <div class="fields-header">
+                <h3>Form Fields</h3>
+                <span>3 required</span>
+              </div>
+              <ul>
+                <li>First Name (Required)</li>
+                <li>Last Name (Required)</li>
+                <li>Email Address (Required)</li>
+              </ul>
+              @if ((overview.lead_form?.fields?.length || 0) > 3) {
+                <p>{{ (overview.lead_form?.fields?.length || 0) - 3 }} more fields</p>
+              }
+            </aside>
+
+            <a routerLink="/professional/forms/create" class="secondary-action edit-form-action">Edit Form</a>
+
+            <div class="meeting-settings-summary nested-meeting-settings" aria-labelledby="meeting-settings-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">After form submission</p>
+                  <h2 id="meeting-settings-title">Introductory Meeting Settings</h2>
+                  @if (overview.lead_form?.introductory_meeting_enabled) {
+                    <p>Applicants can request <strong>{{ overview.lead_form?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
+                  } @else {
+                    <p>Applicants currently submit the form without receiving an introductory-meeting option.</p>
                   }
                 </div>
+                <label class="form-toggle" [class.is-off]="!overview.lead_form?.introductory_meeting_enabled">
+                  <input
+                    type="checkbox"
+                    [checked]="overview.lead_form?.introductory_meeting_enabled"
+                    [disabled]="isSaving"
+                    (change)="toggleIntroMeetingEnabled($event)"
+                  >
+                  <span>{{ overview.lead_form?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
+                </label>
               </div>
-            }
-            <div class="meeting-rule-grid">
-              <div><span>Duration</span><strong>{{ overview.lead_form?.introductory_meeting_duration_minutes }} minutes</strong></div>
-              <div><span>Minimum notice</span><strong>{{ overview.lead_form?.introductory_meeting_min_notice_hours }} hours</strong></div>
-              <div><span>Booking window</span><strong>{{ overview.lead_form?.introductory_meeting_max_advance_days }} days</strong></div>
-              <div><span>Buffer</span><strong>{{ overview.lead_form?.introductory_meeting_buffer_minutes }} minutes</strong></div>
-            </div>
 
-            <div class="lead-meeting-preview">
-              <div class="preview-heading">
-                <h3>Next introductory meetings</h3>
-                <span>Lead-form meetings only · next 5</span>
-              </div>
-              @for (meeting of upcomingLeadMeetings; track meeting.id) {
-                <article class="preview-meeting-row">
-                  <div><strong>{{ meeting.applicant_name }}</strong><small>Lead-form introductory meeting · {{ meeting.reference_id }}</small></div>
-                  <time>{{ meeting.requested_start | date: 'EEE, MMM d · h:mm a' }}</time>
-                  @if (meeting.meeting_url) { <a [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer" class="ghost-action">Open meeting</a> }
-                </article>
-              } @empty {
-                <p class="empty-note">No upcoming introductory meetings.</p>
-              }
-            </div>
-
-            @if (overdueLeadMeetings.length) {
-              <div class="overdue-meetings">
-                <div class="preview-heading">
-                  <h3>Overdue follow-up</h3>
-                  <span>Send an apology, update, or rescheduling message by email.</span>
-                </div>
-                @for (meeting of overdueLeadMeetings; track meeting.id) {
-                  <article class="overdue-meeting-row">
-                    <div><strong>{{ meeting.applicant_name }}</strong><small>{{ meeting.requested_start | date: 'medium' }} · {{ meeting.contact_email }}</small></div>
-                    <textarea rows="2" [(ngModel)]="followupDrafts[meeting.id]" [name]="'followup-' + meeting.id" placeholder="Sorry we missed our meeting. Please reply with a suitable time so we can reschedule."></textarea>
-                    <button type="button" class="secondary-action" [disabled]="isSaving || !followupDrafts[meeting.id]?.trim()" (click)="sendMeetingFollowup(meeting)">Send email</button>
-                  </article>
+              @if (overview.lead_form?.introductory_meeting_enabled) {
+                @if (meetingRequests.length) {
+                  <div class="lead-meeting-preview" aria-labelledby="meeting-requests-title">
+                    <div class="preview-heading">
+                      <div>
+                        <h3 id="meeting-requests-title">Meeting requests</h3>
+                        <span>Lead-form requests only. Accepting creates the calendar invitation.</span>
+                      </div>
+                      <span class="status-pill">{{ meetingRequests.length }} total</span>
+                    </div>
+                    <div class="meeting-request-list">
+                      @for (request of meetingRequests; track request.id) {
+                        <article class="meeting-request-row" [class.resolved]="request.status !== 'pending'">
+                          <div><strong>{{ request.applicant_name }}</strong><span>{{ request.requested_start | date: 'EEE, MMM d, y · h:mm a' }}</span><small>{{ request.reference_id }} · {{ request.contact_email }}</small></div>
+                          <span class="status-pill">{{ request.status }}</span>
+                          @if (request.status === 'pending') {
+                            <div class="meeting-request-actions">
+                              <button type="button" class="primary-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'accept')">Accept &amp; send invite</button>
+                              <button type="button" class="ghost-action danger-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'decline')">Decline</button>
+                            </div>
+                          }
+                        </article>
+                      }
+                    </div>
+                  </div>
                 }
-              </div>
-            }
-          }
+                <div class="meeting-rule-grid">
+                  <div><span>Duration</span><strong>{{ overview.lead_form?.introductory_meeting_duration_minutes }} minutes</strong></div>
+                  <div><span>Minimum notice</span><strong>{{ overview.lead_form?.introductory_meeting_min_notice_hours }} hours</strong></div>
+                  <div><span>Booking window</span><strong>{{ overview.lead_form?.introductory_meeting_max_advance_days }} days</strong></div>
+                  <div><span>Buffer</span><strong>{{ overview.lead_form?.introductory_meeting_buffer_minutes }} minutes</strong></div>
+                </div>
 
-          <a routerLink="/professional/forms/create" [queryParams]="{ step: 'meeting' }" class="secondary-action meeting-settings-action">
-            {{ overview.lead_form?.introductory_meeting_enabled ? 'Edit meeting settings' : 'Set up introductory meetings' }}
-          </a>
+                <div class="lead-meeting-preview">
+                  <div class="preview-heading">
+                    <h3>Next introductory meetings</h3>
+                    <span>Lead-form meetings only · next 5</span>
+                  </div>
+                  @for (meeting of upcomingLeadMeetings; track meeting.id) {
+                    <article class="preview-meeting-row">
+                      <div><strong>{{ meeting.applicant_name }}</strong><small>Lead-form introductory meeting · {{ meeting.reference_id }}</small></div>
+                      <time>{{ meeting.requested_start | date: 'EEE, MMM d · h:mm a' }}</time>
+                      @if (meeting.meeting_url) { <a [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer" class="ghost-action">Open meeting</a> }
+                    </article>
+                  } @empty {
+                    <p class="empty-note">No upcoming introductory meetings.</p>
+                  }
+                </div>
+
+                @if (overdueLeadMeetings.length) {
+                  <div class="overdue-meetings">
+                    <div class="preview-heading">
+                      <h3>Overdue follow-up</h3>
+                      <span>Send an apology, update, or rescheduling message by email.</span>
+                    </div>
+                    @for (meeting of overdueLeadMeetings; track meeting.id) {
+                      <article class="overdue-meeting-row">
+                        <div><strong>{{ meeting.applicant_name }}</strong><small>{{ meeting.requested_start | date: 'medium' }} · {{ meeting.contact_email }}</small></div>
+                        <textarea rows="2" [(ngModel)]="followupDrafts[meeting.id]" [name]="'followup-' + meeting.id" placeholder="Sorry we missed our meeting. Please reply with a suitable time so we can reschedule."></textarea>
+                        <button type="button" class="secondary-action" [disabled]="isSaving || !followupDrafts[meeting.id]?.trim()" (click)="sendMeetingFollowup(meeting)">Send email</button>
+                      </article>
+                    }
+                  </div>
+                }
+              }
+
+              <a routerLink="/professional/forms/create" [queryParams]="{ step: 'meeting' }" class="secondary-action meeting-settings-action">
+                {{ overview.lead_form?.introductory_meeting_enabled ? 'Edit meeting settings' : 'Set up introductory meetings' }}
+              </a>
+            </div>
+          }
         </section>
 
         <section class="panel requests-panel" aria-labelledby="requests-title">

@@ -151,6 +151,69 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
     this.selectedSubmissionView = view;
   }
 
+  toggleLeadFormActive(event: Event): void {
+    if (!this.overview?.lead_form) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const isActive = input.checked;
+    const previous = this.overview.lead_form.is_active;
+    this.overview.lead_form.is_active = isActive;
+    this.isSaving = true;
+
+    this.formsGroupsApi.updateLeadFormStatus(isActive).subscribe({
+      next: (response) => {
+        if (this.overview) {
+          this.overview.lead_form = response.lead_form;
+        }
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSaving = false;
+      },
+      error: (error: unknown) => {
+        if (this.overview?.lead_form) {
+          this.overview.lead_form.is_active = previous;
+        }
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Lead form status could not be updated.');
+        this.isSaving = false;
+      }
+    });
+  }
+
+  toggleIntroMeetingEnabled(event: Event): void {
+    if (!this.overview?.lead_form) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const isEnabled = input.checked;
+    const previous = this.overview.lead_form.introductory_meeting_enabled;
+    this.overview.lead_form.introductory_meeting_enabled = isEnabled;
+    this.isSaving = true;
+
+    this.formsGroupsApi.saveLeadMeetingSettings({ introductory_meeting_enabled: isEnabled }).subscribe({
+      next: (response) => {
+        if (this.overview) {
+          this.overview.lead_form = response.lead_form;
+        }
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isSaving = false;
+        this.loadMeetingRequests();
+      },
+      error: (error: unknown) => {
+        if (this.overview?.lead_form) {
+          this.overview.lead_form.introductory_meeting_enabled = previous;
+        }
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Meeting setting could not be updated.');
+        this.isSaving = false;
+      }
+    });
+  }
+
   copyPublicLink(): void {
     const link = this.overview?.lead_form?.public_link || '';
 

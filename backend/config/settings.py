@@ -6,9 +6,20 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Local dev convenience only: a real deployment sets these as actual process
+# env vars (Render, Docker, etc.), which always take priority — load_dotenv()
+# does not override a variable that's already set. If python-dotenv isn't
+# installed yet (e.g. a venv that predates this), skip it rather than crash;
+# .env then simply has no effect until `pip install -r requirements.txt` runs.
+try:
+  from dotenv import load_dotenv
+  load_dotenv(BASE_DIR / '.env')
+except ImportError:
+  pass
+
 DEVELOPMENT_SECRET_KEY = 'local-development-only-secret-key'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', DEVELOPMENT_SECRET_KEY)
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
 if not DEBUG and SECRET_KEY == DEVELOPMENT_SECRET_KEY:
   raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set to a secure value when DJANGO_DEBUG is False.')
@@ -329,7 +340,7 @@ REPROOT_OPERATIONAL_DATA_MAX_DAYS = int(os.environ.get('REPROOT_OPERATIONAL_DATA
 
 # Storage usage is intentionally a calm operational indicator, not a live
 # counter that changes while the professional navigates between pages.
-REPROOT_DATA_USAGE_CACHE_SECONDS = int(os.environ.get('REPROOT_DATA_USAGE_CACHE_SECONDS', '900'))
+REPROOT_DATA_USAGE_CACHE_SECONDS = int(os.environ.get('REPROOT_DATA_USAGE_CACHE_SECONDS', '120'))
 
 # Stripe Billing — self-serve upgrade support for all tiers. Test-mode keys work
 # with zero business verification; swap for live keys only when actually
@@ -355,12 +366,6 @@ REPROOT_BILLING_CANCEL_URL = os.environ.get(
 # the whole lifecycle (limits, storage quota, lock/grace clearing) be exercised
 # end-to-end today. Flip this off once real prices are set for every tier.
 REPROOT_BILLING_TEST_MODE = os.environ.get('REPROOT_BILLING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
-REPROOT_SCHEDULING_TEST_MODE = os.environ.get('REPROOT_SCHEDULING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
 
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')
-
-# Scheduling — each professional connects their own Cal.com account (API key
-# stored per-professional in CalComConnection, not here). This is only the
-# API host, overridable for a self-hosted Cal.com instance later.
-CAL_COM_API_BASE_URL = os.environ.get('CAL_COM_API_BASE_URL', 'https://api.cal.com')

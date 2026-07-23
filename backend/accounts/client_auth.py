@@ -61,6 +61,9 @@ class ClientTokenAuthentication(authentication.BaseAuthentication):
     ):
       raise exceptions.AuthenticationFailed('Invalid or expired client token.')
 
+    if not token.client.has_portal_access:
+      raise exceptions.AuthenticationFailed('This client does not have portal access.')
+
     return (None, token.client)
 
   def authenticate_header(self, request):

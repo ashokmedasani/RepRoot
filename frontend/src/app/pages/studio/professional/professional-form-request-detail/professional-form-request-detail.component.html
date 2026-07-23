@@ -80,22 +80,43 @@
             }
           </select>
         </label>
+      </div>
 
-        <label>
-          <span class="field-label">Client username <span class="required">*</span></span>
-          <input type="text" [(ngModel)]="clientAccess.username" name="clientUsername" autocomplete="username">
+      <div class="form-grid">
+        <label class="wide check-row">
+          <input type="radio" name="portalAccessMode" value="send" [(ngModel)]="portalAccessMode">
+          <span>Create with portal access &mdash; email login details to the applicant</span>
         </label>
-
-        <label>
-          <span class="field-label">Client password <span class="required">*</span></span>
-          <app-password-input [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password" />
+        <label class="wide check-row">
+          <input type="radio" name="portalAccessMode" value="manual" [(ngModel)]="portalAccessMode">
+          <span>Create with portal access &mdash; don't email, I'll share the credentials manually</span>
         </label>
-
-        <label>
-          <span class="field-label">Confirm password <span class="required">*</span></span>
-          <app-password-input [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password" />
+        <label class="wide check-row">
+          <input type="radio" name="portalAccessMode" value="none" [(ngModel)]="portalAccessMode">
+          <span>No portal access &mdash; just store this applicant's info</span>
         </label>
       </div>
+
+      @if (hasPortalAccess) {
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Client username <span class="required">*</span></span>
+            <input type="text" [(ngModel)]="clientAccess.username" name="clientUsername" autocomplete="username">
+          </label>
+
+          <label>
+            <span class="field-label">Client password <span class="required">*</span></span>
+            <app-password-input [(ngModel)]="clientAccess.password" name="clientPassword" autocomplete="new-password" />
+          </label>
+
+          <label>
+            <span class="field-label">Confirm password <span class="required">*</span></span>
+            <app-password-input [(ngModel)]="clientAccess.confirmPassword" name="clientConfirmPassword" autocomplete="new-password" />
+          </label>
+        </div>
+      } @else {
+        <p class="fields-hint">No username or password will be created. You can grant portal access later from the client's profile.</p>
+      }
 
       @if (selectedRegistrationFields.length) {
         <div class="dynamic-fields">

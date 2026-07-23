@@ -92,9 +92,22 @@ def _usage_status_label(usage_percent: float) -> str:
   return 'plenty_of_room'
 
 
+def _data_usage_cache_key(professional_pk) -> str:
+  return f'professional-data-usage:v5:{professional_pk}'
+
+
+def bust_professional_data_usage_cache(professional) -> None:
+  """Call this after any write that changes a professional's counted records
+  (clients, forms, templates, references, ...) so Settings > Data Usage
+  reflects the change immediately instead of waiting out the cache TTL.
+  Safe to call with either a User instance or a raw pk."""
+  pk = getattr(professional, 'pk', professional)
+  cache.delete(_data_usage_cache_key(pk))
+
+
 def calculate_professional_data_usage(professional) -> dict:
   """Estimate professional-owned storage, broken down by product section and client."""
-  cache_key = f'professional-data-usage:v5:{professional.pk}'
+  cache_key = _data_usage_cache_key(professional.pk)
   cached = cache.get(cache_key)
   if cached is not None:
     return cached

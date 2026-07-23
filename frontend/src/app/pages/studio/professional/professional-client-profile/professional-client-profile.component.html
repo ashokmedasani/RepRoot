@@ -32,6 +32,9 @@
             <div class="name-row">
               <h2>{{ client.first_name }} {{ client.last_name }}</h2>
               <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+              @if (!client.has_portal_access) {
+                <span class="status-pill muted">No portal access</span>
+              }
             </div>
             <a class="group-link" [routerLink]="['/professional/groups', profile.group.id]">{{ profile.group.name }}</a>
             <p class="joined">Joined on {{ client.created_at | date: 'dd MMM yyyy' }}</p>
@@ -39,7 +42,6 @@
           @if (!isEditingClientInfo) {
             <div class="header-actions">
               <button type="button" class="secondary-action compact" (click)="startClientInfoEdit()">Edit Profile</button>
-              <button type="button" class="ghost-action compact" (click)="openAccountDialog()">Password</button>
             </div>
           }
         </div>
@@ -64,7 +66,9 @@
               <label><span>First Name</span><input type="text" [(ngModel)]="clientInfoDraft.first_name" name="ciFirst"></label>
               <label><span>Last Name</span><input type="text" [(ngModel)]="clientInfoDraft.last_name" name="ciLast"></label>
               <label><span>Email Address</span><input type="email" [(ngModel)]="clientInfoDraft.email" name="ciEmail"></label>
-              <label><span>Username</span><input type="text" [(ngModel)]="clientInfoDraft.username" name="ciUsername"></label>
+              @if (client.has_portal_access) {
+                <label><span>Username</span><input type="text" [(ngModel)]="clientInfoDraft.username" name="ciUsername"></label>
+              }
               <label><span>Client Status</span>
                 <select [(ngModel)]="clientInfoDraft.is_active" name="ciStatus">
                   <option [ngValue]="true">Active</option>
@@ -318,7 +322,18 @@
                 <small>Assigned on {{ assignment.assigned_at | date: 'dd MMM yyyy' }}</small>
               </span>
               <span class="assignment-side">
-                <span class="status-pill">Active</span>
+                <span class="visibility-toggle" role="group" aria-label="Client access level">
+                  @for (option of accessLevelOptions; track option.value) {
+                    <button
+                      type="button"
+                      [disabled]="updatingAccessLevelId === assignment.id"
+                      [class.active]="assignment.client_access_level === option.value"
+                      (click)="updateAssignmentAccessLevel(assignment, option.value, $event)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  }
+                </span>
                 <button type="button" class="ghost-action compact" (click)="unassignTemplate(assignment, $event)">Unassign</button>
                 <span class="chevron" aria-hidden="true">&rsaquo;</span>
               </span>
@@ -327,12 +342,17 @@
             <p class="empty-note">No templates assigned yet. Assign one below so {{ client.first_name }} can start tracking.</p>
           }
         </div>
-        <p class="hint-note">Click a template to open its details, references, and entries.</p>
+        <p class="hint-note">Click a template to open its details, references, and entries. Private templates are hidden from the client entirely; view only lets them see entries without submitting.</p>
         <div class="assign-row">
           <select [(ngModel)]="selectedTemplateId" name="assignTemplate">
             <option [ngValue]="null">Select a template to assign</option>
             @for (template of availableTemplates; track template.id) {
               <option [ngValue]="template.id">{{ template.name }} ({{ template.cadence }})</option>
+            }
+          </select>
+          <select [(ngModel)]="selectedAccessLevel" name="assignAccessLevel">
+            @for (option of accessLevelOptions; track option.value) {
+              <option [ngValue]="option.value">{{ option.label }}</option>
             }
           </select>
           <button type="button" class="primary-action compact" [disabled]="!selectedTemplateId || isAssigning" (click)="assignTemplate()">
@@ -443,10 +463,29 @@
               <p class="section-sub">Manage access, account status, client data, and permanent deletion.</p>
             </div>
             <span class="status-pill" [class.suspended]="!isClientActive">{{ isClientActive ? 'Active' : 'Suspended' }}</span>
+            @if (!client.has_portal_access) {
+              <span class="status-pill muted">No portal access</span>
+            }
           </div>
 
+          <h4 class="action-section-heading">Access controls</h4>
+          <p class="action-section-hint">Reversible — none of these touch the client's data.</p>
           <div class="action-group">
-            <button type="button" class="secondary-action compact" (click)="openAccountDialog()">Reset Password</button>
+            @if (client.has_portal_access) {
+              @if (!showResetPasswordForm) {
+                <button type="button" class="secondary-action compact" (click)="openResetPasswordForm()">Reset Password</button>
+              }
+              <button
+                type="button"
+                class="secondary-action compact"
+                [disabled]="isRevokingAccess"
+                (click)="revokePortalAccess()"
+              >
+                {{ isRevokingAccess ? 'Disabling...' : 'Disable Portal Access' }}
+              </button>
+            } @else {
+              <button type="button" class="secondary-action compact" (click)="openAccountDialog(); openGrantAccess()">Grant Portal Access</button>
+            }
             <button
               type="button"
               class="secondary-action compact"
@@ -457,15 +496,45 @@
             </button>
           </div>
 
+          @if (client.has_portal_access && showResetPasswordForm) {
+            <div class="action-block reset-password-block">
+              <div>
+                <strong>New temporary password</strong>
+                <p>The client must change this at next login.</p>
+                <label>
+                  <span>New temporary password *</span>
+                  <app-password-input name="resetPassword" [(ngModel)]="resetPasswordDraft.password" autocomplete="new-password" [required]="true" />
+                </label>
+                <label>
+                  <span>Confirm password *</span>
+                  <app-password-input name="resetConfirmPassword" [(ngModel)]="resetPasswordDraft.confirmPassword" autocomplete="new-password" [required]="true" />
+                </label>
+              </div>
+              <div class="action-group">
+                <button type="button" class="primary-action compact" (click)="resetClientPassword()">Reset &amp; Send</button>
+                <button type="button" class="ghost-action compact" (click)="regenerateResetPassword()">Generate</button>
+                <button type="button" class="secondary-action compact" (click)="cancelResetPasswordForm()">Cancel</button>
+              </div>
+            </div>
+          }
+          @if (resetPasswordResult) {
+            <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
+          }
+
+          <h4 class="action-section-heading danger-heading">Irreversible actions</h4>
+          <p class="action-section-hint">
+            These permanently delete data. Deliberately separated from the reversible controls above so they can't be confused with a password reset.
+          </p>
+
           <div class="action-block warn">
             <div>
-              <strong>Reset Client</strong>
+              <strong>Clear Client History</strong>
               <p>Permanently clears operational data, including currently hidden history. Profile and core payment records remain.</p>
               <button type="button" class="link-action" [disabled]="isExportingClient" (click)="exportClientData()">
                 {{ isExportingClient ? 'Preparing export...' : 'Download client data first' }}
               </button>
               <label><span>Current professional password</span><input type="password" [(ngModel)]="resetCurrentPassword" autocomplete="current-password"></label>
-              <label><span>Type {{ client.username }} to confirm</span><input type="text" [(ngModel)]="resetConfirmation" autocomplete="off"></label>
+              <label><span>Type {{ client.username || client.reference_id }} to confirm</span><input type="text" [(ngModel)]="resetConfirmation" autocomplete="off"></label>
               <label><span>Reset reason</span><textarea rows="2" [(ngModel)]="resetReason"></textarea></label>
             </div>
             <button
@@ -474,7 +543,7 @@
               [disabled]="isResettingClient"
               (click)="resetClient()"
             >
-              {{ isResettingClient ? 'Resetting...' : 'Reset Client' }}
+              {{ isResettingClient ? 'Clearing...' : 'Clear Client History' }}
             </button>
           </div>
 
@@ -506,9 +575,15 @@
 
           <dl class="answer-grid">
             <div>
-              <dt>Username</dt>
-              <dd>{{ client.username }}</dd>
+              <dt>Portal Access</dt>
+              <dd>{{ client.has_portal_access ? 'Enabled' : 'Not enabled' }}</dd>
             </div>
+            @if (client.has_portal_access) {
+              <div>
+                <dt>Username</dt>
+                <dd>{{ client.username }}</dd>
+              </div>
+            }
             <div>
               <dt>Email</dt>
               <dd>{{ client.email }}</dd>
@@ -533,17 +608,37 @@
               <dt>Status</dt>
               <dd>{{ client.is_active ? 'Active' : 'Inactive' }}</dd>
             </div>
-            <div>
-              <dt>Password</dt>
-              <dd>{{ client.must_change_password ? 'Temporary password active' : 'Client-managed password' }}</dd>
-            </div>
+            @if (client.has_portal_access) {
+              <div>
+                <dt>Password</dt>
+                <dd>{{ client.must_change_password ? 'Temporary password active' : 'Client-managed password' }}</dd>
+              </div>
+            }
           </dl>
 
-          <div class="dialog-actions">
-            <button type="button" class="primary-action" (click)="resetClientPassword()">Reset Password</button>
-          </div>
-          @if (resetPasswordResult) {
-            <p class="reset-note">Temporary password: <strong>{{ resetPasswordResult }}</strong></p>
+          @if (client.has_portal_access) {
+            <p class="reset-note">
+              Manage this client's password, portal access, and account status from the
+              <strong>Actions</strong> tab.
+            </p>
+          } @else if (!isGrantAccessOpen) {
+            <div class="dialog-actions">
+              <button type="button" class="primary-action" (click)="openGrantAccess()">Grant Portal Access</button>
+            </div>
+            <p class="reset-note">This client has no login yet. Grant portal access to let them sign in.</p>
+          } @else {
+            <div class="grant-access-form">
+              <label><span>Username *</span><input type="text" [(ngModel)]="grantAccessDraft.username" name="grantUsername" autocomplete="off"></label>
+              <label><span>Temporary password *</span><app-password-input name="grantPassword" [(ngModel)]="grantAccessDraft.password" autocomplete="new-password" [required]="true" /></label>
+              <label><span>Confirm password *</span><app-password-input name="grantConfirmPassword" [(ngModel)]="grantAccessDraft.confirmPassword" autocomplete="new-password" [required]="true" /></label>
+              <label class="check-row"><input type="checkbox" [(ngModel)]="grantAccessDraft.sendCredentials" name="grantSendCredentials"><span>Email these credentials to the client</span></label>
+              <div class="dialog-actions">
+                <button type="button" class="secondary-action" (click)="cancelGrantAccess()">Cancel</button>
+                <button type="button" class="primary-action" [disabled]="isGrantingAccess" (click)="submitGrantAccess()">
+                  {{ isGrantingAccess ? 'Granting...' : 'Grant Access' }}
+                </button>
+              </div>
+            </div>
           }
         </div>
       </section>

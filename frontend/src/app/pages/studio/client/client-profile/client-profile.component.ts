@@ -258,10 +258,16 @@ export class ClientProfileComponent implements OnInit {
     return Array.from({ length: scale }, (_value, index) => index + 1);
   }
 
+  // Backend never sends 'private' assignments to the client; templates are
+  // editable unless the trainer has switched this one to view-only.
+  isTemplateEditable(template: TrackingTemplateRecord): boolean {
+    return (template.client_access_level || 'editable') !== 'view_only';
+  }
+
   submitEntry(template: TrackingTemplateRecord): void {
     const draft = this.draftFor(template);
 
-    if (!draft.entryDate || this.savingTemplateId) {
+    if (!draft.entryDate || this.savingTemplateId || !this.isTemplateEditable(template)) {
       return;
     }
 
@@ -320,6 +326,12 @@ export class ClientProfileComponent implements OnInit {
   }
 
   startEntryEdit(template: TrackingTemplateRecord, entry: TrackingEntryRecord): void {
+    if (!this.isTemplateEditable(template)) {
+      this.messageType = 'error';
+      this.message = 'This template is view-only. You cannot edit entries.';
+      return;
+    }
+
     if (!this.isEntryEditable(entry)) {
       this.messageType = 'error';
       this.message = 'This entry is older than 72 hours and can no longer be edited.';

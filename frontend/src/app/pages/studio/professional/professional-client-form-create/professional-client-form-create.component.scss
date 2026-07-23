@@ -73,6 +73,9 @@ h2 {
   text-decoration: none;
 }
 
+.toggle-row { display: flex; align-items: center; gap: 0.7rem; border: 1px solid var(--app-border); border-radius: 0.75rem; padding: 1rem; background: var(--app-surface-soft); }
+.toggle-row input { width: 1.1rem; min-height: 1.1rem; }
+
 .primary-action {
   min-height: 2.85rem;
   border: 0;

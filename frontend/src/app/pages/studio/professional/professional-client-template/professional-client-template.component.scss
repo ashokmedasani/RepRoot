@@ -90,6 +90,38 @@
   font-weight: 600;
 }
 
+.visibility-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  overflow: hidden;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.visibility-toggle button {
+  min-height: 2.1rem;
+  border: 0;
+  border-right: 1px solid var(--app-border);
+  padding: 0 0.85rem;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--app-transition-fast);
+}
+
+.visibility-toggle button:last-child {
+  border-right: 0;
+}
+
+.visibility-toggle button.active {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
 .range-tabs {
   display: inline-flex;
   gap: 0.25rem;

@@ -1,20 +1,19 @@
 """
-Scheduling — real video meetings between a professional and one client,
-booked through the professional's own Cal.com account (see cal_com.py for
-the API contract). Kept separate from views.py the same way views_payments.py
-is: a self-contained feature module.
+Scheduling — real video meetings between a professional and their client(s),
+booked entirely inside RepRoot: no third-party account or API key required
+from any trainer. A free Jitsi Meet room is generated per meeting and a
+calendar (.ics) invite is emailed to every attendee (see calendar_invites.py
+and scheduling_engine.py for the mechanics).
 
 ClientReminder (in views.py / forms_groups) stays the lightweight "call this
 client back" follow-up with no video component; ScheduledMeeting is the
-richer, Cal.com-backed booking. Both show up together on a client's
-Schedule tab in the frontend, but they're distinct models here.
+richer booking with a join link and calendar invite. Both show up together
+on a client's Schedule tab in the frontend, but they're distinct models here.
 """
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
-from django.conf import settings
-from django.core.mail import send_mail
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -22,31 +21,42 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import cal_com
+from .calendar_invites import send_meeting_invite_email
+from .email_utils import send_mail_background as send_mail
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
 from .access_permissions import ProfessionalAccessPermission
-from .models import CalComConnection, ClientAccess, LeadMeetingRequest, LeadSubmission, ProfessionalLeadForm, ScheduledMeeting, ScheduledMeetingGuest
-from .serializers import CalComConnectionSerializer, LeadMeetingRequestSerializer, ProfessionalLeadFormSerializer, ScheduledMeetingSerializer
+from .models import (
+  ClientAccess,
+  LeadMeetingRequest,
+  LeadSubmission,
+  ProfessionalAvailabilityWindow,
+  ProfessionalLeadForm,
+  ScheduledMeeting,
+  ScheduledMeetingGuest,
+)
+from .scheduling_engine import (
+  compute_available_slots,
+  generate_meeting_room_url,
+  generate_meeting_uid,
+  get_or_create_scheduling_settings,
+)
+from .serializers import (
+  LeadMeetingRequestSerializer,
+  ProfessionalAvailabilityWindowSerializer,
+  ProfessionalLeadFormSerializer,
+  ProfessionalSchedulingSettingsSerializer,
+  ScheduledMeetingSerializer,
+)
 
 
-def _get_or_create_connection(professional) -> CalComConnection:
-  connection, _ = CalComConnection.objects.get_or_create(professional=professional)
-  return connection
+def _attendee_name(person) -> str:
+  return f'{person.first_name} {person.last_name}'.strip() or person.username
 
 
-def _provider_or_test_slots(connection, event_type_id, start_date, end_date):
-  if not settings.REPROOT_SCHEDULING_TEST_MODE:
-    return cal_com.get_available_slots(connection, int(event_type_id), start_date.isoformat(), end_date.isoformat(), connection.timezone)
-  slots = {}
-  current = start_date
-  while current <= end_date:
-    if current.weekday() < 5:
-      slots[current.isoformat()] = [
-        {'start': timezone.make_aware(datetime.combine(current, time(hour, 0))).isoformat()}
-        for hour in (10, 14)
-      ]
-    current += timedelta(days=1)
-  return slots
+def _meeting_attendees(client, guest_clients=()):
+  return [(_attendee_name(client), client.email)] + [
+    (_attendee_name(guest), guest.email) for guest in guest_clients
+  ]
 
 
 class ProfessionalLeadMeetingSettingsView(APIView):
@@ -56,30 +66,35 @@ class ProfessionalLeadMeetingSettingsView(APIView):
     lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
     if lead_form is None:
       return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
-    connection = _get_or_create_connection(request.user)
-    return Response({
-      'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data,
-      'connection': CalComConnectionSerializer(connection).data,
-    })
+    return Response({'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data})
 
   def put(self, request):
     lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
     if lead_form is None:
       return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
-    connection = _get_or_create_connection(request.user)
-    enabled = bool(request.data.get('introductory_meeting_enabled', False))
-    if enabled and not connection.is_connected:
-      return Response({'message': 'Connect your scheduling account before enabling public meeting requests.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    enabled = bool(request.data.get('introductory_meeting_enabled', lead_form.introductory_meeting_enabled))
+    if enabled and not ProfessionalAvailabilityWindow.objects.filter(professional=request.user, is_active=True).exists():
+      return Response(
+        {'message': 'Set your weekly availability before enabling public meeting requests.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
 
     allowed = [
       'introductory_meeting_enabled', 'introductory_meeting_title', 'introductory_meeting_duration_minutes',
-      'introductory_meeting_event_type_id', 'introductory_meeting_min_notice_hours',
-      'introductory_meeting_max_advance_days', 'introductory_meeting_buffer_minutes',
+      'introductory_meeting_min_notice_hours', 'introductory_meeting_max_advance_days',
+      'introductory_meeting_buffer_minutes',
     ]
-    serializer = ProfessionalLeadFormSerializer(lead_form, data={key: request.data[key] for key in allowed if key in request.data}, partial=True, context={'request': request})
+    serializer = ProfessionalLeadFormSerializer(
+      lead_form, data={key: request.data[key] for key in allowed if key in request.data},
+      partial=True, context={'request': request},
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save(introductory_meeting_requires_approval=True)
-    return Response({'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data, 'message': 'Introductory meeting settings saved.'})
+    return Response({
+      'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data,
+      'message': 'Introductory meeting settings saved.',
+    })
 
 
 def _public_submission(public_slug, token):
@@ -104,12 +119,7 @@ class PublicLeadMeetingSlotsView(APIView):
     if submission is None:
       return Response({'message': 'This booking link is invalid or unavailable.'}, status=status.HTTP_404_NOT_FOUND)
     lead_form = submission.lead_form
-    connection = _get_or_create_connection(lead_form.professional)
-    if not connection.is_connected:
-      return Response({'message': 'Online scheduling is temporarily unavailable.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-    event_type_id = lead_form.introductory_meeting_event_type_id or connection.default_event_type_id
-    if not event_type_id:
-      return Response({'message': 'The professional has not selected a meeting type.'}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
       start_date = date.fromisoformat(request.query_params.get('start'))
       end_date = date.fromisoformat(request.query_params.get('end'))
@@ -119,30 +129,17 @@ class PublicLeadMeetingSlotsView(APIView):
     latest = today + timedelta(days=lead_form.introductory_meeting_max_advance_days)
     if start_date < today or end_date < start_date or end_date > latest:
       return Response({'message': f'Choose dates between today and {latest.isoformat()}.'}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-      slots = _provider_or_test_slots(connection, event_type_id, start_date, end_date)
-    except cal_com.CalComError as exc:
-      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-    minimum = timezone.now() + timedelta(hours=lead_form.introductory_meeting_min_notice_hours)
-    pending_requests = list(LeadMeetingRequest.objects.filter(
-      submission__lead_form=lead_form, status=LeadMeetingRequest.STATUS_PENDING, expires_at__gt=timezone.now(),
-    ).values_list('requested_start', 'requested_end'))
-    filtered = {}
-    for day, entries in slots.items():
-      available = []
-      for entry in entries:
-        start_at = parse_datetime(entry.get('start', ''))
-        overlaps_hold = start_at and any(
-          start_at < pending_end + timedelta(minutes=lead_form.introductory_meeting_buffer_minutes)
-          and start_at + timedelta(minutes=lead_form.introductory_meeting_duration_minutes) > pending_start - timedelta(minutes=lead_form.introductory_meeting_buffer_minutes)
-          for pending_start, pending_end in pending_requests
-        )
-        if start_at and start_at >= minimum and not overlaps_hold:
-          available.append(entry)
-      if available:
-        filtered[day] = available
-    return Response({'slots': filtered, 'timezone': connection.timezone})
+    slots = compute_available_slots(
+      lead_form.professional,
+      start_date,
+      end_date,
+      lead_form.introductory_meeting_duration_minutes,
+      buffer_minutes=lead_form.introductory_meeting_buffer_minutes,
+      min_notice_hours=lead_form.introductory_meeting_min_notice_hours,
+    )
+    scheduling_settings = get_or_create_scheduling_settings(lead_form.professional)
+    return Response({'slots': slots, 'timezone': scheduling_settings.timezone})
 
 
 class PublicLeadMeetingRequestView(APIView):
@@ -162,20 +159,24 @@ class PublicLeadMeetingRequestView(APIView):
       return Response({'message': 'That time is too far in advance.'}, status=status.HTTP_400_BAD_REQUEST)
     if hasattr(submission, 'meeting_request'):
       return Response({'message': 'A meeting request already exists for this submission.'}, status=status.HTTP_400_BAD_REQUEST)
+
     duration = lead_form.introductory_meeting_duration_minutes
-    connection = _get_or_create_connection(lead_form.professional)
-    event_type_id = lead_form.introductory_meeting_event_type_id or connection.default_event_type_id
-    try:
-      provider_slots = _provider_or_test_slots(connection, event_type_id, start_at.date(), start_at.date())
-    except (cal_com.CalComError, TypeError, ValueError) as exc:
-      return Response({'message': f'Could not verify that time: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
-    provider_starts = {
+    day_slots = compute_available_slots(
+      lead_form.professional,
+      start_at.date(),
+      start_at.date(),
+      duration,
+      buffer_minutes=lead_form.introductory_meeting_buffer_minutes,
+      min_notice_hours=lead_form.introductory_meeting_min_notice_hours,
+    )
+    available_starts = {
       parse_datetime(entry.get('start', ''))
-      for entries in provider_slots.values()
+      for entries in day_slots.values()
       for entry in entries
     }
-    if start_at not in provider_starts:
+    if start_at not in available_starts:
       return Response({'message': 'That time is no longer available. Please choose another slot.'}, status=status.HTTP_409_CONFLICT)
+
     buffer_delta = timedelta(minutes=lead_form.introductory_meeting_buffer_minutes)
     end_at = start_at + timedelta(minutes=duration)
     if LeadMeetingRequest.objects.filter(
@@ -186,6 +187,7 @@ class PublicLeadMeetingRequestView(APIView):
       requested_end__gt=start_at - buffer_delta,
     ).exists():
       return Response({'message': 'That time is being held for another request. Please choose another slot.'}, status=status.HTTP_409_CONFLICT)
+
     meeting_request = LeadMeetingRequest.objects.create(
       submission=submission,
       requested_start=start_at,
@@ -194,14 +196,28 @@ class PublicLeadMeetingRequestView(APIView):
       contact_mobile=str(request.data.get('contact_mobile', '')).strip(),
       expires_at=timezone.now() + timedelta(hours=24),
     )
-    send_mail(
-      subject='New introductory meeting request',
-      message=f'{submission.first_name} {submission.last_name} requested {start_at.isoformat()} for form {submission.reference_id}. Sign in to RepRoot Studio to accept or decline it.',
-      from_email=None,
-      recipient_list=[lead_form.professional.email],
-      fail_silently=False,
+    try:
+      send_meeting_invite_email(
+        uid=f'lead-request-{meeting_request.id}',
+        sequence=0,
+        start_at=start_at,
+        end_at=end_at,
+        summary=f'Introductory meeting request — {submission.first_name} {submission.last_name}'.strip(),
+        organizer_email=lead_form.professional.email,
+        organizer_name=lead_form.professional.get_full_name() or lead_form.professional.username,
+        attendees=[(lead_form.professional.get_full_name() or lead_form.professional.username, lead_form.professional.email)],
+        extra_body=(
+          f'{submission.first_name} {submission.last_name} requested {start_at.isoformat()} '
+          f'for form {submission.reference_id}. Sign in to RepRoot Studio to accept or decline it.'
+        ),
+      )
+    except Exception:
+      pass  # Notification best-effort; the request itself is already saved and visible in Studio.
+
+    return Response(
+      {'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Your preferred time was sent to the professional for approval.'},
+      status=status.HTTP_201_CREATED,
     )
-    return Response({'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Your preferred time was sent to the professional for approval.'}, status=status.HTTP_201_CREATED)
 
 
 class ProfessionalLeadMeetingRequestListView(APIView):
@@ -221,6 +237,7 @@ class ProfessionalLeadMeetingRequestActionView(APIView):
     if meeting_request is None:
       return Response({'message': 'Meeting request not found.'}, status=status.HTTP_404_NOT_FOUND)
     action = request.data.get('action')
+
     if action == 'send_followup':
       if meeting_request.status != LeadMeetingRequest.STATUS_ACCEPTED or meeting_request.requested_start >= timezone.now():
         return Response({'message': 'Follow-up email is available only for overdue accepted meetings.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -237,158 +254,141 @@ class ProfessionalLeadMeetingRequestActionView(APIView):
       meeting_request.trainer_note = custom_message
       meeting_request.save(update_fields=['trainer_note', 'updated_at'])
       return Response({'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Follow-up email sent.'})
+
     if meeting_request.status != LeadMeetingRequest.STATUS_PENDING or meeting_request.expires_at <= timezone.now():
       return Response({'message': 'This meeting request is no longer pending.'}, status=status.HTTP_400_BAD_REQUEST)
     meeting_request.trainer_note = str(request.data.get('trainer_note', '')).strip()
+
     if action == 'decline':
       meeting_request.status = LeadMeetingRequest.STATUS_DECLINED
       meeting_request.reviewed_at = timezone.now()
       meeting_request.save(update_fields=['status', 'trainer_note', 'reviewed_at', 'updated_at'])
-      send_mail(subject='Meeting request update', message='Your introductory meeting request was declined. The professional may contact you with another option.', from_email=None, recipient_list=[meeting_request.contact_email], fail_silently=False)
+      send_mail(
+        subject='Meeting request update',
+        message='Your introductory meeting request was declined. The professional may contact you with another option.',
+        from_email=None, recipient_list=[meeting_request.contact_email], fail_silently=False,
+      )
       return Response({'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Meeting request declined.'})
+
     if action != 'accept':
       return Response({'message': 'action must be accept or decline.'}, status=status.HTTP_400_BAD_REQUEST)
-    lead_form = meeting_request.submission.lead_form
-    connection = _get_or_create_connection(request.user)
-    event_type_id = lead_form.introductory_meeting_event_type_id or connection.default_event_type_id
-    try:
-      booking = (
-        {
-          'uid': f'local-test-lead-{meeting_request.id}',
-          'location': f'https://meet.example.test/lead-{meeting_request.id}',
-        }
-        if settings.REPROOT_SCHEDULING_TEST_MODE
-        else cal_com.create_booking(
-          connection, int(event_type_id), meeting_request.requested_start.isoformat(),
-          attendee_name=f'{meeting_request.submission.first_name} {meeting_request.submission.last_name}'.strip(),
-          attendee_email=meeting_request.contact_email, attendee_timezone=connection.timezone,
-        )
-      )
-    except (cal_com.CalComError, TypeError, ValueError) as exc:
-      return Response({'message': f'Could not create the calendar booking: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    uid = meeting_request.cal_booking_uid or generate_meeting_uid()
+    meeting_url = generate_meeting_room_url()
+    applicant_name = f'{meeting_request.submission.first_name} {meeting_request.submission.last_name}'.strip()
+
     meeting_request.status = LeadMeetingRequest.STATUS_ACCEPTED
-    meeting_request.cal_booking_uid = booking.get('uid', '')
-    meeting_request.meeting_url = booking.get('location') or ''
+    meeting_request.cal_booking_uid = uid
+    meeting_request.meeting_url = meeting_url
     meeting_request.reviewed_at = timezone.now()
     meeting_request.save(update_fields=['status', 'trainer_note', 'cal_booking_uid', 'meeting_url', 'reviewed_at', 'updated_at'])
-    send_mail(subject='Your meeting is confirmed', message=f'Your introductory meeting is confirmed for {meeting_request.requested_start.isoformat()}. {meeting_request.meeting_url}', from_email=None, recipient_list=[meeting_request.contact_email], fail_silently=False)
-    return Response({'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Meeting accepted and calendar invitation created.'})
+
+    invite_note = ''
+    try:
+      send_meeting_invite_email(
+        uid=uid,
+        sequence=meeting_request.ics_sequence,
+        start_at=meeting_request.requested_start,
+        end_at=meeting_request.requested_end,
+        summary=f'Introductory meeting with {request.user.get_full_name() or request.user.username}',
+        organizer_email=request.user.email,
+        organizer_name=request.user.get_full_name() or request.user.username,
+        attendees=[(applicant_name, meeting_request.contact_email)],
+        meeting_url=meeting_url,
+      )
+    except Exception:
+      invite_note = ' The confirmation email could not be sent — please contact them directly.'
+
+    return Response({
+      'request': LeadMeetingRequestSerializer(meeting_request).data,
+      'message': f'Meeting accepted and a calendar invitation was created.{invite_note}',
+    })
 
 
-class CalComConnectionView(APIView):
-  """View/update the professional's own Cal.com account link. Saving a new
-  api_key immediately validates it against Cal.com (a real API call) rather
-  than trusting it blindly, and returns the account's event types so the
-  frontend can offer a default-meeting-type picker in the same step."""
+class ProfessionalSchedulingSettingsView(APIView):
+  """A professional's own local scheduling configuration (timezone, default
+  meeting length, buffer) plus their weekly availability windows — replaces
+  the old Cal.com account-connection step entirely. Nothing here talks to a
+  third party; slots are computed purely from this data
+  (see scheduling_engine.compute_available_slots)."""
 
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    connection = _get_or_create_connection(request.user)
-    return Response({'connection': CalComConnectionSerializer(connection).data})
+    scheduling_settings = get_or_create_scheduling_settings(request.user)
+    windows = ProfessionalAvailabilityWindow.objects.filter(professional=request.user).order_by('weekday', 'start_time')
+    return Response({
+      'settings': ProfessionalSchedulingSettingsSerializer(scheduling_settings).data,
+      'availability_windows': ProfessionalAvailabilityWindowSerializer(windows, many=True).data,
+    })
 
   def put(self, request):
-    connection = _get_or_create_connection(request.user)
+    scheduling_settings = get_or_create_scheduling_settings(request.user)
+    serializer = ProfessionalSchedulingSettingsSerializer(scheduling_settings, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response({
+      'settings': ProfessionalSchedulingSettingsSerializer(scheduling_settings).data,
+      'message': 'Scheduling settings saved.',
+    })
 
-    api_key = request.data.get('api_key')
-    cal_username = request.data.get('cal_username', connection.cal_username)
 
-    if api_key:
-      connection.api_key = api_key.strip()
-    connection.cal_username = (cal_username or '').strip()
+class ProfessionalAvailabilityWindowsView(APIView):
+  """A professional's weekly recurring availability. Several rows can share
+  the same weekday (e.g. Monday 10:00-12:00 AND Monday 14:00-16:00) — that's
+  how multiple separate blocks on one day are represented, so creating a
+  second window for a weekday that already has one is expected, not an
+  error."""
 
-    if not connection.api_key:
-      return Response({'message': 'An API key is required to connect Cal.com.'}, status=status.HTTP_400_BAD_REQUEST)
+  permission_classes = [ProfessionalAccessPermission]
 
-    try:
-      event_types = (
-        [{
-          'id': connection.default_event_type_id or 15,
-          'slug': connection.default_event_type_slug or 'introductory-call',
-          'title': connection.default_event_type_label or '15-minute introductory call',
-          'lengthInMinutes': connection.default_duration_minutes or 15,
-        }]
-        if settings.REPROOT_SCHEDULING_TEST_MODE
-        else cal_com.list_event_types(connection)
-      )
-    except cal_com.CalComError as exc:
-      connection.is_connected = False
-      connection.save(update_fields=['api_key', 'cal_username', 'is_connected', 'updated_at'])
-      return Response({'message': f'Could not connect to Cal.com: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+  def get(self, request):
+    windows = ProfessionalAvailabilityWindow.objects.filter(professional=request.user).order_by('weekday', 'start_time')
+    return Response({'availability_windows': ProfessionalAvailabilityWindowSerializer(windows, many=True).data})
 
-    connection.is_connected = True
-
-    default_id = request.data.get('default_event_type_id')
-    if default_id:
-      matching = next((et for et in event_types if et.get('id') == int(default_id)), None)
-      if matching:
-        connection.default_event_type_id = matching['id']
-        connection.default_event_type_slug = matching.get('slug', '')
-        connection.default_event_type_label = matching.get('title', '')
-        connection.default_duration_minutes = matching.get('lengthInMinutes') or connection.default_duration_minutes
-    elif not connection.default_event_type_id and event_types:
-      # First-time connect with no explicit choice: default to the first
-      # event type rather than leaving meeting creation with nothing to book.
-      first = event_types[0]
-      connection.default_event_type_id = first['id']
-      connection.default_event_type_slug = first.get('slug', '')
-      connection.default_event_type_label = first.get('title', '')
-      connection.default_duration_minutes = first.get('lengthInMinutes') or connection.default_duration_minutes
-
-    timezone_value = request.data.get('timezone')
-    if timezone_value:
-      connection.timezone = timezone_value
-
-    connection.save()
-
+  def post(self, request):
+    serializer = ProfessionalAvailabilityWindowSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    window = serializer.save(professional=request.user)
     return Response(
-      {
-        'connection': CalComConnectionSerializer(connection).data,
-        'event_types': event_types,
-        'message': 'Cal.com connected.',
-      }
+      {'availability_window': ProfessionalAvailabilityWindowSerializer(window).data, 'message': 'Availability window added.'},
+      status=status.HTTP_201_CREATED,
     )
 
 
-class CalComEventTypesView(APIView):
+class ProfessionalAvailabilityWindowDetailView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def _get_window(self, request, window_id):
+    return ProfessionalAvailabilityWindow.objects.filter(id=window_id, professional=request.user).first()
+
+  def put(self, request, window_id):
+    window = self._get_window(request, window_id)
+    if window is None:
+      return Response({'message': 'Availability window not found.'}, status=status.HTTP_404_NOT_FOUND)
+    serializer = ProfessionalAvailabilityWindowSerializer(window, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response({'availability_window': ProfessionalAvailabilityWindowSerializer(window).data, 'message': 'Availability window updated.'})
+
+  def delete(self, request, window_id):
+    window = self._get_window(request, window_id)
+    if window is None:
+      return Response({'message': 'Availability window not found.'}, status=status.HTTP_404_NOT_FOUND)
+    window.delete()
+    return Response({'message': 'Availability window removed.'})
+
+
+class ProfessionalSchedulingSlotsView(APIView):
+  """Available booking slots for the logged-in professional over a date
+  range — computed locally from their weekly availability windows, minus
+  whatever is already booked. What the "pick a slot" step in the UI reads
+  from when a professional books a client directly."""
+
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    connection = _get_or_create_connection(request.user)
-    if not connection.is_connected:
-      return Response({'message': 'Connect your Cal.com account first.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-      event_types = (
-        [{
-          'id': connection.default_event_type_id or 15,
-          'slug': connection.default_event_type_slug or 'introductory-call',
-          'title': connection.default_event_type_label or '15-minute introductory call',
-          'lengthInMinutes': connection.default_duration_minutes or 15,
-        }]
-        if settings.REPROOT_SCHEDULING_TEST_MODE
-        else cal_com.list_event_types(connection)
-      )
-    except cal_com.CalComError as exc:
-      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response({'event_types': event_types})
-
-
-class CalComSlotsView(APIView):
-  """Available booking slots for the professional's default (or given) event
-  type over a date range — what the "pick a slot" step in the UI reads from."""
-
-  permission_classes = [ProfessionalAccessPermission]
-
-  def get(self, request):
-    connection = _get_or_create_connection(request.user)
-    if not connection.is_connected:
-      return Response({'message': 'Connect your Cal.com account first.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    event_type_id = request.query_params.get('event_type_id') or connection.default_event_type_id
-    if not event_type_id:
-      return Response({'message': 'No event type configured.'}, status=status.HTTP_400_BAD_REQUEST)
+    scheduling_settings = get_or_create_scheduling_settings(request.user)
 
     start_param = request.query_params.get('start')
     end_param = request.query_params.get('end')
@@ -398,14 +398,14 @@ class CalComSlotsView(APIView):
     except ValueError:
       return Response({'message': 'start and end must be valid dates (YYYY-MM-DD).'}, status=status.HTTP_400_BAD_REQUEST)
 
-    tz = request.query_params.get('timezone') or connection.timezone
-
+    duration_param = request.query_params.get('duration_minutes')
     try:
-      slots = _provider_or_test_slots(connection, event_type_id, start_date, end_date)
-    except cal_com.CalComError as exc:
-      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+      duration_minutes = int(duration_param) if duration_param else scheduling_settings.default_duration_minutes
+    except (TypeError, ValueError):
+      return Response({'message': 'duration_minutes must be a whole number of minutes.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'slots': slots})
+    slots = compute_available_slots(request.user, start_date, end_date, duration_minutes)
+    return Response({'slots': slots, 'timezone': scheduling_settings.timezone})
 
 
 class ScheduledMeetingListView(APIView):
@@ -429,25 +429,27 @@ class ScheduledMeetingListView(APIView):
     })
 
   def post(self, request):
-    connection = _get_or_create_connection(request.user)
-    if not connection.is_connected:
-      return Response({'message': 'Connect your Cal.com account first.'}, status=status.HTTP_400_BAD_REQUEST)
+    scheduling_settings = get_or_create_scheduling_settings(request.user)
 
     client = ClientAccess.objects.filter(id=request.data.get('client'), professional=request.user, is_active=True).first()
     if client is None:
       return Response({'message': 'Client not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    start_iso = request.data.get('start')
-    if not start_iso:
-      return Response({'message': 'A start time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    start_at = parse_datetime(str(request.data.get('start', '')))
+    if start_at is None:
+      return Response({'message': 'A valid start time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if timezone.is_naive(start_at):
+      start_at = timezone.make_aware(start_at, timezone.get_default_timezone())
 
-    event_type_id = request.data.get('event_type_id') or connection.default_event_type_id
-    if not event_type_id:
-      return Response({'message': 'No event type configured.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+      duration_minutes = int(request.data.get('duration_minutes') or scheduling_settings.default_duration_minutes)
+    except (TypeError, ValueError):
+      return Response({'message': 'duration_minutes must be a whole number of minutes.'}, status=status.HTTP_400_BAD_REQUEST)
+    end_at = start_at + timedelta(minutes=duration_minutes)
 
     if not client.email:
       return Response(
-        {'message': f'{client.first_name or client.username} has no email on file — Cal.com requires one to book.'},
+        {'message': f'{client.first_name or client.username} has no email on file — a calendar invite needs one to send.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
@@ -456,41 +458,45 @@ class ScheduledMeetingListView(APIView):
     missing_email = [c for c in guest_clients if not c.email]
     if missing_email:
       names = ', '.join(c.first_name or c.username for c in missing_email)
-      return Response({'message': f'{names} has no email on file — Cal.com requires one to book.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': f'{names} has no email on file — a calendar invite needs one to send.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-      booking = cal_com.create_booking(
-        connection,
-        int(event_type_id),
-        start_iso,
-        attendee_name=f'{client.first_name} {client.last_name}'.strip() or client.username,
-        attendee_email=client.email,
-        attendee_timezone=connection.timezone,
-        guest_emails=[c.email for c in guest_clients] or None,
-      )
-    except cal_com.CalComError as exc:
-      return Response({'message': f'Could not book with Cal.com: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+    meeting_url = generate_meeting_room_url()
+    uid = generate_meeting_uid()
+    title = request.data.get('title') or 'Meeting'
 
     meeting = ScheduledMeeting.objects.create(
       professional=request.user,
       client=client,
-      title=request.data.get('title') or booking.get('title') or 'Meeting',
+      title=title,
       notes=request.data.get('notes', ''),
-      start_at=booking.get('start') or start_iso,
-      end_at=booking.get('end') or start_iso,
-      meeting_url=booking.get('location') or '',
-      cal_booking_uid=booking.get('uid', ''),
+      start_at=start_at,
+      end_at=end_at,
+      meeting_url=meeting_url,
+      cal_booking_uid=uid,
       status=ScheduledMeeting.STATUS_SCHEDULED,
     )
     for guest_client in guest_clients:
       ScheduledMeetingGuest.objects.create(meeting=meeting, client=guest_client)
 
+    invite_note = ''
+    try:
+      send_meeting_invite_email(
+        uid=uid,
+        sequence=0,
+        start_at=start_at,
+        end_at=end_at,
+        summary=title,
+        organizer_email=request.user.email,
+        organizer_name=request.user.get_full_name() or request.user.username,
+        attendees=_meeting_attendees(client, guest_clients),
+        meeting_url=meeting_url,
+      )
+    except Exception:
+      invite_note = ' Calendar invite emails could not be sent — please share the join link directly.'
+
     all_names = ', '.join([client.first_name or client.username] + [c.first_name or c.username for c in guest_clients])
     return Response(
-      {
-        'meeting': ScheduledMeetingSerializer(meeting).data,
-        'message': f'Meeting scheduled with {all_names}.',
-      },
+      {'meeting': ScheduledMeetingSerializer(meeting).data, 'message': f'Meeting scheduled with {all_names}.{invite_note}'},
       status=status.HTTP_201_CREATED,
     )
 
@@ -499,7 +505,7 @@ class ScheduledMeetingRescheduleView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, meeting_id):
-    meeting = ScheduledMeeting.objects.filter(id=meeting_id, professional=request.user).first()
+    meeting = ScheduledMeeting.objects.filter(id=meeting_id, professional=request.user).select_related('client').prefetch_related('guests__client').first()
     if meeting is None:
       return Response({'message': 'Meeting not found.'}, status=status.HTTP_404_NOT_FOUND)
     if meeting.status != ScheduledMeeting.STATUS_SCHEDULED:
@@ -508,46 +514,73 @@ class ScheduledMeetingRescheduleView(APIView):
     start_iso = request.data.get('start')
     if not start_iso:
       return Response({'message': 'A new start time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    start_at = parse_datetime(str(start_iso))
+    if start_at is None:
+      return Response({'message': 'A valid new start time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if timezone.is_naive(start_at):
+      start_at = timezone.make_aware(start_at, timezone.get_default_timezone())
 
-    connection = _get_or_create_connection(request.user)
+    duration = meeting.end_at - meeting.start_at
+    meeting.start_at = start_at
+    meeting.end_at = start_at + duration
+    meeting.cal_booking_uid = meeting.cal_booking_uid or generate_meeting_uid()
+    meeting.ics_sequence += 1
+    meeting.save(update_fields=['start_at', 'end_at', 'cal_booking_uid', 'ics_sequence', 'updated_at'])
+
+    guest_clients = [guest.client for guest in meeting.guests.all()]
+    invite_note = ''
     try:
-      booking = cal_com.reschedule_booking(connection, meeting.cal_booking_uid, start_iso, request.data.get('reason', ''))
-    except cal_com.CalComError as exc:
-      return Response({'message': f'Could not reschedule with Cal.com: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+      send_meeting_invite_email(
+        uid=meeting.cal_booking_uid,
+        sequence=meeting.ics_sequence,
+        start_at=meeting.start_at,
+        end_at=meeting.end_at,
+        summary=meeting.title,
+        organizer_email=request.user.email,
+        organizer_name=request.user.get_full_name() or request.user.username,
+        attendees=_meeting_attendees(meeting.client, guest_clients),
+        meeting_url=meeting.meeting_url,
+        extra_body=f"This meeting was rescheduled. {request.data.get('reason', '')}".strip(),
+      )
+    except Exception:
+      invite_note = ' Updated calendar invites could not be emailed — please notify attendees directly.'
 
-    # Cal.com's reschedule creates a new booking under the hood and marks the
-    # old uid cancelled — the response carries the new uid, and losing track
-    # of it here means every future reschedule/cancel call 400s against a
-    # booking that's already gone.
-    meeting.start_at = booking.get('start') or start_iso
-    meeting.end_at = booking.get('end') or meeting.end_at
-    meeting.cal_booking_uid = booking.get('uid') or meeting.cal_booking_uid
-    meeting.meeting_url = booking.get('location') or meeting.meeting_url
-    meeting.save(update_fields=['start_at', 'end_at', 'cal_booking_uid', 'meeting_url', 'updated_at'])
-
-    return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': 'Meeting rescheduled.'})
+    return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': f'Meeting rescheduled.{invite_note}'})
 
 
 class ScheduledMeetingCancelView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request, meeting_id):
-    meeting = ScheduledMeeting.objects.filter(id=meeting_id, professional=request.user).first()
+    meeting = ScheduledMeeting.objects.filter(id=meeting_id, professional=request.user).select_related('client').prefetch_related('guests__client').first()
     if meeting is None:
       return Response({'message': 'Meeting not found.'}, status=status.HTTP_404_NOT_FOUND)
     if meeting.status != ScheduledMeeting.STATUS_SCHEDULED:
       return Response({'message': 'This meeting is already cancelled or completed.'}, status=status.HTTP_400_BAD_REQUEST)
 
     reason = request.data.get('reason', '')
-    connection = _get_or_create_connection(request.user)
-    try:
-      cal_com.cancel_booking(connection, meeting.cal_booking_uid, reason)
-    except cal_com.CalComError as exc:
-      return Response({'message': f'Could not cancel with Cal.com: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
-
     meeting.status = ScheduledMeeting.STATUS_CANCELLED
     meeting.cancellation_reason = reason
-    meeting.save(update_fields=['status', 'cancellation_reason', 'updated_at'])
+    meeting.ics_sequence += 1
+    meeting.save(update_fields=['status', 'cancellation_reason', 'ics_sequence', 'updated_at'])
+
+    if meeting.cal_booking_uid:
+      guest_clients = [guest.client for guest in meeting.guests.all()]
+      try:
+        send_meeting_invite_email(
+          uid=meeting.cal_booking_uid,
+          sequence=meeting.ics_sequence,
+          start_at=meeting.start_at,
+          end_at=meeting.end_at,
+          summary=meeting.title,
+          organizer_email=request.user.email,
+          organizer_name=request.user.get_full_name() or request.user.username,
+          attendees=_meeting_attendees(meeting.client, guest_clients),
+          extra_body=reason,
+          cancelled=True,
+        )
+      except Exception:
+        pass  # Best-effort; the cancellation itself is already saved.
 
     return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': 'Meeting cancelled.'})
 

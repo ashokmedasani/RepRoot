@@ -45,6 +45,7 @@ from .serializers import (
   PaymentRecordSerializer,
   PaymentRequestSerializer,
   ProfessionalPaymentSettingsSerializer,
+  detect_upload_content_type,
 )
 
 
@@ -870,6 +871,27 @@ class PaymentProofRequestInfoView(APIView):
     )
 
 
+def _serve_proof_file(proof):
+  """Stream a proof file with a content type derived from its actual bytes,
+  never from the stored filename, and always as a download.
+
+  Upload-time validation (see `PaymentProofSubmitSerializer.validate_proof_file`)
+  already rejects files whose content doesn't match a known-good signature, but
+  this is defense-in-depth: even a mislabeled/legacy file gets served either as
+  a safe, explicitly-typed download, or - if its bytes don't match any format
+  we recognise - as a generic opaque download that browsers will never render
+  inline (and therefore can't execute as HTML/SVG/script in the app's origin).
+  """
+  handle = proof.proof_file.open('rb')
+  detected_type = detect_upload_content_type(handle)
+  content_type = detected_type or 'application/octet-stream'
+  extension = {
+    'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'application/pdf': '.pdf',
+  }.get(detected_type, '')
+  filename = f'payment-proof-{proof.id}{extension}'
+  return FileResponse(handle, as_attachment=True, filename=filename, content_type=content_type)
+
+
 class PaymentProofFileView(APIView):
   """Streams a proof file only to the owning professional. There is no public
   media URL for payment proofs - this view is the only way to fetch them."""
@@ -880,7 +902,7 @@ class PaymentProofFileView(APIView):
     proof = PaymentProof.objects.filter(id=proof_id, payment_request__professional=request.user).first()
     if proof is None or not proof.proof_file:
       return Response({'message': 'Proof file not found.'}, status=status.HTTP_404_NOT_FOUND)
-    return FileResponse(proof.proof_file.open('rb'), as_attachment=False, filename=proof.proof_file.name.rsplit('/', 1)[-1])
+    return _serve_proof_file(proof)
 
 
 class ClientPaymentProofFileView(APIView):
@@ -895,7 +917,7 @@ class ClientPaymentProofFileView(APIView):
     ).first()
     if proof is None or not proof.proof_file:
       return Response({'message': 'Proof file not found.'}, status=status.HTTP_404_NOT_FOUND)
-    return FileResponse(proof.proof_file.open('rb'), as_attachment=False, filename=proof.proof_file.name.rsplit('/', 1)[-1])
+    return _serve_proof_file(proof)
 
 
 class ProfessionalPaymentActionsView(APIView):
@@ -1006,7 +1028,7 @@ class PaymentRecordListView(APIView):
       if payment_request is None:
         return Response({'message': 'Linked payment request not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = PaymentRecordSerializer(data=request.data)
+    serializer = PaymentRecordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
 
     outcome = request.data.get('status', PaymentRecord.STATUS_COMPLETED)
@@ -1087,7 +1109,7 @@ class PaymentRecordDetailView(APIView):
       'client_visibility': record.client_visibility,
     }
 
-    serializer = PaymentRecordSerializer(record, data=request.data, partial=True)
+    serializer = PaymentRecordSerializer(record, data=request.data, partial=True, context={'request': request})
     serializer.is_valid(raise_exception=True)
     record = serializer.save()
 

@@ -42,10 +42,11 @@ export interface LeadForm {
   public_slug: string;
   public_link: string;
   fields: DynamicField[];
+  is_active: boolean;
+  is_mandatory: boolean;
   introductory_meeting_enabled: boolean;
   introductory_meeting_title: string;
   introductory_meeting_duration_minutes: number;
-  introductory_meeting_event_type_id: number | null;
   introductory_meeting_min_notice_hours: number;
   introductory_meeting_max_advance_days: number;
   introductory_meeting_buffer_minutes: number;
@@ -93,6 +94,8 @@ export interface ClientRegistrationForm {
   group: number;
   public_slug: string;
   fields: DynamicField[];
+  is_active: boolean;
+  is_mandatory: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -141,13 +144,21 @@ export interface FormsGroupsOverview {
 
 export interface ClientAccessPayload {
   group_id: number;
-  username: string;
-  password: string;
-  confirm_password: string;
+  has_portal_access?: boolean;
+  username?: string;
+  password?: string;
+  confirm_password?: string;
   photo?: string;
   registration_answers: Record<string, string>;
   send_credentials?: boolean;
   registration_submission_id?: number | null;
+}
+
+export interface GrantPortalAccessPayload {
+  username: string;
+  password: string;
+  confirm_password: string;
+  send_credentials?: boolean;
 }
 
 export interface PublicGroupRegistrationForm {
@@ -247,7 +258,8 @@ export interface ClientAccessRecord {
   first_name: string;
   last_name: string;
   email: string;
-  username: string;
+  username: string | null;
+  has_portal_access: boolean;
   photo: string;
   registration_answers: Record<string, string>;
   additional_info: AdditionalInfoItem[];
@@ -290,6 +302,54 @@ export interface MessageResponse {
   message: string;
 }
 
+export type GroupImportConfidence = 'exact' | 'partial' | null;
+
+export interface GroupImportColumnMatch {
+  file_column: string;
+  matched_field_key: string | null;
+  matched_field_label: string | null;
+  confidence: GroupImportConfidence;
+}
+
+export interface GroupImportField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+export interface GroupImportPreviewResponse {
+  columns: GroupImportColumnMatch[];
+  rows_preview: Record<string, string>[];
+  row_count: number;
+  unmatched_columns: string[];
+  fields: GroupImportField[];
+}
+
+export interface GroupImportMappingEntry {
+  file_column: string;
+  matched_field_key: string | null;
+}
+
+export interface GroupImportCreatedRow {
+  row_index: number;
+  client_access: ClientAccessRecord;
+  temporary_password: string | null;
+  credentials_sent: boolean;
+}
+
+export interface GroupImportErrorRow {
+  row_index: number;
+  error: string;
+}
+
+export interface GroupImportConfirmResponse {
+  created: GroupImportCreatedRow[];
+  errors: GroupImportErrorRow[];
+  created_count: number;
+  error_count: number;
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FormsGroupsApiService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
@@ -302,10 +362,23 @@ export class FormsGroupsApiService {
     });
   }
 
-  saveLeadForm(title: string, customFields: DynamicField[]): Observable<{ lead_form: LeadForm; message: string }> {
+  saveLeadForm(
+    title: string,
+    customFields: DynamicField[],
+    isMandatory?: boolean
+  ): Observable<{ lead_form: LeadForm; message: string }> {
+    const body: { title: string; custom_fields: DynamicField[]; is_mandatory?: boolean } = {
+      title,
+      custom_fields: customFields
+    };
+
+    if (isMandatory !== undefined) {
+      body.is_mandatory = isMandatory;
+    }
+
     return this.http.post<{ lead_form: LeadForm; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/lead-form/`,
-      { title, custom_fields: customFields },
+      body,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -313,6 +386,14 @@ export class FormsGroupsApiService {
   saveLeadMeetingSettings(payload: Partial<LeadForm>): Observable<{ lead_form: LeadForm; message: string }> {
     return this.http.put<{ lead_form: LeadForm; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/lead-form/meeting-settings/`, payload, { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateLeadFormStatus(isActive: boolean): Observable<{ lead_form: LeadForm; message: string }> {
+    return this.http.put<{ lead_form: LeadForm; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/lead-form/status/`,
+      { is_active: isActive },
+      { headers: this.getAuthHeaders() }
     );
   }
 
@@ -344,11 +425,18 @@ export class FormsGroupsApiService {
 
   saveRegistrationForm(
     groupId: number,
-    customFields: DynamicField[]
+    customFields: DynamicField[],
+    isMandatory?: boolean
   ): Observable<{ registration_form: ClientRegistrationForm; message: string }> {
+    const body: { custom_fields: DynamicField[]; is_mandatory?: boolean } = { custom_fields: customFields };
+
+    if (isMandatory !== undefined) {
+      body.is_mandatory = isMandatory;
+    }
+
     return this.http.post<{ registration_form: ClientRegistrationForm; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/registration-form/`,
-      { custom_fields: customFields },
+      body,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -390,6 +478,37 @@ export class FormsGroupsApiService {
     return this.http.get<GroupUsersResponse>(`${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/clients/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  previewGroupImport(groupId: number, file: File): Observable<GroupImportPreviewResponse> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+
+    return this.http.post<GroupImportPreviewResponse>(
+      `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/import/preview/`,
+      formData,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  confirmGroupImport(
+    groupId: number,
+    file: File,
+    mapping: GroupImportMappingEntry[],
+    createPortalAccess: boolean,
+    sendCredentials: boolean
+  ): Observable<GroupImportConfirmResponse> {
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    formData.append('mapping', JSON.stringify(mapping));
+    formData.append('create_portal_access', String(createPortalAccess));
+    formData.append('send_credentials', String(sendCredentials));
+
+    return this.http.post<GroupImportConfirmResponse>(
+      `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/import/confirm/`,
+      formData,
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   getClientProfile(clientId: number): Observable<ClientAccessDetailResponse> {
@@ -577,6 +696,35 @@ export class FormsGroupsApiService {
     return this.http.post<{ temporary_password: string; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/reset-password/`,
       password ? { password } : {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  grantPortalAccess(
+    clientId: number,
+    payload: GrantPortalAccessPayload
+  ): Observable<{
+    client_access: ClientAccessRecord;
+    temporary_password: string;
+    credentials_sent: boolean;
+    message: string;
+  }> {
+    return this.http.post<{
+      client_access: ClientAccessRecord;
+      temporary_password: string;
+      credentials_sent: boolean;
+      message: string;
+    }>(
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/grant-access/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  revokePortalAccess(clientId: number): Observable<{ client_access: ClientAccessRecord; message: string }> {
+    return this.http.post<{ client_access: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/revoke-access/`,
+      {},
       { headers: this.getAuthHeaders() }
     );
   }

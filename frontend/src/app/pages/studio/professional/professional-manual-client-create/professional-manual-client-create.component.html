@@ -8,7 +8,12 @@
   <a page-actions [routerLink]="selectedGroup ? ['/professional/groups', selectedGroup.id] : ['/professional/forms-groups']" class="secondary-action">Cancel</a>
 
   @if (message) {
-    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    <p #messageBanner class="message" [class.error-message]="messageType === 'error'">
+      {{ message }}
+      @if (messageType === 'success' && createdClientId) {
+        <span class="message-note">Taking you to their profile...</span>
+      }
+    </p>
   }
 
   @if (isLoading) {
@@ -60,29 +65,44 @@
 
       <div class="access-section">
         <div class="section-heading">
-          <div><h2>Account access</h2><p>Username uniqueness is scoped to your professional account.</p></div>
+          <div><h2>Account access</h2><p>Choose whether this client gets portal login access.</p></div>
         </div>
         <div class="form-grid">
-          <label>
-            <span>Username *</span>
-            <input type="text" [(ngModel)]="username" name="username" autocomplete="off" required>
+          <label class="wide check-row">
+            <input type="radio" name="portalAccessMode" value="send" [(ngModel)]="portalAccessMode">
+            <span>Create with portal access &mdash; email login details to the client</span>
           </label>
-          <label>
-            <span>Temporary password *</span>
-            <div class="password-row">
-              <app-password-input name="temporaryPassword" [(ngModel)]="temporaryPassword" autocomplete="new-password" [required]="true" />
-              <button type="button" class="ghost-action" (click)="generatePassword()">Generate</button>
-            </div>
+          <label class="wide check-row">
+            <input type="radio" name="portalAccessMode" value="manual" [(ngModel)]="portalAccessMode">
+            <span>Create with portal access &mdash; don't email, I'll share the credentials manually</span>
           </label>
-          <label>
-            <span>Reference ID</span>
-            <input type="text" [value]="createdReferenceId || 'Generated automatically on creation'" readonly>
-          </label>
-          <label class="check-row">
-            <input type="checkbox" [(ngModel)]="sendCredentials" name="sendCredentials">
-            <span>Send username and temporary password to the client email</span>
+          <label class="wide check-row">
+            <input type="radio" name="portalAccessMode" value="none" [(ngModel)]="portalAccessMode">
+            <span>No portal access &mdash; just store this client's info</span>
           </label>
         </div>
+
+        @if (hasPortalAccess) {
+          <div class="form-grid">
+            <label>
+              <span>Username *</span>
+              <input type="text" [(ngModel)]="username" name="username" autocomplete="off" required>
+            </label>
+            <label>
+              <span>Temporary password *</span>
+              <div class="password-row">
+                <app-password-input name="temporaryPassword" [(ngModel)]="temporaryPassword" autocomplete="new-password" [required]="true" />
+                <button type="button" class="ghost-action" (click)="generatePassword()">Generate</button>
+              </div>
+            </label>
+            <label>
+              <span>Reference ID</span>
+              <input type="text" [value]="createdReferenceId || 'Generated automatically on creation'" readonly>
+            </label>
+          </div>
+        } @else {
+          <p><small>No username or password will be created. You can grant portal access later from the client's profile.</small></p>
+        }
       </div>
 
       <div class="form-actions">

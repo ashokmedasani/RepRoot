@@ -9,7 +9,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.conf import settings
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, ProtectedError, Q
@@ -60,6 +59,7 @@ from .serializers import (
   ClientPhotoUpdateSerializer,
   ClientDetailChangeRequestSerializer,
   ClientLoginSerializer,
+  ClientPortalAccessGrantSerializer,
   ClientProfessionalLookupSerializer,
   ClientAccessSerializer,
   ClientPasswordChangeSerializer,
@@ -102,7 +102,8 @@ from .serializers import (
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
 from .access_permissions import ProfessionalAccessPermission
 from .data_retention import visible_client_data_cutoff
-from .data_usage import calculate_professional_data_usage
+from .data_usage import bust_professional_data_usage_cache, calculate_professional_data_usage
+from .email_utils import send_mail_background
 from .email_verification import OtpCooldownError, send_email_otp, verify_email_otp
 from .standard_templates import STANDARD_TEMPLATES, get_standard_template
 from .plan_limits import plan_limit, professional_plan
@@ -115,7 +116,7 @@ def generate_temporary_password():
 
 
 def send_client_credentials(client_access, temporary_password):
-  send_mail(
+  send_mail_background(
     subject='Your RepRoot client access',
     message=(
       f'Your client access has been created.\n\n'
@@ -896,7 +897,17 @@ class ProfessionalProfileView(APIView):
       context={'request': request},
     )
     serializer.is_valid(raise_exception=True)
-    serializer.save()
+
+    try:
+      serializer.save()
+    except IntegrityError:
+      # Narrow race window: two requests can both pass the pre-save
+      # case-insensitive uniqueness check in validate_professional_id()
+      # before either commits. Fail cleanly instead of a raw 500.
+      return Response(
+        {'message': 'Professional ID is already taken.'}, status=status.HTTP_400_BAD_REQUEST
+      )
+
     return Response(
       {
         'profile': ProfessionalProfileSerializer(profile, context={'request': request}).data,
@@ -987,7 +998,11 @@ class FormsGroupsOverviewView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    # Note: the lead form is a OneToOneField on `professional`, so at most one
+    # row ever exists per professional. We intentionally do not filter on
+    # `is_active` here -- the overview page needs to show the form (and its
+    # enable/disable toggle) even while it is switched off.
+    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
     groups = ProfessionalGroup.objects.filter(professional=request.user, is_active=True).select_related('client_registration_form')
     submissions = LeadSubmission.objects.filter(lead_form__professional=request.user).select_related('client_access__group')
     pending_submissions = submissions.filter(status=LeadSubmission.STATUS_PENDING)
@@ -1012,7 +1027,9 @@ class ProfessionalLeadFormView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    # See FormsGroupsOverviewView.get -- do not filter on `is_active` since
+    # the professional may be editing the form while it is switched off.
+    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
     serializer = ProfessionalLeadFormSerializer(
       lead_form,
       data=request.data,
@@ -1036,6 +1053,25 @@ class ProfessionalLeadFormView(APIView):
 
   def put(self, request):
     return self.post(request)
+
+
+class ProfessionalLeadFormStatusView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def put(self, request):
+    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
+
+    if lead_form is None:
+      return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
+
+    lead_form.is_active = bool(request.data.get('is_active'))
+    lead_form.save(update_fields=['is_active', 'updated_at'])
+    state = 'enabled' if lead_form.is_active else 'disabled'
+
+    return Response({
+      'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data,
+      'message': f'Lead form {state}.',
+    })
 
 
 class ProfessionalGroupListView(APIView):
@@ -1166,7 +1202,7 @@ class PublicLeadFormView(APIView):
       answers=serializer.validated_data['answers'],
     )
 
-    send_mail(
+    send_mail_background(
       subject='Your RepRoot form reference ID',
       message=f'Your form has been submitted successfully. Your reference ID is {submission.reference_id}. Please save this for future communication.',
       from_email=None,
@@ -1245,7 +1281,8 @@ class ClientAccessCreateView(APIView):
     # account, via an edit request the professional approves) - not for the professional
     # to fill in at creation time. So no required-answer validation here.
 
-    client_password = serializer.validated_data['password']
+    has_portal_access = serializer.validated_data.get('has_portal_access', True)
+    client_password = serializer.validated_data.get('password') or ''
 
     try:
       with transaction.atomic():
@@ -1258,11 +1295,12 @@ class ClientAccessCreateView(APIView):
           first_name=submission.first_name,
           last_name=submission.last_name,
           email=submission.email,
-          username=serializer.validated_data['username'],
-          temporary_password=make_password(client_password),
+          has_portal_access=has_portal_access,
+          username=serializer.validated_data['username'] if has_portal_access else None,
+          temporary_password=make_password(client_password) if has_portal_access else None,
           photo=serializer.validated_data.get('photo', ''),
           registration_answers=registration_answers,
-          must_change_password=True,
+          must_change_password=has_portal_access,
         )
         submission.status = LeadSubmission.STATUS_APPROVED
         submission.converted_at = timezone.now()
@@ -1273,12 +1311,24 @@ class ClientAccessCreateView(APIView):
         status=status.HTTP_400_BAD_REQUEST,
       )
 
-    send_client_credentials(client_access, client_password)
+    bust_professional_data_usage_cache(request.user)
+    credentials_sent = has_portal_access and serializer.validated_data.get('send_credentials', True)
+
+    if credentials_sent:
+      send_client_credentials(client_access, client_password)
+
+    if not has_portal_access:
+      message = 'Client record created without portal access.'
+    elif credentials_sent:
+      message = 'Client access created. Temporary credentials were sent to the client email.'
+    else:
+      message = 'Client access created. Temporary credentials were not emailed.'
 
     return Response(
       {
         'client_access': ClientAccessSerializer(client_access).data,
-        'message': 'Client access created. Temporary credentials were sent to the client email.',
+        'credentials_sent': credentials_sent,
+        'message': message,
       },
       status=status.HTTP_201_CREATED,
     )
@@ -1302,8 +1352,9 @@ class ManualClientAccessCreateView(APIView):
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     registration_form = getattr(group, 'client_registration_form', None)
+    registration_form_required = registration_form is None or registration_form.is_mandatory
 
-    if registration_form is None or not registration_form.is_active:
+    if registration_form_required and (registration_form is None or not registration_form.is_active):
       return Response({'message': 'This group needs an active client registration form.'}, status=status.HTTP_400_BAD_REQUEST)
 
     answers = dict(serializer.validated_data.get('registration_answers') or {})
@@ -1324,7 +1375,9 @@ class ManualClientAccessCreateView(APIView):
 
     from .serializers import validate_required_answers
 
-    validate_required_answers(registration_form.fields, answers)
+    if registration_form is not None and registration_form.is_mandatory:
+      validate_required_answers(registration_form.fields, answers)
+
     first_name = str(answers.get('first_name', '')).strip()
     last_name = str(answers.get('last_name', '')).strip()
     email = str(answers.get('email', '')).strip().lower()
@@ -1332,7 +1385,8 @@ class ManualClientAccessCreateView(APIView):
     if not first_name or not last_name or not email:
       return Response({'message': 'First name, last name, and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    temporary_password = serializer.validated_data['password']
+    has_portal_access = serializer.validated_data.get('has_portal_access', True)
+    temporary_password = serializer.validated_data.get('password') or ''
     onboarding_method = (
       ClientAccess.ONBOARDING_GROUP_REGISTRATION
       if registration_submission
@@ -1349,11 +1403,12 @@ class ManualClientAccessCreateView(APIView):
           'first_name': first_name,
           'last_name': last_name,
           'email': email,
-          'username': serializer.validated_data['username'],
-          'temporary_password': make_password(temporary_password),
+          'has_portal_access': has_portal_access,
+          'username': serializer.validated_data['username'] if has_portal_access else None,
+          'temporary_password': make_password(temporary_password) if has_portal_access else None,
           'photo': serializer.validated_data.get('photo', ''),
           'registration_answers': answers,
-          'must_change_password': True,
+          'must_change_password': has_portal_access,
         }
 
         if registration_submission:
@@ -1373,21 +1428,25 @@ class ManualClientAccessCreateView(APIView):
         status=status.HTTP_400_BAD_REQUEST,
       )
 
-    credentials_sent = serializer.validated_data.get('send_credentials', True)
+    bust_professional_data_usage_cache(request.user)
+    credentials_sent = has_portal_access and serializer.validated_data.get('send_credentials', True)
 
     if credentials_sent:
       send_client_credentials(client_access, temporary_password)
 
+    if not has_portal_access:
+      message = 'Client record created without portal access.'
+    elif credentials_sent:
+      message = 'Client account created and temporary credentials emailed.'
+    else:
+      message = 'Client account created. Temporary credentials were not emailed.'
+
     return Response(
       {
         'client_access': ClientAccessSerializer(client_access).data,
-        'temporary_password': temporary_password,
+        'temporary_password': temporary_password if has_portal_access else None,
         'credentials_sent': credentials_sent,
-        'message': (
-          'Client account created and temporary credentials emailed.'
-          if credentials_sent
-          else 'Client account created. Temporary credentials were not emailed.'
-        ),
+        'message': message,
       },
       status=status.HTTP_201_CREATED,
     )
@@ -1440,7 +1499,7 @@ class PublicGroupRegistrationView(APIView):
       answers=serializer.validated_data['answers'],
     )
 
-    send_mail(
+    send_mail_background(
       subject=f'Your {registration_form.group.name} registration',
       message=(
         f'Your registration was submitted for professional review.\n\n'
@@ -1541,12 +1600,16 @@ class ClientAccessDetailView(APIView):
     first_name = str(request.data.get('first_name', client_access.first_name)).strip()
     last_name = str(request.data.get('last_name', client_access.last_name)).strip()
     email = str(request.data.get('email', client_access.email)).strip().lower()
-    username = str(request.data.get('username', client_access.username)).strip()
+    username_default = client_access.username or ''
+    username = str(request.data.get('username', username_default)).strip()
 
-    if not first_name or not last_name or not email or not username:
-      return Response({'message': 'First name, last name, email, and username are required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not first_name or not last_name or not email:
+      return Response({'message': 'First name, last name, and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if ClientAccess.objects.filter(professional=request.user, username=username).exclude(id=client_access.id).exists():
+    if client_access.has_portal_access and not username:
+      return Response({'message': 'Username is required for clients with portal access.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if username and ClientAccess.objects.filter(professional=request.user, username=username).exclude(id=client_access.id).exists():
       return Response({'message': 'Username is already used by another client.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if ClientAccess.objects.filter(professional=request.user, email=email).exclude(id=client_access.id).exists():
@@ -1555,7 +1618,10 @@ class ClientAccessDetailView(APIView):
     client_access.first_name = first_name
     client_access.last_name = last_name
     client_access.email = email
-    client_access.username = username
+
+    if client_access.has_portal_access:
+      client_access.username = username
+
     client_access.registration_answers = registration_answers
 
     if 'is_active' in request.data:
@@ -1566,6 +1632,85 @@ class ClientAccessDetailView(APIView):
     )
 
     return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Client information updated.'})
+
+
+class ClientAccessGrantPortalAccessView(APIView):
+  """Grant portal login access to an existing info-only (has_portal_access=False) client."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if client_access.has_portal_access:
+      return Response({'message': 'This client already has portal access.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = ClientPortalAccessGrantSerializer(
+      data=request.data, context={'professional': request.user, 'client_access': client_access}
+    )
+    serializer.is_valid(raise_exception=True)
+
+    temporary_password = serializer.validated_data['password']
+
+    client_access.username = serializer.validated_data['username']
+    client_access.temporary_password = make_password(temporary_password)
+    client_access.has_portal_access = True
+    client_access.must_change_password = True
+    client_access.save(
+      update_fields=['username', 'temporary_password', 'has_portal_access', 'must_change_password', 'updated_at']
+    )
+
+    credentials_sent = serializer.validated_data.get('send_credentials', True)
+
+    if credentials_sent:
+      send_client_credentials(client_access, temporary_password)
+
+    return Response(
+      {
+        'client_access': ClientAccessSerializer(client_access).data,
+        'temporary_password': temporary_password,
+        'credentials_sent': credentials_sent,
+        'message': (
+          'Portal access granted and credentials emailed.'
+          if credentials_sent
+          else 'Portal access granted. Credentials were not emailed.'
+        ),
+      }
+    )
+
+
+class ClientAccessRevokePortalAccessView(APIView):
+  """Disable portal login access for a client that currently has it.
+
+  Non-destructive: username/temporary_password are left in place so access
+  can be re-granted later. `ClientTokenAuthentication` and `ClientLoginSerializer`
+  already gate on `has_portal_access`, so flipping this flag immediately locks
+  the client out without needing to revoke any issued token separately.
+  """
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, client_id):
+    client_access = ClientAccess.objects.filter(id=client_id, professional=request.user).first()
+
+    if client_access is None:
+      return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if not client_access.has_portal_access:
+      return Response({'message': 'This client does not currently have portal access.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    client_access.has_portal_access = False
+    client_access.save(update_fields=['has_portal_access', 'updated_at'])
+
+    return Response(
+      {
+        'client_access': ClientAccessSerializer(client_access).data,
+        'message': 'Portal access disabled. The client can no longer log in.',
+      }
+    )
 
 
 class ClientProfessionalNotesView(APIView):
@@ -1962,6 +2107,12 @@ class ClientAccessPasswordResetView(APIView):
     if client_access is None:
       return Response({'message': 'Client access record not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    if not client_access.has_portal_access:
+      return Response(
+        {'message': 'This client does not have portal access. Grant portal access first.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
     # Consistent with manual client creation (Option A): the professional defines
     # the temporary password. A generated one is used only when none is sent.
     temporary_password = str(request.data.get('password', '') or '').strip()
@@ -1982,7 +2133,7 @@ class ClientAccessPasswordResetView(APIView):
     client_access.must_change_password = True
     client_access.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
 
-    send_mail(
+    send_mail_background(
       subject='Your RepRoot client password reset',
       message=(
         f'Your professional reset your RepRoot client password.\n\n'
@@ -2018,8 +2169,11 @@ class ClientAccessResetView(APIView):
     confirmation = str(request.data.get('confirmation') or '').strip()
     current_password = str(request.data.get('current_password') or '')
     reason = str(request.data.get('reason') or '').strip()
-    if confirmation != client_access.username:
-      return Response({'message': f'Type {client_access.username} exactly to confirm the reset.'}, status=status.HTTP_400_BAD_REQUEST)
+    # Info-only clients have no username, so the reference ID doubles as the
+    # confirmation phrase for them.
+    expected_confirmation = client_access.username or client_access.reference_id
+    if confirmation != expected_confirmation:
+      return Response({'message': f'Type {expected_confirmation} exactly to confirm the reset.'}, status=status.HTTP_400_BAD_REQUEST)
     if not check_password(current_password, request.user.password):
       return Response({'message': 'Your current professional password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
     if not reason:
@@ -2061,7 +2215,7 @@ class ClientAccessResetView(APIView):
       ClientResetAudit.objects.create(
         professional=request.user, client=client_access,
         professional_reference=request.user.professional_profile.internal_reference_code,
-        client_reference=client_access.reference_id, client_username=client_access.username,
+        client_reference=client_access.reference_id, client_username=client_access.username or '',
         reason=reason, deleted_counts=deleted_counts,
       )
 
@@ -2069,6 +2223,7 @@ class ClientAccessResetView(APIView):
       if file_name and default_storage.exists(file_name):
         default_storage.delete(file_name)
 
+    bust_professional_data_usage_cache(request.user)
     return Response(
       {
         'client': ClientAccessSerializer(client_access).data,
@@ -2149,6 +2304,7 @@ class ClientAccessDeleteView(APIView):
 
       recycle_bin.soft_delete_client_account(client_access)
 
+    bust_professional_data_usage_cache(request.user)
     return Response({'message': 'Client account moved to Recycle Bin.'})
 
 
@@ -2502,7 +2658,15 @@ class ClientTemplateAssignmentListView(APIView):
     if template is None:
       return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    assignment, created = TemplateAssignment.objects.get_or_create(client=client_access, template=template)
+    access_level = request.data.get('client_access_level') or TemplateAssignment.ACCESS_EDITABLE
+    valid_access_levels = {choice for choice, _ in TemplateAssignment.CLIENT_ACCESS_LEVEL_CHOICES}
+
+    if access_level not in valid_access_levels:
+      return Response({'message': 'Invalid client access level.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    assignment, created = TemplateAssignment.objects.get_or_create(
+      client=client_access, template=template, defaults={'client_access_level': access_level}
+    )
 
     if not created:
       return Response({'message': 'Template is already assigned to this client.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2542,12 +2706,22 @@ class ClientTemplateAssignmentDetailView(APIView):
     if assignment is None:
       return Response({'message': 'Template assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    set_assignment_references(assignment, request.user, request.data.get('reference_ids', []))
+    set_assignment_references(assignment, request.user, request.data.get('reference_ids'))
+
+    if 'client_access_level' in request.data:
+      access_level = request.data.get('client_access_level') or TemplateAssignment.ACCESS_EDITABLE
+      valid_access_levels = {choice for choice, _ in TemplateAssignment.CLIENT_ACCESS_LEVEL_CHOICES}
+
+      if access_level not in valid_access_levels:
+        return Response({'message': 'Invalid client access level.'}, status=status.HTTP_400_BAD_REQUEST)
+
+      assignment.client_access_level = access_level
+      assignment.save(update_fields=['client_access_level'])
 
     return Response(
       {
         'assignment': TemplateAssignmentSerializer(assignment, context={'request': request}).data,
-        'message': 'Shared references updated.',
+        'message': 'Assignment updated.',
       }
     )
 
@@ -3025,6 +3199,7 @@ class ClientTemplateListView(APIView):
   def get(self, request):
     assignments = (
       request.auth.template_assignments.filter(template__is_active=True)
+      .exclude(client_access_level=TemplateAssignment.ACCESS_PRIVATE)
       .select_related('template')
       .prefetch_related('references__category')
     )
@@ -3033,6 +3208,7 @@ class ClientTemplateListView(APIView):
     for assignment in assignments:
       template_data = TrackingTemplateSerializer(assignment.template, context={'request': request}).data
       template_data['assignment_id'] = assignment.id
+      template_data['client_access_level'] = assignment.client_access_level
       template_data['references'] = TrackingTemplateReferenceSerializer(
         assignment.references.all(),
         many=True,
@@ -3055,7 +3231,20 @@ class ClientTrackingEntryView(APIView):
     month = request.query_params.get('month')
 
     if template_id:
+      assignment = TemplateAssignment.objects.filter(client=request.auth, template_id=template_id).first()
+
+      if assignment is not None and assignment.client_access_level == TemplateAssignment.ACCESS_PRIVATE:
+        return Response({'message': 'Tracking entries not found.'}, status=status.HTTP_404_NOT_FOUND)
+
       entries = entries.filter(template_id=template_id)
+    else:
+      # Hide entries for templates the trainer has since marked private, even
+      # in the unfiltered list, so a private assignment never leaks via
+      # entries created before it was made private.
+      private_template_ids = TemplateAssignment.objects.filter(
+        client=request.auth, client_access_level=TemplateAssignment.ACCESS_PRIVATE
+      ).values_list('template_id', flat=True)
+      entries = entries.exclude(template_id__in=private_template_ids)
 
     if month:
       try:
@@ -3070,15 +3259,23 @@ class ClientTrackingEntryView(APIView):
     serializer = ClientTrackingEntrySubmitSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     client_access = request.auth
-    template = TrackingTemplate.objects.filter(
-      id=serializer.validated_data['template_id'],
-      professional=client_access.professional,
-      is_active=True,
-      assignments__client=client_access,
-    ).first()
+    assignment = TemplateAssignment.objects.filter(
+      client=client_access,
+      template_id=serializer.validated_data['template_id'],
+      template__professional=client_access.professional,
+      template__is_active=True,
+    ).select_related('template').first()
 
-    if template is None:
+    if assignment is None or assignment.client_access_level == TemplateAssignment.ACCESS_PRIVATE:
       return Response({'message': 'Template is not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if assignment.client_access_level == TemplateAssignment.ACCESS_VIEW_ONLY:
+      return Response(
+        {'message': 'This template is view-only. You cannot submit entries.'},
+        status=status.HTTP_403_FORBIDDEN,
+      )
+
+    template = assignment.template
 
     # A client may log the same template multiple times per day, so every
     # submission creates a new entry (rather than overwriting the day's row).
@@ -3123,6 +3320,19 @@ class ClientTrackingEntryDetailView(APIView):
 
     if entry is None:
       return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment = None
+    if entry.template_id is not None:
+      assignment = TemplateAssignment.objects.filter(client=request.auth, template_id=entry.template_id).first()
+
+    if assignment is not None and assignment.client_access_level == TemplateAssignment.ACCESS_PRIVATE:
+      return Response({'message': 'Tracking entry not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if assignment is not None and assignment.client_access_level == TemplateAssignment.ACCESS_VIEW_ONLY:
+      return Response(
+        {'message': 'This template is view-only. You cannot edit entries.'},
+        status=status.HTTP_403_FORBIDDEN,
+      )
 
     if not entry_editable(entry):
       return Response(

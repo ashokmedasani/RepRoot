@@ -6,7 +6,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DynamicField, FormsGroupsApiService, FormsGroupsOverview } from '@core/api/forms-groups-api.service';
 import { FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
-import { CalComConnectionRecord, CalComEventType, SchedulingApiService } from '@core/api/scheduling-api.service';
+import { SchedulingApiService } from '@core/api/scheduling-api.service';
 
 @Component({
   selector: 'app-professional-lead-form-create',
@@ -29,13 +29,11 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
   message = '';
   messageType: 'success' | 'error' = 'success';
   step: 'form' | 'meeting' = 'form';
-  connection: CalComConnectionRecord | null = null;
-  eventTypes: CalComEventType[] = [];
+  hasAvailability = false;
   meetingSettings = {
     introductory_meeting_enabled: false,
     introductory_meeting_title: '15-minute introductory call',
     introductory_meeting_duration_minutes: 15,
-    introductory_meeting_event_type_id: null as number | null,
     introductory_meeting_min_notice_hours: 24,
     introductory_meeting_max_advance_days: 30,
     introductory_meeting_buffer_minutes: 15,
@@ -98,7 +96,6 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
             introductory_meeting_enabled: overview.lead_form.introductory_meeting_enabled,
             introductory_meeting_title: overview.lead_form.introductory_meeting_title,
             introductory_meeting_duration_minutes: overview.lead_form.introductory_meeting_duration_minutes,
-            introductory_meeting_event_type_id: overview.lead_form.introductory_meeting_event_type_id,
             introductory_meeting_min_notice_hours: overview.lead_form.introductory_meeting_min_notice_hours,
             introductory_meeting_max_advance_days: overview.lead_form.introductory_meeting_max_advance_days,
             introductory_meeting_buffer_minutes: overview.lead_form.introductory_meeting_buffer_minutes,
@@ -115,14 +112,9 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
         this.isLoading = false;
       }
     });
-    this.schedulingApi.getConnection().subscribe({
-      next: ({ connection }) => {
-        this.connection = connection;
-        if (connection.is_connected) {
-          this.schedulingApi.getEventTypes().subscribe({ next: ({ event_types }) => (this.eventTypes = event_types), error: () => (this.eventTypes = []) });
-        }
-      },
-      error: () => (this.connection = null)
+    this.schedulingApi.listAvailabilityWindows().subscribe({
+      next: ({ availability_windows }) => (this.hasAvailability = availability_windows.some((w) => w.is_active)),
+      error: () => (this.hasAvailability = false)
     });
   }
 

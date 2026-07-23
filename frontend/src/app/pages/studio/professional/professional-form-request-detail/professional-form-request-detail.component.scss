@@ -147,6 +147,22 @@ label {
   color: var(--app-text);
 }
 
+.wide {
+  grid-column: 1 / -1;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr;
+}
+
+.check-row input {
+  width: 1rem;
+  height: 1rem;
+}
+
 .required {
   color: #d92d20;
 }

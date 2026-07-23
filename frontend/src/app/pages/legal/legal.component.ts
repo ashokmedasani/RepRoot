@@ -18,5 +18,5 @@ export class LegalPageComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly doc = (this.route.snapshot.data['doc'] as 'terms' | 'privacy') || 'terms';
-  readonly lastUpdated = 'July 10, 2026';
+  readonly lastUpdated = 'July 22, 2026';
 }

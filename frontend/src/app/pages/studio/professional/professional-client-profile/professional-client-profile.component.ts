@@ -15,12 +15,14 @@ import {
 import { ReferencesApiService, ProfessionalReferenceRecord } from '@core/api/references-api.service';
 import {
   TemplateAssignmentRecord,
+  TemplateClientAccessLevel,
   TemplatesApiService,
   TrackingEntryRecord,
   TrackingTemplateRecord
 } from '@core/api/templates-api.service';
 import { ChatPanelComponent } from '@studio-shared/chat-panel/chat-panel.component';
 import { ClientPaymentsTabComponent } from '@studio-shared/client-payments-tab/client-payments-tab.component';
+import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { readImageAsDataUrl } from '@shared/utils/image-helpers';
 import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
@@ -32,7 +34,7 @@ import { ScheduledMeetingRecord, SchedulingApiService } from '@core/api/scheduli
 @Component({
   selector: 'app-professional-client-profile',
   standalone: true,
-  imports: [ChatPanelComponent, ClientPaymentsTabComponent, DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent],
+  imports: [ChatPanelComponent, ClientPaymentsTabComponent, DatePipe, FormsModule, PasswordInputComponent, RouterLink, ProfessionalPageShellComponent],
   templateUrl: './professional-client-profile.component.html',
   styleUrl: './professional-client-profile.component.scss'
 })
@@ -78,7 +80,15 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   assignments: TemplateAssignmentRecord[] = [];
   templates: TrackingTemplateRecord[] = [];
   selectedTemplateId: number | null = null;
+  selectedAccessLevel: TemplateClientAccessLevel = 'editable';
   isAssigning = false;
+  updatingAccessLevelId: number | null = null;
+
+  readonly accessLevelOptions: { value: TemplateClientAccessLevel; label: string }[] = [
+    { value: 'private', label: 'Private' },
+    { value: 'view_only', label: 'View only' },
+    { value: 'editable', label: 'Editable' }
+  ];
 
   entries: TrackingEntryRecord[] = [];
 
@@ -172,11 +182,11 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ----- scheduled meetings (video, booked via Cal.com) -----
-  // Distinct from the reminders above: a meeting has a real join link and
-  // lives in the professional's Cal.com account too. Both show up together
-  // here, but "Schedule Meeting" hands off to the main Schedule page's
-  // booking flow (pick-a-slot UI) rather than duplicating it inline.
+  // ----- scheduled meetings (video, booked locally via RepRoot scheduling) -----
+  // Distinct from the reminders above: a meeting has a real free video join
+  // link (Jitsi) and a calendar invite emailed to the client. Both show up
+  // together here, but "Schedule Meeting" hands off to the main Schedule
+  // page's booking flow (pick-a-slot UI) rather than duplicating it inline.
 
   get upcomingMeetings(): ScheduledMeetingRecord[] {
     const now = Date.now();
@@ -443,7 +453,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       { label: 'Middle Name', value: this.registrationValue(['middle']) },
       { label: 'Last Name', value: client.last_name },
       { label: 'Email Address', value: client.email },
-      { label: 'Username', value: client.username },
+      { label: 'Username', value: client.username || (client.has_portal_access ? '' : 'No portal access') },
       { label: 'Professional Code', value: client.professional_name },
       { label: 'Group', value: client.group_name },
       { label: 'Client Status', value: client.is_active ? 'Active' : 'Inactive' },
@@ -497,7 +507,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       first_name: client.first_name,
       last_name: client.last_name,
       email: client.email,
-      username: client.username,
+      username: client.username || '',
       is_active: client.is_active,
       registration_answers: { ...(client.registration_answers || {}) }
     };
@@ -704,19 +714,21 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
 
     const confirmed = await this.confirmation.confirm({
       kind: 'warning',
-      title: 'Reset client data for',
+      title: 'Clear client history for',
       target: `${client.first_name} ${client.last_name}`,
-      impact: 'Assignments, entries, chat, schedules, progress, additional information, and professional notes will be cleared. Identity and registration details remain.',
-      confirmLabel: 'Reset Client Data'
+      impact: 'Assignments, entries, chat, schedules, progress, additional information, and professional notes will be cleared. Identity and registration details remain. This is unrelated to their login password.',
+      confirmLabel: 'Clear Client History'
     });
 
     if (!confirmed) {
       return;
     }
 
-    if (!this.resetCurrentPassword || this.resetConfirmation !== client.username || !this.resetReason.trim()) {
+    const expectedConfirmation = client.username || client.reference_id;
+
+    if (!this.resetCurrentPassword || this.resetConfirmation !== expectedConfirmation || !this.resetReason.trim()) {
       this.messageType = 'error';
-      this.message = `Enter your password, type ${client.username} exactly, and provide a reset reason.`;
+      this.message = `Enter your password, type ${expectedConfirmation} exactly, and provide a reset reason.`;
       return;
     }
 
@@ -913,12 +925,142 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
 
   closeAccountDialog(): void {
     this.isAccountDialogOpen = false;
+    this.cancelGrantAccess();
+    this.showResetPasswordForm = false;
+  }
+
+  // ----- grant portal access (info-only clients) -----
+
+  isGrantAccessOpen = false;
+  isGrantingAccess = false;
+  grantAccessDraft = { username: '', password: '', confirmPassword: '', sendCredentials: true };
+
+  openGrantAccess(): void {
+    this.grantAccessDraft = { username: '', password: '', confirmPassword: '', sendCredentials: true };
+    this.isGrantAccessOpen = true;
+  }
+
+  cancelGrantAccess(): void {
+    this.isGrantAccessOpen = false;
+  }
+
+  submitGrantAccess(): void {
+    const client = this.client;
+
+    if (!client || this.isGrantingAccess) {
+      return;
+    }
+
+    if (!this.grantAccessDraft.username.trim() || !this.grantAccessDraft.password) {
+      this.messageType = 'error';
+      this.message = 'Username and temporary password are required to grant portal access.';
+      return;
+    }
+
+    if (this.grantAccessDraft.password !== this.grantAccessDraft.confirmPassword) {
+      this.messageType = 'error';
+      this.message = 'Passwords must match.';
+      return;
+    }
+
+    this.isGrantingAccess = true;
+    this.formsGroupsApi.grantPortalAccess(client.id, {
+      username: this.grantAccessDraft.username.trim().toLowerCase(),
+      password: this.grantAccessDraft.password,
+      confirm_password: this.grantAccessDraft.confirmPassword,
+      send_credentials: this.grantAccessDraft.sendCredentials
+    }).subscribe({
+      next: (response) => {
+        this.replaceClient(response.client_access);
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isGrantingAccess = false;
+        this.isGrantAccessOpen = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Portal access could not be granted.');
+        this.isGrantingAccess = false;
+      }
+    });
+  }
+
+  // ----- revoke portal access -----
+
+  isRevokingAccess = false;
+
+  async revokePortalAccess(): Promise<void> {
+    const client = this.client;
+
+    if (!client || this.isRevokingAccess) {
+      return;
+    }
+
+    const confirmed = await this.confirmation.confirm({
+      kind: 'warning',
+      title: 'Disable Portal Access',
+      target: `${client.first_name} ${client.last_name}`,
+      impact: 'The client will no longer be able to log in. Their stored information is not affected, and access can be granted again later.',
+      confirmLabel: 'Disable Access'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.isRevokingAccess = true;
+    this.formsGroupsApi.revokePortalAccess(client.id).subscribe({
+      next: (response) => {
+        this.replaceClient(response.client_access);
+        this.messageType = 'success';
+        this.message = response.message;
+        this.isRevokingAccess = false;
+        this.isAccountDialogOpen = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Portal access could not be disabled.');
+        this.isRevokingAccess = false;
+      }
+    });
+  }
+
+  // ----- reset password (Account & Access dialog) -----
+  //
+  // Previously used window.prompt() to collect the new temporary password.
+  // Native browser dialogs like window.prompt() aren't part of the page —
+  // they're blocked entirely by some browser policies/extensions and can
+  // leave the tab looking hung to anything (including some real users'
+  // setups) that can't respond to them. Replaced with the same inline
+  // password-field pattern already used for Grant Portal Access above.
+  showResetPasswordForm = false;
+  resetPasswordDraft = { password: '', confirmPassword: '' };
+
+  openResetPasswordForm(): void {
+    this.resetPasswordDraft = { password: this.generateTemporaryPassword(), confirmPassword: '' };
+    this.resetPasswordDraft.confirmPassword = this.resetPasswordDraft.password;
+    this.showResetPasswordForm = true;
+  }
+
+  cancelResetPasswordForm(): void {
+    this.showResetPasswordForm = false;
+  }
+
+  regenerateResetPassword(): void {
+    const generated = this.generateTemporaryPassword();
+    this.resetPasswordDraft = { password: generated, confirmPassword: generated };
   }
 
   async resetClientPassword(): Promise<void> {
     const client = this.client;
 
     if (!client) {
+      return;
+    }
+
+    if (!this.resetPasswordDraft.password || this.resetPasswordDraft.password !== this.resetPasswordDraft.confirmPassword) {
+      this.messageType = 'error';
+      this.message = 'Enter the new temporary password in both fields — they must match.';
       return;
     }
 
@@ -934,19 +1076,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Option A: the professional defines the temporary password, exactly like
-    // manual client creation. A generated suggestion is offered as default.
-    const suggested = this.generateTemporaryPassword();
-    const entered = window.prompt(
-      'Set the temporary password for this client (min 8 characters, 1 special character):',
-      suggested
-    );
-
-    if (entered === null) {
-      return;
-    }
-
-    const temporaryPassword = entered.trim() || suggested;
+    const temporaryPassword = this.resetPasswordDraft.password;
 
     this.formsGroupsApi.resetClientPassword(client.id, temporaryPassword).subscribe({
       next: (response) => {
@@ -954,6 +1084,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
         this.message = response.message;
         this.resetPasswordResult = response.temporary_password;
         client.must_change_password = true;
+        this.showResetPasswordForm = false;
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -1017,16 +1148,40 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     }
 
     this.isAssigning = true;
-    this.templatesApi.assignTemplate(this.clientId, this.selectedTemplateId).subscribe({
+    this.templatesApi
+      .assignTemplate(this.clientId, this.selectedTemplateId, [], this.selectedAccessLevel)
+      .subscribe({
+        next: (response) => {
+          this.isAssigning = false;
+          this.selectedTemplateId = null;
+          this.selectedAccessLevel = 'editable';
+          this.openTemplatePage(response.assignment, { share: '1' });
+        },
+        error: (error: unknown) => {
+          this.messageType = 'error';
+          this.message = formatApiError(error, 'Template could not be assigned.');
+          this.isAssigning = false;
+        }
+      });
+  }
+
+  updateAssignmentAccessLevel(assignment: TemplateAssignmentRecord, level: TemplateClientAccessLevel, event: Event): void {
+    event.stopPropagation();
+
+    if (assignment.client_access_level === level || this.updatingAccessLevelId === assignment.id) {
+      return;
+    }
+
+    this.updatingAccessLevelId = assignment.id;
+    this.templatesApi.updateAssignmentAccessLevel(this.clientId, assignment.id, level).subscribe({
       next: (response) => {
-        this.isAssigning = false;
-        this.selectedTemplateId = null;
-        this.openTemplatePage(response.assignment, { share: '1' });
+        this.updatingAccessLevelId = null;
+        this.assignments = this.assignments.map((item) => (item.id === response.assignment.id ? response.assignment : item));
       },
       error: (error: unknown) => {
+        this.updatingAccessLevelId = null;
         this.messageType = 'error';
-        this.message = formatApiError(error, 'Template could not be assigned.');
-        this.isAssigning = false;
+        this.message = formatApiError(error, 'Access level could not be updated.');
       }
     });
   }

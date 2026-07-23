@@ -211,6 +211,20 @@ p {
   transform: translateY(-1px);
 }
 
+.field-chip:disabled,
+.field-chip-added {
+  cursor: default;
+  opacity: 0.6;
+  background: var(--app-surface);
+  border-color: var(--app-border);
+  color: var(--app-text-muted, var(--app-primary-strong));
+}
+
+.field-chip:disabled:hover {
+  transform: none;
+  background: var(--app-surface);
+}
+
 .chip-plus {
   font-size: 1rem;
   line-height: 1;

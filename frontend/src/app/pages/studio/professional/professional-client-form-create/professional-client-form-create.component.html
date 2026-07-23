@@ -19,6 +19,13 @@
       </section>
 
       <section class="setup-card">
+        <label class="toggle-row">
+          <input type="checkbox" [(ngModel)]="isMandatory" name="registrationFormMandatory">
+          <span>Require this form to be completed before a client can be added to this group</span>
+        </label>
+      </section>
+
+      <section class="setup-card">
         <app-form-field-builder [customFields]="customFields"></app-form-field-builder>
       </section>
 

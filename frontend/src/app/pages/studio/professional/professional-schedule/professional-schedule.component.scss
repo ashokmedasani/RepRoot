@@ -117,6 +117,85 @@ textarea {
   min-width: 16rem;
 }
 
+/* ---- Weekly availability ---- */
+.availability-panel {
+  max-width: none;
+}
+
+.settings-heading {
+  margin-top: 0.5rem;
+}
+
+.availability-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.availability-day-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  border: 1px solid var(--app-border);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--app-surface-soft);
+}
+
+.weekday-tag {
+  min-width: 6rem;
+  color: var(--app-text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.availability-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.availability-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--app-primary);
+  border-radius: 999px;
+  padding: 0.25rem 0.4rem 0.25rem 0.7rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.remove-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.add-window-row {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 0.9rem 0 1.25rem;
+}
+
+.add-window-row label {
+  min-width: 8rem;
+}
+
 /* ---- Calendar ---- */
 .calendar-section {
   margin-bottom: 1.75rem;
@@ -411,6 +490,7 @@ textarea {
   background: var(--app-primary-soft);
   color: var(--app-primary-strong);
   font-weight: 600;
+  scroll-margin-top: 1rem;
 }
 
 .message.error-message {

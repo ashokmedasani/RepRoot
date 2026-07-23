@@ -7,6 +7,7 @@ import { ReferenceType } from './references-api.service';
 
 export type TemplateFieldType = 'number' | 'short_text' | 'long_text' | 'yes_no' | 'dropdown' | 'rating';
 export type TemplateCadence = 'daily' | 'weekly' | 'monthly';
+export type TemplateClientAccessLevel = 'private' | 'view_only' | 'editable';
 
 export interface TemplateField {
   key?: string;
@@ -43,6 +44,7 @@ export interface TrackingTemplateRecord {
   updated_at: string;
   assignment_id?: number;
   references?: TemplateReference[];
+  client_access_level?: TemplateClientAccessLevel;
 }
 
 export interface StandardTemplateRecord {
@@ -70,6 +72,7 @@ export interface TemplateAssignmentRecord {
   template_cadence: TemplateCadence;
   template_accent: string;
   references: TemplateReference[];
+  client_access_level: TemplateClientAccessLevel;
   assigned_at: string;
 }
 
@@ -161,11 +164,12 @@ export class TemplatesApiService {
   assignTemplate(
     clientId: number,
     templateId: number,
-    referenceIds: number[] = []
+    referenceIds: number[] = [],
+    clientAccessLevel: TemplateClientAccessLevel = 'editable'
   ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
     return this.http.post<{ assignment: TemplateAssignmentRecord; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/`,
-      { template_id: templateId, reference_ids: referenceIds },
+      { template_id: templateId, reference_ids: referenceIds, client_access_level: clientAccessLevel },
       { headers: this.getAuthHeaders() }
     );
   }
@@ -178,6 +182,18 @@ export class TemplatesApiService {
     return this.http.put<{ assignment: TemplateAssignmentRecord; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
       { reference_ids: referenceIds },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateAssignmentAccessLevel(
+    clientId: number,
+    assignmentId: number,
+    clientAccessLevel: TemplateClientAccessLevel
+  ): Observable<{ assignment: TemplateAssignmentRecord; message: string }> {
+    return this.http.put<{ assignment: TemplateAssignmentRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/clients/${clientId}/assignments/${assignmentId}/`,
+      { client_access_level: clientAccessLevel },
       { headers: this.getAuthHeaders() }
     );
   }

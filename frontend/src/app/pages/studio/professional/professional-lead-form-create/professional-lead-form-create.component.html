@@ -36,12 +36,12 @@
         <p>Applicants see available times only after their form is submitted. Every request stays pending until you accept it.</p>
 
         <label class="toggle-row">
-          <input type="checkbox" [(ngModel)]="meetingSettings.introductory_meeting_enabled" [disabled]="!connection?.is_connected">
+          <input type="checkbox" [(ngModel)]="meetingSettings.introductory_meeting_enabled" [disabled]="!hasAvailability">
           <span>Allow applicants to request a meeting</span>
         </label>
 
-        @if (!connection?.is_connected) {
-          <p class="message error-message">Connect your scheduling account first. You can skip this step now and enable it later.</p>
+        @if (!hasAvailability) {
+          <p class="message error-message">Set your weekly availability first. You can skip this step now and enable it later.</p>
           <a class="ghost-link" routerLink="/professional/schedule">Open scheduling setup</a>
         }
 
@@ -50,15 +50,6 @@
             <label>
               <span class="field-label">Meeting title</span>
               <input type="text" [(ngModel)]="meetingSettings.introductory_meeting_title">
-            </label>
-            <label>
-              <span class="field-label">Calendar meeting type</span>
-              <select [(ngModel)]="meetingSettings.introductory_meeting_event_type_id">
-                <option [ngValue]="null">Use scheduling default</option>
-                @for (eventType of eventTypes; track eventType.id) {
-                  <option [ngValue]="eventType.id">{{ eventType.title }} ({{ eventType.lengthInMinutes }} min)</option>
-                }
-              </select>
             </label>
             <label>
               <span class="field-label">Display duration</span>

@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 
 import { DynamicField, FormsGroupsApiService, ProfessionalGroup } from '@core/api/forms-groups-api.service';
@@ -10,7 +11,7 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 @Component({
   selector: 'app-professional-client-form-create',
   standalone: true,
-  imports: [RouterLink, FormFieldBuilderComponent, ProfessionalPageShellComponent],
+  imports: [FormsModule, RouterLink, FormFieldBuilderComponent, ProfessionalPageShellComponent],
   templateUrl: './professional-client-form-create.component.html',
   styleUrl: './professional-client-form-create.component.scss'
 })
@@ -21,6 +22,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
 
   group: ProfessionalGroup | null = null;
   customFields: DynamicField[] = [];
+  isMandatory = true;
   isLoading = true;
   isSaving = false;
   message = '';
@@ -42,6 +44,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
         this.customFields = (this.group.registration_form?.fields || [])
           .filter((field) => !field.is_core)
           .map((field) => ({ ...field }));
+        this.isMandatory = this.group.registration_form?.is_mandatory ?? true;
 
         // First-time setup: reuse the custom fields the professional already built
         // on the Lead Form so the same questions never have to be recreated.
@@ -78,7 +81,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
 
     this.isSaving = true;
     this.message = '';
-    this.formsGroupsApi.saveRegistrationForm(this.group.id, this.customFields).subscribe({
+    this.formsGroupsApi.saveRegistrationForm(this.group.id, this.customFields, this.isMandatory).subscribe({
       next: () => {
         this.messageType = 'success';
         this.message = 'Client creation form saved. Forms & Groups setup is complete.';

@@ -515,8 +515,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
       return 'Username must be at least 5 characters.';
     }
 
-    if (username.length > 10) {
-      return 'Username must be no more than 10 characters.';
+    if (username.length > 30) {
+      return 'Username must be no more than 30 characters.';
     }
 
     if (/\s/.test(username) || !/^[A-Za-z0-9.-]+$/.test(username)) {

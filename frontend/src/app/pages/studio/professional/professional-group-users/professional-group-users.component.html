@@ -116,7 +116,10 @@
                 <h2>Approved Users</h2>
                 <p>{{ filteredClients.length }} users shown</p>
               </div>
-              <button type="button" class="ghost-action" (click)="loadGroup(group.id)">Refresh</button>
+              <div class="registration-actions">
+                <button type="button" class="ghost-action" (click)="openImportModal()">Import Clients</button>
+                <button type="button" class="ghost-action" (click)="loadGroup(group.id)">Refresh</button>
+              </div>
             </div>
 
             <div class="filters">
@@ -149,8 +152,13 @@
                         <span class="client-name"><span class="avatar small">{{ initials(client) }}</span>{{ client.first_name }} {{ client.last_name }}</span>
                       </td>
                       <td>{{ client.email }}</td>
-                      <td>{{ client.username }}</td>
-                      <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
+                      <td>{{ client.username || '—' }}</td>
+                      <td>
+                        <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+                        @if (!client.has_portal_access) {
+                          <span class="status-pill muted">No portal access</span>
+                        }
+                      </td>
                       <td>{{ client.created_at | date: 'mediumDate' }}</td>
                       <td>
                         <a [routerLink]="['/professional/clients', client.id]" class="ghost-action compact">View Profile</a>
@@ -175,6 +183,7 @@
               <div>
                 <h2>Client Registration Form</h2>
                 <p>For known or accepted clients joining this group. This is separate from the public lead form used for initial enquiries.</p>
+                <span class="status-pill">{{ group.registration_form?.is_mandatory === false ? 'Optional - clients can be added without it' : 'Required before adding a client' }}</span>
               </div>
               <div class="registration-actions">
                 <button type="button" class="ghost-action" [disabled]="!registrationLink" (click)="copyRegistrationLink()">Share Registration Form</button>
@@ -288,5 +297,186 @@
       <section class="panel error-panel">
         <p>{{ message || 'Group not found.' }}</p>
       </section>
+    }
+
+    @if (isImportOpen && group) {
+      <div class="import-backdrop" (click)="closeImportModal()">
+        <section class="import-panel" role="dialog" aria-modal="true" aria-labelledby="import-clients-title" (click)="$event.stopPropagation()">
+          <header class="import-panel-header">
+            <div>
+              <p class="action-label">Import Clients</p>
+              <h2 id="import-clients-title">Bulk import for {{ group.name }}</h2>
+            </div>
+            <button type="button" class="ghost-action compact" (click)="closeImportModal()">Close</button>
+          </header>
+
+          @if (importError) {
+            <p class="message error-message">{{ importError }}</p>
+          }
+
+          @if (importStep === 'upload') {
+            <div class="import-body">
+              <p>
+                Upload a CSV file with a header row. Columns will be matched against this group's
+                client registration form fields so you can confirm the mapping before anything is created.
+              </p>
+              <label class="import-file-picker">
+                <span class="field-label">CSV file</span>
+                <input type="file" accept=".csv,text/csv" (change)="onImportFileSelected($event)">
+              </label>
+              @if (importIsLoading) {
+                <p>Reading file...</p>
+              }
+            </div>
+          }
+
+          @if (importStep === 'preview' && importPreview) {
+            <div class="import-body">
+              <p>
+                {{ importPreview.row_count }} row(s) detected in <strong>{{ importFile?.name }}</strong>.
+                Review the column mapping below, then confirm.
+              </p>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>File Column</th>
+                      <th>Maps To</th>
+                      <th>Match</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (column of importMapping; track column.file_column; let i = $index) {
+                      <tr>
+                        <td>{{ column.file_column }}</td>
+                        <td>
+                          <select [(ngModel)]="importMapping[i].matched_field_key" name="importMapping{{ i }}">
+                            <option [ngValue]="null">Ignore this column</option>
+                            @for (field of importPreview.fields; track field.key) {
+                              <option [ngValue]="field.key">{{ field.label }}{{ field.required ? ' (required)' : '' }}</option>
+                            }
+                          </select>
+                        </td>
+                        <td>
+                          @if (importPreview.columns[i].confidence === 'exact') {
+                            <span class="status-pill">Exact match</span>
+                          } @else if (importPreview.columns[i].confidence === 'partial') {
+                            <span class="status-pill muted">Partial match</span>
+                          } @else {
+                            <span class="status-pill muted">Unmatched</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (importUnmatchedCount > 0) {
+                <p class="access-note">{{ importUnmatchedCount }} column(s) will be ignored on import.</p>
+              }
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      @for (column of importPreview.columns; track column.file_column) {
+                        <th>{{ column.file_column }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of importPreview.rows_preview; track $index) {
+                      <tr>
+                        @for (column of importPreview.columns; track column.file_column) {
+                          <td>{{ row[column.file_column] }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <label class="import-toggle">
+                <input type="checkbox" [(ngModel)]="importCreatePortalAccess" name="importCreatePortalAccess">
+                <span>Create login access for these clients (off by default - imported clients are info-only)</span>
+              </label>
+
+              @if (importCreatePortalAccess) {
+                <label class="import-toggle">
+                  <input type="checkbox" [(ngModel)]="importSendCredentials" name="importSendCredentials">
+                  <span>Email generated usernames and temporary passwords to each client</span>
+                </label>
+              }
+
+              <div class="import-actions">
+                <button type="button" class="ghost-action" (click)="restartImport()">Choose a different file</button>
+                <button type="button" class="primary-action" [disabled]="importIsLoading" (click)="confirmImport()">
+                  {{ importIsLoading ? 'Importing...' : 'Confirm Import' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (importStep === 'result' && importResult) {
+            <div class="import-body">
+              <p class="message">{{ importResult.message }}</p>
+
+              @if (importResult.created.length > 0) {
+                <h3>Created ({{ importResult.created_count }})</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Client</th>
+                        <th>Email</th>
+                        <th>Portal Access</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of importResult.created; track row.row_index) {
+                        <tr>
+                          <td>{{ row.row_index }}</td>
+                          <td>{{ row.client_access.first_name }} {{ row.client_access.last_name }}</td>
+                          <td>{{ row.client_access.email }}</td>
+                          <td>{{ row.client_access.has_portal_access ? 'Yes' : 'No' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              @if (importResult.errors.length > 0) {
+                <h3>Failed ({{ importResult.error_count }})</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of importResult.errors; track row.row_index) {
+                        <tr>
+                          <td>{{ row.row_index }}</td>
+                          <td>{{ row.error }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              <div class="import-actions">
+                <button type="button" class="primary-action" (click)="finishImport()">Done</button>
+              </div>
+            </div>
+          }
+        </section>
+      </div>
     }
 </app-professional-page-shell>

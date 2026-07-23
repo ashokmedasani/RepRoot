@@ -107,6 +107,16 @@ small {
   font-weight: 700;
 }
 
+.status-pill + .status-pill {
+  margin-left: 0.4rem;
+}
+
+.status-pill.muted {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-muted);
+}
+
 .group-tabs,
 .profile-tabs {
   display: flex;
@@ -669,4 +679,80 @@ dd {
   .registration-link-box > div {
     grid-template-columns: 1fr;
   }
+}
+
+.import-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(3px);
+}
+
+.import-panel {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 52rem);
+  max-height: min(90vh, 46rem);
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 1.35rem;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-lg);
+  animation: slide-up 180ms ease-out;
+}
+
+.import-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.import-panel-header h2 {
+  margin-top: 0.2rem;
+  color: var(--app-text);
+  font-size: 1.15rem;
+}
+
+.action-label {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
+}
+
+.import-body {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.import-file-picker {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.import-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.import-toggle input {
+  width: auto;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  margin-top: 0.25rem;
 }

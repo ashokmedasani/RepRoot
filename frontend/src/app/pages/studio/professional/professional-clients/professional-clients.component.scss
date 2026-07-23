@@ -180,6 +180,16 @@ tbody tr:last-child td {
   font-weight: 700;
 }
 
+.status-pill + .status-pill {
+  margin-left: 0.4rem;
+}
+
+.status-pill.muted {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-muted);
+}
+
 /* Action buttons come from the global premium button styles. */
 
 .message {

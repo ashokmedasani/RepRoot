@@ -1,21 +1,23 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 
 import { ClientAccessRecord, FormsGroupsApiService } from '@core/api/forms-groups-api.service';
 import {
-  CalComConnectionRecord,
-  CalComEventType,
-  CalComSlotsByDate,
+  AvailabilityWindowRecord,
   LeadFormMeetingRecord,
+  SchedulingSettingsRecord,
   ScheduledMeetingRecord,
-  SchedulingApiService
+  SchedulingApiService,
+  SlotsByDate
 } from '@core/api/scheduling-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+
+const WEEKDAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 @Component({
   selector: 'app-professional-schedule',
@@ -30,27 +32,70 @@ export class ProfessionalScheduleComponent implements OnInit {
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly route = inject(ActivatedRoute);
 
+  readonly weekdayLabels = WEEKDAY_LABELS;
+
   isLoading = true;
-  message = '';
   messageType: 'success' | 'error' = 'success';
 
-  connection: CalComConnectionRecord | null = null;
-  eventTypes: CalComEventType[] = [];
+  // This page is long (weekly availability, meeting defaults, calendar,
+  // multiple meeting lists) and messages were previously only visible if you
+  // happened to be scrolled to the top — e.g. "End time must be after start
+  // time" from the availability form near the top rendered totally out of
+  // view if you'd scrolled down. Using a get/set pair here means every
+  // existing `this.message = ...` call site (there are many, across
+  // availability/settings/booking/reschedule/cancel) automatically scrolls
+  // the banner into view without having to touch each one individually.
+  @ViewChild('messageBanner') private messageBannerRef?: ElementRef<HTMLElement>;
+  private _message = '';
+
+  get message(): string {
+    return this._message;
+  }
+
+  set message(value: string) {
+    this._message = value;
+    if (value) {
+      setTimeout(() => {
+        this.messageBannerRef?.nativeElement?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      });
+    }
+  }
+
+  schedulingSettings: SchedulingSettingsRecord | null = null;
+  availabilityWindows: AvailabilityWindowRecord[] = [];
   meetings: ScheduledMeetingRecord[] = [];
   leadMeetings: LeadFormMeetingRecord[] = [];
   clients: ClientAccessRecord[] = [];
   clientGroups: { id: number; name: string; clients: ClientAccessRecord[] }[] = [];
 
-  // Connect form
-  connectForm = { api_key: '', cal_username: '' };
-  isConnecting = false;
+  // Availability management
+  showAvailabilityPanel = false;
+  newWindow = { weekday: 0, start_time: '09:00', end_time: '17:00' };
+  isSavingWindow = false;
+  isSavingSettings = false;
+  settingsForm = { timezone: 'UTC', default_duration_minutes: 30, slot_interval_minutes: 30, buffer_minutes: 15 };
+
+  // Searchable list of real IANA timezone names for the Meeting defaults
+  // field below — replaces a free-text box that happily accepted typos and
+  // silently broke slot math. Intl.supportedValuesOf is supported in all
+  // current major browsers; the tiny fallback list covers the rare case
+  // where it isn't, so the field never ends up empty.
+  readonly timezoneOptions: string[] = (() => {
+    try {
+      return (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone')
+        ?? ['UTC'];
+    } catch {
+      return ['UTC'];
+    }
+  })();
+
 
   // Schedule-meeting form
   showScheduleForm = false;
-  scheduleForm = { client_ids: [] as number[], event_type_id: null as number | null, title: '', notes: '' };
+  scheduleForm = { client_ids: [] as number[], duration_minutes: null as number | null, title: '', notes: '' };
   clientSearchQuery = '';
   slotDate = new Date().toISOString().slice(0, 10);
-  slots: CalComSlotsByDate = {};
+  slots: SlotsByDate = {};
   selectedSlot = '';
   isLoadingSlots = false;
   isSavingMeeting = false;
@@ -62,10 +107,14 @@ export class ProfessionalScheduleComponent implements OnInit {
   // Reschedule modal
   reschedulingMeeting: ScheduledMeetingRecord | null = null;
   rescheduleDate = '';
-  rescheduleSlots: CalComSlotsByDate = {};
+  rescheduleSlots: SlotsByDate = {};
   selectedRescheduleSlot = '';
   isLoadingRescheduleSlots = false;
   isSavingReschedule = false;
+
+  get hasAvailability(): boolean {
+    return this.availabilityWindows.some((w) => w.is_active);
+  }
 
   ngOnInit(): void {
     this.loadAll();
@@ -73,15 +122,20 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   private loadAll(): void {
     this.isLoading = true;
-    this.schedulingApi.getConnection().subscribe({
+    this.schedulingApi.getSchedulingSettings().subscribe({
       next: (response) => {
-        this.connection = response.connection;
+        this.schedulingSettings = response.settings;
+        this.availabilityWindows = response.availability_windows;
+        this.settingsForm = {
+          timezone: response.settings.timezone,
+          default_duration_minutes: response.settings.default_duration_minutes,
+          slot_interval_minutes: response.settings.slot_interval_minutes,
+          buffer_minutes: response.settings.buffer_minutes
+        };
+        this.autoDetectTimezone(response.settings.timezone);
         this.isLoading = false;
-        if (this.connection.is_connected) {
-          this.loadEventTypes();
-          this.loadMeetings();
-          this.loadClients();
-        }
+        this.loadMeetings();
+        this.loadClients();
       },
       error: () => {
         this.isLoading = false;
@@ -128,7 +182,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     if (!query) return this.clients;
     return this.clients.filter((client) => {
       const name = `${client.first_name} ${client.last_name}`.toLowerCase();
-      return name.includes(query) || client.username.toLowerCase().includes(query);
+      return name.includes(query) || (client.username || '').toLowerCase().includes(query);
     });
   }
 
@@ -157,13 +211,6 @@ export class ProfessionalScheduleComponent implements OnInit {
 
     this.openScheduleForm();
     this.scheduleForm.client_ids = [clientId];
-  }
-
-  private loadEventTypes(): void {
-    this.schedulingApi.getEventTypes().subscribe({
-      next: (response) => (this.eventTypes = response.event_types),
-      error: () => (this.eventTypes = [])
-    });
   }
 
   loadMeetings(): void {
@@ -309,32 +356,109 @@ export class ProfessionalScheduleComponent implements OnInit {
     return meeting.guests.map((g) => g.client_name).join(', ');
   }
 
-  connectCalCom(): void {
-    if (!this.connectForm.api_key.trim() || !this.connectForm.cal_username.trim()) return;
+  // --- Weekly availability -----------------------------------------------
 
-    this.isConnecting = true;
+  windowsForWeekday(weekday: number): AvailabilityWindowRecord[] {
+    return this.availabilityWindows
+      .filter((w) => w.weekday === weekday)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }
+
+  toggleAvailabilityPanel(): void {
+    this.showAvailabilityPanel = !this.showAvailabilityPanel;
+  }
+
+  addAvailabilityWindow(): void {
+    if (!this.newWindow.start_time || !this.newWindow.end_time) return;
+    if (this.newWindow.start_time >= this.newWindow.end_time) {
+      this.messageType = 'error';
+      this.message = 'End time must be after start time.';
+      return;
+    }
+    this.isSavingWindow = true;
     this.message = '';
-    this.schedulingApi.saveConnection({ api_key: this.connectForm.api_key.trim(), cal_username: this.connectForm.cal_username.trim() }).subscribe({
+    this.schedulingApi.addAvailabilityWindow(this.newWindow).subscribe({
       next: (response) => {
-        this.connection = response.connection;
-        this.eventTypes = response.event_types || [];
-        this.isConnecting = false;
+        this.availabilityWindows = [...this.availabilityWindows, response.availability_window];
+        this.isSavingWindow = false;
         this.messageType = 'success';
-        this.message = response.message || 'Cal.com connected.';
-        this.loadMeetings();
-        this.loadClients();
+        this.message = response.message;
       },
       error: (error: unknown) => {
-        this.isConnecting = false;
+        this.isSavingWindow = false;
         this.messageType = 'error';
-        this.message = formatApiError(error, 'Could not connect to Cal.com.');
+        this.message = formatApiError(error, 'Could not add that availability window.');
       }
     });
   }
 
-  setDefaultEventType(eventTypeId: number): void {
-    this.schedulingApi.saveConnection({ default_event_type_id: eventTypeId }).subscribe({
-      next: (response) => (this.connection = response.connection)
+  removeAvailabilityWindow(window: AvailabilityWindowRecord): void {
+    this.schedulingApi.deleteAvailabilityWindow(window.id).subscribe({
+      next: () => {
+        this.availabilityWindows = this.availabilityWindows.filter((w) => w.id !== window.id);
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not remove that availability window.');
+      }
+    });
+  }
+
+  /** Runs once per page load. Only acts when the timezone is still at its
+   * untouched 'UTC' default (i.e. never explicitly set) and the browser
+   * reports a genuinely different, valid local zone — so a professional who
+   * deliberately chose UTC is never silently overridden. When it applies,
+   * the field is set to the detected zone and saved automatically using the
+   * device's system time zone, matching how e.g. calendar apps behave. It
+   * stays fully editable in Meeting defaults at any time afterward. */
+  private autoDetectTimezone(currentTimezone: string): void {
+    let detected = '';
+    try {
+      detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      detected = '';
+    }
+
+    const shouldApply = Boolean(
+      detected
+      && currentTimezone === 'UTC'
+      && detected !== 'UTC'
+      && this.timezoneOptions.includes(detected)
+    );
+
+    if (!shouldApply) {
+      return;
+    }
+
+    this.settingsForm.timezone = detected;
+    this.schedulingApi.saveSchedulingSettings(this.settingsForm).subscribe({
+      next: (response) => {
+        this.schedulingSettings = response.settings;
+        this.messageType = 'success';
+        this.message = `Detected your timezone as ${detected} and set it for scheduling. You can change this anytime below.`;
+      },
+      error: () => {
+        // Auto-detection is a convenience only — leave the field populated
+        // (still editable and savable normally) if the background save fails.
+      }
+    });
+  }
+
+  saveSchedulingSettings(): void {
+    this.isSavingSettings = true;
+    this.message = '';
+    this.schedulingApi.saveSchedulingSettings(this.settingsForm).subscribe({
+      next: (response) => {
+        this.schedulingSettings = response.settings;
+        this.isSavingSettings = false;
+        this.messageType = 'success';
+        this.message = response.message;
+      },
+      error: (error: unknown) => {
+        this.isSavingSettings = false;
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not save scheduling settings.');
+      }
     });
   }
 
@@ -343,7 +467,7 @@ export class ProfessionalScheduleComponent implements OnInit {
   openScheduleForm(): void {
     this.scheduleForm = {
       client_ids: [],
-      event_type_id: this.connection?.default_event_type_id || null,
+      duration_minutes: this.schedulingSettings?.default_duration_minutes || null,
       title: '',
       notes: ''
     };
@@ -369,7 +493,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     this.selectedSlot = '';
     const endDate = new Date(this.slotDate);
     endDate.setDate(endDate.getDate() + 6);
-    this.schedulingApi.getSlots(this.slotDate, endDate.toISOString().slice(0, 10), this.scheduleForm.event_type_id || undefined).subscribe({
+    this.schedulingApi.getSlots(this.slotDate, endDate.toISOString().slice(0, 10), this.scheduleForm.duration_minutes || undefined).subscribe({
       next: (response) => {
         this.slots = response.slots;
         this.isLoadingSlots = false;
@@ -397,7 +521,7 @@ export class ProfessionalScheduleComponent implements OnInit {
       kind: 'send',
       title: 'Schedule meeting',
       target: `${selectedNames.join(', ') || 'these clients'} on ${new Date(this.selectedSlot).toLocaleString()}`,
-      impact: 'This books a real meeting on your Cal.com calendar and emails everyone invited.',
+      impact: 'This books a real meeting with a free video link and emails a calendar invite to everyone invited.',
       confirmLabel: 'Schedule Meeting'
     });
     if (!confirmed) return;
@@ -411,7 +535,7 @@ export class ProfessionalScheduleComponent implements OnInit {
         start: this.selectedSlot,
         title: this.scheduleForm.title || undefined,
         notes: this.scheduleForm.notes || undefined,
-        event_type_id: this.scheduleForm.event_type_id || undefined
+        duration_minutes: this.scheduleForm.duration_minutes || undefined
       })
       .subscribe({
         next: (response) => {

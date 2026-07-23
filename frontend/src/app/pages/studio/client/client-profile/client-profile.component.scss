@@ -864,6 +864,16 @@ textarea {
   padding: 2.5rem 1rem;
 }
 
+.view-only-note {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .empty-state h2 {
   font-size: 1.15rem;
   font-weight: 800;

@@ -10,8 +10,8 @@ swallowed so a broken SMTP config never blocks a payment action.
 import logging
 
 from django.conf import settings
-from django.core.mail import send_mail
 
+from .email_utils import send_mail_background as send_mail
 from .models import PaymentNotification
 from .notifications import notify_client as notify_shared_client, notify_professional as notify_shared_professional
 from . import web_routes

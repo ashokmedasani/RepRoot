@@ -40,7 +40,13 @@ class ProfessionalAccessPermission(permissions.IsAuthenticated):
       return False
     profile = getattr(request.user, 'professional_profile', None)
     if profile is None:
-      return True
+      # A Django User with no professional profile (e.g. an admin-portal
+      # staff account) has no business hitting professional-scoped
+      # endpoints. Every view still additionally filters by
+      # `professional=request.user`, so this was not previously
+      # exploitable for cross-tenant data access, but failing closed here
+      # is the correct default rather than relying on that second layer.
+      return False
     if profile.lifecycle_status in (ProfessionalProfile.LIFECYCLE_FROZEN, ProfessionalProfile.LIFECYCLE_RECYCLED):
       self.message = 'This professional account is frozen. Contact support to restore access.'
       return False

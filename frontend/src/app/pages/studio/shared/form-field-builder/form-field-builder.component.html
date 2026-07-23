@@ -33,8 +33,15 @@
 
     <div class="chip-row">
       @for (template of visibleRecommended; track template.label) {
-        <button type="button" class="field-chip" (click)="addRecommendedField(template)" [title]="template.help_text">
-          <span class="chip-plus">+</span>{{ template.label }}
+        <button
+          type="button"
+          class="field-chip"
+          [class.field-chip-added]="isRecommendedFieldAdded(template)"
+          [disabled]="isRecommendedFieldAdded(template)"
+          (click)="addRecommendedField(template)"
+          [title]="isRecommendedFieldAdded(template) ? template.label + ' is already on this form' : template.help_text"
+        >
+          <span class="chip-plus">{{ isRecommendedFieldAdded(template) ? '✓' : '+' }}</span>{{ template.label }}
         </button>
       }
     </div>

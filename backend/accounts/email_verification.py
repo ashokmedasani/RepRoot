@@ -3,7 +3,8 @@ import time
 from dataclasses import dataclass
 
 from django.core.cache import cache
-from django.core.mail import send_mail
+
+from .email_utils import send_mail_background as send_mail
 
 
 OTP_TTL_SECONDS = 600

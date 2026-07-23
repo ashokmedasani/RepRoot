@@ -16,6 +16,7 @@ import {
 } from '@core/api/references-api.service';
 import {
   TemplateAssignmentRecord,
+  TemplateClientAccessLevel,
   TemplateField,
   TemplatesApiService,
   TrackingEntryRecord,
@@ -68,6 +69,13 @@ export class ProfessionalClientTemplateComponent implements OnInit {
   shareSelectedIds = new Set<number>();
   referenceSearch = '';
   isSavingShare = false;
+
+  isSavingAccessLevel = false;
+  readonly accessLevelOptions: { value: TemplateClientAccessLevel; label: string }[] = [
+    { value: 'private', label: 'Private' },
+    { value: 'view_only', label: 'View only' },
+    { value: 'editable', label: 'Editable' }
+  ];
 
   editingEntry: TrackingEntryRecord | null = null;
   entryDraftAnswers: EntryAnswerDraft[] = [];
@@ -411,6 +419,31 @@ export class ProfessionalClientTemplateComponent implements OnInit {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Shared references could not be updated.');
         this.isSavingShare = false;
+      }
+    });
+  }
+
+  // ----- client access level -----
+
+  setAccessLevel(level: TemplateClientAccessLevel): void {
+    const assignment = this.assignment;
+
+    if (!assignment || assignment.client_access_level === level || this.isSavingAccessLevel) {
+      return;
+    }
+
+    this.isSavingAccessLevel = true;
+    this.templatesApi.updateAssignmentAccessLevel(this.clientId, assignment.id, level).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.assignment = response.assignment;
+        this.isSavingAccessLevel = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Access level could not be updated.');
+        this.isSavingAccessLevel = false;
       }
     });
   }

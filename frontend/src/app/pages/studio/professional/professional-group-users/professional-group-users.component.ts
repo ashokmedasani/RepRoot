@@ -7,6 +7,9 @@ import {
   ClientAccessRecord,
   DynamicField,
   FormsGroupsApiService,
+  GroupImportConfirmResponse,
+  GroupImportMappingEntry,
+  GroupImportPreviewResponse,
   GroupRegistrationSubmission,
   ProfessionalGroup
 } from '@core/api/forms-groups-api.service';
@@ -51,6 +54,18 @@ export class ProfessionalGroupUsersComponent implements OnInit {
     { id: 'settings', label: 'Settings' }
   ];
 
+  // ----- bulk import wizard -----
+  isImportOpen = false;
+  importStep: 'upload' | 'preview' | 'result' = 'upload';
+  importFile: File | null = null;
+  importIsLoading = false;
+  importError = '';
+  importPreview: GroupImportPreviewResponse | null = null;
+  importMapping: GroupImportMappingEntry[] = [];
+  importCreatePortalAccess = false;
+  importSendCredentials = true;
+  importResult: GroupImportConfirmResponse | null = null;
+
   ngOnInit(): void {
     const groupId = Number(this.route.snapshot.paramMap.get('groupId'));
     const requestedTab = this.route.snapshot.queryParamMap.get('tab') as GroupTab | null;
@@ -78,7 +93,7 @@ export class ProfessionalGroupUsersComponent implements OnInit {
         !searchTerm ||
         `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchTerm) ||
         client.email.toLowerCase().includes(searchTerm) ||
-        client.username.toLowerCase().includes(searchTerm);
+        (client.username || '').toLowerCase().includes(searchTerm);
       const matchesStatus =
         this.statusFilter === 'all' ||
         (this.statusFilter === 'active' && client.is_active) ||
@@ -219,5 +234,112 @@ export class ProfessionalGroupUsersComponent implements OnInit {
 
   initials(client: ClientAccessRecord): string {
     return initialsFor(client.first_name, client.last_name);
+  }
+
+  // ----- bulk import wizard -----
+
+  openImportModal(): void {
+    this.isImportOpen = true;
+    this.importStep = 'upload';
+    this.importFile = null;
+    this.importIsLoading = false;
+    this.importError = '';
+    this.importPreview = null;
+    this.importMapping = [];
+    this.importCreatePortalAccess = false;
+    this.importSendCredentials = true;
+    this.importResult = null;
+  }
+
+  closeImportModal(): void {
+    this.isImportOpen = false;
+  }
+
+  onImportFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files && input.files.length ? input.files[0] : null;
+    input.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    this.importFile = file;
+    this.loadImportPreview();
+  }
+
+  restartImport(): void {
+    this.importStep = 'upload';
+    this.importFile = null;
+    this.importPreview = null;
+    this.importMapping = [];
+    this.importResult = null;
+    this.importError = '';
+  }
+
+  get importUnmatchedCount(): number {
+    return this.importMapping.filter((column) => !column.matched_field_key).length;
+  }
+
+  confirmImport(): void {
+    if (!this.group || !this.importFile) {
+      return;
+    }
+
+    this.importIsLoading = true;
+    this.importError = '';
+
+    this.formsGroupsApi
+      .confirmGroupImport(
+        this.group.id,
+        this.importFile,
+        this.importMapping,
+        this.importCreatePortalAccess,
+        this.importSendCredentials
+      )
+      .subscribe({
+        next: (response) => {
+          this.importResult = response;
+          this.importStep = 'result';
+          this.importIsLoading = false;
+
+          if (this.group) {
+            this.loadGroup(this.group.id);
+          }
+        },
+        error: (error: unknown) => {
+          this.importError = formatApiError(error, 'Import could not be completed.');
+          this.importIsLoading = false;
+        }
+      });
+  }
+
+  finishImport(): void {
+    this.closeImportModal();
+  }
+
+  private loadImportPreview(): void {
+    if (!this.group || !this.importFile) {
+      return;
+    }
+
+    this.importIsLoading = true;
+    this.importError = '';
+
+    this.formsGroupsApi.previewGroupImport(this.group.id, this.importFile).subscribe({
+      next: (response) => {
+        this.importPreview = response;
+        this.importMapping = response.columns.map((column) => ({
+          file_column: column.file_column,
+          matched_field_key: column.matched_field_key
+        }));
+        this.importStep = 'preview';
+        this.importIsLoading = false;
+      },
+      error: (error: unknown) => {
+        this.importError = formatApiError(error, 'Could not read this file.');
+        this.importIsLoading = false;
+      }
+    });
   }
 }

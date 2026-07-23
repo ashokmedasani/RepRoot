@@ -48,6 +48,18 @@
           <div class="status-line">
             <span class="status-pill" [class.completed]="templateStatus === 'Completed'">{{ templateStatus }}</span>
             <span class="assigned">Assigned {{ assignment.assigned_at | date: 'dd MMM yyyy' }}</span>
+            <span class="visibility-toggle" role="group" aria-label="Client access level">
+              @for (option of accessLevelOptions; track option.value) {
+                <button
+                  type="button"
+                  [disabled]="isSavingAccessLevel"
+                  [class.active]="assignment.client_access_level === option.value"
+                  (click)="setAccessLevel(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              }
+            </span>
           </div>
           <div class="range-tabs" role="group" aria-label="Date range">
             @for (range of rangeOptions; track range.value) {

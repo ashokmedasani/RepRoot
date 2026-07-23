@@ -50,7 +50,13 @@ export class FormFieldBuilderComponent {
       label: 'Phone Number',
       field_type: 'phone',
       placeholder: 'Mobile number',
-      help_text: 'Country code selector plus mobile number input.'
+      help_text: 'Country code selector plus mobile number input.',
+      // Matches UNIVERSAL_CLIENT_FORM_FIELDS on the backend and the manual
+      // Add Client form, which both always require a phone number — this
+      // suggested-fields chip must stay in sync or a professional adding
+      // "Phone Number" from here ends up with a field that's silently
+      // optional here but rejected as required everywhere else.
+      required: true
     },
     {
       icon: 'GO',
@@ -117,7 +123,17 @@ export class FormFieldBuilderComponent {
     this.customFields.push({ ...this.createEmptyField(), isEditing: true });
   }
 
+  isRecommendedFieldAdded(template: FitnessFieldTemplate): boolean {
+    const label = template.label.trim().toLowerCase();
+    return this.customFields.some((field) => (field.label || '').trim().toLowerCase() === label);
+  }
+
   addRecommendedField(template: FitnessFieldTemplate): void {
+    // Already on the form (most likely because it's part of the default
+    // pre-populated set) — do nothing instead of inserting a duplicate field.
+    if (this.isRecommendedFieldAdded(template)) {
+      return;
+    }
     // Insert the suggested field and open its settings panel immediately.
     this.customFields.push(this.createFieldFromTemplate(template, true));
   }

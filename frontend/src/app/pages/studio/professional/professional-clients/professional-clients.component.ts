@@ -72,7 +72,7 @@ export class ProfessionalClientsComponent implements OnInit, OnDestroy {
           !searchTerm ||
           `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchTerm) ||
           client.email.toLowerCase().includes(searchTerm) ||
-          client.username.toLowerCase().includes(searchTerm) ||
+          (client.username || '').toLowerCase().includes(searchTerm) ||
           client.group_name.toLowerCase().includes(searchTerm);
         const matchesGroup = this.groupFilter === 'all' || String(client.group) === this.groupFilter;
         const matchesStatus =

@@ -44,6 +44,12 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
 
   clientPhoto = '';
+  /**
+   * 'send'   - create with portal access, email login details to the applicant
+   * 'manual' - create with portal access, don't email (professional shares manually)
+   * 'none'   - no portal access, just store the applicant's info
+   */
+  portalAccessMode: 'send' | 'manual' | 'none' = 'send';
   clientAccess = {
     groupId: '',
     username: '',
@@ -51,6 +57,10 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
     confirmPassword: '',
     registrationAnswers: {} as Record<string, string>
   };
+
+  get hasPortalAccess(): boolean {
+    return this.portalAccessMode !== 'none';
+  }
 
   onPhotoSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -170,28 +180,48 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
       return;
     }
 
-    if (!this.clientAccess.username.trim()) {
-      this.setError('Enter a client username.');
-      return;
+    if (this.hasPortalAccess) {
+      if (!this.clientAccess.username.trim()) {
+        this.setError('Enter a client username.');
+        return;
+      }
+
+      if (!this.isPasswordStrong(this.clientAccess.password)) {
+        this.setError('Client password must be at least 8 characters and include 1 special character.');
+        return;
+      }
+
+      if (this.clientAccess.password !== this.clientAccess.confirmPassword) {
+        this.setError('Client passwords must match.');
+        return;
+      }
     }
 
-    if (!this.isPasswordStrong(this.clientAccess.password)) {
-      this.setError('Client password must be at least 8 characters and include 1 special character.');
-      return;
-    }
-
-    if (this.clientAccess.password !== this.clientAccess.confirmPassword) {
-      this.setError('Client passwords must match.');
-      return;
-    }
-
-    const confirmed = await this.confirmation.confirm({
-      kind: 'approve',
-      title: 'Approve and convert request for',
-      target: this.submission.applicant_name,
-      impact: `This request will become a client account and temporary login credentials will be sent to ${this.submission.email}.`,
-      confirmLabel: 'Approve & Create Client'
-    });
+    const confirmed = await this.confirmation.confirm(
+      this.portalAccessMode === 'send'
+        ? {
+            kind: 'approve',
+            title: 'Approve and convert request for',
+            target: this.submission.applicant_name,
+            impact: `This request will become a client account and temporary login credentials will be sent to ${this.submission.email}.`,
+            confirmLabel: 'Approve & Create Client'
+          }
+        : this.portalAccessMode === 'manual'
+        ? {
+            kind: 'approve',
+            title: 'Approve and convert request for',
+            target: this.submission.applicant_name,
+            impact: 'This request will become a client account. Credentials will not be emailed - you must deliver them separately.',
+            confirmLabel: 'Approve & Create Client'
+          }
+        : {
+            kind: 'approve',
+            title: 'Approve request without portal access for',
+            target: this.submission.applicant_name,
+            impact: 'Only the applicant’s info will be stored - no login will be created. You can grant portal access later from the client’s profile.',
+            confirmLabel: 'Approve & Create Client'
+          }
+    );
 
     if (!confirmed) {
       return;
@@ -202,9 +232,15 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
     this.formsGroupsApi
       .createClientAccess(this.submission.id, {
         group_id: Number(this.clientAccess.groupId),
-        username: this.clientAccess.username,
-        password: this.clientAccess.password,
-        confirm_password: this.clientAccess.confirmPassword,
+        has_portal_access: this.hasPortalAccess,
+        ...(this.hasPortalAccess
+          ? {
+              username: this.clientAccess.username,
+              password: this.clientAccess.password,
+              confirm_password: this.clientAccess.confirmPassword,
+              send_credentials: this.portalAccessMode === 'send'
+            }
+          : {}),
         photo: this.clientPhoto,
         registration_answers: this.clientAccess.registrationAnswers
       })

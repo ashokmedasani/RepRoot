@@ -1,6 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
   DynamicField,
@@ -20,10 +20,19 @@ import { formatApiError } from '@shared/utils/ui-helpers';
   templateUrl: './professional-manual-client-create.component.html',
   styleUrl: './professional-manual-client-create.component.scss'
 })
-export class ProfessionalManualClientCreateComponent implements OnInit {
+export class ProfessionalManualClientCreateComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly api = inject(FormsGroupsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+
+  // The message banner renders at the top of a long, scrollable form while
+  // the submit button is at the bottom — without this, a professional
+  // watching the bottom of the screen sees no reaction to clicking submit
+  // and may assume it silently failed (or, on success, not notice the
+  // confirmation at all). Scrolling it into view on every result fixes both.
+  @ViewChild('messageBanner') private messageBannerRef?: ElementRef<HTMLElement>;
+  private redirectTimer?: ReturnType<typeof setTimeout>;
 
   groups: ProfessionalGroup[] = [];
   selectedGroupId: number | null = null;
@@ -31,7 +40,12 @@ export class ProfessionalManualClientCreateComponent implements OnInit {
   answers: Record<string, string> = {};
   username = '';
   temporaryPassword = '';
-  sendCredentials = true;
+  /**
+   * 'send'   - create with portal access, email login details to the client
+   * 'manual' - create with portal access, don't email (professional shares manually)
+   * 'none'   - no portal access, just store the client's info
+   */
+  portalAccessMode: 'send' | 'manual' | 'none' = 'send';
   isLoading = true;
   isSaving = false;
   message = '';
@@ -73,6 +87,10 @@ export class ProfessionalManualClientCreateComponent implements OnInit {
     return Boolean(this.routeGroupId || this.registrationSubmissionId);
   }
 
+  get hasPortalAccess(): boolean {
+    return this.portalAccessMode !== 'none';
+  }
+
   onGroupChange(): void {
     this.answers = {};
     this.registrationSubmission = null;
@@ -96,21 +114,43 @@ export class ProfessionalManualClientCreateComponent implements OnInit {
     const group = this.selectedGroup;
     const email = String(this.answers['email'] || '').trim();
 
-    if (!group || !this.username.trim() || !this.temporaryPassword || !email) {
+    if (!group || !email) {
       this.messageType = 'error';
-      this.message = 'Group, client details, username, and temporary password are required.';
+      this.message = 'Group and client details are required.';
       return;
     }
 
-    const confirmed = await this.confirmation.confirm({
-      kind: this.sendCredentials ? 'send' : 'warning',
-      title: this.sendCredentials ? 'Create client and send login credentials to' : 'Create client without emailing',
-      target: email,
-      impact: this.sendCredentials
-        ? 'The client account will be created and the username and temporary password will be emailed.'
-        : 'The account will be created, but you must deliver the temporary credentials separately.',
-      confirmLabel: this.sendCredentials ? 'Create & Send' : 'Create Client'
-    });
+    if (this.hasPortalAccess && (!this.username.trim() || !this.temporaryPassword)) {
+      this.messageType = 'error';
+      this.message = 'Username and temporary password are required to create portal access.';
+      return;
+    }
+
+    const confirmed = await this.confirmation.confirm(
+      this.portalAccessMode === 'send'
+        ? {
+            kind: 'send',
+            title: 'Create client and send login credentials to',
+            target: email,
+            impact: 'The client account will be created and the username and temporary password will be emailed.',
+            confirmLabel: 'Create & Send'
+          }
+        : this.portalAccessMode === 'manual'
+        ? {
+            kind: 'warning',
+            title: 'Create client without emailing',
+            target: email,
+            impact: 'The account will be created, but you must deliver the temporary credentials separately.',
+            confirmLabel: 'Create Client'
+          }
+        : {
+            kind: 'warning',
+            title: 'Create client record without portal access for',
+            target: email,
+            impact: 'Only the client’s info will be stored - no login will be created. You can grant portal access later from the client’s profile.',
+            confirmLabel: 'Create Client'
+          }
+    );
 
     if (!confirmed) {
       return;
@@ -119,11 +159,16 @@ export class ProfessionalManualClientCreateComponent implements OnInit {
     this.isSaving = true;
     this.api.createManualClient({
       group_id: group.id,
-      username: this.username.trim().toLowerCase(),
-      password: this.temporaryPassword,
-      confirm_password: this.temporaryPassword,
+      has_portal_access: this.hasPortalAccess,
+      ...(this.hasPortalAccess
+        ? {
+            username: this.username.trim().toLowerCase(),
+            password: this.temporaryPassword,
+            confirm_password: this.temporaryPassword,
+            send_credentials: this.portalAccessMode === 'send'
+          }
+        : {}),
       registration_answers: this.answers,
-      send_credentials: this.sendCredentials,
       registration_submission_id: this.registrationSubmission?.id || null
     }).subscribe({
       next: (response) => {
@@ -132,12 +177,36 @@ export class ProfessionalManualClientCreateComponent implements OnInit {
         this.messageType = 'success';
         this.message = response.message;
         this.isSaving = false;
+        this.scrollToMessage();
+        // Give the professional a moment to actually read the confirmation,
+        // then move on to the new client's profile — leaving this page is
+        // what actually prevents an accidental duplicate submission (the
+        // submit button being disabled only helps if you're still here).
+        this.redirectTimer = setTimeout(() => {
+          this.router.navigate(['/professional/clients', this.createdClientId]);
+        }, 1800);
       },
       error: (error: unknown) => {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Client account could not be created.');
         this.isSaving = false;
+        this.scrollToMessage();
       }
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.redirectTimer) {
+      clearTimeout(this.redirectTimer);
+    }
+  }
+
+  private scrollToMessage(): void {
+    // behavior: 'auto' (not 'smooth') deliberately — the app's global smooth
+    // scroll can jank badly on some pages, so error/success scrolling always
+    // jumps instantly instead of animating.
+    setTimeout(() => {
+      this.messageBannerRef?.nativeElement?.scrollIntoView({ behavior: 'auto', block: 'start' });
     });
   }
 

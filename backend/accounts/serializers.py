@@ -1,6 +1,8 @@
 import hashlib
 import json
 import re
+import secrets
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password, make_password
@@ -9,12 +11,13 @@ from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
 from .models import (
-  CalComConnection,
   ChatMessage,
   ClientAccess,
   ClientDetailChangeRequest,
   ClientRegistrationForm,
   ClientReminder,
+  ProfessionalAvailabilityWindow,
+  ProfessionalSchedulingSettings,
   ScheduledMeeting,
   ScheduledMeetingGuest,
   GroupRegistrationSubmission,
@@ -49,6 +52,44 @@ from .payment_constants import (
 )
 
 User = get_user_model()
+
+
+def detect_upload_content_type(value):
+  """Sniff the real content type of an uploaded file from its leading bytes.
+
+  Uploaded ``content_type`` is fully attacker-controlled (it's just a
+  multipart header), so it must never be trusted on its own to decide what a
+  file "is" before it's stored and later served back to another user. This
+  checks the actual file signature against the small set of formats we
+  accept for payment proofs / QR codes, and returns ``None`` if it doesn't
+  match a known-good signature (including for formats we deliberately don't
+  support, like SVG/HTML, which could otherwise be used to smuggle a script
+  that executes when the file is later served inline to another party).
+  """
+  try:
+    position = value.tell()
+  except (AttributeError, OSError):
+    position = None
+
+  head = value.read(16)
+
+  if position is not None:
+    value.seek(position)
+  else:
+    value.seek(0)
+
+  if head.startswith(b'\x89PNG\r\n\x1a\n'):
+    return 'image/png'
+  if head.startswith(b'\xff\xd8\xff'):
+    return 'image/jpeg'
+  if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
+    return 'image/webp'
+  if head.startswith(b'GIF87a') or head.startswith(b'GIF89a'):
+    return 'image/gif'
+  if head.startswith(b'%PDF-'):
+    return 'application/pdf'
+  return None
+
 
 PROFILE_VISIBILITY_KEYS = {
   'professional_headline',
@@ -146,6 +187,9 @@ def normalize_additional_info(items):
 
 
 def validate_client_photo(value):
+  import base64
+  from io import BytesIO
+
   photo = str(value or '')
   if not photo:
     return ''
@@ -153,8 +197,20 @@ def validate_client_photo(value):
   if len(photo) > 7_000_000:
     raise serializers.ValidationError('The profile photo must be smaller than 5 MB.')
 
-  if not re.match(r'^data:image/(jpeg|jpg|png|webp|gif);base64,', photo, re.IGNORECASE):
+  match = re.match(r'^data:image/(jpeg|jpg|png|webp|gif);base64,(?P<data>.+)$', photo, re.IGNORECASE | re.DOTALL)
+  if not match:
     raise serializers.ValidationError('Upload a JPEG, PNG, WebP, or GIF image.')
+
+  try:
+    decoded = base64.b64decode(match.group('data'), validate=True)
+  except (ValueError, TypeError):
+    raise serializers.ValidationError('That image file appears to be corrupted - try a different file.')
+
+  # The data-URI prefix above is just attacker-controlled text; confirm the
+  # base64 payload actually decodes to real image bytes rather than trusting
+  # the declared type on its own (same class of check as file uploads).
+  if detect_upload_content_type(BytesIO(decoded)) is None:
+    raise serializers.ValidationError('That file does not look like a valid image - try a different file.')
 
   return photo
 
@@ -250,7 +306,7 @@ def validate_username_charset(username: str) -> None:
 
 
 class UsernameAvailabilitySerializer(serializers.Serializer):
-  username = serializers.CharField(max_length=10)
+  username = serializers.CharField(max_length=30)
 
   def validate_username(self, value: str) -> str:
     username = value.strip().lower()
@@ -295,7 +351,7 @@ class EmailOtpVerifySerializer(serializers.Serializer):
 
 class ProfessionalSignupSerializer(serializers.Serializer):
   email = serializers.EmailField()
-  username = serializers.CharField(min_length=5, max_length=10)
+  username = serializers.CharField(min_length=5, max_length=30)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
   email_verification_token = serializers.CharField(write_only=True)
@@ -605,6 +661,10 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     content_type = str(getattr(value, 'content_type', '') or '').lower()
     if content_type and content_type != 'application/pdf' and not content_type.startswith('image/'):
       raise serializers.ValidationError('Upload a PDF or image certification file.')
+
+    detected_type = detect_upload_content_type(value)
+    if detected_type is None:
+      raise serializers.ValidationError('Upload a PDF or a JPG/PNG/WEBP image - the file content could not be verified.')
     return value
 
   def validate_image_upload(self, value):
@@ -614,6 +674,10 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     content_type = str(getattr(value, 'content_type', '') or '').lower()
     if content_type and not content_type.startswith('image/'):
       raise serializers.ValidationError('Upload a valid image file.')
+
+    detected_type = detect_upload_content_type(value)
+    if detected_type is None or not detected_type.startswith('image/'):
+      raise serializers.ValidationError('Upload a valid JPG, PNG, WEBP, or GIF image - the file content could not be verified.')
     return value
 
   def validate_profile_images(self, value):
@@ -687,9 +751,9 @@ class ProfessionalLeadFormSerializer(serializers.ModelSerializer):
   class Meta:
     model = ProfessionalLeadForm
     fields = [
-      'id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active',
+      'id', 'title', 'public_slug', 'public_link', 'fields', 'custom_fields', 'is_active', 'is_mandatory',
       'introductory_meeting_enabled', 'introductory_meeting_title', 'introductory_meeting_duration_minutes',
-      'introductory_meeting_event_type_id', 'introductory_meeting_min_notice_hours',
+      'introductory_meeting_min_notice_hours',
       'introductory_meeting_max_advance_days', 'introductory_meeting_buffer_minutes',
       'introductory_meeting_requires_approval', 'created_at', 'updated_at',
     ]
@@ -722,8 +786,8 @@ class PublicLeadFormSerializer(serializers.ModelSerializer):
     return obj.professional.get_full_name() or obj.professional.username
 
   def get_meeting_offer(self, obj):
-    connection = getattr(obj.professional, 'cal_com_connection', None)
-    enabled = bool(obj.introductory_meeting_enabled and connection and connection.is_connected)
+    has_availability = ProfessionalAvailabilityWindow.objects.filter(professional=obj.professional, is_active=True).exists()
+    enabled = bool(obj.introductory_meeting_enabled and has_availability)
     return {
       'enabled': enabled,
       'title': obj.introductory_meeting_title,
@@ -765,7 +829,7 @@ class ClientRegistrationFormSerializer(serializers.ModelSerializer):
 
   class Meta:
     model = ClientRegistrationForm
-    fields = ['id', 'group', 'public_slug', 'fields', 'custom_fields', 'is_active', 'created_at', 'updated_at']
+    fields = ['id', 'group', 'public_slug', 'fields', 'custom_fields', 'is_active', 'is_mandatory', 'created_at', 'updated_at']
     read_only_fields = ['id', 'group', 'public_slug', 'fields', 'is_active', 'created_at', 'updated_at']
 
   def validate(self, attrs):
@@ -899,13 +963,71 @@ class PublicGroupRegistrationSerializer(serializers.Serializer):
 
 class ClientAccessCreateSerializer(serializers.Serializer):
   group_id = serializers.IntegerField()
-  username = serializers.CharField(max_length=150)
-  password = serializers.CharField(min_length=8, write_only=True)
-  confirm_password = serializers.CharField(min_length=8, write_only=True)
+  has_portal_access = serializers.BooleanField(required=False, default=True)
+  username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+  password = serializers.CharField(min_length=8, write_only=True, required=False, allow_blank=True)
+  confirm_password = serializers.CharField(min_length=8, write_only=True, required=False, allow_blank=True)
   photo = serializers.CharField(required=False, allow_blank=True, default='')
   registration_answers = serializers.DictField(required=False)
   send_credentials = serializers.BooleanField(required=False, default=True)
   registration_submission_id = serializers.IntegerField(required=False, allow_null=True)
+
+  def validate_username(self, value):
+    username = value.strip().lower()
+
+    if not username:
+      return username
+
+    validate_username_charset(username)
+
+    professional = self.context.get('professional')
+
+    if professional and ClientAccess.objects.filter(professional=professional, username__iexact=username).exists():
+      raise serializers.ValidationError('Client username is already taken.')
+
+    return username
+
+  def validate(self, attrs):
+    has_portal_access = attrs.get('has_portal_access', True)
+
+    if not has_portal_access:
+      # Info-only client: no login credentials are created or expected.
+      attrs['username'] = ''
+      attrs['password'] = ''
+      attrs['confirm_password'] = ''
+      return attrs
+
+    username = attrs.get('username', '')
+    password = attrs.get('password', '')
+    confirm_password = attrs.get('confirm_password', '')
+
+    if not username:
+      raise serializers.ValidationError({'username': 'Client username is required.'})
+
+    if not password:
+      raise serializers.ValidationError({'password': 'Client password is required.'})
+
+    if not confirm_password:
+      raise serializers.ValidationError({'confirm_password': 'Please confirm the client password.'})
+
+    try:
+      validate_password_strength(password)
+    except serializers.ValidationError as error:
+      raise serializers.ValidationError({'password': error.detail[0]})
+
+    if password != confirm_password:
+      raise serializers.ValidationError({'confirm_password': 'Passwords must match.'})
+
+    return attrs
+
+
+class ClientPortalAccessGrantSerializer(serializers.Serializer):
+  """Used to grant portal login access to an existing info-only ClientAccess."""
+
+  username = serializers.CharField(max_length=150)
+  password = serializers.CharField(min_length=8, write_only=True)
+  confirm_password = serializers.CharField(min_length=8, write_only=True)
+  send_credentials = serializers.BooleanField(required=False, default=True)
 
   def validate_username(self, value):
     username = value.strip().lower()
@@ -916,8 +1038,14 @@ class ClientAccessCreateSerializer(serializers.Serializer):
     validate_username_charset(username)
 
     professional = self.context.get('professional')
+    client_access = self.context.get('client_access')
 
-    if professional and ClientAccess.objects.filter(professional=professional, username__iexact=username).exists():
+    existing = ClientAccess.objects.filter(professional=professional, username__iexact=username)
+
+    if client_access is not None:
+      existing = existing.exclude(id=client_access.id)
+
+    if professional and existing.exists():
       raise serializers.ValidationError('Client username is already taken.')
 
     return username
@@ -947,13 +1075,18 @@ class ClientLoginSerializer(serializers.Serializer):
     if not professional_id:
       raise serializers.ValidationError({'professional_id': 'Professional ID is required.'})
 
-    access_records = ClientAccess.objects.filter(
+    base_records = ClientAccess.objects.filter(
       professional__professional_profile__professional_id__iexact=professional_id,
       professional__is_active=True,
       professional__professional_profile__lifecycle_status=ProfessionalProfile.LIFECYCLE_ACTIVE,
       username__iexact=username,
       is_active=True,
     ).select_related('professional', 'group', 'lead_submission', 'registration_submission')
+
+    if base_records.filter(has_portal_access=False).exists() and not base_records.filter(has_portal_access=True).exists():
+      raise serializers.ValidationError('This client does not have portal access. Ask your professional to grant access.')
+
+    access_records = base_records.filter(has_portal_access=True)
 
     client_access = None
 
@@ -964,7 +1097,12 @@ class ClientLoginSerializer(serializers.Serializer):
         client_access = access_record
         break
 
-      if stored_password == password:
+      # Legacy fallback for any record whose password was never hashed
+      # (every current write path uses make_password(), so this should be
+      # unreachable in practice - kept only so an old plaintext row isn't
+      # a permanent lockout). Constant-time compare to avoid a timing
+      # side-channel on a raw string in the database.
+      if secrets.compare_digest(stored_password, password):
         access_record.temporary_password = make_password(password)
         access_record.must_change_password = False
         access_record.save(update_fields=['temporary_password', 'must_change_password', 'updated_at'])
@@ -1175,6 +1313,9 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
       if upload and getattr(upload, 'content_type', '') != 'application/pdf':
         raise serializers.ValidationError({'file': 'Only PDF uploads are allowed.'})
 
+      if upload and detect_upload_content_type(upload) != 'application/pdf':
+        raise serializers.ValidationError({'file': 'The file content does not match a valid PDF.'})
+
     if reference_type == ProfessionalReference.TYPE_TEXT_NOTE:
       if not attrs.get('description', '').strip():
         raise serializers.ValidationError({'description': 'Text is required.'})
@@ -1189,6 +1330,11 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
       content_type = getattr(upload or file, 'content_type', '')
       if upload and not content_type.startswith('image/'):
         raise serializers.ValidationError({'file': 'Only image uploads are allowed.'})
+
+      if upload:
+        detected_type = detect_upload_content_type(upload)
+        if detected_type is None or not detected_type.startswith('image/'):
+          raise serializers.ValidationError({'file': 'The file content does not match a supported image format.'})
 
     return attrs
 
@@ -1269,7 +1415,16 @@ class TemplateAssignmentSerializer(serializers.ModelSerializer):
 
   class Meta:
     model = TemplateAssignment
-    fields = ['id', 'template_id', 'template_name', 'template_cadence', 'template_accent', 'references', 'assigned_at']
+    fields = [
+      'id',
+      'template_id',
+      'template_name',
+      'template_cadence',
+      'template_accent',
+      'references',
+      'client_access_level',
+      'assigned_at',
+    ]
     read_only_fields = fields
 
 
@@ -1333,6 +1488,9 @@ class ChatMessageSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('Images must be 5MB or smaller.')
     if value.content_type not in CHAT_IMAGE_CONTENT_TYPES:
       raise serializers.ValidationError('Images must be JPEG, PNG, WebP, or GIF.')
+    detected_type = detect_upload_content_type(value)
+    if detected_type is None or detected_type not in CHAT_IMAGE_CONTENT_TYPES:
+      raise serializers.ValidationError('The file content does not match a supported image format.')
     return value
 
   def validate(self, attrs):
@@ -1396,6 +1554,7 @@ class ClientAccessSerializer(serializers.ModelSerializer):
       'last_name',
       'email',
       'username',
+      'has_portal_access',
       'photo',
       'registration_answers',
       'additional_info',
@@ -1520,6 +1679,9 @@ class SupportIncidentCreateSerializer(serializers.Serializer):
     content_type = str(getattr(value, 'content_type', '')).lower()
     if content_type not in ('image/jpeg', 'image/png', 'image/webp'):
       raise serializers.ValidationError('Only PNG, JPEG, and WebP screenshots are supported.')
+    detected_type = detect_upload_content_type(value)
+    if detected_type not in ('image/jpeg', 'image/png', 'image/webp'):
+      raise serializers.ValidationError('The file content does not match a supported image format.')
     return value
 
 
@@ -1565,29 +1727,55 @@ class ClientReminderSerializer(serializers.ModelSerializer):
     return f'{obj.client.first_name} {obj.client.last_name}'.strip() or obj.client.username
 
 
-class CalComConnectionSerializer(serializers.ModelSerializer):
-  """Never exposes api_key back to the client — write-only, and the field
-  itself isn't even included in the read shape (has_api_key is)."""
-
-  has_api_key = serializers.SerializerMethodField()
+class ProfessionalSchedulingSettingsSerializer(serializers.ModelSerializer):
+  """Local, self-contained scheduling configuration — no third-party account
+  required. Replaces the old CalComConnectionSerializer entirely."""
 
   class Meta:
-    model = CalComConnection
-    fields = [
-      'cal_username',
-      'default_event_type_id',
-      'default_event_type_slug',
-      'default_event_type_label',
-      'default_duration_minutes',
-      'timezone',
-      'is_connected',
-      'has_api_key',
-      'updated_at',
-    ]
-    read_only_fields = ['is_connected', 'has_api_key', 'updated_at']
+    model = ProfessionalSchedulingSettings
+    fields = ['timezone', 'default_duration_minutes', 'slot_interval_minutes', 'buffer_minutes', 'updated_at']
+    read_only_fields = ['updated_at']
 
-  def get_has_api_key(self, obj):
-    return bool(obj.api_key)
+  def validate_timezone(self, value):
+    try:
+      ZoneInfo(value)
+    except Exception:
+      raise serializers.ValidationError('That is not a recognized timezone.')
+    return value
+
+  def validate_default_duration_minutes(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Meeting length must be at least 1 minute.')
+    return value
+
+  def validate_slot_interval_minutes(self, value):
+    if value <= 0:
+      raise serializers.ValidationError('Slot interval must be at least 1 minute.')
+    return value
+
+
+class ProfessionalAvailabilityWindowSerializer(serializers.ModelSerializer):
+  """One weekly recurring block of bookable time. A professional can have
+  several rows for the same weekday — that's how multiple separate blocks on
+  one day (e.g. Monday 10-12 and Monday 14-16) are represented — so there is
+  deliberately no uniqueness validation on weekday alone."""
+
+  class Meta:
+    model = ProfessionalAvailabilityWindow
+    fields = ['id', 'weekday', 'start_time', 'end_time', 'is_active', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'created_at', 'updated_at']
+
+  def validate_weekday(self, value):
+    if not (0 <= value <= 6):
+      raise serializers.ValidationError('weekday must be between 0 (Monday) and 6 (Sunday).')
+    return value
+
+  def validate(self, attrs):
+    start_time = attrs.get('start_time', getattr(self.instance, 'start_time', None))
+    end_time = attrs.get('end_time', getattr(self.instance, 'end_time', None))
+    if start_time and end_time and start_time >= end_time:
+      raise serializers.ValidationError({'end_time': 'End time must be after start time.'})
+    return attrs
 
 
 class ScheduledMeetingGuestSerializer(serializers.ModelSerializer):
@@ -1752,6 +1940,9 @@ class ManualPaymentProfileSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('QR code must be a PNG, JPG, or WEBP image.')
     if value.size > PAYMENT_QR_MAX_BYTES:
       raise serializers.ValidationError('QR code image must be under 2MB.')
+    detected_type = detect_upload_content_type(value)
+    if detected_type is None or detected_type != content_type:
+      raise serializers.ValidationError('The file content does not match a supported PNG, JPG, or WEBP image.')
     return value
 
   def validate(self, attrs):
@@ -1947,6 +2138,11 @@ class PaymentProofSubmitSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('Use a JPG, PNG, WEBP, or PDF file.')
     if value.size > PAYMENT_PROOF_MAX_BYTES:
       raise serializers.ValidationError('Proof file must be under 5MB.')
+    detected_type = detect_upload_content_type(value)
+    if detected_type is None or detected_type != content_type:
+      raise serializers.ValidationError(
+        'The file content does not match a supported JPG, PNG, WEBP, or PDF format.'
+      )
     return value
 
   def validate_confirmed_accurate(self, value):
@@ -2034,6 +2230,15 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
 
   def get_payment_method_label(self, obj):
     return obj.payment_method.display_label if obj.payment_method else ''
+
+  def validate_payment_method(self, value):
+    if value is None:
+      return value
+    request = self.context.get('request')
+    professional = getattr(request, 'user', None)
+    if professional is None or value.professional_id != professional.id:
+      raise serializers.ValidationError('Choose a payment method that belongs to your own account.')
+    return value
 
   def get_request_reference(self, obj):
     return obj.payment_request.request_id if obj.payment_request else ''

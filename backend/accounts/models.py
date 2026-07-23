@@ -225,6 +225,7 @@ class ProfessionalLeadForm(models.Model):
   title = models.CharField(max_length=160, default='Professional Lead Form')
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
+  is_mandatory = models.BooleanField(default=True)
   introductory_meeting_enabled = models.BooleanField(default=False)
   introductory_meeting_title = models.CharField(max_length=180, default='15-minute introductory call')
   introductory_meeting_duration_minutes = models.PositiveIntegerField(default=15)
@@ -265,6 +266,7 @@ class ClientRegistrationForm(models.Model):
   public_slug = models.SlugField(max_length=64, unique=True, null=True, blank=True, db_index=True)
   fields = models.JSONField(default=list)
   is_active = models.BooleanField(default=True, db_index=True)
+  is_mandatory = models.BooleanField(default=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -332,7 +334,10 @@ class LeadMeetingRequest(models.Model):
   contact_mobile = models.CharField(max_length=32, blank=True)
   status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
   trainer_note = models.TextField(blank=True)
+  # Holds our own locally-generated calendar UID (see scheduling_engine.generate_meeting_uid),
+  # not a Cal.com booking id — field name kept for backward compatibility with existing rows.
   cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
+  ics_sequence = models.PositiveIntegerField(default=0)
   meeting_url = models.URLField(blank=True)
   expires_at = models.DateTimeField(db_index=True)
   reviewed_at = models.DateTimeField(null=True, blank=True)
@@ -408,8 +413,9 @@ class ClientAccess(models.Model):
   first_name = models.CharField(max_length=150)
   last_name = models.CharField(max_length=150)
   email = models.EmailField()
-  username = models.CharField(max_length=150)
-  temporary_password = models.CharField(max_length=128)
+  username = models.CharField(max_length=150, null=True, blank=True)
+  temporary_password = models.CharField(max_length=128, null=True, blank=True)
+  has_portal_access = models.BooleanField(default=True)
   photo = models.TextField(blank=True)
   registration_answers = models.JSONField(default=dict)
   additional_info = models.JSONField(default=list)
@@ -427,7 +433,7 @@ class ClientAccess(models.Model):
     ordering = ['-created_at']
 
   def __str__(self) -> str:
-    return f'{self.username} for {self.professional.username}'
+    return f'{self.username or "(no portal access)"} for {self.professional.username}'
 
 
 class ClientResetAudit(models.Model):
@@ -637,40 +643,57 @@ class ClientReminder(models.Model):
     return f'{self.title} for {self.client.username} ({self.date})'
 
 
-class CalComConnection(models.Model):
-  """A professional's own Cal.com account, used to book real video meetings
-  with clients from inside RepRoot (as opposed to ClientReminder, which is
-  just a follow-up note with no video/slot-booking component).
+class ProfessionalAvailabilityWindow(models.Model):
+  """One weekly recurring block of time (e.g. "Monday 10:00-12:00") during
+  which a professional is bookable. A professional can have several of these
+  for the same weekday — that's how multiple separate blocks on one day are
+  represented — so there is deliberately no uniqueness constraint on weekday
+  alone."""
 
-  The professional picks a client + an open slot inside RepRoot; we call
-  Cal.com's API on their behalf with the client's name/email as the
-  attendee, so there's no separate public booking link to send out."""
-
-  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cal_com_connection')
-  api_key = models.CharField(max_length=255, blank=True)
-  cal_username = models.CharField(max_length=150, blank=True)
-  default_event_type_id = models.PositiveIntegerField(null=True, blank=True)
-  default_event_type_slug = models.CharField(max_length=150, blank=True)
-  default_event_type_label = models.CharField(max_length=180, blank=True)
-  default_duration_minutes = models.PositiveIntegerField(default=30)
-  timezone = models.CharField(max_length=64, default='UTC')
-  is_connected = models.BooleanField(default=False, db_index=True)
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='availability_windows')
+  weekday = models.PositiveSmallIntegerField(help_text='0=Monday .. 6=Sunday, matching date.weekday().')
+  start_time = models.TimeField()
+  end_time = models.TimeField()
+  is_active = models.BooleanField(default=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'cal_com_connections'
+    db_table = 'professional_availability_windows'
+    ordering = ['weekday', 'start_time']
 
   def __str__(self) -> str:
-    return f'Cal.com connection for {self.professional.username} ({"connected" if self.is_connected else "not connected"})'
+    return f'{self.professional.username} availability: weekday {self.weekday} {self.start_time}-{self.end_time}'
+
+
+class ProfessionalSchedulingSettings(models.Model):
+  """Local, self-contained scheduling configuration for a professional — no
+  third-party account required. Slots are computed from this plus the
+  professional's ProfessionalAvailabilityWindow rows, minus already-booked
+  meetings (see scheduling_engine.compute_available_slots)."""
+
+  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='scheduling_settings')
+  timezone = models.CharField(max_length=64, default='UTC')
+  default_duration_minutes = models.PositiveIntegerField(default=30)
+  slot_interval_minutes = models.PositiveIntegerField(default=30)
+  buffer_minutes = models.PositiveIntegerField(default=15)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'professional_scheduling_settings'
+
+  def __str__(self) -> str:
+    return f'Scheduling settings for {self.professional.username}'
 
 
 class ScheduledMeeting(models.Model):
   """A real, video-enabled meeting between a professional and one client,
-  booked through the professional's own Cal.com account. Distinct from
-  ClientReminder (a simple follow-up note) — both show up together on a
-  client's Schedule tab, but only this one has a join link and lives in
-  Cal.com too."""
+  booked locally inside RepRoot: a free Jitsi Meet room link is generated
+  and a calendar (.ics) invite is emailed to every attendee — no third-party
+  scheduling account required. Distinct from ClientReminder (a simple
+  follow-up note) — both show up together on a client's Schedule tab, but
+  only this one has a join link and a calendar invite."""
 
   STATUS_SCHEDULED = 'scheduled'
   STATUS_CANCELLED = 'cancelled'
@@ -699,7 +722,10 @@ class ScheduledMeeting(models.Model):
   start_at = models.DateTimeField(db_index=True)
   end_at = models.DateTimeField()
   meeting_url = models.URLField(blank=True)
+  # Holds our own locally-generated calendar UID (see scheduling_engine.generate_meeting_uid),
+  # not a Cal.com booking id — field name kept for backward compatibility with existing rows.
   cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
+  ics_sequence = models.PositiveIntegerField(default=0)
   status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, db_index=True)
   cancellation_reason = models.TextField(blank=True)
   client_response_status = models.CharField(max_length=10, choices=RESPONSE_CHOICES, default=RESPONSE_PENDING)
@@ -842,9 +868,22 @@ class TrackingTemplate(models.Model):
 
 
 class TemplateAssignment(models.Model):
+  ACCESS_PRIVATE = 'private'
+  ACCESS_VIEW_ONLY = 'view_only'
+  ACCESS_EDITABLE = 'editable'
+
+  CLIENT_ACCESS_LEVEL_CHOICES = [
+    (ACCESS_PRIVATE, 'Private'),
+    (ACCESS_VIEW_ONLY, 'View only'),
+    (ACCESS_EDITABLE, 'Editable'),
+  ]
+
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='template_assignments')
   template = models.ForeignKey(TrackingTemplate, on_delete=models.CASCADE, related_name='assignments')
   references = models.ManyToManyField(ProfessionalReference, blank=True, related_name='template_assignments')
+  client_access_level = models.CharField(
+    max_length=20, choices=CLIENT_ACCESS_LEVEL_CHOICES, default=ACCESS_EDITABLE
+  )
   assigned_at = models.DateTimeField(auto_now_add=True)
 
   class Meta:

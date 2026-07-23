@@ -5,42 +5,110 @@
   activeSection="schedule"
   titleId="schedule-title">
 
-  @if (connection?.is_connected) {
+  <button page-actions type="button" class="ghost-action" (click)="toggleAvailabilityPanel()">
+    {{ showAvailabilityPanel ? 'Hide availability' : 'Manage availability' }}
+  </button>
+  @if (hasAvailability) {
     <button page-actions type="button" class="primary-action" (click)="openScheduleForm()">Schedule Meeting</button>
   }
 
   @if (isLoading) {
     <p class="state-note">Loading...</p>
-  } @else if (!connection?.is_connected) {
-    <section class="connect-panel">
-      <h2>Connect Cal.com</h2>
-      <p class="section-note">
-        Link your Cal.com account so you can pick a client and an open time slot right here, and RepRoot books the
-        real meeting (with a video link) on your behalf.
-      </p>
-      <div class="form-grid">
-        <label>
-          <span class="field-label">Cal.com API key</span>
-          <input type="password" [(ngModel)]="connectForm.api_key" placeholder="cal_live_...">
-        </label>
-        <label>
-          <span class="field-label">Cal.com username</span>
-          <input type="text" [(ngModel)]="connectForm.cal_username" placeholder="your-username">
-        </label>
-      </div>
-      <button type="button" class="primary-action" [disabled]="isConnecting || !connectForm.api_key.trim() || !connectForm.cal_username.trim()" (click)="connectCalCom()">
-        {{ isConnecting ? 'Connecting...' : 'Connect' }}
-      </button>
-    </section>
   } @else {
-    @if (eventTypes.length > 1) {
-      <section class="event-type-picker">
-        <span class="field-label">Default meeting type</span>
-        <select [ngModel]="connection?.default_event_type_id" (ngModelChange)="setDefaultEventType($event)">
-          @for (type of eventTypes; track type.id) {
-            <option [ngValue]="type.id">{{ type.title }} ({{ type.lengthInMinutes }} min)</option>
+    @if (!hasAvailability && !showAvailabilityPanel) {
+      <section class="connect-panel">
+        <h2>Set your weekly availability</h2>
+        <p class="section-note">
+          No third-party account or API key needed — set the hours you're bookable each week and RepRoot computes
+          open slots itself, generates a free video link, and emails a calendar invite automatically.
+        </p>
+        <button type="button" class="primary-action" (click)="toggleAvailabilityPanel()">Set availability</button>
+      </section>
+    }
+
+    @if (showAvailabilityPanel) {
+      <section class="connect-panel availability-panel">
+        <h2>Weekly availability</h2>
+        <p class="section-note">
+          Add the blocks of time you're bookable. You can add more than one block on the same day
+          (e.g. Monday 10:00–12:00 and Monday 14:00–16:00).
+        </p>
+
+        <div class="availability-list">
+          @for (weekday of [0, 1, 2, 3, 4, 5, 6]; track weekday) {
+            <div class="availability-day-row">
+              <span class="weekday-tag">{{ weekdayLabels[weekday] }}</span>
+              <div class="availability-blocks">
+                @for (window of windowsForWeekday(weekday); track window.id) {
+                  <span class="availability-block">
+                    {{ window.start_time.slice(0, 5) }}–{{ window.end_time.slice(0, 5) }}
+                    <button type="button" class="remove-block" (click)="removeAvailabilityWindow(window)" aria-label="Remove this block">&times;</button>
+                  </span>
+                } @empty {
+                  <span class="empty-note">No availability</span>
+                }
+              </div>
+            </div>
           }
-        </select>
+        </div>
+
+        <div class="add-window-row">
+          <label>
+            <span class="field-label">Day</span>
+            <select [(ngModel)]="newWindow.weekday">
+              @for (weekday of [0, 1, 2, 3, 4, 5, 6]; track weekday) {
+                <option [ngValue]="weekday">{{ weekdayLabels[weekday] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Start</span>
+            <input type="time" [(ngModel)]="newWindow.start_time">
+          </label>
+          <label>
+            <span class="field-label">End</span>
+            <input type="time" [(ngModel)]="newWindow.end_time">
+          </label>
+          <button type="button" class="primary-action" [disabled]="isSavingWindow" (click)="addAvailabilityWindow()">
+            {{ isSavingWindow ? 'Adding...' : 'Add block' }}
+          </button>
+        </div>
+
+        <h2 class="settings-heading">Meeting defaults</h2>
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Timezone</span>
+            <input
+              type="text"
+              [(ngModel)]="settingsForm.timezone"
+              list="timezoneOptions"
+              placeholder="Search for a timezone, e.g. Asia/Kolkata"
+              autocomplete="off"
+            >
+            <datalist id="timezoneOptions">
+              @for (zone of timezoneOptions; track zone) {
+                <option [value]="zone"></option>
+              }
+            </datalist>
+            <small>Detected automatically from your device the first time you opened this page. You can change it any time — it only affects how meeting times are computed and displayed.</small>
+          </label>
+          <label>
+            <span class="field-label">Default meeting length (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="settingsForm.default_duration_minutes">
+          </label>
+          <label>
+            <span class="field-label">Slot interval (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="settingsForm.slot_interval_minutes">
+          </label>
+          <label>
+            <span class="field-label">Buffer between meetings (minutes)</span>
+            <input type="number" min="0" step="5" [(ngModel)]="settingsForm.buffer_minutes">
+          </label>
+        </div>
+        <button type="button" class="primary-action" [disabled]="isSavingSettings" (click)="saveSchedulingSettings()">
+          {{ isSavingSettings ? 'Saving...' : 'Save meeting defaults' }}
+        </button>
       </section>
     }
 
@@ -188,7 +256,7 @@
   }
 
   @if (message) {
-    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    <p #messageBanner class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
   }
 
   @if (showScheduleForm) {
@@ -244,16 +312,10 @@
         </div>
 
         <div class="form-grid">
-          @if (eventTypes.length > 1) {
-            <label>
-              <span class="field-label">Meeting type</span>
-              <select [(ngModel)]="scheduleForm.event_type_id" (ngModelChange)="loadSlots()">
-                @for (type of eventTypes; track type.id) {
-                  <option [ngValue]="type.id">{{ type.title }} ({{ type.lengthInMinutes }} min)</option>
-                }
-              </select>
-            </label>
-          }
+          <label>
+            <span class="field-label">Duration (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="scheduleForm.duration_minutes" (ngModelChange)="loadSlots()">
+          </label>
 
           <label>
             <span class="field-label">Title</span>

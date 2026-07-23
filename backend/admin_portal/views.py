@@ -395,6 +395,13 @@ class AdminTeamView(APIView):
       authority_level = min(authority_level, request.admin_staff.authority_level - 1)
       if role and role.slug == 'super-admin':
         return Response({'message': 'Only the Owner can create Super Admin access.'}, status=403)
+      if role:
+        role_permissions = set(role.permission_links.filter(allowed=True).values_list('permission__code', flat=True))
+        actor_permissions = set(permission_codes_for(request.admin_staff))
+        if not role_permissions.issubset(actor_permissions):
+          return Response(
+            {'message': 'You cannot assign a role that has permissions beyond your own.'}, status=403
+          )
     if not username or not email or len(password) < 10 or not role or User.objects.filter(Q(username__iexact=username) | Q(email__iexact=email)).exists():
       return Response({'message': 'Unique username/email, role and a password of at least 10 characters are required.'}, status=400)
     user = User.objects.create_user(username=username.lower(), email=email.lower(), password=password, first_name=str(request.data.get('first_name', ''))[:150], last_name=str(request.data.get('last_name', ''))[:150], is_staff=True)
@@ -408,10 +415,22 @@ class AdminTeamView(APIView):
 
   @staticmethod
   def save_overrides(member, selected, actor):
-    if selected is None:
-      return
-    selected = set(selected) & set(permission_codes_for(actor))
     role_permissions = set(member.role.permission_links.filter(allowed=True).values_list('permission__code', flat=True))
+    actor_permissions = None if actor.is_owner else set(permission_codes_for(actor))
+
+    if selected is not None:
+      selected = set(selected)
+      if actor_permissions is not None:
+        selected &= actor_permissions
+    elif actor_permissions is not None:
+      # No explicit override selection was supplied. A non-owner actor must
+      # never be able to hand out permissions - via the role alone - that
+      # they don't hold themselves, so cap the effective set here too rather
+      # than relying solely on the upfront role-assignment check above.
+      selected = role_permissions & actor_permissions
+    else:
+      return
+
     member.permission_overrides.all().delete()
     for permission in AdminPermission.objects.all():
       allowed = permission.code in selected
@@ -435,8 +454,15 @@ class AdminTeamMemberView(APIView):
     if member.pk == request.admin_staff.pk and request.data.get('status') == AdminStaffProfile.STATUS_DISABLED:
       return Response({'message': 'You cannot disable your own account.'}, status=400)
     role = AdminRole.objects.filter(slug=request.data.get('role_slug', member.role.slug)).first()
-    if not request.admin_staff.is_owner and role and role.slug == 'super-admin':
-      return Response({'message': 'Only the Owner can assign Super Admin access.'}, status=403)
+    if not request.admin_staff.is_owner and role:
+      if role.slug == 'super-admin':
+        return Response({'message': 'Only the Owner can assign Super Admin access.'}, status=403)
+      role_permissions = set(role.permission_links.filter(allowed=True).values_list('permission__code', flat=True))
+      actor_permissions = set(permission_codes_for(request.admin_staff))
+      if not role_permissions.issubset(actor_permissions):
+        return Response(
+          {'message': 'You cannot assign a role that has permissions beyond your own.'}, status=403
+        )
     if role:
       member.role = role
     if request.data.get('status') in dict(AdminStaffProfile.STATUS_CHOICES):

@@ -10,36 +10,41 @@ declare global {
   }
 }
 
-export interface CalComConnectionRecord {
-  cal_username: string;
-  default_event_type_id: number | null;
-  default_event_type_slug: string;
-  default_event_type_label: string;
-  default_duration_minutes: number;
+/** Local, self-contained scheduling configuration — no third-party account or
+ * API key needed. Slots are computed purely from this plus the trainer's own
+ * availability windows and existing bookings. */
+export interface SchedulingSettingsRecord {
   timezone: string;
-  is_connected: boolean;
-  has_api_key: boolean;
+  default_duration_minutes: number;
+  slot_interval_minutes: number;
+  buffer_minutes: number;
   updated_at: string;
 }
 
-export interface CalComEventType {
+/** One weekly recurring block of bookable time, e.g. "Monday 10:00-12:00".
+ * A trainer can have several windows for the same weekday — that's how
+ * multiple separate blocks on one day (e.g. Monday 10-12 AND Monday 14-16)
+ * are represented. */
+export interface AvailabilityWindowRecord {
   id: number;
-  slug: string;
-  title: string;
-  lengthInMinutes: number;
+  weekday: number; // 0=Monday .. 6=Sunday
+  start_time: string; // "HH:MM" or "HH:MM:SS"
+  end_time: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface CalComConnectionResponse {
-  connection: CalComConnectionRecord;
-  event_types?: CalComEventType[];
-  message?: string;
+export interface SchedulingSettingsResponse {
+  settings: SchedulingSettingsRecord;
+  availability_windows: AvailabilityWindowRecord[];
 }
 
-export interface CalComSlotEntry {
+export interface SlotEntry {
   start: string;
 }
 
-export type CalComSlotsByDate = Record<string, CalComSlotEntry[]>;
+export type SlotsByDate = Record<string, SlotEntry[]>;
 
 export type MeetingStatus = 'scheduled' | 'cancelled' | 'completed';
 export type MeetingResponseStatus = 'pending' | 'accepted' | 'declined';
@@ -88,9 +93,9 @@ export interface LeadFormMeetingRecord {
 export interface CreateMeetingPayload {
   client: number;
   start: string;
+  duration_minutes?: number;
   title?: string;
   notes?: string;
-  event_type_id?: number;
   guest_client_ids?: number[];
 }
 
@@ -100,36 +105,58 @@ export class SchedulingApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getConnection(): Observable<CalComConnectionResponse> {
-    return this.http.get<CalComConnectionResponse>(`${this.apiBaseUrl}/professional/scheduling/connection/`, {
+  // --- Scheduling settings + weekly availability -------------------------
+
+  getSchedulingSettings(): Observable<SchedulingSettingsResponse> {
+    return this.http.get<SchedulingSettingsResponse>(`${this.apiBaseUrl}/professional/scheduling/settings/`, {
       headers: this.getProfessionalAuthHeaders()
     });
   }
 
-  saveConnection(payload: {
-    api_key?: string;
-    cal_username?: string;
-    default_event_type_id?: number;
-    timezone?: string;
-  }): Observable<CalComConnectionResponse> {
-    return this.http.put<CalComConnectionResponse>(
-      `${this.apiBaseUrl}/professional/scheduling/connection/`,
+  saveSchedulingSettings(payload: Partial<SchedulingSettingsRecord>): Observable<{ settings: SchedulingSettingsRecord; message: string }> {
+    return this.http.put<{ settings: SchedulingSettingsRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/settings/`,
       payload,
       { headers: this.getProfessionalAuthHeaders() }
     );
   }
 
-  getEventTypes(): Observable<{ event_types: CalComEventType[] }> {
-    return this.http.get<{ event_types: CalComEventType[] }>(`${this.apiBaseUrl}/professional/scheduling/event-types/`, {
-      headers: this.getProfessionalAuthHeaders()
-    });
+  listAvailabilityWindows(): Observable<{ availability_windows: AvailabilityWindowRecord[] }> {
+    return this.http.get<{ availability_windows: AvailabilityWindowRecord[] }>(
+      `${this.apiBaseUrl}/professional/scheduling/availability-windows/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
   }
 
-  getSlots(start: string, end: string, eventTypeId?: number, timeZone?: string): Observable<{ slots: CalComSlotsByDate }> {
+  addAvailabilityWindow(payload: { weekday: number; start_time: string; end_time: string }): Observable<{ availability_window: AvailabilityWindowRecord; message: string }> {
+    return this.http.post<{ availability_window: AvailabilityWindowRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/availability-windows/`,
+      payload,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  updateAvailabilityWindow(windowId: number, payload: Partial<{ weekday: number; start_time: string; end_time: string; is_active: boolean }>): Observable<{ availability_window: AvailabilityWindowRecord; message: string }> {
+    return this.http.put<{ availability_window: AvailabilityWindowRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/availability-windows/${windowId}/`,
+      payload,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  deleteAvailabilityWindow(windowId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/availability-windows/${windowId}/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  // --- Slots + meetings ---------------------------------------------------
+
+  getSlots(start: string, end: string, durationMinutes?: number): Observable<{ slots: SlotsByDate; timezone: string }> {
     const params: Record<string, string> = { start, end };
-    if (eventTypeId) params['event_type_id'] = String(eventTypeId);
-    if (timeZone) params['timezone'] = timeZone;
-    return this.http.get<{ slots: CalComSlotsByDate }>(`${this.apiBaseUrl}/professional/scheduling/slots/`, {
+    if (durationMinutes) params['duration_minutes'] = String(durationMinutes);
+    return this.http.get<{ slots: SlotsByDate; timezone: string }>(`${this.apiBaseUrl}/professional/scheduling/slots/`, {
       headers: this.getProfessionalAuthHeaders(),
       params
     });

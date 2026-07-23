@@ -12,7 +12,6 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils import timezone
@@ -20,6 +19,7 @@ from rest_framework.authtoken.models import Token
 
 from accounts.models import ClientAuthToken, ProfessionalProfile, RecycledProfessionalAccount
 from accounts.data_usage import calculate_professional_data_usage
+from accounts.email_utils import send_mail_background as send_mail
 
 User = get_user_model()
 

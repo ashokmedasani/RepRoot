@@ -229,6 +229,42 @@ h3 {
   right: 1rem;
 }
 
+.lead-form-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.nested-meeting-settings {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--app-border);
+  margin-top: 0.3rem;
+  padding-top: 1.1rem;
+}
+
+.form-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--app-text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form-toggle input {
+  width: 1.15rem;
+  min-height: 1.15rem;
+  accent-color: var(--app-primary);
+  cursor: pointer;
+}
+
+.form-toggle.is-off {
+  color: var(--app-muted);
+}
+
 .status-pill {
   border-radius: 999px;
   padding: 0.32rem 0.6rem;
@@ -377,10 +413,6 @@ tr:last-child td {
   padding: 0 0.85rem;
   font-weight: 700;
   text-decoration: none;
-}
-
-.group-create-action {
-  background: var(--app-success);
 }
 
 .icon-action {

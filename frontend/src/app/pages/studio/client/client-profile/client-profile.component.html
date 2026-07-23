@@ -408,6 +408,10 @@
 
             @if (templateTab === 'data-entry') {
               <section class="portal-card">
+                @if (!isTemplateEditable(template)) {
+                  <p class="view-only-note">This template is view-only. Your professional logs entries here; you can review them below.</p>
+                }
+                @if (isTemplateEditable(template)) {
                 <form class="entry-form" (ngSubmit)="submitEntry(template)">
                   <div class="datetime-fields">
                     <label class="date-field">
@@ -488,6 +492,7 @@
                     <button type="button" class="ghost-action" (click)="clearEntryForm(template)">Clear Form</button>
                   </div>
                 </form>
+                }
 
                 <div class="recent-entries">
                   <h3>Recent Entries <span class="total-count">{{ entryCountFor(template) }} total</span></h3>
@@ -498,7 +503,7 @@
                         <span class="entry-time">{{ entry.entry_time || '--:--' }}</span>
                         <p>{{ answerSummary(entry) }}</p>
                         <button type="button" class="entry-edit-btn">View</button>
-                        @if (isEntryEditable(entry)) {
+                        @if (isTemplateEditable(template) && isEntryEditable(entry)) {
                           <button type="button" class="entry-edit-btn" (click)="startEntryEdit(template, entry)">Edit</button>
                         } @else if (entry.edited_by_professional) {
                           <small>Adjusted by professional</small>

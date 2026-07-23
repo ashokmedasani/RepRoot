@@ -87,8 +87,13 @@
                 </td>
                 <td>{{ client.email }}</td>
                 <td>{{ client.group_name }}</td>
-                <td>{{ client.username }}</td>
-                <td><span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span></td>
+                <td>{{ client.username || '—' }}</td>
+                <td>
+                  <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
+                  @if (!client.has_portal_access) {
+                    <span class="status-pill muted">No portal access</span>
+                  }
+                </td>
                 <td>{{ client.created_at | date: 'mediumDate' }}</td>
                 <td>
                   <a [routerLink]="['/professional/clients', client.id]" class="ghost-action compact">Open</a>
