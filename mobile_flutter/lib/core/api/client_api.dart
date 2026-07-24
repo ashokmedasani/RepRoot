@@ -282,11 +282,11 @@ class ClientApi {
     });
   }
 
-  Future<NotificationInbox> getNotifications({int limit = 50}) =>
+  Future<NotificationInbox> getNotifications({int limit = 50, String? category}) =>
       runApi(() async {
         final res = await _dio.get<Map<String, dynamic>>(
           '/client/notifications/',
-          queryParameters: {'limit': limit},
+          queryParameters: {'limit': limit, 'category': ?category},
           options: _auth,
         );
         return NotificationInbox.fromJson(res.data ?? {});
@@ -298,6 +298,42 @@ class ClientApi {
       options: _auth,
     );
   });
+
+  Future<List<NotificationPreferenceRow>> getNotificationPreferences() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/client/notification-preferences/',
+        options: _auth,
+      );
+      return (res.data?['categories'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(NotificationPreferenceRow.fromJson)
+          .toList();
+    });
+  }
+
+  Future<NotificationPreferenceRow> updateNotificationPreference(
+    String category, {
+    bool? inAppEnabled,
+    bool? emailEnabled,
+    bool? pushEnabled,
+    String? digestFrequency,
+  }) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/client/notification-preferences/',
+        data: {
+          'category': category,
+          'in_app_enabled': ?inAppEnabled,
+          'email_enabled': ?emailEnabled,
+          'push_enabled': ?pushEnabled,
+          'digest_frequency': ?digestFrequency,
+        },
+        options: _auth,
+      );
+      return NotificationPreferenceRow.fromJson(res.data ?? {});
+    });
+  }
   Future<List<ClientMeetingRecord>> getMeetings() => runApi(() async {
     final res = await _dio.get<Map<String, dynamic>>(
       '/client/scheduling/meetings/',

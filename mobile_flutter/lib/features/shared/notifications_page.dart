@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/api/client_api.dart';
 import '../../core/api/models/notification_models.dart';
 import '../../core/api/professional_auth_api.dart';
@@ -15,6 +17,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   NotificationInbox? inbox;
   String error = '';
   bool loading = true;
+  String? category;
+
   @override
   void initState() {
     super.initState();
@@ -28,8 +32,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     });
     try {
       final value = widget.professional
-          ? await ref.read(professionalAuthApiProvider).getNotifications()
-          : await ref.read(clientApiProvider).getNotifications();
+          ? await ref.read(professionalAuthApiProvider).getNotifications(category: category)
+          : await ref.read(clientApiProvider).getNotifications(category: category);
       if (mounted) {
         setState(() {
           inbox = value;
@@ -70,43 +74,102 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Notifications'),
-      actions: [TextButton(onPressed: readAll, child: const Text('Read all'))],
+      actions: [
+        IconButton(
+          onPressed: () => context.push(
+            widget.professional
+                ? '/professional/tabs/more/notifications/preferences'
+                : '/client/tabs/more/notifications/preferences',
+          ),
+          icon: const Icon(Icons.tune),
+          tooltip: 'Preferences',
+        ),
+        TextButton(onPressed: readAll, child: const Text('Read all')),
+      ],
     ),
-    body: RefreshIndicator(
-      onRefresh: load,
-      child: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error.isNotEmpty
-          ? ListView(
-              children: [
-                Padding(padding: const EdgeInsets.all(24), child: Text(error)),
-              ],
-            )
-          : ListView.separated(
-              itemCount: inbox?.notifications.length ?? 0,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = inbox!.notifications[index];
-                return ListTile(
-                  onTap: () => read(item),
-                  leading: Icon(
-                    item.isRead
-                        ? Icons.notifications_none
-                        : Icons.notifications_active,
+    body: Column(
+      children: [
+        SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: const Text('All'),
+                  selected: category == null,
+                  onSelected: (_) {
+                    setState(() => category = null);
+                    load();
+                  },
+                ),
+              ),
+              for (final c in NotificationCategory.all)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(NotificationCategory.label(c)),
+                    selected: category == c,
+                    onSelected: (_) {
+                      setState(() => category = c);
+                      load();
+                    },
                   ),
-                  title: Text(
-                    item.title,
-                    style: TextStyle(
-                      fontWeight: item.isRead
-                          ? FontWeight.w500
-                          : FontWeight.w800,
-                    ),
+                ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: load,
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : error.isNotEmpty
+                ? ListView(
+                    children: [
+                      Padding(padding: const EdgeInsets.all(24), child: Text(error)),
+                    ],
+                  )
+                : (inbox?.notifications.isEmpty ?? true)
+                ? ListView(
+                    children: const [
+                      Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('No notifications here.'),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                    itemCount: inbox?.notifications.length ?? 0,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = inbox!.notifications[index];
+                      return ListTile(
+                        onTap: () => read(item),
+                        leading: Icon(
+                          item.isRead
+                              ? Icons.notifications_none
+                              : Icons.notifications_active,
+                        ),
+                        title: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontWeight: item.isRead
+                                ? FontWeight.w500
+                                : FontWeight.w800,
+                          ),
+                        ),
+                        subtitle: Text(item.body),
+                        trailing: Text(NotificationCategory.label(item.category)),
+                      );
+                    },
                   ),
-                  subtitle: Text(item.body),
-                  trailing: Text(item.category),
-                );
-              },
-            ),
+          ),
+        ),
+      ],
     ),
   );
 }

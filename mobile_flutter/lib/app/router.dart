@@ -10,15 +10,18 @@ import '../features/client/client_change_password_page.dart';
 import '../features/client/client_dashboard_page.dart';
 import '../features/client/client_more_page.dart';
 import '../features/client/client_meetings_page.dart';
+import '../features/client/client_payments_page.dart';
 import '../features/client/client_programs_page.dart';
 import '../features/client/client_settings_page.dart';
 import '../features/client/client_tabs_shell.dart';
 import '../features/client/client_template_resources_page.dart';
 import '../features/client/client_professional_page.dart';
 import '../features/support/support_incidents_page.dart';
+import '../features/shared/notification_preferences_page.dart';
 import '../features/shared/notifications_page.dart';
 import '../features/professional/professional_client_create_page.dart';
 import '../features/professional/professional_client_detail_page.dart';
+import '../features/professional/professional_client_payments_page.dart';
 import '../features/professional/professional_client_template_page.dart';
 import '../features/professional/professional_clients_page.dart';
 import '../features/professional/professional_dashboard_page.dart';
@@ -26,6 +29,7 @@ import '../features/professional/professional_forms_groups_page.dart';
 import '../features/professional/professional_group_detail_page.dart';
 import '../features/professional/professional_manage_page.dart';
 import '../features/professional/professional_more_page.dart';
+import '../features/professional/professional_payments_page.dart';
 import '../features/professional/professional_profile_page.dart';
 import '../features/professional/professional_references_page.dart';
 import '../features/professional/professional_schedule_page.dart';
@@ -56,6 +60,7 @@ class Routes {
   static const professionalTemplates = '/professional/tabs/manage/templates';
   static const professionalReferences = '/professional/tabs/manage/references';
   static const professionalSchedule = '/professional/tabs/manage/schedule';
+  static const professionalPayments = '/professional/tabs/manage/payments';
   static const professionalProfile = '/professional/tabs/more/profile';
   static const professionalSettings = '/professional/tabs/more/settings';
   static const professionalSupport = '/professional/tabs/more/support';
@@ -74,6 +79,7 @@ class Routes {
   static const clientSupport = '/client/tabs/more/support';
   static const clientNotifications = '/client/tabs/more/notifications';
   static const clientMeetings = '/client/tabs/more/meetings';
+  static const clientPayments = '/client/tabs/more/payments';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -154,6 +160,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) =>
                         const ProfessionalSchedulePage(),
                   ),
+                  GoRoute(
+                    path: 'payments',
+                    builder: (context, state) =>
+                        const ProfessionalPaymentsPage(),
+                  ),
                 ],
               ),
             ],
@@ -195,6 +206,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                                   0,
                             ),
                       ),
+                      GoRoute(
+                        path: 'payments',
+                        builder: (context, state) =>
+                            ProfessionalClientPaymentsPage(
+                              clientId:
+                                  int.tryParse(
+                                    state.pathParameters['clientId'] ?? '',
+                                  ) ??
+                                  0,
+                              clientName:
+                                  state.uri.queryParameters['name'] ?? 'Client',
+                            ),
+                      ),
                     ],
                   ),
                 ],
@@ -227,6 +251,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'notifications',
                     builder: (context, state) =>
                         const NotificationsPage(professional: true),
+                    routes: [
+                      GoRoute(
+                        path: 'preferences',
+                        builder: (context, state) =>
+                            const NotificationPreferencesPage(professional: true),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -297,10 +328,29 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'notifications',
                     builder: (context, state) =>
                         const NotificationsPage(professional: false),
+                    routes: [
+                      GoRoute(
+                        path: 'preferences',
+                        builder: (context, state) =>
+                            const NotificationPreferencesPage(professional: false),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'meetings',
                     builder: (context, state) => const ClientMeetingsPage(),
+                  ),
+                  GoRoute(
+                    path: 'payments',
+                    builder: (context, state) => const ClientPaymentsPage(),
+                    routes: [
+                      GoRoute(
+                        path: ':requestId',
+                        builder: (context, state) => ClientPaymentRequestDetailPage(
+                          requestId: state.pathParameters['requestId'] ?? '',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

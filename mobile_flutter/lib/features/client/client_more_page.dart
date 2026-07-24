@@ -156,6 +156,11 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
                 onTap: () => context.go(Routes.clientMeetings),
               ),
               _MenuItem(
+                icon: Icons.payments_outlined,
+                label: 'Payments',
+                onTap: () => context.go(Routes.clientPayments),
+              ),
+              _MenuItem(
                 icon: Icons.notifications_outlined,
                 label: 'Notifications',
                 onTap: () => context.go(Routes.clientNotifications),

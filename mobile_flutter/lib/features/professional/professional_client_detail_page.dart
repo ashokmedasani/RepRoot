@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
@@ -11,7 +16,9 @@ import '../../core/api/chat_api.dart';
 import '../../core/api/forms_groups_api.dart';
 import '../../core/api/models/client_models.dart';
 import '../../core/api/models/forms_groups_models.dart';
+import '../../core/api/models/scheduling_models.dart';
 import '../../core/api/models/template_models.dart';
+import '../../core/api/scheduling_api.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
@@ -44,6 +51,7 @@ class _ProfessionalClientDetailPageState
   List<TemplateAssignmentRecord> _assignments = [];
   List<TrackingTemplateRecord> _allTemplates = [];
   List<ChatMessageRecord> _chatMessages = [];
+  List<ScheduledMeetingRecord> _meetings = [];
 
   final _chatDraft = TextEditingController();
   final _chatScroll = ScrollController();
@@ -61,6 +69,13 @@ class _ProfessionalClientDetailPageState
   bool _showReminderForm = false;
   DateTime? _reminderDate;
   TimeOfDay? _reminderTime;
+
+  bool _isSavingClientInfo = false;
+  bool _isSavingAdditional = false;
+  bool _isUploadingPhoto = false;
+  bool _isExportingClient = false;
+  bool _isResettingClient = false;
+  bool _isDeletingClient = false;
 
   Timer? _chatPoll;
   Timer? _unreadPoll;
@@ -176,6 +191,16 @@ class _ProfessionalClientDetailPageState
           if (mounted) setState(() => _allTemplates = []);
         }
       }(),
+      () async {
+        try {
+          final response = await ref
+              .read(schedulingApiProvider)
+              .getMeetings(clientId: widget.clientId);
+          if (mounted) setState(() => _meetings = response.meetings);
+        } catch (_) {
+          if (mounted) setState(() => _meetings = []);
+        }
+      }(),
       _loadChat(),
     ]);
 
@@ -277,6 +302,21 @@ class _ProfessionalClientDetailPageState
     }
   }
 
+  Future<void> _setAccessLevel(TemplateAssignmentRecord assignment, String level) async {
+    if (assignment.clientAccessLevel == level) return;
+    try {
+      final updated = await ref
+          .read(templatesApiProvider)
+          .updateAssignmentAccessLevel(widget.clientId, assignment.id, level);
+      if (!mounted) return;
+      setState(() => _assignments =
+          _assignments.map((a) => a.id == assignment.id ? updated : a).toList());
+      _toast('Client access updated.');
+    } catch (_) {
+      _toast('Could not update access level.');
+    }
+  }
+
   Future<void> _unassign(TemplateAssignmentRecord assignment) async {
     final confirmed = await _confirm(
       title: 'Remove ${assignment.templateName}?',
@@ -358,6 +398,90 @@ class _ProfessionalClientDetailPageState
       });
     } catch (_) {
       _toast('Could not save the schedule.');
+    }
+  }
+
+  Future<void> _scheduleMeeting() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time == null || !mounted) return;
+    final notesCtrl = TextEditingController();
+    final titleCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Schedule meeting'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Title (optional)'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: notesCtrl,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Notes (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            child: const Text('Schedule'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      titleCtrl.dispose();
+      notesCtrl.dispose();
+      return;
+    }
+    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    try {
+      final meeting = await ref.read(schedulingApiProvider).createMeeting(
+            client: widget.clientId,
+            start: start.toIso8601String(),
+            title: titleCtrl.text.trim(),
+            notes: notesCtrl.text.trim(),
+          );
+      if (mounted) setState(() => _meetings = [..._meetings, meeting]);
+      _toast('Meeting scheduled.');
+    } on ApiException catch (error) {
+      _toast(error.message);
+    } catch (_) {
+      _toast('Could not schedule the meeting.');
+    }
+    titleCtrl.dispose();
+    notesCtrl.dispose();
+  }
+
+  Future<void> _cancelMeeting(ScheduledMeetingRecord meeting) async {
+    final confirmed = await _confirm(
+      title: 'Cancel this meeting?',
+      body: 'The client will be notified.',
+      confirmLabel: 'Cancel meeting',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    try {
+      final updated = await ref.read(schedulingApiProvider).cancelMeeting(meeting.id);
+      if (!mounted) return;
+      setState(() =>
+          _meetings = _meetings.map((m) => m.id == meeting.id ? updated : m).toList());
+    } catch (_) {
+      _toast('Could not cancel the meeting.');
     }
   }
 
@@ -453,39 +577,483 @@ class _ProfessionalClientDetailPageState
     }
   }
 
+  /// The phrase the professional must type back exactly, matching the web's
+  /// destructive-action verification (client username, or reference ID for
+  /// info-only clients with no login).
+  String get _expectedConfirmation {
+    final client = _client;
+    if (client == null) return '';
+    return client.username.isNotEmpty ? client.username : client.referenceId;
+  }
+
   Future<void> _resetClient() async {
-    final confirmed = await _confirm(
-      title: 'Reset client data?',
-      body: "This clears the client's tracking history. Their account and "
-          'profile stay.',
-      confirmLabel: 'Reset data',
-      destructive: true,
+    final client = _client;
+    if (client == null || _isResettingClient) return;
+    final verification = await _verifyDangerousAction(
+      title: 'Clear client history',
+      impact:
+          'Assignments, entries, chat, schedules, progress, additional '
+          'information, and professional notes will be cleared. Identity and '
+          'registration details remain. This is unrelated to their login '
+          'password.',
+      confirmLabel: 'Clear client history',
     );
-    if (!confirmed) return;
+    if (verification == null) return;
+    setState(() => _isResettingClient = true);
     try {
-      await ref.read(formsGroupsApiProvider).resetClient(widget.clientId);
-      _toast('Client data reset.');
+      final updated = await ref.read(formsGroupsApiProvider).resetClient(
+            widget.clientId,
+            currentPassword: verification.password,
+            confirmation: verification.confirmation,
+            reason: verification.reason,
+          );
+      if (!mounted) return;
+      setState(() {
+        _client = updated;
+        _notes.clear();
+        _isResettingClient = false;
+      });
+      _toast('Client history cleared.');
       await _load();
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _isResettingClient = false);
+      _toast(error.message);
     } catch (_) {
-      _toast('Could not reset the client.');
+      if (mounted) setState(() => _isResettingClient = false);
+      _toast('Could not clear the client history.');
     }
   }
 
   Future<void> _deleteClient() async {
-    final name = _client?.displayName ?? 'This client';
+    final client = _client;
+    if (client == null || _isDeletingClient) return;
+    final verification = await _verifyDangerousAction(
+      title: 'Move account to Recycle Bin',
+      impact:
+          'Login access stops immediately. The bundled client account can be '
+          'restored from the Recycle Bin during its retention period.',
+      confirmLabel: 'Move to Recycle Bin',
+    );
+    if (verification == null) return;
+    setState(() => _isDeletingClient = true);
+    try {
+      await ref.read(formsGroupsApiProvider).deleteClient(
+            widget.clientId,
+            currentPassword: verification.password,
+            confirmation: verification.confirmation,
+            reason: verification.reason,
+          );
+      if (mounted) context.go(Routes.professionalClients);
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _isDeletingClient = false);
+      _toast(error.message);
+    } catch (_) {
+      if (mounted) setState(() => _isDeletingClient = false);
+      _toast('Could not delete the client.');
+    }
+  }
+
+  Future<void> _exportClientData() async {
+    if (_isExportingClient) return;
+    setState(() => _isExportingClient = true);
+    try {
+      final bytes =
+          await ref.read(formsGroupsApiProvider).exportClientData(widget.clientId);
+      final refId = _client?.referenceId ?? widget.clientId.toString();
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/reproot-$refId-export.zip');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'application/zip')],
+          subject: 'RepRoot client data export',
+        ),
+      );
+    } on ApiException catch (error) {
+      _toast(error.message);
+    } catch (_) {
+      _toast('Client data export could not be created.');
+    }
+    if (mounted) setState(() => _isExportingClient = false);
+  }
+
+  /// Shared verification form for the two destructive actions: current
+  /// password + typed confirmation phrase + a reason. Returns null if the
+  /// professional cancels or the fields don't validate.
+  Future<({String password, String confirmation, String reason})?>
+      _verifyDangerousAction({
+    required String title,
+    required String impact,
+    required String confirmLabel,
+  }) async {
+    final expected = _expectedConfirmation;
+    final passwordCtrl = TextEditingController();
+    final confirmationCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    String? error;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(impact, style: context.text.bodySmall),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: passwordCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Your current password',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: confirmationCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Type $expected to confirm',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Reason'),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(error!, style: TextStyle(color: context.colors.error)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (passwordCtrl.text.isEmpty ||
+                    confirmationCtrl.text.trim() != expected ||
+                    reasonCtrl.text.trim().isEmpty) {
+                  setDialogState(() => error =
+                      'Enter your password, type $expected exactly, and give a reason.');
+                  return;
+                }
+                context.pop(true);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: context.colors.error,
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
+              child: Text(confirmLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final ok = result == true &&
+        passwordCtrl.text.isNotEmpty &&
+        confirmationCtrl.text.trim() == expected &&
+        reasonCtrl.text.trim().isNotEmpty;
+    final verification = ok
+        ? (
+            password: passwordCtrl.text,
+            confirmation: confirmationCtrl.text.trim(),
+            reason: reasonCtrl.text.trim(),
+          )
+        : null;
+    passwordCtrl.dispose();
+    confirmationCtrl.dispose();
+    reasonCtrl.dispose();
+    return verification;
+  }
+
+  // ----- client profile / additional info / photo (professional-editable) -----
+
+  Future<void> _editClientInfo() async {
+    final client = _client;
+    if (client == null) return;
+    final firstNameCtrl = TextEditingController(text: client.firstName);
+    final lastNameCtrl = TextEditingController(text: client.lastName);
+    final emailCtrl = TextEditingController(text: client.email);
+    final usernameCtrl = TextEditingController(text: client.username);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit client information'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstNameCtrl,
+                decoration: const InputDecoration(labelText: 'First name'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: lastNameCtrl,
+                decoration: const InputDecoration(labelText: 'Last name'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              if (client.username.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: usernameCtrl,
+                  decoration: const InputDecoration(labelText: 'Username'),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      setState(() => _isSavingClientInfo = true);
+      try {
+        final updated = await ref.read(formsGroupsApiProvider).updateClientProfile(
+              widget.clientId,
+              firstName: firstNameCtrl.text.trim(),
+              lastName: lastNameCtrl.text.trim(),
+              email: emailCtrl.text.trim(),
+              username: client.username.isNotEmpty ? usernameCtrl.text.trim() : null,
+            );
+        if (mounted) setState(() => _client = updated);
+        _toast('Client information updated.');
+      } on ApiException catch (error) {
+        _toast(error.message);
+      } catch (_) {
+        _toast('Client information could not be saved.');
+      }
+      if (mounted) setState(() => _isSavingClientInfo = false);
+    }
+    firstNameCtrl.dispose();
+    lastNameCtrl.dispose();
+    emailCtrl.dispose();
+    usernameCtrl.dispose();
+  }
+
+  Future<void> _pickClientPhoto() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.path.split('.').last.toLowerCase();
+      final mime = switch (ext) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        _ => 'image/jpeg',
+      };
+      final dataUrl = 'data:$mime;base64,${base64Encode(bytes)}';
+      final updated = await ref
+          .read(formsGroupsApiProvider)
+          .updateClientPhoto(widget.clientId, dataUrl);
+      if (mounted) setState(() => _client = updated);
+      _toast('Client photo updated.');
+    } on ApiException catch (error) {
+      _toast(error.message);
+    } catch (_) {
+      _toast('Could not update the client photo.');
+    }
+    if (mounted) setState(() => _isUploadingPhoto = false);
+  }
+
+  Future<void> _persistAdditionalInfo(List<AdditionalInfoItem> items, {bool? shared}) async {
+    if (_isSavingAdditional) return;
+    final previous = _client;
+    setState(() => _isSavingAdditional = true);
+    try {
+      final updated = await ref.read(formsGroupsApiProvider).updateClientAdditionalInfo(
+            widget.clientId,
+            items,
+            shared: shared,
+          );
+      if (mounted) setState(() => _client = updated);
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _client = previous);
+      _toast(error.message);
+    } catch (_) {
+      if (mounted) setState(() => _client = previous);
+      _toast('Additional information could not be saved.');
+    }
+    if (mounted) setState(() => _isSavingAdditional = false);
+  }
+
+  Future<void> _toggleAdditionalShared(bool shared) async {
+    final client = _client;
+    if (client == null || client.additionalInfoShared == shared) return;
+    setState(() => _client = ClientAccessRecord(
+          id: client.id,
+          group: client.group,
+          groupName: client.groupName,
+          professionalName: client.professionalName,
+          referenceId: client.referenceId,
+          onboardingMethod: client.onboardingMethod,
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          username: client.username,
+          photo: client.photo,
+          registrationAnswers: client.registrationAnswers,
+          additionalInfo: client.additionalInfo,
+          additionalInfoShared: shared,
+          mustChangePassword: client.mustChangePassword,
+          isActive: client.isActive,
+          createdAt: client.createdAt,
+          updatedAt: client.updatedAt,
+          leadSubmission: client.leadSubmission,
+          registrationSubmission: client.registrationSubmission,
+        ));
+    await _persistAdditionalInfo(client.additionalInfo, shared: shared);
+  }
+
+  Future<void> _addAdditionalInfoItem() async {
+    final titleCtrl = TextEditingController();
+    final textCtrl = TextEditingController();
+    final linkCtrl = TextEditingController();
+    String type = AdditionalInfoType.text;
+    String visibility = 'private';
+
+    final add = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add additional information'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'Type'),
+                  items: const [
+                    DropdownMenuItem(value: AdditionalInfoType.text, child: Text('Text')),
+                    DropdownMenuItem(value: AdditionalInfoType.link, child: Text('Link')),
+                  ],
+                  onChanged: (value) => setDialogState(() => type = value ?? AdditionalInfoType.text),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                if (type == AdditionalInfoType.text)
+                  TextField(
+                    controller: textCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Text'),
+                  )
+                else
+                  TextField(
+                    controller: linkCtrl,
+                    keyboardType: TextInputType.url,
+                    decoration: const InputDecoration(labelText: 'URL'),
+                  ),
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Shared with client'),
+                  value: visibility == 'client',
+                  onChanged: (value) =>
+                      setDialogState(() => visibility = value ? 'client' : 'private'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: titleCtrl.text.trim().isEmpty ? null : () => context.pop(true),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (add == true && titleCtrl.text.trim().isNotEmpty) {
+      final item = AdditionalInfoItem(
+        id: 'item-${DateTime.now().millisecondsSinceEpoch}',
+        title: titleCtrl.text.trim(),
+        type: type,
+        visibility: visibility,
+        text: type == AdditionalInfoType.text ? textCtrl.text.trim() : '',
+        link: type == AdditionalInfoType.link ? linkCtrl.text.trim() : '',
+      );
+      final client = _client;
+      if (client != null) {
+        await _persistAdditionalInfo([...client.additionalInfo, item]);
+      }
+    }
+    titleCtrl.dispose();
+    textCtrl.dispose();
+    linkCtrl.dispose();
+  }
+
+  Future<void> _toggleAdditionalItemVisibility(AdditionalInfoItem item) async {
+    final client = _client;
+    if (client == null) return;
+    final nextVisibility = item.visibility == 'client' ? 'private' : 'client';
+    final items = client.additionalInfo
+        .map((i) => i.id == item.id
+            ? AdditionalInfoItem(
+                id: i.id,
+                title: i.title,
+                type: i.type,
+                visibility: nextVisibility,
+                text: i.text,
+                link: i.link,
+                referenceId: i.referenceId,
+                referenceTitle: i.referenceTitle,
+              )
+            : i)
+        .toList();
+    await _persistAdditionalInfo(items);
+  }
+
+  Future<void> _removeAdditionalInfoItem(AdditionalInfoItem item) async {
+    final client = _client;
+    if (client == null) return;
     final confirmed = await _confirm(
-      title: 'Delete client permanently?',
-      body: '$name and all their data will be removed. This cannot be undone.',
+      title: 'Delete "${item.title}"?',
+      body: 'This item will be removed from the client profile.',
       confirmLabel: 'Delete',
       destructive: true,
     );
     if (!confirmed) return;
-    try {
-      await ref.read(formsGroupsApiProvider).deleteClient(widget.clientId);
-      if (mounted) context.go(Routes.professionalClients);
-    } catch (_) {
-      _toast('Could not delete the client.');
-    }
+    final items = client.additionalInfo.where((i) => i.id != item.id).toList();
+    await _persistAdditionalInfo(items);
   }
 
   Future<bool> _confirm({
@@ -652,6 +1220,45 @@ class _ProfessionalClientDetailPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Client information', style: context.text.titleSmall),
+                  ),
+                  IconButton(
+                    onPressed: _isUploadingPhoto ? null : _pickClientPhoto,
+                    icon: _isUploadingPhoto
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.photo_camera_outlined),
+                    tooltip: 'Update photo',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: _isSavingClientInfo ? null : _editClientInfo,
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Edit',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              _infoRow('First name', _client?.firstName ?? ''),
+              _infoRow('Last name', _client?.lastName ?? ''),
+              _infoRow('Email', _client?.email ?? ''),
+              if ((_client?.username ?? '').isNotEmpty)
+                _infoRow('Username', _client!.username),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text('Registration details', style: context.text.titleSmall),
               const SizedBox(height: AppSpacing.md),
               if (_registrationFields.isEmpty)
@@ -692,6 +1299,89 @@ class _ProfessionalClientDetailPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Additional information', style: context.text.titleSmall),
+                  ),
+                  IconButton(
+                    onPressed: _isSavingAdditional ? null : _addAdditionalInfoItem,
+                    icon: const Icon(Icons.add_circle_outline),
+                    tooltip: 'Add item',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Share this section with the client'),
+                value: _client?.additionalInfoShared ?? false,
+                onChanged: _isSavingAdditional ? null : _toggleAdditionalShared,
+              ),
+              if ((_client?.additionalInfo ?? []).isEmpty)
+                const EmptyState(message: 'No additional information yet.')
+              else
+                for (final item in _client!.additionalInfo)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.title, style: context.text.bodyMedium),
+                              Text(
+                                item.type == AdditionalInfoType.link
+                                    ? item.link
+                                    : item.text,
+                                style: context.text.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _isSavingAdditional
+                              ? null
+                              : () => _toggleAdditionalItemVisibility(item),
+                          icon: Icon(
+                            item.isSharedWithClient
+                                ? Icons.visibility
+                                : Icons.visibility_off_outlined,
+                            color: item.isSharedWithClient
+                                ? context.colors.primary
+                                : context.tokens.muted,
+                          ),
+                          tooltip: item.isSharedWithClient
+                              ? 'Shared with client'
+                              : 'Private',
+                          iconSize: AppSize.iconRow,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          onPressed: _isSavingAdditional
+                              ? null
+                              : () => _removeAdditionalInfoItem(item),
+                          icon: const Icon(Icons.delete_outline),
+                          iconSize: AppSize.iconRow,
+                          color: context.colors.error,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text('Professional notes', style: context.text.titleSmall),
               Text(
                 'Private to you.',
@@ -716,6 +1406,27 @@ class _ProfessionalClientDetailPageState
       ],
     );
   }
+
+  Widget _infoRow(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(label, style: context.text.bodySmall),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                value.trim().isNotEmpty ? value : '—',
+                style: context.text.titleSmall,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _overviewTab() {
     return PagePad(
@@ -828,6 +1539,35 @@ class _ProfessionalClientDetailPageState
               ),
             ),
 
+        SectionHeader(
+          title: 'Meetings',
+          actionLabel: 'Schedule',
+          onAction: _scheduleMeeting,
+        ),
+        if (_meetings.isEmpty)
+          const EmptyState(message: 'No meetings scheduled with this client.')
+        else
+          for (final meeting in _meetings)
+            RowItem(
+              title: meeting.title.isNotEmpty ? meeting.title : 'Meeting',
+              subtitle: [
+                if (meeting.startAt != null)
+                  dateTimeLabel(meeting.startAt!.toIso8601String()),
+                meeting.status,
+                'Response: ${meeting.clientResponseStatus}',
+              ].join(' · '),
+              trailing: meeting.status == MeetingStatus.scheduled
+                  ? IconButton(
+                      onPressed: () => _cancelMeeting(meeting),
+                      icon: const Icon(Icons.event_busy),
+                      iconSize: AppSize.iconRow,
+                      color: context.colors.error,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Cancel meeting',
+                    )
+                  : null,
+            ),
+
         const SectionHeader(title: 'Progress'),
         if (_progress.isEmpty)
           const EmptyState(message: 'No progress records yet.')
@@ -907,14 +1647,34 @@ class _ProfessionalClientDetailPageState
             RowItem(
               title: assignment.templateName,
               subtitle:
-                  '${TemplateCadence.label(assignment.templateCadence)}${assignment.references.isNotEmpty ? ' · ${assignment.references.length} refs' : ''}',
-              trailing: IconButton(
-                onPressed: () => _unassign(assignment),
-                icon: const Icon(Icons.link_off),
-                iconSize: AppSize.iconRow,
-                color: context.colors.error,
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Remove',
+                  '${TemplateCadence.label(assignment.templateCadence)}'
+                  '${assignment.references.isNotEmpty ? ' · ${assignment.references.length} refs' : ''}'
+                  ' · ${TemplateClientAccessLevel.label(assignment.clientAccessLevel)}',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PopupMenuButton<String>(
+                    tooltip: 'Client access',
+                    icon: const Icon(Icons.lock_outline, size: AppSize.iconRow),
+                    initialValue: assignment.clientAccessLevel,
+                    onSelected: (value) => _setAccessLevel(assignment, value),
+                    itemBuilder: (context) => [
+                      for (final level in TemplateClientAccessLevel.all)
+                        PopupMenuItem(
+                          value: level,
+                          child: Text(TemplateClientAccessLevel.label(level)),
+                        ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => _unassign(assignment),
+                    icon: const Icon(Icons.link_off),
+                    iconSize: AppSize.iconRow,
+                    color: context.colors.error,
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Remove',
+                  ),
+                ],
               ),
               onTap: () => context.go(
                 '${Routes.professionalClients}/${widget.clientId}/templates/${assignment.id}',
@@ -1022,18 +1782,39 @@ class _ProfessionalClientDetailPageState
           onTap: _resetPassword,
         ),
         _ActionRow(
+          icon: Icons.payments_outlined,
+          title: 'Payments',
+          subtitle: 'Send payment requests and review proofs.',
+          onTap: () => context.go(
+            '${Routes.professionalClients}/${widget.clientId}/payments'
+            '?name=${Uri.encodeQueryComponent(client?.displayName ?? 'Client')}',
+          ),
+        ),
+
+        const SectionHeader(title: 'Destructive data actions'),
+        _ActionRow(
+          icon: Icons.download_outlined,
+          title: _isExportingClient ? 'Preparing export…' : 'Download client data',
+          subtitle: 'Export everything before clearing history or deleting.',
+          onTap: _isExportingClient ? () {} : _exportClientData,
+        ),
+        _ActionRow(
           icon: Icons.restart_alt,
-          title: 'Reset client data',
-          subtitle: 'Clears tracking history. Account and profile stay.',
+          title: _isResettingClient ? 'Clearing…' : 'Clear client history',
+          subtitle:
+              'Clears tracking, chat, schedules, and notes. Identity and '
+              'registration details stay. Requires your password.',
           destructive: true,
-          onTap: _resetClient,
+          onTap: _isResettingClient ? () {} : _resetClient,
         ),
         _ActionRow(
           icon: Icons.delete_forever_outlined,
-          title: 'Delete client',
-          subtitle: 'Removes the client and all their data. Cannot be undone.',
+          title: _isDeletingClient ? 'Moving to Recycle Bin…' : 'Delete client',
+          subtitle:
+              'Moves the account to your Recycle Bin (restorable). Requires '
+              'your password.',
           destructive: true,
-          onTap: _deleteClient,
+          onTap: _isDeletingClient ? () {} : _deleteClient,
         ),
       ],
     );

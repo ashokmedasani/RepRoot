@@ -130,6 +130,15 @@ class LeadForm {
     required this.fields,
     required this.createdAt,
     required this.updatedAt,
+    this.isActive = true,
+    this.isMandatory = false,
+    this.introductoryMeetingEnabled = false,
+    this.introductoryMeetingTitle = '',
+    this.introductoryMeetingDurationMinutes = 30,
+    this.introductoryMeetingMinNoticeHours = 0,
+    this.introductoryMeetingMaxAdvanceDays = 30,
+    this.introductoryMeetingBufferMinutes = 0,
+    this.introductoryMeetingRequiresApproval = false,
   });
 
   final int id;
@@ -139,6 +148,20 @@ class LeadForm {
   final List<DynamicField> fields;
   final String createdAt;
   final String updatedAt;
+
+  /// Enable/disable the public lead form, and whether it must be completed
+  /// before a client can be added — matches the web toggles.
+  final bool isActive;
+  final bool isMandatory;
+
+  /// Introductory-meeting settings applicants can book from the public form.
+  final bool introductoryMeetingEnabled;
+  final String introductoryMeetingTitle;
+  final int introductoryMeetingDurationMinutes;
+  final int introductoryMeetingMinNoticeHours;
+  final int introductoryMeetingMaxAdvanceDays;
+  final int introductoryMeetingBufferMinutes;
+  final bool introductoryMeetingRequiresApproval;
 
   factory LeadForm.fromJson(Map<String, dynamic> json) => LeadForm(
         id: json['id'] as int? ?? 0,
@@ -151,6 +174,22 @@ class LeadForm {
             .toList(),
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
+        isActive: json['is_active'] as bool? ?? true,
+        isMandatory: json['is_mandatory'] as bool? ?? false,
+        introductoryMeetingEnabled:
+            json['introductory_meeting_enabled'] as bool? ?? false,
+        introductoryMeetingTitle:
+            json['introductory_meeting_title'] as String? ?? '',
+        introductoryMeetingDurationMinutes:
+            (json['introductory_meeting_duration_minutes'] as num?)?.toInt() ?? 30,
+        introductoryMeetingMinNoticeHours:
+            (json['introductory_meeting_min_notice_hours'] as num?)?.toInt() ?? 0,
+        introductoryMeetingMaxAdvanceDays:
+            (json['introductory_meeting_max_advance_days'] as num?)?.toInt() ?? 30,
+        introductoryMeetingBufferMinutes:
+            (json['introductory_meeting_buffer_minutes'] as num?)?.toInt() ?? 0,
+        introductoryMeetingRequiresApproval:
+            json['introductory_meeting_requires_approval'] as bool? ?? false,
       );
 }
 
@@ -162,6 +201,8 @@ class ClientRegistrationForm {
     required this.fields,
     required this.createdAt,
     required this.updatedAt,
+    this.isActive = true,
+    this.isMandatory = false,
   });
 
   final int id;
@@ -170,6 +211,11 @@ class ClientRegistrationForm {
   final List<DynamicField> fields;
   final String createdAt;
   final String updatedAt;
+
+  /// Whether registration is active, and whether it must be completed before
+  /// a client can be added to the group — matches the web toggles.
+  final bool isActive;
+  final bool isMandatory;
 
   factory ClientRegistrationForm.fromJson(Map<String, dynamic> json) =>
       ClientRegistrationForm(
@@ -182,6 +228,8 @@ class ClientRegistrationForm {
             .toList(),
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
+        isActive: json['is_active'] as bool? ?? true,
+        isMandatory: json['is_mandatory'] as bool? ?? false,
       );
 }
 

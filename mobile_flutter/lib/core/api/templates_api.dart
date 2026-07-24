@@ -134,11 +134,35 @@ class TemplatesApi {
     int clientId,
     int templateId, {
     List<int> referenceIds = const [],
+    String clientAccessLevel = 'editable',
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/clients/$clientId/assignments/',
-        data: {'template_id': templateId, 'reference_ids': referenceIds},
+        data: {
+          'template_id': templateId,
+          'reference_ids': referenceIds,
+          'client_access_level': clientAccessLevel,
+        },
+        options: _auth,
+      );
+      return TemplateAssignmentRecord.fromJson(
+        res.data?['assignment'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  /// 'private' | 'view_only' | 'editable' — controls whether the client can
+  /// see and edit their own entries for this assignment.
+  Future<TemplateAssignmentRecord> updateAssignmentAccessLevel(
+    int clientId,
+    int assignmentId,
+    String clientAccessLevel,
+  ) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/assignments/$assignmentId/',
+        data: {'client_access_level': clientAccessLevel},
         options: _auth,
       );
       return TemplateAssignmentRecord.fromJson(

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/models/account_models.dart';
 import '../../core/api/models/professional_models.dart';
 import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
@@ -28,6 +30,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
 
   ProfessionalProfile? _profile;
   ProfessionalDataUsage? _usage;
+  ProfessionalBillingStatus? _billing;
+  List<RecycleBinItem> _recycleBin = [];
+  bool _billingBusy = false;
   String _originalCode = '';
   bool _isSavingCode = false;
   String _codeMessage = '';
@@ -68,6 +73,118 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
       final usage = await api.getDataUsage();
       if (mounted) setState(() => _usage = usage);
     } catch (_) {}
+    try {
+      final billing = await api.getBillingStatus();
+      if (mounted) setState(() => _billing = billing);
+    } catch (_) {}
+    try {
+      final bin = await api.getRecycleBin();
+      if (mounted) setState(() => _recycleBin = bin);
+    } catch (_) {}
+  }
+
+  void _toast(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _changePlan(String tier) async {
+    if (_billingBusy) return;
+    setState(() => _billingBusy = true);
+    try {
+      final url = await ref.read(professionalAuthApiProvider).createBillingCheckout(tier);
+      if (url.isNotEmpty) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        _toast('Plan updated.');
+      }
+      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      if (mounted) setState(() => _billing = billing);
+    } catch (error) {
+      _toast(error is ApiException ? error.message : 'Could not update the plan.');
+    }
+    if (mounted) setState(() => _billingBusy = false);
+  }
+
+  Future<void> _cancelPlan() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel plan?'),
+        content: const Text('Your plan will revert to the free tier at the end of the period.'),
+        actions: [
+          TextButton(onPressed: () => context.pop(false), child: const Text('Keep plan')),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.error,
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
+            child: const Text('Cancel plan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan();
+      _toast(message.isNotEmpty ? message : 'Plan cancelled.');
+      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      if (mounted) setState(() => _billing = billing);
+    } catch (error) {
+      _toast(error is ApiException ? error.message : 'Could not cancel the plan.');
+    }
+  }
+
+  Future<void> _openBillingPortal() async {
+    try {
+      final url = await ref.read(professionalAuthApiProvider).createBillingPortal();
+      if (url.isNotEmpty) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        _toast('Billing portal is not available yet.');
+      }
+    } catch (error) {
+      _toast(error is ApiException ? error.message : 'Could not open billing portal.');
+    }
+  }
+
+  Future<void> _restoreBinItem(RecycleBinItem item) async {
+    try {
+      await ref.read(professionalAuthApiProvider).restoreRecycleBinItem(item.id);
+      if (mounted) setState(() => _recycleBin = _recycleBin.where((i) => i.id != item.id).toList());
+      _toast('Restored.');
+    } catch (error) {
+      _toast(error is ApiException ? error.message : 'Could not restore.');
+    }
+  }
+
+  Future<void> _deleteBinItem(RecycleBinItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete "${item.title}" forever?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.error,
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
+            child: const Text('Delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(professionalAuthApiProvider).deleteRecycleBinItemPermanently(item.id);
+      if (mounted) setState(() => _recycleBin = _recycleBin.where((i) => i.id != item.id).toList());
+    } catch (error) {
+      _toast(error is ApiException ? error.message : 'Could not delete.');
+    }
   }
 
   double get _usagePercent => ((_usage?.usagePercent ?? 0) * 10).round() / 10;
@@ -168,11 +285,14 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
           _Card(
             title: 'Plan & Storage',
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _KvList(
                   rows: [
                     ('Plan', _usage?.planName.isNotEmpty ?? false ? _usage!.planName : '—'),
                     ('Storage used', '$_usagePercent%'),
+                    if ((_usage?.usageLabel ?? '').isNotEmpty)
+                      ('Capacity', titleCase(_usage!.usageLabel)),
                     (
                       'Records',
                       '${_usage?.recordCount ?? 0}'
@@ -187,12 +307,159 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     value: (_usagePercent / 100).clamp(0, 1),
                     minHeight: 10,
                     backgroundColor: tokens.surfaceSoft,
+                    color: _usage?.isDanger ?? false
+                        ? context.colors.error
+                        : _usage?.isWarning ?? false
+                            ? tokens.accent
+                            : context.colors.primary,
                   ),
                 ),
+                if (_usage?.isLocked ?? false) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    _usage!.lockReason.isNotEmpty
+                        ? _usage!.lockReason
+                        : 'Uploads are paused — you are over your storage quota.',
+                    style: context.text.bodySmall?.copyWith(color: context.colors.error),
+                  ),
+                ] else if (_usage?.gracePeriodEndsAt != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Grace period ends ${shortDate(_usage!.gracePeriodEndsAt!)}.',
+                    style: context.text.bodySmall?.copyWith(color: tokens.accent),
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+
+          if (_billing != null) ...[
+            _Card(
+              title: 'Billing',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _KvList(
+                    rows: [
+                      ('Current plan', _billing!.planName.isNotEmpty ? _billing!.planName : '—'),
+                      if (_billing!.planRenewsAt != null)
+                        ('Renews', shortDate(_billing!.planRenewsAt!)),
+                    ],
+                  ),
+                  if (_billing!.testMode) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text('Test mode — plan changes apply instantly with no charge.',
+                        style: context.text.bodySmall?.copyWith(color: tokens.muted)),
+                  ],
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final tier in _billing!.upgradeTiers)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _billingBusy ? null : () => _changePlan(tier),
+                          child: Text('Switch to ${ProfessionalUpgradeTier.label(tier)}'),
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      if (_billing!.billingConfigured)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _openBillingPortal,
+                            child: const Text('Billing portal'),
+                          ),
+                        ),
+                      if (_billing!.planCode != 'starter_free' &&
+                          _billing!.planCode != 'starter') ...[
+                        if (_billing!.billingConfigured) const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _cancelPlan,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: context.colors.error,
+                            ),
+                            child: const Text('Cancel plan'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+
+          _Card(
+            title: 'Notifications',
+            child: InkWell(
+              onTap: () => context.push(
+                '${Routes.professionalNotifications}/preferences',
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Choose how you\'re notified per category (website, email, digest).',
+                        style: context.text.bodySmall,
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          if (_recycleBin.isNotEmpty) ...[
+            _Card(
+              title: 'Recycle bin',
+              child: Column(
+                children: [
+                  for (final item in _recycleBin)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.title.isNotEmpty ? item.title : item.categoryLabel,
+                                    style: context.text.bodyMedium),
+                                Text(
+                                  '${item.categoryLabel} · ${item.daysRemaining}d left',
+                                  style: context.text.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => _restoreBinItem(item),
+                            child: const Text('Restore'),
+                          ),
+                          IconButton(
+                            onPressed: () => _deleteBinItem(item),
+                            icon: const Icon(Icons.delete_forever_outlined),
+                            iconSize: AppSize.iconRow,
+                            color: context.colors.error,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
 
           _Card(
             title: 'Security',

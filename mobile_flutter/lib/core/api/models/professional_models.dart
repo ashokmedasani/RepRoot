@@ -158,6 +158,13 @@ class ProfessionalDataUsage {
     this.databaseBytes = 0,
     this.fileBytes = 0,
     this.planLimits = const {},
+    this.usageLabel = '',
+    this.isWarning = false,
+    this.isDanger = false,
+    this.isOverQuota = false,
+    this.isLocked = false,
+    this.lockReason = '',
+    this.gracePeriodEndsAt,
   });
 
   /// 'starter' | 'premium'
@@ -173,6 +180,15 @@ class ProfessionalDataUsage {
   /// null values mean "unlimited" for that limit.
   final Map<String, int?> planLimits;
 
+  /// Human capacity label + threshold flags, matching the web data-usage API.
+  final String usageLabel;
+  final bool isWarning;
+  final bool isDanger;
+  final bool isOverQuota;
+  final bool isLocked;
+  final String lockReason;
+  final String? gracePeriodEndsAt;
+
   factory ProfessionalDataUsage.fromJson(Map<String, dynamic> json) => ProfessionalDataUsage(
         planCode: json['plan_code'] as String? ?? '',
         planName: json['plan_name'] as String? ?? '',
@@ -185,6 +201,13 @@ class ProfessionalDataUsage {
         planLimits: (json['plan_limits'] as Map<dynamic, dynamic>? ?? {}).map(
           (key, value) => MapEntry(key.toString(), (value as num?)?.toInt()),
         ),
+        usageLabel: (json['usage_label'] as String? ?? '').replaceAll('_', ' '),
+        isWarning: json['is_warning'] as bool? ?? false,
+        isDanger: json['is_danger'] as bool? ?? false,
+        isOverQuota: json['is_over_quota'] as bool? ?? false,
+        isLocked: json['is_locked'] as bool? ?? false,
+        lockReason: json['lock_reason'] as String? ?? '',
+        gracePeriodEndsAt: json['grace_period_ends_at'] as String?,
       );
 }
 

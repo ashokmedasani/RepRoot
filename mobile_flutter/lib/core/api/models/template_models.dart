@@ -261,6 +261,23 @@ class TemplatePayload {
       };
 }
 
+/// 'private' | 'view_only' | 'editable' — whether the client can see/edit
+/// their own entries for a template assignment.
+class TemplateClientAccessLevel {
+  const TemplateClientAccessLevel._();
+  static const private = 'private';
+  static const viewOnly = 'view_only';
+  static const editable = 'editable';
+  static const all = [private, viewOnly, editable];
+
+  static String label(String value) => switch (value) {
+        'private' => 'Private (hidden)',
+        'view_only' => 'View only',
+        'editable' => 'Editable',
+        _ => value,
+      };
+}
+
 class TemplateAssignmentRecord {
   const TemplateAssignmentRecord({
     required this.id,
@@ -270,6 +287,7 @@ class TemplateAssignmentRecord {
     required this.templateAccent,
     required this.references,
     required this.assignedAt,
+    this.clientAccessLevel = 'editable',
   });
 
   final int id;
@@ -279,6 +297,7 @@ class TemplateAssignmentRecord {
   final String templateAccent;
   final List<TemplateReference> references;
   final String assignedAt;
+  final String clientAccessLevel;
 
   factory TemplateAssignmentRecord.fromJson(Map<String, dynamic> json) =>
       TemplateAssignmentRecord(
@@ -292,6 +311,7 @@ class TemplateAssignmentRecord {
             .map(TemplateReference.fromJson)
             .toList(),
         assignedAt: json['assigned_at'] as String? ?? '',
+        clientAccessLevel: json['client_access_level'] as String? ?? 'editable',
       );
 }
 

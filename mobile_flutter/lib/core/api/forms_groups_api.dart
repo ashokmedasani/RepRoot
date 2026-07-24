@@ -26,13 +26,59 @@ class FormsGroupsApi {
     });
   }
 
-  Future<LeadForm> saveLeadForm(String title, List<DynamicField> customFields) {
+  Future<LeadForm> saveLeadForm(
+    String title,
+    List<DynamicField> customFields, {
+    bool? isMandatory,
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/lead-form/',
         data: {
           'title': title,
           'custom_fields': customFields.map((f) => f.toJson()).toList(),
+          'is_mandatory': ?isMandatory,
+        },
+        options: _auth,
+      );
+      return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+    });
+  }
+
+  /// Enable/disable the public lead form.
+  Future<LeadForm> updateLeadFormStatus(bool isActive) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/forms-groups/lead-form/status/',
+        data: {'is_active': isActive},
+        options: _auth,
+      );
+      return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+    });
+  }
+
+  /// Update the introductory-meeting settings on the lead form (enable, title,
+  /// duration, notice/advance windows, approval).
+  Future<LeadForm> saveLeadMeetingSettings({
+    bool? introductoryMeetingEnabled,
+    String? introductoryMeetingTitle,
+    int? introductoryMeetingDurationMinutes,
+    int? introductoryMeetingMinNoticeHours,
+    int? introductoryMeetingMaxAdvanceDays,
+    int? introductoryMeetingBufferMinutes,
+    bool? introductoryMeetingRequiresApproval,
+  }) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/forms-groups/lead-form/meeting-settings/',
+        data: {
+          'introductory_meeting_enabled': ?introductoryMeetingEnabled,
+          'introductory_meeting_title': ?introductoryMeetingTitle,
+          'introductory_meeting_duration_minutes': ?introductoryMeetingDurationMinutes,
+          'introductory_meeting_min_notice_hours': ?introductoryMeetingMinNoticeHours,
+          'introductory_meeting_max_advance_days': ?introductoryMeetingMaxAdvanceDays,
+          'introductory_meeting_buffer_minutes': ?introductoryMeetingBufferMinutes,
+          'introductory_meeting_requires_approval': ?introductoryMeetingRequiresApproval,
         },
         options: _auth,
       );
@@ -64,12 +110,16 @@ class FormsGroupsApi {
 
   Future<ClientRegistrationForm> saveRegistrationForm(
     int groupId,
-    List<DynamicField> customFields,
-  ) {
+    List<DynamicField> customFields, {
+    bool? isMandatory,
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/groups/$groupId/registration-form/',
-        data: {'custom_fields': customFields.map((f) => f.toJson()).toList()},
+        data: {
+          'custom_fields': customFields.map((f) => f.toJson()).toList(),
+          'is_mandatory': ?isMandatory,
+        },
         options: _auth,
       );
       return ClientRegistrationForm.fromJson(
@@ -269,11 +319,23 @@ class FormsGroupsApi {
     });
   }
 
-  Future<ClientAccessRecord> resetClient(int clientId) {
+  /// Clearing history now requires the same verification as delete: the
+  /// professional's current password, the client's username/reference typed
+  /// back exactly, and a reason — matches the web's destructive-actions form.
+  Future<ClientAccessRecord> resetClient(
+    int clientId, {
+    required String currentPassword,
+    required String confirmation,
+    required String reason,
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/clients/$clientId/reset/',
-        data: const {},
+        data: {
+          'current_password': currentPassword,
+          'confirmation': confirmation,
+          'reason': reason,
+        },
         options: _auth,
       );
       return ClientAccessRecord.fromJson(
@@ -282,13 +344,38 @@ class FormsGroupsApi {
     });
   }
 
-  Future<String> deleteClient(int clientId) {
+  /// Soft-deletes: the client account moves to the professional's Recycle Bin
+  /// rather than being hard-deleted, so it's restorable during the retention
+  /// window. Requires the same verification fields as [resetClient].
+  Future<String> deleteClient(
+    int clientId, {
+    required String currentPassword,
+    required String confirmation,
+    required String reason,
+  }) {
     return runApi(() async {
       final res = await _dio.delete<Map<String, dynamic>>(
         '/professional/forms-groups/clients/$clientId/delete/',
+        data: {
+          'current_password': currentPassword,
+          'confirmation': confirmation,
+          'reason': reason,
+        },
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  /// Downloads a zip archive (client JSON + chat attachments) as raw bytes so
+  /// the caller can save/share it — mirrors the web's blob download.
+  Future<List<int>> exportClientData(int clientId) {
+    return runApi(() async {
+      final res = await _dio.get<List<int>>(
+        '/professional/forms-groups/clients/$clientId/export/',
+        options: _auth.copyWith(responseType: ResponseType.bytes),
+      );
+      return res.data ?? const [];
     });
   }
 

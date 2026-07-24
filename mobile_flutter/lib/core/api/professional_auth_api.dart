@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../session/session_store.dart';
 import 'api_client.dart';
+import 'models/account_models.dart';
 import 'models/support_models.dart';
 import 'models/professional_models.dart';
 import 'models/notification_models.dart';
@@ -79,11 +80,11 @@ class ProfessionalAuthApi {
     });
   }
 
-  Future<NotificationInbox> getNotifications({int limit = 50}) =>
+  Future<NotificationInbox> getNotifications({int limit = 50, String? category}) =>
       runApi(() async {
         final res = await _dio.get<Map<String, dynamic>>(
           '/professional/notifications/',
-          queryParameters: {'limit': limit},
+          queryParameters: {'limit': limit, 'category': ?category},
           options: _auth,
         );
         return NotificationInbox.fromJson(res.data ?? {});
@@ -95,6 +96,42 @@ class ProfessionalAuthApi {
       options: _auth,
     );
   });
+
+  Future<List<NotificationPreferenceRow>> getNotificationPreferences() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/notification-preferences/',
+        options: _auth,
+      );
+      return (res.data?['categories'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(NotificationPreferenceRow.fromJson)
+          .toList();
+    });
+  }
+
+  Future<NotificationPreferenceRow> updateNotificationPreference(
+    String category, {
+    bool? inAppEnabled,
+    bool? emailEnabled,
+    bool? pushEnabled,
+    String? digestFrequency,
+  }) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/notification-preferences/',
+        data: {
+          'category': category,
+          'in_app_enabled': ?inAppEnabled,
+          'email_enabled': ?emailEnabled,
+          'push_enabled': ?pushEnabled,
+          'digest_frequency': ?digestFrequency,
+        },
+        options: _auth,
+      );
+      return NotificationPreferenceRow.fromJson(res.data ?? {});
+    });
+  }
 
   Future<ProfessionalProfile> getProfile() {
     return runApi(() async {
@@ -156,6 +193,89 @@ class ProfessionalAuthApi {
         options: _auth,
       );
       return ProfessionalDataUsage.fromJson(res.data ?? {});
+    });
+  }
+
+  // ----- billing (professional's own RepRoot subscription) -----
+
+  Future<ProfessionalBillingStatus> getBillingStatus() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/billing/status/',
+        options: _auth,
+      );
+      return ProfessionalBillingStatus.fromJson(res.data ?? {});
+    });
+  }
+
+  /// Returns a Stripe checkout URL (empty in test mode — the tier applies
+  /// immediately server-side without a charge).
+  Future<String> createBillingCheckout(String targetTier) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/billing/checkout/',
+        data: {'target_tier': targetTier},
+        options: _auth,
+      );
+      return res.data?['checkout_url'] as String? ?? '';
+    });
+  }
+
+  Future<String> cancelBillingPlan() {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/billing/cancel/',
+        data: const {},
+        options: _auth,
+      );
+      return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  Future<String> createBillingPortal() {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/billing/portal/',
+        data: const {},
+        options: _auth,
+      );
+      return res.data?['portal_url'] as String? ?? '';
+    });
+  }
+
+  // ----- recycle bin -----
+
+  Future<List<RecycleBinItem>> getRecycleBin() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/recycle-bin/',
+        options: _auth,
+      );
+      return (res.data?['items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(RecycleBinItem.fromJson)
+          .toList();
+    });
+  }
+
+  Future<String> restoreRecycleBinItem(int itemId) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/recycle-bin/$itemId/restore/',
+        data: const {},
+        options: _auth,
+      );
+      return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  Future<String> deleteRecycleBinItemPermanently(int itemId) {
+    return runApi(() async {
+      final res = await _dio.delete<Map<String, dynamic>>(
+        '/professional/recycle-bin/$itemId/',
+        options: _auth,
+      );
+      return res.data?['message'] as String? ?? '';
     });
   }
 

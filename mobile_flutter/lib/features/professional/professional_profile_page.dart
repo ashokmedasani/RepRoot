@@ -26,8 +26,12 @@ class ProfessionalProfilePage extends ConsumerStatefulWidget {
 /// The keys are the backend's, and `certification` is singular on purpose —
 /// sending `certifications` silently does nothing.
 const _visibilitySections = <({String key, String label})>[
+  (key: 'professional_headline', label: 'Headline'),
   (key: 'about', label: 'About me'),
   (key: 'professional_summary', label: 'Professional details'),
+  (key: 'specializations', label: 'Specializations'),
+  (key: 'experience', label: 'Experience'),
+  (key: 'languages', label: 'Languages'),
   (key: 'training_style', label: 'Training style'),
   (key: 'certification', label: 'Certifications'),
   (key: 'images', label: 'Images'),

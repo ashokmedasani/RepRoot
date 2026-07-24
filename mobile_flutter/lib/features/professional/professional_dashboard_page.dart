@@ -7,6 +7,8 @@ import '../../core/api/forms_groups_api.dart';
 import '../../core/api/models/forms_groups_models.dart';
 import '../../core/api/models/template_models.dart';
 import '../../core/api/models/professional_models.dart';
+import '../../core/api/models/payment_models.dart';
+import '../../core/api/payments_api.dart';
 import '../../core/api/templates_api.dart';
 import '../../core/api/professional_auth_api.dart';
 import '../../core/config/env.dart';
@@ -34,6 +36,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
   List<TrackingTemplateRecord> _templates = [];
   ProfessionalProfile? _profile;
   ProfessionalDataUsage? _usage;
+  PaymentActionsResponse? _paymentActions;
+  RevenueSummaryResponse? _revenue;
 
   String _message = '';
   bool _loading = true;
@@ -85,6 +89,14 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
       _guard(() async {
         final usage = await professionalAuth.getDataUsage();
         if (mounted) setState(() => _usage = usage);
+      }),
+      _guard(() async {
+        final actions = await ref.read(paymentsApiProvider).getPaymentActions();
+        if (mounted) setState(() => _paymentActions = actions);
+      }),
+      _guard(() async {
+        final revenue = await ref.read(paymentsApiProvider).getRevenueSummary('30');
+        if (mounted) setState(() => _revenue = revenue);
       }),
       _guard(() async {
         final response = await templatesApi.getTemplates();
@@ -243,6 +255,41 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
               ),
             ],
           ),
+
+          if (_revenue != null || _paymentActions != null) ...[
+            SectionHeader(
+              title: 'Payments',
+              actionLabel: 'Open',
+              onAction: () => context.go(Routes.professionalPayments),
+            ),
+            AppCard(
+              onTap: () => context.go(Routes.professionalPayments),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Revenue (30d)',
+                            style: context.text.bodySmall?.copyWith(color: context.tokens.muted)),
+                        Text(
+                          _revenue != null
+                              ? '${_revenue!.reportingCurrency} ${_revenue!.totalRevenue}'
+                              : '—',
+                          style: context.text.titleLarge,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if ((_paymentActions?.actionCount ?? 0) > 0)
+                    StatusPill(
+                      label: '${_paymentActions!.actionCount} to action',
+                      tone: PillTone.warn,
+                    ),
+                ],
+              ),
+            ),
+          ],
 
           const SectionHeader(title: 'Client Tracking Center'),
           KpiGrid(

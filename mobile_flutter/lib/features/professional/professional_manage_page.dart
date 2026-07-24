@@ -83,6 +83,7 @@ class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage>
               (Icons.layers_outlined, 'Templates', Routes.professionalTemplates),
               (Icons.folder_open_outlined, 'References', Routes.professionalReferences),
               (Icons.calendar_today_outlined, 'Schedule', Routes.professionalSchedule),
+              (Icons.payments_outlined, 'Payments', Routes.professionalPayments),
               (Icons.add_circle_outline, 'New client', Routes.professionalClientCreate),
             ],
           ),

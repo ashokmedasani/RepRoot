@@ -70,8 +70,13 @@ class _ProfessionalGroupDetailPageState
   bool _loading = true;
   String _registrationLinkBase = '';
 
+  bool _selectionMode = false;
+  final Set<int> _selectedMembers = {};
+  bool _bulkBusy = false;
+
   bool _isEditingForm = false;
   bool _isSavingForm = false;
+  bool _formMandatory = false;
   List<_DraftField> _customFields = [];
 
   int _convertingId = 0;
@@ -168,6 +173,7 @@ class _ProfessionalGroupDetailPageState
 
   void _startFormEdit() {
     setState(() {
+      _formMandatory = _group?.registrationForm?.isMandatory ?? false;
       // Core fields are built in and not editable — only custom ones show.
       _customFields = (_group?.registrationForm?.fields ?? [])
           .where((f) => !f.isCore)
@@ -186,6 +192,7 @@ class _ProfessionalGroupDetailPageState
                 .where((f) => f.label.trim().isNotEmpty)
                 .map((f) => f.toField())
                 .toList(),
+            isMandatory: _formMandatory,
           );
       if (!mounted) return;
       setState(() {
@@ -390,11 +397,90 @@ class _ProfessionalGroupDetailPageState
     );
   }
 
+  Future<void> _bulkSetStatus(List<ClientAccessRecord> members, bool active) async {
+    if (_bulkBusy || _selectedMembers.isEmpty) return;
+    setState(() => _bulkBusy = true);
+    final api = ref.read(formsGroupsApiProvider);
+    var failures = 0;
+    for (final id in _selectedMembers) {
+      try {
+        await api.updateClientStatus(id, active);
+      } catch (_) {
+        failures++;
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _bulkBusy = false;
+        _selectionMode = false;
+        _selectedMembers.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failures == 0
+            ? (active ? 'Members activated.' : 'Members deactivated.')
+            : '$failures update(s) failed.')),
+      );
+    }
+    _load();
+  }
+
   Widget _membersTab(List<ClientAccessRecord> members) {
+    final allSelected =
+        members.isNotEmpty && _selectedMembers.length == members.length;
+
     return PagePad(
       onRefresh: _load,
       children: [
         if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
+        if (members.isNotEmpty)
+          Row(
+            children: [
+              if (_selectionMode)
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    if (allSelected) {
+                      _selectedMembers.clear();
+                    } else {
+                      _selectedMembers
+                        ..clear()
+                        ..addAll(members.map((m) => m.id));
+                    }
+                  }),
+                  icon: Icon(allSelected ? Icons.deselect : Icons.select_all, size: 18),
+                  label: Text(allSelected ? 'Clear' : 'Select all'),
+                ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() {
+                  _selectionMode = !_selectionMode;
+                  _selectedMembers.clear();
+                }),
+                child: Text(_selectionMode ? 'Done' : 'Select'),
+              ),
+            ],
+          ),
+        if (_selectionMode && _selectedMembers.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _bulkBusy ? null : () => _bulkSetStatus(members, true),
+                    child: const Text('Activate'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _bulkBusy ? null : () => _bulkSetStatus(members, false),
+                    style: OutlinedButton.styleFrom(foregroundColor: context.colors.error),
+                    child: const Text('Deactivate'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         if (members.isEmpty)
           const EmptyState(
             compact: false,
@@ -406,15 +492,34 @@ class _ProfessionalGroupDetailPageState
             RowItem(
               title: client.displayName.isEmpty ? client.username : client.displayName,
               subtitle: client.email.isEmpty ? client.username : client.email,
-              leading: AppAvatar(
-                initials: _initialsOf(client),
-                imageUrl: Env.mediaUrl(client.photo),
-                size: 40,
-              ),
+              leading: _selectionMode
+                  ? Checkbox(
+                      value: _selectedMembers.contains(client.id),
+                      onChanged: (value) => setState(() {
+                        if (value ?? false) {
+                          _selectedMembers.add(client.id);
+                        } else {
+                          _selectedMembers.remove(client.id);
+                        }
+                      }),
+                    )
+                  : AppAvatar(
+                      initials: _initialsOf(client),
+                      imageUrl: Env.mediaUrl(client.photo),
+                      size: 40,
+                    ),
               trailing: client.isActive
                   ? null
                   : const StatusPill(label: 'Inactive', tone: PillTone.bad),
-              onTap: () => context.go('${Routes.professionalClients}/${client.id}'),
+              onTap: _selectionMode
+                  ? () => setState(() {
+                        if (_selectedMembers.contains(client.id)) {
+                          _selectedMembers.remove(client.id);
+                        } else {
+                          _selectedMembers.add(client.id);
+                        }
+                      })
+                  : () => context.go('${Routes.professionalClients}/${client.id}'),
             ),
       ],
     );
@@ -758,6 +863,14 @@ class _ProfessionalGroupDetailPageState
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, AppSize.buttonHeightSm),
                   ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Require before adding a client'),
+                  subtitle: const Text('Clients must complete this form first'),
+                  value: _formMandatory,
+                  onChanged: (value) => setState(() => _formMandatory = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(

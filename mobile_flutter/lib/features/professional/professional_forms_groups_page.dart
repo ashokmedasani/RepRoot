@@ -157,10 +157,15 @@ class _ProfessionalFormsGroupsPageState
 
   // ----- lead form -----
 
+  bool _formMandatory = false;
+  bool _togglingStatus = false;
+  bool _togglingMeeting = false;
+
   void _startFormEdit() {
     final leadForm = _overview?.leadForm;
     setState(() {
       _formTitle.text = leadForm?.title ?? 'Training Enquiry';
+      _formMandatory = leadForm?.isMandatory ?? false;
       // Core fields are built in and not editable — only custom ones show.
       _customFields = (leadForm?.fields ?? [])
           .where((field) => !field.isCore)
@@ -179,6 +184,7 @@ class _ProfessionalFormsGroupsPageState
                 .where((field) => field.label.trim().isNotEmpty)
                 .map((field) => field.toField())
                 .toList(),
+            isMandatory: _formMandatory,
           );
       if (!mounted) return;
       setState(() {
@@ -194,6 +200,120 @@ class _ProfessionalFormsGroupsPageState
         _message = error.message;
       });
     }
+  }
+
+  Future<void> _toggleLeadFormActive(bool active) async {
+    if (_togglingStatus) return;
+    setState(() => _togglingStatus = true);
+    try {
+      await ref.read(formsGroupsApiProvider).updateLeadFormStatus(active);
+      await _load();
+      _toast(active ? 'Form enabled.' : 'Form disabled.');
+    } on ApiException catch (error) {
+      _toast(error.message);
+    }
+    if (mounted) setState(() => _togglingStatus = false);
+  }
+
+  Future<void> _toggleIntroMeeting(bool enabled) async {
+    if (_togglingMeeting) return;
+    setState(() => _togglingMeeting = true);
+    try {
+      await ref
+          .read(formsGroupsApiProvider)
+          .saveLeadMeetingSettings(introductoryMeetingEnabled: enabled);
+      await _load();
+      _toast(enabled ? 'Intro meetings enabled.' : 'Intro meetings disabled.');
+    } on ApiException catch (error) {
+      _toast(error.message);
+    }
+    if (mounted) setState(() => _togglingMeeting = false);
+  }
+
+  Future<void> _editMeetingSettings(LeadForm leadForm) async {
+    final titleCtrl = TextEditingController(text: leadForm.introductoryMeetingTitle);
+    final durationCtrl =
+        TextEditingController(text: '${leadForm.introductoryMeetingDurationMinutes}');
+    final noticeCtrl =
+        TextEditingController(text: '${leadForm.introductoryMeetingMinNoticeHours}');
+    final advanceCtrl =
+        TextEditingController(text: '${leadForm.introductoryMeetingMaxAdvanceDays}');
+    var requiresApproval = leadForm.introductoryMeetingRequiresApproval;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Meeting settings'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(labelText: 'Meeting title'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: durationCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Duration (minutes)'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: noticeCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Minimum notice (hours)'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: advanceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Max advance (days)'),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Requires my approval'),
+                  value: requiresApproval,
+                  onChanged: (value) => setDialogState(() => requiresApproval = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => context.pop(true),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true) {
+      try {
+        await ref.read(formsGroupsApiProvider).saveLeadMeetingSettings(
+              introductoryMeetingTitle: titleCtrl.text.trim(),
+              introductoryMeetingDurationMinutes:
+                  int.tryParse(durationCtrl.text.trim()) ?? leadForm.introductoryMeetingDurationMinutes,
+              introductoryMeetingMinNoticeHours:
+                  int.tryParse(noticeCtrl.text.trim()) ?? leadForm.introductoryMeetingMinNoticeHours,
+              introductoryMeetingMaxAdvanceDays:
+                  int.tryParse(advanceCtrl.text.trim()) ?? leadForm.introductoryMeetingMaxAdvanceDays,
+              introductoryMeetingRequiresApproval: requiresApproval,
+            );
+        await _load();
+        _toast('Meeting settings saved.');
+      } on ApiException catch (error) {
+        _toast(error.message);
+      }
+    }
+    titleCtrl.dispose();
+    durationCtrl.dispose();
+    noticeCtrl.dispose();
+    advanceCtrl.dispose();
   }
 
   // ----- approval -----
@@ -432,7 +552,10 @@ class _ProfessionalFormsGroupsPageState
                       ),
                     ),
                     if (leadForm != null)
-                      const StatusPill(label: 'Live', tone: PillTone.good),
+                      StatusPill(
+                        label: leadForm.isActive ? 'Live' : 'Disabled',
+                        tone: leadForm.isActive ? PillTone.good : PillTone.neutral,
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -501,6 +624,51 @@ class _ProfessionalFormsGroupsPageState
             ),
           ),
           if (leadForm != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Form settings', style: context.text.titleSmall),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Form enabled'),
+                    subtitle: const Text('Accept new public enquiries'),
+                    value: leadForm.isActive,
+                    onChanged: _togglingStatus ? null : _toggleLeadFormActive,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Introductory meeting'),
+                    subtitle: const Text('Let applicants request a meeting'),
+                    value: leadForm.introductoryMeetingEnabled,
+                    onChanged: _togglingMeeting ? null : _toggleIntroMeeting,
+                  ),
+                  if (leadForm.introductoryMeetingEnabled)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _editMeetingSettings(leadForm),
+                        icon: const Icon(Icons.tune, size: 18),
+                        label: Text(
+                          '${leadForm.introductoryMeetingDurationMinutes}-min'
+                          '${leadForm.introductoryMeetingRequiresApproval ? ' · needs approval' : ''} · edit',
+                        ),
+                      ),
+                    ),
+                  if (leadForm.isMandatory)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
+                      child: Text(
+                        'This form must be completed before a client can be added.',
+                        style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             const SectionHeader(title: 'Fields'),
             for (final field in leadForm.fields)
               RowItem(
@@ -549,6 +717,14 @@ class _ProfessionalFormsGroupsPageState
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, AppSize.buttonHeightSm),
             ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: const Text('Require before adding a client'),
+            subtitle: const Text('Clients must complete this form first'),
+            value: _formMandatory,
+            onChanged: (value) => setState(() => _formMandatory = value),
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
