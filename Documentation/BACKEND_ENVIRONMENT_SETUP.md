@@ -25,6 +25,11 @@ or redeploy Django after changing values.
 Keep the secure-cookie and HSTS fields at the values shown in `.env.example`
 after production HTTPS is active.
 
+When CloudFront terminates HTTPS in front of an HTTP Elastic Beanstalk origin,
+set `DJANGO_PROXY_SSL_HEADER=HTTP_CLOUDFRONT_FORWARDED_PROTO`. Keep the default
+`HTTP_X_FORWARDED_PROTO` value for reverse proxies that send that standard
+header directly.
+
 ### Database and cache
 
 | Variable | Secret | What to enter |
