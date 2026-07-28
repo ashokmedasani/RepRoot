@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
 
-/// The "CF" gradient mark + heading used across the auth screens.
-/// Port of the .login-brand block in the Ionic login/signup pages.
+/// RepRoot brand mark and heading used across authentication screens.
 class AuthBrand extends StatelessWidget {
   const AuthBrand({super.key, required this.title, required this.subtitle});
 
@@ -13,36 +12,15 @@ class AuthBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final colors = context.colors;
 
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: 56,
           height: 56,
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.lgAll,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [colors.primary, tokens.accent],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.primary.withValues(alpha: 0.22),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            'CF',
-            style: context.text.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 19,
-            ),
+          child: Image.asset(
+            'assets/icon/icon.png',
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(height: AppSpacing.md),

@@ -252,6 +252,59 @@ h3 {
   cursor: pointer;
 }
 
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+  padding: 0.35rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  background: var(--app-surface-soft);
+}
+
+.workspace-tab {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 4.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--app-panel-radius) - 0.25rem);
+  background: transparent;
+  color: var(--app-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-tab span {
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.workspace-tab small {
+  color: inherit;
+  font-weight: 600;
+}
+
+.workspace-tab:hover {
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.workspace-tab.active {
+  border-color: color-mix(in srgb, var(--app-primary) 45%, var(--app-border));
+  background: var(--app-surface);
+  color: var(--app-primary-strong);
+  box-shadow: var(--app-shadow);
+}
+
+@media (max-width: 640px) {
+  .workspace-tabs {
+    grid-template-columns: 1fr;
+  }
+}
+
 .switch-control input {
   position: absolute;
   width: 1px;
@@ -591,4 +644,42 @@ textarea {
   .stats-grid {
     grid-template-columns: 1fr;
   }
+}
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.workspace-actions span {
+  color: var(--app-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.lead-form-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.lead-form-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.8rem 1rem;
+  background: var(--app-surface-soft);
+}
+
+.lead-form-list article div {
+  display: grid;
+}
+
+.lead-form-list small {
+  color: var(--app-muted);
 }

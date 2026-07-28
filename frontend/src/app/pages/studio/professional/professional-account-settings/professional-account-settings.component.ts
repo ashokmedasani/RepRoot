@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, KeyValuePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -40,6 +40,7 @@ type SettingsSection =
   standalone: true,
   imports: [
     DatePipe,
+    KeyValuePipe,
     FormsModule,
     RouterLink,
     ProfessionalPageShellComponent,
@@ -59,7 +60,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private readonly confirmation = inject(ConfirmationDialogService);
 
   readonly appVersion = '1.0.0';
-  readonly supportEmail = 'support@rep-root.com';
+  readonly supportEmail = window.APP_CONFIG?.supportEmail || '';
 
   readonly menu: { id: SettingsSection; label: string }[] = [
     { id: 'my-account', label: 'My Account' },
@@ -169,7 +170,10 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private loadBillingStatus(): void {
     this.billingError = '';
     this.professionalAuthApi.getBillingStatus().subscribe({
-      next: (status) => (this.billingStatus = status),
+      next: (status) => {
+        this.billingStatus = status;
+        this.selectedCurrency = status.billing_currency;
+      },
       error: () => (this.billingError = 'Plan and billing details are temporarily unavailable.')
     });
   }
@@ -247,21 +251,38 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   }
 
   async cancelPlan(): Promise<void> {
+    const assessment = this.billingStatus?.downgrade_assessment;
+    if (!assessment) return;
+    if (!assessment.storage.eligible) {
+      this.billingActionMessageType = 'error';
+      this.billingActionMessage = `Cancellation is blocked because storage is ${assessment.storage.free_tier_percent}% of the Free allowance. Contact ${assessment.support_email || 'support'}.`;
+      return;
+    }
+
+    const requiresCleanup = !assessment.eligible;
     const confirmed = await this.confirmation.confirm({
       kind: 'warning',
       title: 'Cancel plan',
       target: 'your current plan',
-      impact: 'Your account moves to Starter Free. If current storage is over the Starter allowance, a 14-day cleanup or upgrade grace period begins before the account is frozen.',
-      confirmLabel: 'Cancel Plan'
+      impact: requiresCleanup
+        ? 'At the end of the billing period, excess forms, unused groups, unused templates, references, and empty categories may be deleted. Client records are preserved.'
+        : 'Your paid access remains active until the expiry date, then the account moves to Free. Client records are preserved.',
+      confirmLabel: requiresCleanup ? 'Continue to forced cleanup' : 'Schedule cancellation'
     });
 
     if (!confirmed) {
       return;
     }
 
+    let confirmation = '';
+    if (requiresCleanup) {
+      confirmation = window.prompt('Type DELETE EXCESS PLAN DATA to confirm deletion of excess non-client plan data at expiry.') || '';
+      if (confirmation !== 'DELETE EXCESS PLAN DATA') return;
+    }
+
     this.billingActionMessage = '';
     this.isCancellingPlan = true;
-    this.professionalAuthApi.cancelBillingPlan().subscribe({
+    this.professionalAuthApi.cancelBillingPlan(requiresCleanup, confirmation).subscribe({
       next: (response) => {
         this.billingActionMessageType = 'success';
         this.billingActionMessage = response.message;
@@ -279,11 +300,13 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
 
   readonly upgradeTierCopy: Record<ProfessionalUpgradeTier, { name: string; blurb: string }> = {
     pro: { name: 'Pro', blurb: '1 GB included storage with a temporary 20% buffer.' },
-    premium_unlimited: { name: 'Premium Unlimited', blurb: '5 GB included storage with a temporary 20% buffer.' }
+    premium_unlimited: { name: 'Premium', blurb: '5 GB storage, 25 groups, 250 references, and no trainer ads.' }
   };
 
   isUpdatePlanOpen = false;
   selectedUpgradeTier: ProfessionalUpgradeTier | null = null;
+  selectedBillingCycle = 'monthly';
+  selectedCurrency: 'INR' | 'USD' = 'INR';
 
   private readonly planRank: Record<ProfessionalPlanCode, number> = {
     starter_free: 0,
@@ -319,15 +342,54 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     if (!this.selectedUpgradeTier) return;
     this.billingActionMessage = '';
     this.isStartingCheckout = true;
-    this.professionalAuthApi.createBillingCheckout(this.selectedUpgradeTier).subscribe({
+    this.professionalAuthApi.createBillingCheckout(
+      this.selectedUpgradeTier,
+      this.selectedBillingCycle,
+      this.selectedCurrency
+    ).subscribe({
       next: (response) => {
-        window.location.href = response.checkout_url;
+        if (response.checkout_url) {
+          window.location.href = response.checkout_url;
+        } else {
+          this.billingActionMessageType = 'success';
+          this.billingActionMessage = response.message || 'Test plan updated.';
+          this.isStartingCheckout = false;
+          this.closeUpdatePlan();
+          this.loadBillingStatus();
+          this.refreshDataUsage();
+        }
       },
       error: (error: unknown) => {
         this.billingActionMessageType = 'error';
         this.billingActionMessage = this.formatApiError(error, 'Could not start checkout.');
         this.isStartingCheckout = false;
       }
+    });
+  }
+
+  selectedPrice(billing: ProfessionalBillingStatus, tier: ProfessionalUpgradeTier): string {
+    const price = billing.catalog?.trainer?.[tier]?.[this.selectedBillingCycle]?.[this.selectedCurrency];
+    if (!price) return '—';
+    return `${this.selectedCurrency === 'INR' ? '₹' : '$'}${price}`;
+  }
+
+  planPrice(billing: ProfessionalBillingStatus, code: ProfessionalPlanCode): string {
+    if (code === 'starter_free' || code === 'starter') return this.selectedCurrency === 'INR' ? '₹0' : '$0';
+    const tier = code === 'premium' ? 'premium_unlimited' : code;
+    const value = billing.catalog?.trainer?.[tier as ProfessionalUpgradeTier]?.[this.selectedBillingCycle]?.[this.selectedCurrency];
+    if (!value) return '—';
+    return `${this.selectedCurrency === 'INR' ? '₹' : '$'}${value}`;
+  }
+
+  storageLabel(bytes: number): string {
+    if (bytes >= 1024 ** 3) return `${Math.round(bytes / 1024 ** 3)} GB`;
+    return `${Math.round(bytes / 1024 ** 2)} MB`;
+  }
+
+  applyTemporaryPlan(code: ProfessionalPlanCode): void {
+    if (code === this.billingStatus?.plan.code || this.isStartingCheckout) return;
+    void this.router.navigate(['/professional/subscription-payment'], {
+      queryParams: { plan: code, cycle: this.selectedBillingCycle }
     });
   }
 

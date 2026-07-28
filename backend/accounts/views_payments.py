@@ -8,6 +8,7 @@ Kept in its own module so the main views.py doesn't keep growing.
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import Sum
 from django.http import FileResponse
 from django.utils import timezone
@@ -60,14 +61,23 @@ class ProfessionalPaymentSettingsView(APIView):
 
   def get(self, request):
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
+    payload = ProfessionalPaymentSettingsSerializer(settings_row).data
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      payload['payment_tracking_enabled'] = False
+      payload['client_payment_history_enabled'] = False
     return Response(
       {
-        'settings': ProfessionalPaymentSettingsSerializer(settings_row).data,
+        'settings': payload,
         'currency_options': _currency_options(),
       }
     )
 
   def put(self, request):
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      return Response(
+        {'message': 'Payments are not available yet.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+      )
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
     serializer = ProfessionalPaymentSettingsSerializer(settings_row, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)

@@ -12,11 +12,11 @@ import 'package:flutter/foundation.dart';
 class Env {
   const Env._();
 
-  /// Defaults to the PC's LAN IP, matching NATIVE_API_URL in the Ionic app —
-  /// the common case here is an installed debug build on a real phone.
+  /// Defaults to Android emulator loopback. Real-device and production builds
+  /// receive their public/LAN backend URL explicitly at build time.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.4.68:8000',
+    defaultValue: 'http://10.0.2.2:8000',
   );
 
   /// Deliberate opt-out for pointing a release build at a LAN dev backend:

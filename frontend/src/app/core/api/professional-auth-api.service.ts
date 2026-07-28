@@ -6,6 +6,7 @@ declare global {
   interface Window {
     APP_CONFIG?: {
       apiBaseUrl?: string;
+      supportEmail?: string;
     };
   }
 }
@@ -87,6 +88,8 @@ export interface ProfessionalDataUsageResponse {
   plan_code: ProfessionalPlanCode;
   plan_name: string;
   plan_limits: Record<string, number | null>;
+  resource_usage: Record<string, { used: number; limit: number | null; percentage: number | null }>;
+  warnings: { resource: string; level: string; message: string }[];
   usage_percent: number;
   included_quota_bytes: number;
   hard_limit_percent: number;
@@ -109,6 +112,18 @@ export interface ProfessionalDataUsageResponse {
 export interface ProfessionalDataUsageSection {
   percent_of_quota: number;
   record_count: number;
+}
+
+export interface ProfessionalOnboardingStatus {
+  profile_complete: boolean;
+  form_created: boolean;
+  group_created: boolean;
+  template_created: boolean;
+  reference_created: boolean;
+  meeting_setup_complete: boolean;
+  missing_actions: string[];
+  actions: { code: string; label: string; route: string }[];
+  message: string;
 }
 
 export interface SupportIncidentMessage {
@@ -151,6 +166,23 @@ export interface SupportIncidentListResponse {
 
 export type ProfessionalUpgradeTier = 'pro' | 'premium_unlimited';
 
+export interface DowngradeAssessment {
+  eligible: boolean;
+  storage: {
+    free_tier_percent: number;
+    exceeded_by_percent: number;
+    eligible: boolean;
+  };
+  resources: Record<string, {
+    used: number;
+    free_limit: number;
+    exceeded_by: number;
+    eligible: boolean;
+  }>;
+  clients_preserved: boolean;
+  support_email: string;
+}
+
 export interface ProfessionalBillingStatus {
   plan: {
     code: ProfessionalPlanCode;
@@ -158,13 +190,36 @@ export interface ProfessionalBillingStatus {
     [limit: string]: number | string | null;
   };
   plan_renews_at: string | null;
+  cancellation_requested_at: string | null;
+  cancellation_effective_at: string | null;
+  cancellation_force_cleanup: boolean;
+  downgrade_assessment: DowngradeAssessment;
   has_billing_account: boolean;
   billing_configured: boolean;
   // True while real Stripe pricing isn't wired up for every tier yet —
   // "Update plan" applies the chosen tier directly with no charge so the
   // rest of the lifecycle can be tested end-to-end.
   test_mode: boolean;
+  billing_currency: 'INR' | 'USD';
+  billing_region: 'India' | 'International';
   available_upgrades: Partial<Record<ProfessionalUpgradeTier, boolean>>;
+  catalog: {
+    provider: 'razorpay';
+    trainer: Record<ProfessionalUpgradeTier, Record<string, { months: number; INR: string; USD: string }>>;
+    client_ad_free: Record<string, { months: number; INR: string; USD: string }>;
+    cycles: { code: string; name: string; charged_months: number }[];
+  };
+  plans: {
+    code: ProfessionalPlanCode;
+    name: string;
+    lead_forms: number;
+    clients: number | null;
+    groups: number;
+    templates: number;
+    references: number;
+    categories: number;
+    professional_storage_bytes: number;
+  }[];
 }
 
 // The Recycle Bin is scoped narrow: only chat images, references, and whole
@@ -410,18 +465,38 @@ export class ProfessionalAuthApiService {
     });
   }
 
-  createBillingCheckout(targetTier: ProfessionalUpgradeTier): Observable<{ checkout_url: string }> {
-    return this.http.post<{ checkout_url: string }>(
+  getOnboardingStatus(): Observable<ProfessionalOnboardingStatus> {
+    return this.http.get<ProfessionalOnboardingStatus>(
+      `${this.apiBaseUrl}/professional/dashboard/onboarding-status/`,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+  createBillingCheckout(
+    targetTier: ProfessionalPlanCode,
+    billingCycle: string,
+    currency: 'INR' | 'USD'
+  ): Observable<{ checkout_url?: string; applied?: boolean; message?: string }> {
+    return this.http.post<{ checkout_url?: string; applied?: boolean; message?: string }>(
       `${this.apiBaseUrl}/professional/billing/checkout/`,
-      { target_tier: targetTier },
+      { target_tier: targetTier, billing_cycle: billingCycle, currency },
       { headers: this.getAuthHeaders() }
     );
   }
 
-  cancelBillingPlan(): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(
+  cancelBillingPlan(forceCleanup = false, confirmation = ''): Observable<{
+    message: string;
+    cancellation_effective_at?: string;
+    forced_cleanup_scheduled?: boolean;
+    assessment?: DowngradeAssessment;
+  }> {
+    return this.http.post<{
+      message: string;
+      cancellation_effective_at?: string;
+      forced_cleanup_scheduled?: boolean;
+      assessment?: DowngradeAssessment;
+    }>(
       `${this.apiBaseUrl}/professional/billing/cancel/`,
-      {},
+      { force_cleanup: forceCleanup, confirmation },
       { headers: this.getAuthHeaders() }
     );
   }

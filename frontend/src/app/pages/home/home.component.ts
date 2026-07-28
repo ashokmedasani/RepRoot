@@ -19,7 +19,7 @@ interface BrandValue {
   styleUrl: './home.component.scss'
 })
 export class HomeComponent {
-  readonly supportEmail = 'support@rep-root.com';
+  readonly supportEmail = window.APP_CONFIG?.supportEmail || '';
 
   readonly studioFeatures: StudioFeature[] = [
     { label: 'Client Management' },

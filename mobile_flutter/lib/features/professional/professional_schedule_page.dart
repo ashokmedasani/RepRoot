@@ -509,6 +509,75 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     );
   }
 
+  Future<void> _editSchedulingSettings(SchedulingSettingsRecord settings) async {
+    final timezoneCtrl = TextEditingController(text: settings.timezone);
+    final durationCtrl = TextEditingController(text: '${settings.defaultDurationMinutes}');
+    final intervalCtrl = TextEditingController(text: '${settings.slotIntervalMinutes}');
+    final bufferCtrl = TextEditingController(text: '${settings.bufferMinutes}');
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Scheduling settings'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: timezoneCtrl,
+                decoration: const InputDecoration(labelText: 'Timezone (e.g. America/New_York)'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: durationCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Default duration (min)'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: intervalCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Slot interval (min)'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: bufferCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Buffer between meetings (min)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      try {
+        final updated = await ref.read(schedulingApiProvider).saveSchedulingSettings(
+              timezone: timezoneCtrl.text.trim(),
+              defaultDurationMinutes: int.tryParse(durationCtrl.text.trim()),
+              slotIntervalMinutes: int.tryParse(intervalCtrl.text.trim()),
+              bufferMinutes: int.tryParse(bufferCtrl.text.trim()),
+            );
+        if (mounted) setState(() => _settings = updated);
+      } catch (_) {
+        if (mounted) setState(() => _availabilityMessage = 'Could not save settings.');
+      }
+    }
+    timezoneCtrl.dispose();
+    durationCtrl.dispose();
+    intervalCtrl.dispose();
+    bufferCtrl.dispose();
+  }
+
   Widget _availabilityView() {
     final settings = _settings;
     return PagePad(
@@ -521,11 +590,25 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Scheduling settings', style: context.text.titleSmall),
-                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Scheduling settings', style: context.text.titleSmall),
+                    ),
+                    IconButton(
+                      onPressed: () => _editSchedulingSettings(settings),
+                      icon: const Icon(Icons.edit_outlined),
+                      iconSize: AppSize.iconRow,
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Edit',
+                    ),
+                  ],
+                ),
                 Text('Timezone: ${settings.timezone}', style: context.text.bodySmall),
                 Text(
-                  'Default duration: ${settings.defaultDurationMinutes} min · Buffer: ${settings.bufferMinutes} min',
+                  'Default duration: ${settings.defaultDurationMinutes} min · '
+                  'Slot interval: ${settings.slotIntervalMinutes} min · '
+                  'Buffer: ${settings.bufferMinutes} min',
                   style: context.text.bodySmall,
                 ),
               ],

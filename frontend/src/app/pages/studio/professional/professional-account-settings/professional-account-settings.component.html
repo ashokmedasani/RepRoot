@@ -99,13 +99,144 @@
           <section class="account-section" aria-labelledby="billing-title">
             <div>
               <h2 id="billing-title">Plan & Billing</h2>
-              <p class="section-note">Every plan supports unlimited clients. Plans differ primarily by storage and visible operational history.</p>
+              <p class="section-note">Compare Free, Pro, and Premium usage, pricing, and limits. Paid trainer plans never display advertisements.</p>
             </div>
 
             @if (billingError) {
               <p class="message error-message">{{ billingError }}</p>
             } @else if (billingStatus; as billing) {
-              <div class="plan-summary">
+              <div class="billing-preview">
+                @if (dataUsage; as usage) {
+                  <section class="usage-preview" aria-label="Current plan usage">
+                    <div class="usage-intro">
+                      <span>Current Usage</span>
+                      <strong>{{ usage.usage_percent }}%</strong>
+                      <small>of your storage limit used</small>
+                    </div>
+                    <div class="usage-ring" [style.--usage]="usage.usage_percent">
+                      <span>{{ usage.usage_percent }}%</span>
+                    </div>
+                    <div class="usage-resources">
+                      <div><span>Groups</span><strong>{{ usage.resource_usage['groups'].used }} / {{ usage.resource_usage['groups'].limit }}</strong></div>
+                      <div><span>Templates</span><strong>{{ usage.resource_usage['templates'].used }} / {{ usage.resource_usage['templates'].limit }}</strong></div>
+                      <div><span>References</span><strong>{{ usage.resource_usage['references'].used }} / {{ usage.resource_usage['references'].limit }}</strong></div>
+                      <div><span>Storage</span><strong>{{ usage.usage_percent }}%</strong></div>
+                    </div>
+                  </section>
+                }
+
+                <div class="billing-preview-heading">
+                  <div>
+                    <h3>Choose Your Plan</h3>
+                    <p>Temporary testing only. No payment will be collected.</p>
+                  </div>
+                  <div class="preview-selectors">
+                    <select [(ngModel)]="selectedBillingCycle" name="billingCycle" aria-label="Billing period">
+                      @for (cycle of billing.catalog.cycles; track cycle.code) {
+                        <option [value]="cycle.code">{{ cycle.name }}</option>
+                      }
+                    </select>
+                    <span class="detected-region">{{ billing.billing_region }} · {{ billing.billing_currency }}</span>
+                  </div>
+                </div>
+
+                <div class="plan-card-grid">
+                  @for (plan of billing.plans; track plan.code; let index = $index) {
+                    <article class="preview-plan-card" [class.current]="billing.plan.code === plan.code">
+                      @if (billing.plan.code === plan.code) {
+                        <span class="current-plan-badge">Current Plan</span>
+                      }
+                      <div class="plan-icon" [class.pro]="plan.code === 'pro'" [class.premium]="plan.code === 'premium_unlimited'">
+                        {{ plan.code === 'starter_free' ? '➤' : (plan.code === 'pro' ? '★' : '♛') }}
+                      </div>
+                      <h3>{{ plan.name }}</h3>
+                      <p>{{ index === 0 ? 'For getting started' : (index === 1 ? 'For growing trainers' : 'For established trainers') }}</p>
+                      <div class="preview-plan-price">
+                        <strong>{{ planPrice(billing, plan.code) }}</strong>
+                        <span>/{{ selectedBillingCycle === 'monthly' ? 'month' : selectedBillingCycle === 'six_months' ? '6 months' : 'year' }}</span>
+                      </div>
+                      <ul>
+                        <li>{{ plan.lead_forms }} lead form{{ plan.lead_forms === 1 ? '' : 's' }}</li>
+                        <li>{{ plan.clients === null ? 'Unlimited clients' : (plan.clients + ' clients') }}</li>
+                        <li>{{ storageLabel(plan.professional_storage_bytes) }} storage</li>
+                        <li>{{ plan.groups }} groups</li>
+                        <li>{{ plan.references }} references</li>
+                        <li>{{ plan.categories }} categories</li>
+                      </ul>
+                      <button
+                        type="button"
+                        class="preview-plan-action"
+                        [class.current]="billing.plan.code === plan.code"
+                        [disabled]="billing.plan.code === plan.code || isStartingCheckout || plan.code === 'starter_free'"
+                        (click)="applyTemporaryPlan(plan.code)"
+                      >
+                        {{ billing.plan.code === plan.code ? 'Current Plan' : (plan.code === 'starter_free' ? 'Use cancellation below' : 'Continue to checkout') }}
+                      </button>
+                    </article>
+                  }
+                </div>
+
+                @if (billing.plan.code !== 'starter_free' && billing.plan.code !== 'starter') {
+                  <section class="membership-cancellation" aria-labelledby="membership-cancellation-title">
+                    <div>
+                      <h3 id="membership-cancellation-title">Membership</h3>
+                      @if (billing.cancellation_effective_at) {
+                        <p>Your cancellation is scheduled. Paid access ends {{ billing.cancellation_effective_at | date: 'mediumDate' }}, then your account moves to Free.</p>
+                      } @else if (billing.plan_renews_at) {
+                        <p>Your {{ billing.plan.name }} plan expires or renews on {{ billing.plan_renews_at | date: 'mediumDate' }}.</p>
+                      } @else {
+                        <p>Your paid plan is active. A cancellation scheduled during testing takes effect after 30 days.</p>
+                      }
+                    </div>
+
+                    <div class="downgrade-assessment">
+                      <h4>Free-plan eligibility</h4>
+                      <p>
+                        Storage would use {{ billing.downgrade_assessment.storage.free_tier_percent }}% of the Free allowance.
+                        @if (billing.downgrade_assessment.storage.exceeded_by_percent > 0) {
+                          This is {{ billing.downgrade_assessment.storage.exceeded_by_percent }}% over the Free allowance.
+                        }
+                      </p>
+                      <ul>
+                        @for (item of billing.downgrade_assessment.resources | keyvalue; track item.key) {
+                          <li [class.exceeded]="!item.value.eligible">
+                            {{ item.key.replace('_', ' ') }}: {{ item.value.used }} / {{ item.value.free_limit }}
+                            @if (!item.value.eligible) { <strong>Exceeded by {{ item.value.exceeded_by }}</strong> }
+                          </li>
+                        }
+                      </ul>
+                      <p>Client records are never deleted by membership cancellation.</p>
+                      @if (!billing.downgrade_assessment.storage.eligible) {
+                        <p class="message error-message">
+                          Self-service cancellation is unavailable because storage exceeds the Free allowance.
+                          Contact {{ billing.downgrade_assessment.support_email || 'customer support' }}.
+                        </p>
+                      } @else if (!billing.downgrade_assessment.eligible) {
+                        <p class="message">
+                          Reduce the exceeded items first, or choose forced cleanup. Forced cleanup removes excess non-client plan data when paid access expires.
+                        </p>
+                      }
+                    </div>
+
+                    @if (!billing.cancellation_effective_at) {
+                      <button
+                        type="button"
+                        class="link-action danger"
+                        [disabled]="isCancellingPlan || !billing.downgrade_assessment.storage.eligible"
+                        (click)="cancelPlan()"
+                      >
+                        {{ isCancellingPlan ? 'Scheduling...' : 'Cancel membership' }}
+                      </button>
+                    }
+                    @if (billingActionMessage) {
+                      <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
+                    }
+                  </section>
+                }
+              </div>
+
+              @if (billingStatus; as billing) {
+              <div class="plan-summary" hidden>
                 <div class="plan-summary-header">
                   <span class="plan-badge" [class.premium]="isTopTier(billing.plan.code)">{{ billing.plan.name }}</span>
                   @if (isTopTier(billing.plan.code) && billing.plan_renews_at) {
@@ -125,10 +256,6 @@
                   <div>
                     <span>Clients</span>
                     <strong aria-label="Unlimited clients">∞ Unlimited</strong>
-                  </div>
-                  <div>
-                    <span>Visible history</span>
-                    <strong>{{ billing.plan['client_data_retention_days'] }} days</strong>
                   </div>
                   <div>
                     <span>Templates</span>
@@ -172,6 +299,18 @@
                   <div class="update-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="update-plan-title" (click)="$event.stopPropagation()">
                     <h3 id="update-plan-title">Update plan</h3>
                     <p class="section-note">Pick the tier that fits where your business is headed.</p>
+                    <div class="tier-options" role="group" aria-label="Billing period">
+                      @for (cycle of billing.catalog.cycles; track cycle.code) {
+                        <button type="button" class="tier-option" [class.selected]="selectedBillingCycle === cycle.code" (click)="selectedBillingCycle = cycle.code">
+                          <strong>{{ cycle.name }}</strong>
+                          <span>{{ cycle.code === 'monthly' ? 'Standard monthly price' : ('Pay for ' + cycle.charged_months + ' months') }}</span>
+                        </button>
+                      }
+                    </div>
+                    <div class="tier-options" role="group" aria-label="Currency">
+                      <button type="button" class="tier-option" [class.selected]="selectedCurrency === 'INR'" (click)="selectedCurrency = 'INR'">India · INR</button>
+                      <button type="button" class="tier-option" [class.selected]="selectedCurrency === 'USD'" (click)="selectedCurrency = 'USD'">International · USD</button>
+                    </div>
                     @if (billing.test_mode) {
                       <p class="test-mode-note">🧪 Test environment — this applies the plan instantly with no real payment.</p>
                     }
@@ -186,6 +325,7 @@
                         >
                           <strong>{{ upgradeTierCopy[tier].name }}</strong>
                           <span>{{ upgradeTierCopy[tier].blurb }}</span>
+                          <strong>{{ selectedPrice(billing, tier) }}</strong>
                         </button>
                       }
                     </div>
@@ -207,6 +347,7 @@
                     </div>
                   </div>
                 </div>
+              }
               }
             }
           </section>

@@ -14,14 +14,16 @@ on a client's Schedule tab in the frontend, but they're distinct models here.
 from datetime import date, timedelta
 from uuid import UUID
 
+from django.conf import settings
 from django.db.models import Q
+from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .calendar_invites import send_meeting_invite_email
+from .calendar_invites import build_ics_bytes, send_meeting_invite_email
 from .email_utils import send_mail_background as send_mail
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
 from .access_permissions import ProfessionalAccessPermission
@@ -33,6 +35,13 @@ from .models import (
   ProfessionalLeadForm,
   ScheduledMeeting,
   ScheduledMeetingGuest,
+)
+from .google_calendar import (
+  GoogleCalendarError,
+  cancel_google_event,
+  create_google_meet_event,
+  is_google_calendar_configured,
+  update_google_event,
 )
 from .scheduling_engine import (
   compute_available_slots,
@@ -59,17 +68,57 @@ def _meeting_attendees(client, guest_clients=()):
   ]
 
 
+def _provision_video_meeting(*, uid, title, notes, start_at, end_at, attendee_emails):
+  """Create a Google Meet event when configured, with an internal fallback."""
+  if is_google_calendar_configured():
+    try:
+      event = create_google_meet_event(
+        uid=uid,
+        title=title,
+        description=notes,
+        start_at=start_at,
+        end_at=end_at,
+        attendee_emails=attendee_emails,
+      )
+      return {
+        'meeting_url': event.meeting_url,
+        'provider': 'google',
+        'event_id': event.event_id,
+        'calendar_url': event.calendar_url,
+        'sync_status': 'synced',
+      }
+    except GoogleCalendarError:
+      return {
+        'meeting_url': generate_meeting_room_url(),
+        'provider': 'google',
+        'event_id': '',
+        'calendar_url': '',
+        'sync_status': 'failed',
+      }
+  return {
+    'meeting_url': generate_meeting_room_url(),
+    'provider': 'internal',
+    'event_id': '',
+    'calendar_url': '',
+    'sync_status': 'internal',
+  }
+
+
 class ProfessionalLeadMeetingSettingsView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    forms = ProfessionalLeadForm.objects.filter(professional=request.user)
+    form_id = request.query_params.get('form_id')
+    lead_form = forms.filter(id=form_id).first() if form_id else forms.first()
     if lead_form is None:
       return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
     return Response({'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data})
 
   def put(self, request):
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user, is_active=True).first()
+    forms = ProfessionalLeadForm.objects.filter(professional=request.user)
+    form_id = request.data.get('form_id')
+    lead_form = forms.filter(id=form_id).first() if form_id else forms.first()
     if lead_form is None:
       return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -247,7 +296,7 @@ class ProfessionalLeadMeetingRequestActionView(APIView):
       send_mail(
         subject=f'Follow-up about your meeting with {request.user.get_full_name() or request.user.username}',
         message=custom_message,
-        from_email=None,
+        from_email=settings.MEETING_FROM_EMAIL,
         recipient_list=[meeting_request.contact_email],
         fail_silently=False,
       )
@@ -266,7 +315,7 @@ class ProfessionalLeadMeetingRequestActionView(APIView):
       send_mail(
         subject='Meeting request update',
         message='Your introductory meeting request was declined. The professional may contact you with another option.',
-        from_email=None, recipient_list=[meeting_request.contact_email], fail_silently=False,
+        from_email=settings.MEETING_FROM_EMAIL, recipient_list=[meeting_request.contact_email], fail_silently=False,
       )
       return Response({'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Meeting request declined.'})
 
@@ -274,31 +323,53 @@ class ProfessionalLeadMeetingRequestActionView(APIView):
       return Response({'message': 'action must be accept or decline.'}, status=status.HTTP_400_BAD_REQUEST)
 
     uid = meeting_request.cal_booking_uid or generate_meeting_uid()
-    meeting_url = generate_meeting_room_url()
     applicant_name = f'{meeting_request.submission.first_name} {meeting_request.submission.last_name}'.strip()
+    meeting_title = f'Introductory meeting with {request.user.get_full_name() or request.user.username}'
+    external = _provision_video_meeting(
+      uid=uid,
+      title=meeting_title,
+      notes=meeting_request.trainer_note,
+      start_at=meeting_request.requested_start,
+      end_at=meeting_request.requested_end,
+      attendee_emails=[meeting_request.contact_email],
+    )
 
     meeting_request.status = LeadMeetingRequest.STATUS_ACCEPTED
     meeting_request.cal_booking_uid = uid
-    meeting_request.meeting_url = meeting_url
+    meeting_request.meeting_url = external['meeting_url']
+    meeting_request.external_calendar_provider = external['provider']
+    meeting_request.external_calendar_event_id = external['event_id']
+    meeting_request.external_calendar_url = external['calendar_url']
+    meeting_request.external_calendar_sync_status = external['sync_status']
     meeting_request.reviewed_at = timezone.now()
-    meeting_request.save(update_fields=['status', 'trainer_note', 'cal_booking_uid', 'meeting_url', 'reviewed_at', 'updated_at'])
+    meeting_request.save(update_fields=[
+      'status', 'trainer_note', 'cal_booking_uid', 'meeting_url',
+      'external_calendar_provider', 'external_calendar_event_id', 'external_calendar_url',
+      'external_calendar_sync_status', 'reviewed_at', 'updated_at',
+    ])
 
     invite_note = ''
     try:
+      if external['sync_status'] == 'synced':
+        raise StopIteration
       send_meeting_invite_email(
         uid=uid,
         sequence=meeting_request.ics_sequence,
         start_at=meeting_request.requested_start,
         end_at=meeting_request.requested_end,
-        summary=f'Introductory meeting with {request.user.get_full_name() or request.user.username}',
+        summary=meeting_title,
         organizer_email=request.user.email,
         organizer_name=request.user.get_full_name() or request.user.username,
         attendees=[(applicant_name, meeting_request.contact_email)],
-        meeting_url=meeting_url,
+        meeting_url=meeting_request.meeting_url,
       )
+    except StopIteration:
+      pass
     except Exception:
       invite_note = ' The confirmation email could not be sent — please contact them directly.'
 
+    if external['sync_status'] == 'failed':
+      invite_note += ' Google Calendar was unavailable, so a fallback video room was created.'
     return Response({
       'request': LeadMeetingRequestSerializer(meeting_request).data,
       'message': f'Meeting accepted and a calendar invitation was created.{invite_note}',
@@ -445,6 +516,8 @@ class ScheduledMeetingListView(APIView):
       duration_minutes = int(request.data.get('duration_minutes') or scheduling_settings.default_duration_minutes)
     except (TypeError, ValueError):
       return Response({'message': 'duration_minutes must be a whole number of minutes.'}, status=status.HTTP_400_BAD_REQUEST)
+    if duration_minutes not in (15, 30):
+      return Response({'message': 'Video meetings must be 15 or 30 minutes.'}, status=status.HTTP_400_BAD_REQUEST)
     end_at = start_at + timedelta(minutes=duration_minutes)
 
     if not client.email:
@@ -460,9 +533,17 @@ class ScheduledMeetingListView(APIView):
       names = ', '.join(c.first_name or c.username for c in missing_email)
       return Response({'message': f'{names} has no email on file — a calendar invite needs one to send.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    meeting_url = generate_meeting_room_url()
     uid = generate_meeting_uid()
     title = request.data.get('title') or 'Meeting'
+    attendee_rows = _meeting_attendees(client, guest_clients)
+    external = _provision_video_meeting(
+      uid=uid,
+      title=title,
+      notes=request.data.get('notes', ''),
+      start_at=start_at,
+      end_at=end_at,
+      attendee_emails=[email for _, email in attendee_rows],
+    )
 
     meeting = ScheduledMeeting.objects.create(
       professional=request.user,
@@ -471,8 +552,12 @@ class ScheduledMeetingListView(APIView):
       notes=request.data.get('notes', ''),
       start_at=start_at,
       end_at=end_at,
-      meeting_url=meeting_url,
+      meeting_url=external['meeting_url'],
       cal_booking_uid=uid,
+      external_calendar_provider=external['provider'],
+      external_calendar_event_id=external['event_id'],
+      external_calendar_url=external['calendar_url'],
+      external_calendar_sync_status=external['sync_status'],
       status=ScheduledMeeting.STATUS_SCHEDULED,
     )
     for guest_client in guest_clients:
@@ -480,6 +565,8 @@ class ScheduledMeetingListView(APIView):
 
     invite_note = ''
     try:
+      if external['sync_status'] == 'synced':
+        raise StopIteration
       send_meeting_invite_email(
         uid=uid,
         sequence=0,
@@ -488,12 +575,16 @@ class ScheduledMeetingListView(APIView):
         summary=title,
         organizer_email=request.user.email,
         organizer_name=request.user.get_full_name() or request.user.username,
-        attendees=_meeting_attendees(client, guest_clients),
-        meeting_url=meeting_url,
+        attendees=attendee_rows,
+        meeting_url=meeting.meeting_url,
       )
+    except StopIteration:
+      pass
     except Exception:
       invite_note = ' Calendar invite emails could not be sent — please share the join link directly.'
 
+    if external['sync_status'] == 'failed':
+      invite_note += ' Google Calendar was unavailable, so a fallback video room was created.'
     all_names = ', '.join([client.first_name or client.username] + [c.first_name or c.username for c in guest_clients])
     return Response(
       {'meeting': ScheduledMeetingSerializer(meeting).data, 'message': f'Meeting scheduled with {all_names}.{invite_note}'},
@@ -525,11 +616,26 @@ class ScheduledMeetingRescheduleView(APIView):
     meeting.end_at = start_at + duration
     meeting.cal_booking_uid = meeting.cal_booking_uid or generate_meeting_uid()
     meeting.ics_sequence += 1
-    meeting.save(update_fields=['start_at', 'end_at', 'cal_booking_uid', 'ics_sequence', 'updated_at'])
+    if meeting.external_calendar_provider == 'google' and meeting.external_calendar_event_id:
+      try:
+        update_google_event(
+          meeting.external_calendar_event_id,
+          start_at=meeting.start_at,
+          end_at=meeting.end_at,
+        )
+        meeting.external_calendar_sync_status = 'synced'
+      except GoogleCalendarError:
+        meeting.external_calendar_sync_status = 'failed'
+    meeting.save(update_fields=[
+      'start_at', 'end_at', 'cal_booking_uid', 'ics_sequence',
+      'external_calendar_sync_status', 'updated_at',
+    ])
 
     guest_clients = [guest.client for guest in meeting.guests.all()]
     invite_note = ''
     try:
+      if meeting.external_calendar_sync_status == 'synced':
+        raise StopIteration
       send_meeting_invite_email(
         uid=meeting.cal_booking_uid,
         sequence=meeting.ics_sequence,
@@ -542,9 +648,13 @@ class ScheduledMeetingRescheduleView(APIView):
         meeting_url=meeting.meeting_url,
         extra_body=f"This meeting was rescheduled. {request.data.get('reason', '')}".strip(),
       )
+    except StopIteration:
+      pass
     except Exception:
       invite_note = ' Updated calendar invites could not be emailed — please notify attendees directly.'
 
+    if meeting.external_calendar_sync_status == 'failed':
+      invite_note += ' Google Calendar could not be updated; the RepRoot appointment was updated.'
     return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': f'Meeting rescheduled.{invite_note}'})
 
 
@@ -562,9 +672,17 @@ class ScheduledMeetingCancelView(APIView):
     meeting.status = ScheduledMeeting.STATUS_CANCELLED
     meeting.cancellation_reason = reason
     meeting.ics_sequence += 1
-    meeting.save(update_fields=['status', 'cancellation_reason', 'ics_sequence', 'updated_at'])
+    if meeting.external_calendar_provider == 'google' and meeting.external_calendar_event_id:
+      try:
+        cancel_google_event(meeting.external_calendar_event_id)
+        meeting.external_calendar_sync_status = 'cancelled'
+      except GoogleCalendarError:
+        meeting.external_calendar_sync_status = 'failed'
+    meeting.save(update_fields=[
+      'status', 'cancellation_reason', 'ics_sequence', 'external_calendar_sync_status', 'updated_at',
+    ])
 
-    if meeting.cal_booking_uid:
+    if meeting.cal_booking_uid and meeting.external_calendar_sync_status != 'cancelled':
       guest_clients = [guest.client for guest in meeting.guests.all()]
       try:
         send_meeting_invite_email(
@@ -583,6 +701,41 @@ class ScheduledMeetingCancelView(APIView):
         pass  # Best-effort; the cancellation itself is already saved.
 
     return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': 'Meeting cancelled.'})
+
+
+class ClientMeetingCalendarInviteView(APIView):
+  """Return an RFC 5545 invite that a mobile device can open in any calendar."""
+
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request, meeting_id):
+    client = request.auth
+    meeting = ScheduledMeeting.objects.filter(
+      Q(client=client) | Q(guests__client=client),
+      id=meeting_id,
+    ).select_related('professional', 'client').prefetch_related('guests__client').distinct().first()
+    if meeting is None:
+      return Response({'message': 'Meeting not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    attendees = _meeting_attendees(meeting.client, [guest.client for guest in meeting.guests.all()])
+    invite = build_ics_bytes(
+      uid=meeting.cal_booking_uid or f'reproot-meeting-{meeting.id}',
+      sequence=meeting.ics_sequence,
+      start_at=meeting.start_at,
+      end_at=meeting.end_at,
+      summary=meeting.title,
+      organizer_email=meeting.professional.email,
+      organizer_name=meeting.professional.get_full_name() or meeting.professional.username,
+      attendees=attendees,
+      location=meeting.meeting_url,
+      description=f'{meeting.notes}\nJoin: {meeting.meeting_url}'.strip(),
+      method='CANCEL' if meeting.status == ScheduledMeeting.STATUS_CANCELLED else 'REQUEST',
+      cancelled=meeting.status == ScheduledMeeting.STATUS_CANCELLED,
+    )
+    response = HttpResponse(invite, content_type='text/calendar; charset=UTF-8')
+    response['Content-Disposition'] = f'attachment; filename="reproot-meeting-{meeting.id}.ics"'
+    return response
 
 
 class ClientScheduledMeetingListView(APIView):

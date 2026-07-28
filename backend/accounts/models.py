@@ -161,7 +161,12 @@ class ProfessionalProfile(models.Model):
   plan_tier = models.CharField(max_length=20, choices=PLAN_CHOICES, default=PLAN_STARTER_FREE, db_index=True)
   stripe_customer_id = models.CharField(max_length=64, blank=True, db_index=True)
   stripe_subscription_id = models.CharField(max_length=64, blank=True, db_index=True)
+  razorpay_payment_link_id = models.CharField(max_length=64, blank=True, db_index=True)
+  razorpay_payment_id = models.CharField(max_length=64, blank=True, db_index=True)
   plan_renews_at = models.DateTimeField(null=True, blank=True)
+  cancellation_requested_at = models.DateTimeField(null=True, blank=True)
+  cancellation_effective_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  cancellation_force_cleanup = models.BooleanField(default=False)
 
   # NEW: Account lifecycle fields
   is_locked = models.BooleanField(default=False, db_index=True)
@@ -220,7 +225,7 @@ class ProfessionalProfile(models.Model):
 
 
 class ProfessionalLeadForm(models.Model):
-  professional = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lead_form')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='lead_forms')
   public_slug = models.SlugField(max_length=64, unique=True)
   title = models.CharField(max_length=160, default='Professional Lead Form')
   fields = models.JSONField(default=list)
@@ -339,6 +344,10 @@ class LeadMeetingRequest(models.Model):
   cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
   ics_sequence = models.PositiveIntegerField(default=0)
   meeting_url = models.URLField(blank=True)
+  external_calendar_provider = models.CharField(max_length=20, blank=True)
+  external_calendar_event_id = models.CharField(max_length=255, blank=True, db_index=True)
+  external_calendar_url = models.URLField(blank=True)
+  external_calendar_sync_status = models.CharField(max_length=20, default='internal')
   expires_at = models.DateTimeField(db_index=True)
   reviewed_at = models.DateTimeField(null=True, blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
@@ -726,6 +735,10 @@ class ScheduledMeeting(models.Model):
   # not a Cal.com booking id — field name kept for backward compatibility with existing rows.
   cal_booking_uid = models.CharField(max_length=64, blank=True, db_index=True)
   ics_sequence = models.PositiveIntegerField(default=0)
+  external_calendar_provider = models.CharField(max_length=20, blank=True)
+  external_calendar_event_id = models.CharField(max_length=255, blank=True, db_index=True)
+  external_calendar_url = models.URLField(blank=True)
+  external_calendar_sync_status = models.CharField(max_length=20, default='internal')
   status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, db_index=True)
   cancellation_reason = models.TextField(blank=True)
   client_response_status = models.CharField(max_length=10, choices=RESPONSE_CHOICES, default=RESPONSE_PENDING)

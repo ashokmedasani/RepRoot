@@ -6,6 +6,7 @@ declare global {
   interface Window {
     APP_CONFIG?: {
       apiBaseUrl?: string;
+      supportEmail?: string;
     };
   }
 }
@@ -135,6 +136,8 @@ export interface LeadSubmission {
 export interface FormsGroupsOverview {
   has_lead_form: boolean;
   lead_form: LeadForm | null;
+  lead_forms: LeadForm[];
+  max_lead_forms: number;
   groups: ProfessionalGroup[];
   pending_forms: LeadSubmission[];
   approved_forms: LeadSubmission[];
@@ -365,15 +368,19 @@ export class FormsGroupsApiService {
   saveLeadForm(
     title: string,
     customFields: DynamicField[],
-    isMandatory?: boolean
+    isMandatory?: boolean,
+    formId?: number
   ): Observable<{ lead_form: LeadForm; message: string }> {
-    const body: { title: string; custom_fields: DynamicField[]; is_mandatory?: boolean } = {
+    const body: { title: string; custom_fields: DynamicField[]; is_mandatory?: boolean; form_id?: number } = {
       title,
       custom_fields: customFields
     };
 
     if (isMandatory !== undefined) {
       body.is_mandatory = isMandatory;
+    }
+    if (formId !== undefined) {
+      body.form_id = formId;
     }
 
     return this.http.post<{ lead_form: LeadForm; message: string }>(
@@ -383,16 +390,16 @@ export class FormsGroupsApiService {
     );
   }
 
-  saveLeadMeetingSettings(payload: Partial<LeadForm>): Observable<{ lead_form: LeadForm; message: string }> {
+  saveLeadMeetingSettings(payload: Partial<LeadForm> & { form_id?: number }): Observable<{ lead_form: LeadForm; message: string }> {
     return this.http.put<{ lead_form: LeadForm; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/lead-form/meeting-settings/`, payload, { headers: this.getAuthHeaders() }
     );
   }
 
-  updateLeadFormStatus(isActive: boolean): Observable<{ lead_form: LeadForm; message: string }> {
+  updateLeadFormStatus(isActive: boolean, formId?: number): Observable<{ lead_form: LeadForm; message: string }> {
     return this.http.put<{ lead_form: LeadForm; message: string }>(
       `${this.apiBaseUrl}/professional/forms-groups/lead-form/status/`,
-      { is_active: isActive },
+      { is_active: isActive, ...(formId !== undefined ? { form_id: formId } : {}) },
       { headers: this.getAuthHeaders() }
     );
   }

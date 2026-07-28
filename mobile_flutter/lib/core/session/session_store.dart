@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -15,7 +17,7 @@ class SessionKeys {
   static const clientAccess = 'client-access';
 }
 
-class SessionStore {
+class SessionStore extends ChangeNotifier {
   SessionStore(this._storage);
 
   final FlutterSecureStorage _storage;
@@ -48,12 +50,16 @@ class SessionStore {
 
   Future<void> write(String key, String value) async {
     _cache[key] = value;
+    notifyListeners();
     await _storage.write(key: key, value: value);
   }
 
   Future<void> clear(List<String> keys) async {
     for (final key in keys) {
       _cache.remove(key);
+    }
+    notifyListeners();
+    for (final key in keys) {
       await _storage.delete(key: key);
     }
   }
@@ -69,10 +75,41 @@ class SessionStore {
   Future<void> storeClientToken(String token) =>
       write(SessionKeys.clientToken, token);
 
-  Future<void> clearProfessionalSession() => clear([SessionKeys.professionalToken]);
+  Future<void> clearProfessionalSession() =>
+      clear([SessionKeys.professionalToken]);
 
   Future<void> clearClientSession() =>
       clear([SessionKeys.clientToken, SessionKeys.clientAccess]);
+
+  /// Immediately invalidates an unauthorized role in memory so interceptors
+  /// stop attaching the rejected token. Secure-storage cleanup is best-effort
+  /// in the background because a 401 response must not wait on the keystore.
+  void invalidateProfessionalSession() {
+    _invalidate([SessionKeys.professionalToken]);
+  }
+
+  void invalidateClientSession() {
+    _invalidate([SessionKeys.clientToken, SessionKeys.clientAccess]);
+  }
+
+  void _invalidate(List<String> keys) {
+    for (final key in keys) {
+      _cache.remove(key);
+    }
+    notifyListeners();
+    unawaited(_deletePersisted(keys));
+  }
+
+  Future<void> _deletePersisted(List<String> keys) async {
+    for (final key in keys) {
+      try {
+        await _storage.delete(key: key);
+      } catch (_) {
+        // The in-memory session is already invalid. Keystore cleanup is
+        // best-effort here (and unavailable under unit tests).
+      }
+    }
+  }
 }
 
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {

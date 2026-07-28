@@ -216,6 +216,15 @@ export const routes: Routes = [
     title: 'Create Lead Form'
   },
   {
+    path: 'professional/subscription-payment',
+    canActivate: [professionalAuthGuard],
+    loadComponent: () =>
+      import('./pages/studio/professional/professional-subscription-payment/professional-subscription-payment.component').then(
+        (module) => module.ProfessionalSubscriptionPaymentComponent
+      ),
+    title: 'Subscription Payment'
+  },
+  {
     path: 'professional/groups/create',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>

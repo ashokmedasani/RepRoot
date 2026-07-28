@@ -333,7 +333,7 @@ Your RepRoot account has been **FROZEN** because you exceeded your Starter stora
 
 **IMPORTANT:** After 30 frozen days, the account enters a final 14-day Recycle Bin. Support can restore it during that window; deletion after expiry is permanent.
 
-To upgrade or request support, email us at support@reproot.com or visit {settings.REPROOT_FRONTEND_URL}
+To upgrade or request support, email us at {settings.SUPPORT_EMAIL or settings.DEFAULT_FROM_EMAIL} or visit {settings.REPROOT_FRONTEND_URL}
 
 Best regards,
 RepRoot Team
@@ -385,7 +385,7 @@ Support can restore the complete account during these 14 days. After the recycle
 
 **To prevent deletion, you must:**
 1. Upgrade to Pro or Premium Unlimited tier immediately
-2. Contact support@reproot.com to request emergency account recovery
+2. Contact {settings.SUPPORT_EMAIL or settings.DEFAULT_FROM_EMAIL} to request emergency account recovery
 
 After 14 days, your data will be erased automatically.
 

@@ -210,22 +210,36 @@ class ProfessionalAuthApi {
 
   /// Returns a Stripe checkout URL (empty in test mode — the tier applies
   /// immediately server-side without a charge).
-  Future<String> createBillingCheckout(String targetTier) {
+  Future<String> createBillingCheckout(
+    String targetTier, {
+    String billingCycle = 'monthly',
+    String currency = 'INR',
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/billing/checkout/',
-        data: {'target_tier': targetTier},
+        data: {
+          'target_tier': targetTier,
+          'billing_cycle': billingCycle,
+          'currency': currency,
+        },
         options: _auth,
       );
       return res.data?['checkout_url'] as String? ?? '';
     });
   }
 
-  Future<String> cancelBillingPlan() {
+  Future<String> cancelBillingPlan({
+    bool forceCleanup = false,
+    String confirmation = '',
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/billing/cancel/',
-        data: const {},
+        data: {
+          'force_cleanup': forceCleanup,
+          'confirmation': confirmation,
+        },
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';
@@ -281,9 +295,9 @@ class ProfessionalAuthApi {
 
   Future<bool> checkProfessionalCode(String professionalCode) {
     return runApi(() async {
-      final res = await _dio.get<Map<String, dynamic>>(
+      final res = await _dio.post<Map<String, dynamic>>(
         '/professional/check-professional-code/',
-        queryParameters: {'professional_code': professionalCode},
+        data: {'professional_code': professionalCode},
         options: _auth,
       );
       return res.data?['available'] as bool? ?? false;

@@ -15,6 +15,7 @@ import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmat
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
 
 type SubmissionView = 'pending' | 'approved' | 'deleted';
+type WorkspaceTab = 'forms' | 'groups';
 
 @Component({
   selector: 'app-professional-forms-groups',
@@ -35,6 +36,7 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
   message = '';
   messageType: 'success' | 'error' = 'success';
   selectedSubmissionView: SubmissionView = 'pending';
+  activeWorkspaceTab: WorkspaceTab = 'forms';
   monthFilter = '';
   readonly monthOptions = this.createLastSixMonthOptions();
 
@@ -149,6 +151,10 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
 
   setSubmissionView(view: SubmissionView): void {
     this.selectedSubmissionView = view;
+  }
+
+  setWorkspaceTab(tab: WorkspaceTab): void {
+    this.activeWorkspaceTab = tab;
   }
 
   toggleLeadFormActive(event: Event): void {

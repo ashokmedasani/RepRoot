@@ -191,7 +191,11 @@ def calculate_professional_data_usage(professional) -> dict:
   # visually capped at 100 — percentage only, never raw byte counts.
   usage_percent = round((total_bytes / quota_bytes) * 100, 2)
   usage_display_percent = min(settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT, usage_percent)
-  warning_threshold = settings.REPROOT_DATA_USAGE_WARNING_PERCENT
+  warning_threshold = (
+    90
+    if plan['code'] == 'premium_unlimited'
+    else settings.REPROOT_DATA_USAGE_WARNING_PERCENT
+  )
   danger_threshold = settings.REPROOT_DATA_USAGE_DANGER_PERCENT
 
   # Get professional profile for account lock status
@@ -207,11 +211,54 @@ def calculate_professional_data_usage(professional) -> dict:
   plan_limits = {
     key: value for key, value in plan.items() if key not in ('code', 'name', 'professional_storage_bytes')
   }
+  resource_counts = {
+    'lead_forms': ProfessionalLeadForm.objects.filter(professional=professional).count(),
+    'clients': ClientAccess.objects.filter(professional=professional).count(),
+    'groups': ProfessionalGroup.objects.filter(professional=professional).count(),
+    'templates': TrackingTemplate.objects.filter(professional=professional).count(),
+    'references': ProfessionalReference.objects.filter(professional=professional).count(),
+    'categories': ReferenceCategory.objects.filter(professional=professional).count(),
+  }
+  resource_usage = {
+    key: {
+      'used': used,
+      'limit': plan.get(key),
+      'percentage': (
+        round((used / plan[key]) * 100, 2)
+        if isinstance(plan.get(key), int) and plan[key] > 0
+        else None
+      ),
+    }
+    for key, used in resource_counts.items()
+  }
+  warnings = []
+  if usage_percent >= 100:
+    warnings.append({
+      'resource': 'storage',
+      'level': 'limit_reached',
+      'message': (
+        'You have reached the maximum Premium storage usage. Free up storage to continue uploads.'
+        if plan['code'] == 'premium_unlimited'
+        else 'You have reached your storage limit. Switch or upgrade your plan to continue.'
+      ),
+    })
+  elif usage_percent >= warning_threshold:
+    warnings.append({
+      'resource': 'storage',
+      'level': 'urgent' if usage_percent >= 90 else 'approaching',
+      'message': (
+        f'You are close to the maximum Premium storage usage ({round(usage_percent)}%). Review and free up storage.'
+        if plan['code'] == 'premium_unlimited'
+        else f'Your storage usage is {round(usage_percent)}%. Consider switching or upgrading your plan.'
+      ),
+    })
 
   result = {
     'plan_code': plan['code'],
     'plan_name': plan['name'],
     'plan_limits': plan_limits,
+    'resource_usage': resource_usage,
+    'warnings': warnings,
     'usage_percent': usage_display_percent,
     'included_quota_bytes': quota_bytes,
     'hard_limit_percent': settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT,

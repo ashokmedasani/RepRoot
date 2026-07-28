@@ -191,7 +191,7 @@ def _send_invite_emails(
       message = EmailMessage(
         subject=subject,
         body=body,
-        from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+        from_email=getattr(settings, 'MEETING_FROM_EMAIL', None) or getattr(settings, 'DEFAULT_FROM_EMAIL', None),
         to=[email],
       )
       message.attach(filename, ics_bytes, content_type)

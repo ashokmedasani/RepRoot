@@ -30,6 +30,7 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
   step: 'form' | 'meeting' = 'form';
   hasAvailability = false;
+  activeFormId: number | undefined;
   meetingSettings = {
     introductory_meeting_enabled: false,
     introductory_meeting_title: '15-minute introductory call',
@@ -85,23 +86,29 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
     this.formsGroupsApi.getOverview().subscribe({
       next: (overview) => {
         this.overview = overview;
-        this.title = overview.lead_form?.title || 'Professional Lead Form';
-        const savedCustomFields = (overview.lead_form?.fields || []).filter((field) => !field.is_core);
+        const requestedId = Number(this.route.snapshot.queryParamMap.get('formId'));
+        const isNew = this.route.snapshot.queryParamMap.get('new') === '1';
+        const selectedForm = isNew
+          ? null
+          : overview.lead_forms.find((form) => form.id === requestedId) || overview.lead_form;
+        this.activeFormId = selectedForm?.id;
+        this.title = selectedForm?.title || 'Professional Lead Form';
+        const savedCustomFields = (selectedForm?.fields || []).filter((field) => !field.is_core);
         this.customFields = (savedCustomFields.length ? savedCustomFields : this.defaultLeadFields).map((field) => ({
           ...field,
           options: [...(field.options || [])]
         }));
-        if (overview.lead_form) {
+        if (selectedForm) {
           this.meetingSettings = {
-            introductory_meeting_enabled: overview.lead_form.introductory_meeting_enabled,
-            introductory_meeting_title: overview.lead_form.introductory_meeting_title,
-            introductory_meeting_duration_minutes: overview.lead_form.introductory_meeting_duration_minutes,
-            introductory_meeting_min_notice_hours: overview.lead_form.introductory_meeting_min_notice_hours,
-            introductory_meeting_max_advance_days: overview.lead_form.introductory_meeting_max_advance_days,
-            introductory_meeting_buffer_minutes: overview.lead_form.introductory_meeting_buffer_minutes,
+            introductory_meeting_enabled: selectedForm.introductory_meeting_enabled,
+            introductory_meeting_title: selectedForm.introductory_meeting_title,
+            introductory_meeting_duration_minutes: selectedForm.introductory_meeting_duration_minutes,
+            introductory_meeting_min_notice_hours: selectedForm.introductory_meeting_min_notice_hours,
+            introductory_meeting_max_advance_days: selectedForm.introductory_meeting_max_advance_days,
+            introductory_meeting_buffer_minutes: selectedForm.introductory_meeting_buffer_minutes,
           };
         }
-        if (this.route.snapshot.queryParamMap.get('step') === 'meeting' && overview.lead_form) {
+        if (this.route.snapshot.queryParamMap.get('step') === 'meeting' && selectedForm) {
           this.step = 'meeting';
         }
         this.isLoading = false;
@@ -121,8 +128,9 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
   saveForm(): void {
     this.isSaving = true;
     this.message = '';
-    this.formsGroupsApi.saveLeadForm(this.title, this.customFields).subscribe({
-      next: () => {
+    this.formsGroupsApi.saveLeadForm(this.title, this.customFields, undefined, this.activeFormId).subscribe({
+      next: ({ lead_form }) => {
+        this.activeFormId = lead_form.id;
         this.messageType = 'success';
         this.message = 'Form saved. Now choose whether applicants may request an introductory meeting.';
         this.step = 'meeting';
@@ -139,7 +147,7 @@ export class ProfessionalLeadFormCreateComponent implements OnInit {
   saveMeetingSettings(): void {
     this.isSaving = true;
     this.message = '';
-    this.formsGroupsApi.saveLeadMeetingSettings(this.meetingSettings).subscribe({
+    this.formsGroupsApi.saveLeadMeetingSettings({ ...this.meetingSettings, form_id: this.activeFormId }).subscribe({
       next: () => {
         this.messageType = 'success';
         this.message = this.meetingSettings.introductory_meeting_enabled

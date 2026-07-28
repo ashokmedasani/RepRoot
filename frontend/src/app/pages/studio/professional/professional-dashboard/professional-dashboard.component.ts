@@ -19,6 +19,11 @@ import { ChartRendererComponent } from '@studio-shared/analytics/chart-renderer.
 import { chartTheme } from '@studio-shared/analytics/charts/chart-theme';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
+import {
+  ProfessionalAuthApiService,
+  ProfessionalDataUsageResponse,
+  ProfessionalOnboardingStatus
+} from '@core/api/professional-auth-api.service';
 
 type DashboardTab = 'activity' | 'payments' | 'schedules';
 
@@ -41,10 +46,13 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   private readonly chatApi = inject(ChatApiService);
   private readonly paymentsApi = inject(PaymentsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
 
   activeTab: DashboardTab = 'activity';
   isLoading = true;
   message = '';
+  planUsage: ProfessionalDataUsageResponse | null = null;
+  onboarding: ProfessionalOnboardingStatus | null = null;
 
   // Activity
   overview: FormsGroupsOverview | null = null;
@@ -55,7 +63,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   // Payments
-  paymentsEnabled = true;
+  paymentsEnabled = false;
   paymentActions: PaymentActionItem[] = [];
   paymentReviewCount = 0;
   paymentOverdueCount = 0;
@@ -90,6 +98,14 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   };
 
   ngOnInit(): void {
+    this.professionalAuthApi.getDataUsage().subscribe({
+      next: (usage) => (this.planUsage = usage),
+      error: () => (this.planUsage = null)
+    });
+    this.professionalAuthApi.getOnboardingStatus().subscribe({
+      next: (status) => (this.onboarding = status),
+      error: () => (this.onboarding = null)
+    });
     this.formsGroupsApi.getOverview().subscribe({
       next: (overview) => {
         this.overview = overview;
@@ -134,7 +150,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
           this.activeTab = 'activity';
         }
       },
-      error: () => (this.paymentsEnabled = true)
+      error: () => (this.paymentsEnabled = false)
     });
   }
 

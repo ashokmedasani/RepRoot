@@ -43,7 +43,8 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final scheme = options.extra[kAuthSchemeKey] as AuthScheme? ?? AuthScheme.none;
+    final scheme =
+        options.extra[kAuthSchemeKey] as AuthScheme? ?? AuthScheme.none;
     final token = switch (scheme) {
       AuthScheme.professional => _session.professionalToken,
       AuthScheme.client => _session.clientToken,
@@ -58,11 +59,26 @@ class _AuthInterceptor extends Interceptor {
 }
 
 class _ErrorInterceptor extends Interceptor {
+  _ErrorInterceptor(this._session);
+
+  final SessionStore _session;
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    handler.reject(
-      err.copyWith(error: _toApiException(err)),
-    );
+    if (err.response?.statusCode == 401) {
+      final scheme =
+          err.requestOptions.extra[kAuthSchemeKey] as AuthScheme? ??
+          AuthScheme.none;
+      switch (scheme) {
+        case AuthScheme.professional:
+          _session.invalidateProfessionalSession();
+        case AuthScheme.client:
+          _session.invalidateClientSession();
+        case AuthScheme.none:
+          break;
+      }
+    }
+    handler.reject(err.copyWith(error: _toApiException(err)));
   }
 
   ApiException _toApiException(DioException err) {
@@ -74,13 +90,18 @@ class _ErrorInterceptor extends Interceptor {
       for (final entry in data.entries) {
         final value = entry.value;
         if (value is List) {
-          fieldErrors[entry.key.toString()] =
-              value.map((v) => v.toString()).toList();
+          fieldErrors[entry.key.toString()] = value
+              .map((v) => v.toString())
+              .toList();
         }
       }
       final message = data['message'] ?? data['detail'] ?? data['error'];
       if (message is String && message.isNotEmpty) {
-        return ApiException(message, statusCode: status, fieldErrors: fieldErrors);
+        return ApiException(
+          message,
+          statusCode: status,
+          fieldErrors: fieldErrors,
+        );
       }
       if (fieldErrors.isNotEmpty) {
         return ApiException(
@@ -98,9 +119,10 @@ class _ErrorInterceptor extends Interceptor {
         'The server took too long to respond. Check your connection and try again.',
       DioExceptionType.connectionError =>
         'Cannot reach the server. Check that you are on the same network and try again.',
-      _ => status != null
-          ? 'Something went wrong (error $status). Please try again.'
-          : 'Something went wrong. Please try again.',
+      _ =>
+        status != null
+            ? 'Something went wrong (error $status). Please try again.'
+            : 'Something went wrong. Please try again.',
     };
     return ApiException(message, statusCode: status);
   }
@@ -123,7 +145,7 @@ Dio buildDio(SessionStore session) {
   );
   dio.interceptors.addAll([
     _AuthInterceptor(session),
-    _ErrorInterceptor(),
+    _ErrorInterceptor(session),
   ]);
   return dio;
 }

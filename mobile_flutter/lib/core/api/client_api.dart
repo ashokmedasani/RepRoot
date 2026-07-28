@@ -355,6 +355,13 @@ class ClientApi {
           res.data?['meeting'] as Map<String, dynamic>? ?? {},
         );
       });
+  Future<List<int>> downloadMeetingCalendarInvite(int id) => runApi(() async {
+    final res = await _dio.get<List<int>>(
+      '/client/scheduling/meetings/$id/calendar/',
+      options: _auth.copyWith(responseType: ResponseType.bytes),
+    );
+    return res.data ?? const [];
+  });
 
   // ----- profile change / deletion requests -----
 

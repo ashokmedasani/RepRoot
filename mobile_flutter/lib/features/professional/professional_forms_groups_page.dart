@@ -498,7 +498,9 @@ class _ProfessionalFormsGroupsPageState
                     AppSpacing.screen,
                     AppSpacing.sm,
                   ),
-                  child: SegmentedButton<FormsTab>(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<FormsTab>(
                     segments: [
                       const ButtonSegment(value: FormsTab.form, label: Text('Form')),
                       const ButtonSegment(value: FormsTab.groups, label: Text('Groups')),
@@ -515,6 +517,7 @@ class _ProfessionalFormsGroupsPageState
                     style: SegmentedButton.styleFrom(
                       textStyle: context.text.labelMedium,
                       visualDensity: VisualDensity.compact,
+                    ),
                     ),
                   ),
                 ),

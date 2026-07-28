@@ -14,6 +14,30 @@
       <p>Loading dashboard...</p>
     </section>
   } @else {
+    @if (onboarding && onboarding.missing_actions.length > 0) {
+      <section class="action-required" aria-labelledby="action-required-title">
+        <div>
+          <p class="eyebrow">Workspace setup</p>
+          <h2 id="action-required-title">Action Required</h2>
+          <p>{{ onboarding.message }}</p>
+        </div>
+        <div class="action-required-links">
+          @for (action of onboarding.actions; track action.code) {
+            <a [routerLink]="action.route">{{ action.label }}</a>
+          }
+        </div>
+      </section>
+    }
+
+    @if (planUsage; as usage) {
+      <div class="attention-kpi-row" aria-label="Current plan usage">
+        <article class="attention-kpi clear"><span>Plan</span><strong>{{ usage.plan_name }}</strong><small>Current subscription</small></article>
+        <article class="attention-kpi"><span>Groups</span><strong>{{ usage.resource_usage['groups'].used }} / {{ usage.resource_usage['groups'].limit }}</strong><small>Used</small></article>
+        <article class="attention-kpi"><span>References</span><strong>{{ usage.resource_usage['references'].used }} / {{ usage.resource_usage['references'].limit }}</strong><small>Used</small></article>
+        <article class="attention-kpi"><span>Lead Forms</span><strong>{{ usage.resource_usage['lead_forms'].used }} / {{ usage.resource_usage['lead_forms'].limit }}</strong><small>Used</small></article>
+      </div>
+    }
+
     <nav class="dash-tabs" aria-label="Dashboard sections">
       <button type="button" class="dash-tab" [class.active]="activeTab === 'activity'" (click)="selectTab('activity')">
         <span>Activity</span>

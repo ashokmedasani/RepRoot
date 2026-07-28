@@ -19,6 +19,47 @@
         <p>Loading Forms & Groups...</p>
       </section>
     } @else if (overview) {
+      <nav class="workspace-tabs" aria-label="Forms and groups sections">
+        <button
+          type="button"
+          class="workspace-tab"
+          [class.active]="activeWorkspaceTab === 'forms'"
+          [attr.aria-selected]="activeWorkspaceTab === 'forms'"
+          (click)="setWorkspaceTab('forms')"
+        >
+          <span>Forms</span>
+          <small>Lead form and requests</small>
+        </button>
+        <button
+          type="button"
+          class="workspace-tab"
+          [class.active]="activeWorkspaceTab === 'groups'"
+          [attr.aria-selected]="activeWorkspaceTab === 'groups'"
+          (click)="setWorkspaceTab('groups')"
+        >
+          <span>Groups</span>
+          <small>{{ overview.groups.length }} managed group{{ overview.groups.length === 1 ? '' : 's' }}</small>
+        </button>
+      </nav>
+
+      @if (activeWorkspaceTab === 'forms') {
+      <div class="workspace-actions">
+        <span>{{ overview.lead_forms.length }} / {{ overview.max_lead_forms }} forms used</span>
+        <a routerLink="/professional/forms/create" [queryParams]="{ new: 1 }" class="primary-action">Create Form</a>
+      </div>
+      @if (overview.lead_forms.length > 1) {
+        <div class="lead-form-list" aria-label="Lead forms">
+          @for (form of overview.lead_forms; track form.id) {
+            <article>
+              <div>
+                <strong>{{ form.title }}</strong>
+                <small>{{ form.is_active ? 'Active' : 'Disabled' }}</small>
+              </div>
+              <a routerLink="/professional/forms/create" [queryParams]="{ formId: form.id }" class="ghost-action">Edit</a>
+            </article>
+          }
+        </div>
+      }
       @if (!overview.has_lead_form) {
         <section class="empty-state" aria-labelledby="empty-form-title">
           <h2 id="empty-form-title">You haven't created a form yet.</h2>
@@ -279,11 +320,14 @@
             </div>
           </app-fixed-height-list>
         </section>
+        }
+      }
 
+      @if (activeWorkspaceTab === 'groups') {
         <section class="panel groups-panel" aria-labelledby="groups-title">
           <div class="section-heading">
             <div>
-              <h2 id="groups-title">Groups</h2>
+              <h2 id="groups-title">Groups ({{ overview.groups.length }} / {{ overview.max_groups }})</h2>
               <p>Organize clients and share group registration forms with known or already accepted clients.</p>
             </div>
             <a routerLink="/professional/groups/create" class="primary-action group-create-action">Create Group</a>

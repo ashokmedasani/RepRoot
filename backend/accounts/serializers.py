@@ -762,6 +762,11 @@ class ProfessionalLeadFormSerializer(serializers.ModelSerializer):
   def get_public_link(self, obj):
     return get_public_form_link(self.context.get('request'), obj.public_slug)
 
+  def validate_introductory_meeting_duration_minutes(self, value):
+    if value not in (15, 30):
+      raise serializers.ValidationError('Introductory video meetings must be 15 or 30 minutes.')
+    return value
+
   def validate(self, attrs):
     if 'custom_fields' in attrs:
       attrs['fields'] = normalize_dynamic_fields(attrs.pop('custom_fields'))
@@ -891,6 +896,7 @@ class LeadMeetingRequestSerializer(serializers.ModelSerializer):
     fields = [
       'id', 'reference_id', 'applicant_name', 'form_title', 'contact_email', 'contact_mobile',
       'requested_start', 'requested_end', 'status', 'trainer_note', 'meeting_url', 'expires_at',
+      'external_calendar_provider', 'external_calendar_url', 'external_calendar_sync_status',
       'reviewed_at', 'created_at', 'updated_at',
     ]
     read_only_fields = fields
@@ -1744,8 +1750,8 @@ class ProfessionalSchedulingSettingsSerializer(serializers.ModelSerializer):
     return value
 
   def validate_default_duration_minutes(self, value):
-    if value <= 0:
-      raise serializers.ValidationError('Meeting length must be at least 1 minute.')
+    if value not in (15, 30):
+      raise serializers.ValidationError('Default video meetings must be 15 or 30 minutes.')
     return value
 
   def validate_slot_interval_minutes(self, value):
@@ -1812,6 +1818,9 @@ class ScheduledMeetingSerializer(serializers.ModelSerializer):
       'start_at',
       'end_at',
       'meeting_url',
+      'external_calendar_provider',
+      'external_calendar_url',
+      'external_calendar_sync_status',
       'status',
       'cancellation_reason',
       'client_response_status',
@@ -1822,7 +1831,8 @@ class ScheduledMeetingSerializer(serializers.ModelSerializer):
       'updated_at',
     ]
     read_only_fields = [
-      'id', 'client_name', 'meeting_url', 'status', 'cancellation_reason', 'client_response_status',
+      'id', 'client_name', 'meeting_url', 'external_calendar_provider', 'external_calendar_url',
+      'external_calendar_sync_status', 'status', 'cancellation_reason', 'client_response_status',
       'guests', 'is_group_meeting', 'my_response_status', 'created_at', 'updated_at',
     ]
 

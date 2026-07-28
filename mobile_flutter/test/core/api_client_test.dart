@@ -70,7 +70,9 @@ SessionStore _storeWith(Map<String, String> values) {
 void main() {
   group('auth interceptor', () {
     test('attaches "Token <t>" for professional-scoped requests', () async {
-      final session = _storeWith({SessionKeys.professionalToken: 'professional-abc'});
+      final session = _storeWith({
+        SessionKeys.professionalToken: 'professional-abc',
+      });
       final dio = buildDio(session);
       final adapter = _MockAdapter(statusCode: 200, body: {'ok': true});
       dio.httpClientAdapter = adapter;
@@ -80,7 +82,10 @@ void main() {
         options: authOptions(AuthScheme.professional),
       );
 
-      expect(adapter.captured!.headers['Authorization'], 'Token professional-abc');
+      expect(
+        adapter.captured!.headers['Authorization'],
+        'Token professional-abc',
+      );
     });
 
     test('attaches "ClientToken <t>" for client-scoped requests', () async {
@@ -94,16 +99,24 @@ void main() {
         options: authOptions(AuthScheme.client),
       );
 
-      expect(adapter.captured!.headers['Authorization'], 'ClientToken client-xyz');
+      expect(
+        adapter.captured!.headers['Authorization'],
+        'ClientToken client-xyz',
+      );
     });
 
     test('sends no Authorization header on unauthenticated requests', () async {
-      final session = _storeWith({SessionKeys.professionalToken: 'professional-abc'});
+      final session = _storeWith({
+        SessionKeys.professionalToken: 'professional-abc',
+      });
       final dio = buildDio(session);
       final adapter = _MockAdapter(statusCode: 200, body: {'ok': true});
       dio.httpClientAdapter = adapter;
 
-      await dio.post<Map<String, dynamic>>('/professional/login/', data: const {});
+      await dio.post<Map<String, dynamic>>(
+        '/professional/login/',
+        data: const {},
+      );
 
       expect(adapter.captured!.headers.containsKey('Authorization'), isFalse);
     });
@@ -124,8 +137,64 @@ void main() {
         options: authOptions(AuthScheme.client),
       );
 
-      expect(adapter.captured!.headers['Authorization'], 'ClientToken client-xyz');
+      expect(
+        adapter.captured!.headers['Authorization'],
+        'ClientToken client-xyz',
+      );
     });
+
+    test('a client 401 invalidates only the client session', () async {
+      final session = _storeWith({
+        SessionKeys.professionalToken: 'professional-abc',
+        SessionKeys.clientToken: 'expired-client-token',
+      });
+      final dio = buildDio(session);
+      dio.httpClientAdapter = _MockAdapter(
+        statusCode: 401,
+        body: {'detail': 'Invalid token.'},
+      );
+
+      await expectLater(
+        runApi(
+          () => dio.get<Map<String, dynamic>>(
+            '/client/me/',
+            options: authOptions(AuthScheme.client),
+          ),
+        ),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(session.hasClientSession, isFalse);
+      expect(session.hasProfessionalSession, isTrue);
+    });
+
+    test(
+      'a professional 401 invalidates only the professional session',
+      () async {
+        final session = _storeWith({
+          SessionKeys.professionalToken: 'expired-professional-token',
+          SessionKeys.clientToken: 'client-xyz',
+        });
+        final dio = buildDio(session);
+        dio.httpClientAdapter = _MockAdapter(
+          statusCode: 401,
+          body: {'detail': 'Invalid token.'},
+        );
+
+        await expectLater(
+          runApi(
+            () => dio.get<Map<String, dynamic>>(
+              '/professional/profile/',
+              options: authOptions(AuthScheme.professional),
+            ),
+          ),
+          throwsA(isA<ApiException>()),
+        );
+
+        expect(session.hasProfessionalSession, isFalse);
+        expect(session.hasClientSession, isTrue);
+      },
+    );
   });
 
   group('error interceptor', () {
@@ -206,8 +275,10 @@ void main() {
     });
 
     test('passes absolute media URLs through unchanged', () {
-      expect(Env.mediaUrl('https://cdn.example.com/a.png'),
-          'https://cdn.example.com/a.png');
+      expect(
+        Env.mediaUrl('https://cdn.example.com/a.png'),
+        'https://cdn.example.com/a.png',
+      );
     });
 
     test('absolute-ises a relative media path', () {

@@ -67,6 +67,7 @@
       }
     </label>
 
+    @if (emailOtpStatus === 'sent' || emailOtpStatus === 'failed' || emailOtpStatus === 'verified') {
     <label class="wide-field">
       <span class="field-label">OTP <span class="required">*</span></span>
       <span class="input-with-button">
@@ -77,6 +78,7 @@
         <span class="field-help error-text">{{ fieldErrors.otp }}</span>
       }
     </label>
+    }
 
     <label class="wide-field">
       <span class="field-label">Password <span class="required">*</span></span>

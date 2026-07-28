@@ -12,7 +12,7 @@ class ProfessionalUpgradeTier {
 
   static String label(String tier) => switch (tier) {
         'pro' => 'Pro',
-        'premium_unlimited' => 'Premium (Unlimited)',
+        'premium_unlimited' => 'Premium',
         _ => tier,
       };
 }
@@ -26,6 +26,15 @@ class ProfessionalBillingStatus {
     required this.billingConfigured,
     required this.testMode,
     required this.availableUpgrades,
+    required this.catalog,
+    required this.billingCurrency,
+    required this.billingRegion,
+    required this.cancellationEffectiveAt,
+    required this.downgradeEligible,
+    required this.freeStoragePercent,
+    required this.storageDowngradeEligible,
+    required this.downgradeResources,
+    required this.supportEmail,
   });
 
   final String planCode;
@@ -40,12 +49,23 @@ class ProfessionalBillingStatus {
 
   /// Tiers the professional can move to, e.g. {'pro': true, ...}.
   final Map<String, bool> availableUpgrades;
+  final Map<String, dynamic> catalog;
+  final String billingCurrency;
+  final String billingRegion;
+  final String? cancellationEffectiveAt;
+  final bool downgradeEligible;
+  final double freeStoragePercent;
+  final bool storageDowngradeEligible;
+  final Map<String, Map<String, dynamic>> downgradeResources;
+  final String supportEmail;
 
   List<String> get upgradeTiers =>
       availableUpgrades.entries.where((e) => e.value).map((e) => e.key).toList();
 
   factory ProfessionalBillingStatus.fromJson(Map<String, dynamic> json) {
     final plan = json['plan'] as Map<String, dynamic>? ?? {};
+    final assessment = json['downgrade_assessment'] as Map<String, dynamic>? ?? {};
+    final storage = assessment['storage'] as Map<String, dynamic>? ?? {};
     return ProfessionalBillingStatus(
       planCode: plan['code']?.toString() ?? '',
       planName: plan['name']?.toString() ?? '',
@@ -57,6 +77,23 @@ class ProfessionalBillingStatus {
           (json['available_upgrades'] as Map<dynamic, dynamic>? ?? {}).map(
         (k, v) => MapEntry(k.toString(), v == true),
       ),
+      catalog: Map<String, dynamic>.from(
+        json['catalog'] as Map<dynamic, dynamic>? ?? {},
+      ),
+      billingCurrency: json['billing_currency']?.toString() ?? 'USD',
+      billingRegion: json['billing_region']?.toString() ?? 'International',
+      cancellationEffectiveAt: json['cancellation_effective_at'] as String?,
+      downgradeEligible: assessment['eligible'] as bool? ?? true,
+      freeStoragePercent: (storage['free_tier_percent'] as num?)?.toDouble() ?? 0,
+      storageDowngradeEligible: storage['eligible'] as bool? ?? true,
+      downgradeResources:
+          (assessment['resources'] as Map<dynamic, dynamic>? ?? {}).map(
+        (key, value) => MapEntry(
+          key.toString(),
+          Map<String, dynamic>.from(value as Map<dynamic, dynamic>? ?? {}),
+        ),
+      ),
+      supportEmail: assessment['support_email']?.toString() ?? '',
     );
   }
 }

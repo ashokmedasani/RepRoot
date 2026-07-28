@@ -19,4 +19,5 @@ export class LegalPageComponent {
 
   readonly doc = (this.route.snapshot.data['doc'] as 'terms' | 'privacy') || 'terms';
   readonly lastUpdated = 'July 22, 2026';
+  readonly supportEmail = window.APP_CONFIG?.supportEmail || 'the support address listed in the application';
 }

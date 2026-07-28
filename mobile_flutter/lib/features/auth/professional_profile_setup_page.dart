@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
@@ -41,6 +44,7 @@ class _ProfessionalProfileSetupPageState
   String _message = '';
   String _codeMessage = '';
   bool _codeAvailable = false;
+  XFile? _profilePhoto;
 
   static const _genders = ['Male', 'Female', 'Other', 'Prefer not to say'];
   static const _months = [
@@ -164,6 +168,17 @@ class _ProfessionalProfileSetupPageState
       'birth_month': '$_birthMonth',
       'birth_year': '$_birthYear',
     });
+    if (_profilePhoto != null) {
+      form.files.add(
+        MapEntry(
+          'profile_photo',
+          await MultipartFile.fromFile(
+            _profilePhoto!.path,
+            filename: _profilePhoto!.name,
+          ),
+        ),
+      );
+    }
 
     try {
       await ref.read(professionalAuthApiProvider).saveProfile(form);
@@ -176,6 +191,25 @@ class _ProfessionalProfileSetupPageState
         _message = error.message;
       });
     }
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final photo = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
+    if (photo == null || !mounted) return;
+    final size = await photo.length();
+    if (size > 5 * 1024 * 1024) {
+      setState(() => _message = 'Profile photo must be 5 MB or smaller.');
+      return;
+    }
+    setState(() {
+      _profilePhoto = photo;
+      _message = '';
+    });
   }
 
   @override
@@ -207,6 +241,46 @@ class _ProfessionalProfileSetupPageState
                         'Your clients need these details before they can sign in',
                   ),
                   const SizedBox(height: AppSpacing.xl),
+                  Center(
+                    child: CircleAvatar(
+                      radius: 46,
+                      backgroundColor: context.colors.primaryContainer,
+                      backgroundImage: _profilePhoto == null
+                          ? null
+                          : FileImage(File(_profilePhoto!.path)),
+                      child: _profilePhoto == null
+                          ? Icon(Icons.person_outline, size: 42, color: context.colors.primary)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: AppSpacing.sm,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _isSubmitting ? null : () => _pickPhoto(ImageSource.camera),
+                        icon: const Icon(Icons.photo_camera_outlined),
+                        label: const Text('Camera'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _isSubmitting ? null : () => _pickPhoto(ImageSource.gallery),
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: Text(_profilePhoto == null ? 'Gallery' : 'Replace'),
+                      ),
+                      if (_profilePhoto != null)
+                        TextButton(
+                          onPressed: _isSubmitting ? null : () => setState(() => _profilePhoto = null),
+                          child: const Text('Remove'),
+                        ),
+                    ],
+                  ),
+                  Text(
+                    'Optional · JPG, PNG, or supported phone image · maximum 5 MB',
+                    textAlign: TextAlign.center,
+                    style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   TextField(
                     controller: _firstName,
                     enabled: !_isSubmitting,

@@ -41,6 +41,50 @@ p {
   margin-bottom: 1.5rem;
 }
 
+.action-required {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid color-mix(in srgb, #f59e0b 55%, var(--app-border));
+  border-radius: var(--app-panel-radius);
+  padding: 1rem 1.2rem;
+  background: color-mix(in srgb, #f59e0b 9%, var(--app-surface));
+}
+
+.action-required h2,
+.action-required p {
+  margin: 0;
+}
+
+.action-required-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.action-required-links a {
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--app-primary);
+  color: #fff;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .action-required {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .action-required-links {
+    justify-content: flex-start;
+  }
+}
+
 .kpi-card {
   display: flex;
   align-items: center;

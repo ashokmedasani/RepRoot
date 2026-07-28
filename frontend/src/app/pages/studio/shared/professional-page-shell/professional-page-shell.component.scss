@@ -6,8 +6,9 @@
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
   width: 100%;
-  min-height: 100vh;
-  overflow-x: clip;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: var(--app-bg);
 }
 
@@ -219,6 +220,11 @@ nav {
 
 .shell-main {
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .professional-workspace {
@@ -284,6 +290,9 @@ button:disabled {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .sidebar {
@@ -302,6 +311,10 @@ button:disabled {
     background: var(--app-glass-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+  }
+
+  .shell-main {
+    overflow: visible;
   }
 
   nav {

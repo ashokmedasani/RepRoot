@@ -1,8 +1,9 @@
+import os
 from datetime import date, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
@@ -30,10 +31,6 @@ User = get_user_model()
 
 PROFESSIONAL_USERNAME = 'maya_coach'
 PROFESSIONAL_EMAIL = 'maya.coach@example.com'
-PROFESSIONAL_PASSWORD = 'ProfessionalDemo!2026'
-CLIENT_PASSWORD = 'ClientDemo!2026'
-
-
 GROUPS = [
   {
     'name': 'Strength Foundations',
@@ -179,7 +176,21 @@ def entry_payload(template_name, day_index):
 class Command(BaseCommand):
   help = 'Seed a complete demo professional, groups, clients, references, assignments, and 90 days of client inputs.'
 
+  def add_arguments(self, parser):
+    parser.add_argument('--clients', type=int, default=50)
+    parser.add_argument('--days', type=int, default=90)
+
   def handle(self, *args, **options):
+    self.professional_password = os.environ.get('REPROOT_DEMO_TRAINER_PASSWORD', '')
+    self.client_password = os.environ.get('REPROOT_DEMO_CLIENT_PASSWORD', '')
+    self.client_count = max(1, min(options['clients'], 100))
+    self.history_days = max(1, min(options['days'], 365))
+    if not self.professional_password or not self.client_password:
+      raise CommandError(
+        'Set REPROOT_DEMO_TRAINER_PASSWORD and REPROOT_DEMO_CLIENT_PASSWORD '
+        'in the backend environment before running this development seed.'
+      )
+
     with transaction.atomic():
       professional = self.seed_professional()
       groups = self.seed_groups(professional)
@@ -188,19 +199,20 @@ class Command(BaseCommand):
       references = self.seed_references(professional)
       templates = self.seed_templates(professional)
       self.seed_assignments(clients, templates, references)
-      self.seed_tracking_entries(clients[0], templates)
+      for client in clients:
+        self.seed_tracking_entries(client, templates)
       self.seed_chat(professional, clients[0])
 
-    professional_token, _created = Token.objects.get_or_create(user=professional)
-    client_token = issue_client_token(clients[0])
+    Token.objects.get_or_create(user=professional)
+    issue_client_token(clients[0])
 
     self.stdout.write(self.style.SUCCESS('Demo fitness data seeded successfully.'))
-    self.stdout.write(f'Professional login: {PROFESSIONAL_USERNAME} / {PROFESSIONAL_PASSWORD}')
-    self.stdout.write(f'Professional email: {PROFESSIONAL_EMAIL}')
-    self.stdout.write(f'Professional token: {professional_token.key}')
-    self.stdout.write(f'Client login: professional_id=coach-maya, username={clients[0].username}, password={CLIENT_PASSWORD}')
-    self.stdout.write(f'Client token: {client_token.key}')
-    self.stdout.write(f'Created/updated: 1 professional, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, 270 tracking entries for {clients[0].first_name}.')
+    self.stdout.write(
+      f'Created/updated: 1 trainer, {len(groups)} groups, {len(clients)} synthetic clients, '
+      f'{len(references)} references, {len(templates)} templates, and '
+      f'{self.history_days} days of tracking history per client.'
+    )
+    self.stdout.write('Credentials were read from the backend environment and were not printed.')
 
   def seed_professional(self):
     professional, created = User.objects.get_or_create(
@@ -214,7 +226,7 @@ class Command(BaseCommand):
     professional.email = PROFESSIONAL_EMAIL
     professional.first_name = 'Maya'
     professional.last_name = 'Santos'
-    professional.set_password(PROFESSIONAL_PASSWORD)
+    professional.set_password(self.professional_password)
     professional.save()
 
     profile, _profile_created = ProfessionalProfile.objects.get_or_create(user=professional)
@@ -273,7 +285,25 @@ class Command(BaseCommand):
 
   def seed_clients(self, professional, groups, lead_form):
     clients = []
-    for index, (first_name, last_name, email, username, group_name, goal, age, activity_level) in enumerate(CLIENTS, start=1):
+    client_rows = list(CLIENTS[:self.client_count])
+    goals = ['Strength', 'Weight Loss', 'Mobility', 'General Fitness', 'Muscle Gain']
+    activity_levels = ['Sedentary', 'Lightly Active', 'Moderately Active', 'Very Active']
+    group_names = list(groups)
+    for index in range(len(client_rows) + 1, self.client_count + 1):
+      first_name = f'Demo{index:02d}'
+      last_name = 'Client'
+      client_rows.append((
+        first_name,
+        last_name,
+        f'demo.client{index:02d}@example.invalid',
+        f'demo_client_{index:02d}',
+        group_names[(index - 1) % len(group_names)],
+        goals[(index - 1) % len(goals)],
+        20 + (index % 35),
+        activity_levels[(index - 1) % len(activity_levels)],
+      ))
+
+    for index, (first_name, last_name, email, username, group_name, goal, age, activity_level) in enumerate(client_rows, start=1):
       answers = client_answers(first_name, last_name, email, goal, age, activity_level)
       lead, _created = LeadSubmission.objects.update_or_create(
         reference_id=f'DEMO-MAYA-{index:03d}',
@@ -297,7 +327,7 @@ class Command(BaseCommand):
           'first_name': first_name,
           'last_name': last_name,
           'username': username,
-          'temporary_password': make_password(CLIENT_PASSWORD),
+          'temporary_password': make_password(self.client_password),
           'registration_answers': answers,
           'professional_notes': f'Demo client focused on {goal.lower()} with {activity_level.lower()} baseline activity.',
           'must_change_password': False,
@@ -370,7 +400,7 @@ class Command(BaseCommand):
 
   def seed_tracking_entries(self, client, templates):
     end_date = date.today()
-    start_date = end_date - timedelta(days=89)
+    start_date = end_date - timedelta(days=self.history_days - 1)
     TrackingEntry.objects.filter(
       client=client,
       template__in=templates,
@@ -379,7 +409,7 @@ class Command(BaseCommand):
     ).delete()
 
     entries = []
-    for day_index in range(90):
+    for day_index in range(self.history_days):
       entry_date = start_date + timedelta(days=day_index)
       for template_index, template in enumerate(templates):
         entries.append(

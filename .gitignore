@@ -5,7 +5,21 @@ dist/
 __pycache__/
 *.py[cod]
 .venv/
+# Environment and secret configuration (real values are always user-managed)
 .env
+.env.*
+*.env
+*.env.*
+!.env.example
+!.env.*.example
+!*.env.example
+!*.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
 db.sqlite3
 postgres_data/
 backend/media/

@@ -6,10 +6,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 const configPath = join(publicDir, 'app-config.js');
 const apiBaseUrl = process.env.RENDER_API_BASE_URL || process.env.API_BASE_URL || '';
+const supportEmail = process.env.SUPPORT_EMAIL || '';
 
 mkdirSync(publicDir, { recursive: true });
 writeFileSync(
   configPath,
-  `window.APP_CONFIG = {\n  apiBaseUrl: ${JSON.stringify(apiBaseUrl)}\n};\n`,
+  `window.APP_CONFIG = {\n  apiBaseUrl: ${JSON.stringify(apiBaseUrl)},\n  supportEmail: ${JSON.stringify(supportEmail)}\n};\n`,
   'utf8',
 );

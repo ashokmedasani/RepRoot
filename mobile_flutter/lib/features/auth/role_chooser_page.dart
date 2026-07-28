@@ -48,7 +48,6 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final colors = context.colors;
     final text = context.text;
 
     return Scaffold(
@@ -61,7 +60,7 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _Brand(tokens: tokens, colors: colors, text: text),
+                  _Brand(tokens: tokens, text: text),
                   const SizedBox(height: AppSpacing.xxl + AppSpacing.sm), // 2.5rem
                   _Choices(tokens: tokens, text: text),
                 ],
@@ -75,42 +74,21 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
 }
 
 class _Brand extends StatelessWidget {
-  const _Brand({required this.tokens, required this.colors, required this.text});
+  const _Brand({required this.tokens, required this.text});
 
   final AppTokens tokens;
-  final ColorScheme colors;
   final TextTheme text;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: 64,
           height: 64,
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.xlAll,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [colors.primary, tokens.accent],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.primary.withValues(alpha: 0.22),
-                blurRadius: 32,
-                offset: const Offset(0, 16),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            'CF',
-            style: text.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-            ),
+          child: Image.asset(
+            'assets/icon/icon.png',
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(height: AppSpacing.md),

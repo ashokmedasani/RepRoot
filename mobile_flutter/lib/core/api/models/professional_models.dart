@@ -158,6 +158,8 @@ class ProfessionalDataUsage {
     this.databaseBytes = 0,
     this.fileBytes = 0,
     this.planLimits = const {},
+    this.resourceUsage = const {},
+    this.warnings = const [],
     this.usageLabel = '',
     this.isWarning = false,
     this.isDanger = false,
@@ -179,6 +181,8 @@ class ProfessionalDataUsage {
 
   /// null values mean "unlimited" for that limit.
   final Map<String, int?> planLimits;
+  final Map<String, PlanResourceUsage> resourceUsage;
+  final List<String> warnings;
 
   /// Human capacity label + threshold flags, matching the web data-usage API.
   final String usageLabel;
@@ -201,6 +205,16 @@ class ProfessionalDataUsage {
         planLimits: (json['plan_limits'] as Map<dynamic, dynamic>? ?? {}).map(
           (key, value) => MapEntry(key.toString(), (value as num?)?.toInt()),
         ),
+        resourceUsage: (json['resource_usage'] as Map<dynamic, dynamic>? ?? {}).map(
+          (key, value) => MapEntry(
+            key.toString(),
+            PlanResourceUsage.fromJson(value as Map<String, dynamic>? ?? {}),
+          ),
+        ),
+        warnings: (json['warnings'] as List<dynamic>? ?? [])
+            .map((item) => (item as Map<String, dynamic>)['message']?.toString() ?? '')
+            .where((message) => message.isNotEmpty)
+            .toList(),
         usageLabel: (json['usage_label'] as String? ?? '').replaceAll('_', ' '),
         isWarning: json['is_warning'] as bool? ?? false,
         isDanger: json['is_danger'] as bool? ?? false,
@@ -209,6 +223,22 @@ class ProfessionalDataUsage {
         lockReason: json['lock_reason'] as String? ?? '',
         gracePeriodEndsAt: json['grace_period_ends_at'] as String?,
       );
+}
+
+class PlanResourceUsage {
+  const PlanResourceUsage({required this.used, this.limit, this.percentage});
+
+  final int used;
+  final int? limit;
+  final double? percentage;
+
+  factory PlanResourceUsage.fromJson(Map<String, dynamic> json) => PlanResourceUsage(
+        used: (json['used'] as num?)?.toInt() ?? 0,
+        limit: (json['limit'] as num?)?.toInt(),
+        percentage: (json['percentage'] as num?)?.toDouble(),
+      );
+
+  String get label => limit == null ? '$used used' : '$used / $limit used';
 }
 
 class ProfessionalProfileImage {

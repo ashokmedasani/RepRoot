@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/session/session_store.dart';
 import '../features/auth/client_login_page.dart';
 import '../features/auth/role_chooser_page.dart';
 import '../features/auth/professional_login_page.dart';
@@ -83,8 +84,31 @@ class Routes {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final session = ref.watch(sessionStoreProvider);
   return GoRouter(
     initialLocation: Routes.roleChooser,
+    refreshListenable: session,
+    redirect: (context, state) {
+      final location = state.matchedLocation;
+      final clientPublic =
+          location == Routes.clientLogin || location == Routes.roleChooser;
+      if (location.startsWith('/client/') &&
+          !clientPublic &&
+          !session.hasClientSession) {
+        return Routes.clientLogin;
+      }
+
+      final professionalPublic =
+          location == Routes.professionalLogin ||
+          location == Routes.professionalSignup ||
+          location == Routes.roleChooser;
+      if (location.startsWith('/professional/') &&
+          !professionalPublic &&
+          !session.hasProfessionalSession) {
+        return Routes.professionalLogin;
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: Routes.roleChooser,
@@ -255,7 +279,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'preferences',
                         builder: (context, state) =>
-                            const NotificationPreferencesPage(professional: true),
+                            const NotificationPreferencesPage(
+                              professional: true,
+                            ),
                       ),
                     ],
                   ),
@@ -332,7 +358,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'preferences',
                         builder: (context, state) =>
-                            const NotificationPreferencesPage(professional: false),
+                            const NotificationPreferencesPage(
+                              professional: false,
+                            ),
                       ),
                     ],
                   ),
@@ -346,9 +374,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     routes: [
                       GoRoute(
                         path: ':requestId',
-                        builder: (context, state) => ClientPaymentRequestDetailPage(
-                          requestId: state.pathParameters['requestId'] ?? '',
-                        ),
+                        builder: (context, state) =>
+                            ClientPaymentRequestDetailPage(
+                              requestId:
+                                  state.pathParameters['requestId'] ?? '',
+                            ),
                       ),
                     ],
                   ),

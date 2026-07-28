@@ -1,3 +1,4 @@
 window.APP_CONFIG = {
-  apiBaseUrl: ""
+  apiBaseUrl: "",
+  supportEmail: ""
 };

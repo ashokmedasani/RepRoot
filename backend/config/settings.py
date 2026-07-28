@@ -24,18 +24,23 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 if not DEBUG and SECRET_KEY == DEVELOPMENT_SECRET_KEY:
   raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set to a secure value when DJANGO_DEBUG is False.')
 
-# 10.0.2.2 is how the Android emulator reaches this PC's localhost.
-default_allowed_hosts = ['localhost', '127.0.0.1', '10.0.2.2']
+# 10.0.2.2 is how the Android emulator reaches this PC's localhost. In DEBUG
+# mode these development hosts are always merged with configured hosts rather
+# than being replaced by DJANGO_ALLOWED_HOSTS. Production remains explicit.
+development_allowed_hosts = ['localhost', '127.0.0.1', '10.0.2.2']
 render_external_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
 
-if render_external_hostname:
-  default_allowed_hosts.append(render_external_hostname)
-
-ALLOWED_HOSTS = [
+configured_allowed_hosts = [
   host.strip()
-  for host in os.environ.get('DJANGO_ALLOWED_HOSTS', ','.join(default_allowed_hosts)).split(',')
+  for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
   if host.strip()
 ]
+
+ALLOWED_HOSTS = list(dict.fromkeys([
+  *(development_allowed_hosts if DEBUG else []),
+  *configured_allowed_hosts,
+  *([render_external_hostname] if render_external_hostname else []),
+]))
 
 INSTALLED_APPS = [
   'django.contrib.admin',
@@ -174,9 +179,31 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '').strip()
+MEETING_FROM_EMAIL = os.environ.get('MEETING_FROM_EMAIL', DEFAULT_FROM_EMAIL).strip()
 
 if not DEBUG and EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
   raise ImproperlyConfigured('Configure a production EMAIL_BACKEND and EMAIL_HOST before deployment.')
+
+# Optional production calendar bridge. RepRoot scheduling continues to work
+# internally when this is disabled; enabled meetings are mirrored to one Google
+# Calendar and receive a unique Google Meet room.
+GOOGLE_CALENDAR_ENABLED = os.environ.get('GOOGLE_CALENDAR_ENABLED', 'False').lower() == 'true'
+GOOGLE_CALENDAR_CLIENT_ID = os.environ.get('GOOGLE_CALENDAR_CLIENT_ID', '').strip()
+GOOGLE_CALENDAR_CLIENT_SECRET = os.environ.get('GOOGLE_CALENDAR_CLIENT_SECRET', '').strip()
+GOOGLE_CALENDAR_REFRESH_TOKEN = os.environ.get('GOOGLE_CALENDAR_REFRESH_TOKEN', '').strip()
+GOOGLE_CALENDAR_ID = os.environ.get('GOOGLE_CALENDAR_ID', '').strip()
+GOOGLE_CALENDAR_TIMEOUT_SECONDS = int(os.environ.get('GOOGLE_CALENDAR_TIMEOUT_SECONDS', '15'))
+
+if GOOGLE_CALENDAR_ENABLED and not all([
+  GOOGLE_CALENDAR_CLIENT_ID,
+  GOOGLE_CALENDAR_CLIENT_SECRET,
+  GOOGLE_CALENDAR_REFRESH_TOKEN,
+  GOOGLE_CALENDAR_ID,
+]):
+  raise ImproperlyConfigured(
+    'Google Calendar is enabled but its OAuth client, refresh token, or calendar ID is missing.'
+  )
 
 CACHE_URL = os.environ.get('CACHE_URL', '').strip()
 if CACHE_URL:
@@ -274,7 +301,7 @@ REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES = int(
 # 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
 REPROOT_PLAN_TIERS = {
   'starter_free': {
-    'name': 'Starter Free',
+    'name': 'Free',
     'lead_forms': int(os.environ.get('REPROOT_STARTER_FREE_LEAD_FORM_LIMIT', '1')),
     'groups': int(os.environ.get('REPROOT_STARTER_FREE_GROUP_LIMIT', '3')),
     'clients': None,
@@ -298,12 +325,12 @@ REPROOT_PLAN_TIERS = {
     'client_data_retention_days': int(os.environ.get('REPROOT_PRO_DATA_RETENTION_DAYS', '90')),
   },
   'premium_unlimited': {
-    'name': 'Premium Unlimited',
+    'name': 'Premium',
     'lead_forms': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_LEAD_FORM_LIMIT', '3')),
-    'groups': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_GROUP_LIMIT', '999')),
+    'groups': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_GROUP_LIMIT', '25')),
     'clients': None,
     'templates': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_TEMPLATE_LIMIT', '50')),
-    'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '1000')),
+    'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '250')),
     'categories': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CATEGORY_LIMIT', '50')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_SUBCATEGORY_LIMIT', '20')),
     'professional_storage_bytes': REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES,
@@ -366,6 +393,17 @@ REPROOT_BILLING_CANCEL_URL = os.environ.get(
 # the whole lifecycle (limits, storage quota, lock/grace clearing) be exercised
 # end-to-end today. Flip this off once real prices are set for every tier.
 REPROOT_BILLING_TEST_MODE = os.environ.get('REPROOT_BILLING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
+
+# Razorpay is backend-only. Never expose the key secret or webhook secret to
+# either frontend. The public key ID is returned only as part of checkout.
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+RAZORPAY_BASE_URL = os.environ.get('RAZORPAY_BASE_URL', 'https://api.razorpay.com').rstrip('/')
+RAZORPAY_PERSONAL_LINK = os.environ.get('RAZORPAY_PERSONAL_LINK', '')
+REPROOT_BILLING_PROVIDER = os.environ.get('REPROOT_BILLING_PROVIDER', 'razorpay').strip().lower()
+REPROOT_ADS_ENABLED = False
+REPROOT_PAYMENTS_ENABLED = True
 
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')

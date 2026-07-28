@@ -156,9 +156,9 @@
       we'll get back to you.
     </p>
 
-    <a class="primary-action" [href]="'mailto:' + supportEmail">
-      {{ supportEmail }}
-    </a>
+    @if (supportEmail) {
+      <a class="primary-action" [href]="'mailto:' + supportEmail">{{ supportEmail }}</a>
+    }
   </section>
 
   <footer class="home-footer">

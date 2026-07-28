@@ -88,11 +88,19 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _changePlan(String tier) async {
+  Future<void> _changePlan(
+    String tier, {
+    String billingCycle = 'monthly',
+    String currency = 'INR',
+  }) async {
     if (_billingBusy) return;
     setState(() => _billingBusy = true);
     try {
-      final url = await ref.read(professionalAuthApiProvider).createBillingCheckout(tier);
+      final url = await ref.read(professionalAuthApiProvider).createBillingCheckout(
+            tier,
+            billingCycle: billingCycle,
+            currency: currency,
+          );
       if (url.isNotEmpty) {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } else {
@@ -106,16 +114,83 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     if (mounted) setState(() => _billingBusy = false);
   }
 
+  Future<void> _choosePlan(String tier) async {
+    var cycle = 'monthly';
+    final currency = _billing?.billingCurrency ?? 'USD';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Choose ${ProfessionalUpgradeTier.label(tier)} billing'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: cycle,
+                decoration: const InputDecoration(labelText: 'Billing period'),
+                items: const [
+                  DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                  DropdownMenuItem(value: 'six_months', child: Text('6 Months · pay for 5')),
+                  DropdownMenuItem(value: 'yearly', child: Text('Yearly · pay for 10')),
+                ],
+                onChanged: (value) => setDialogState(() => cycle = value ?? cycle),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${_billing?.billingRegion ?? 'International'} · $currency',
+                  style: context.text.labelLarge,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => context.pop(true), child: const Text('Continue to checkout')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true) {
+      await _changePlan(tier, billingCycle: cycle, currency: currency);
+    }
+  }
   Future<void> _cancelPlan() async {
+    final billing = _billing;
+    if (billing == null) return;
+    if (!billing.storageDowngradeEligible) {
+      _toast(
+        'Cancellation is blocked because storage is ${billing.freeStoragePercent}% of the Free allowance. '
+        'Contact ${billing.supportEmail.isNotEmpty ? billing.supportEmail : 'support'}.',
+      );
+      return;
+    }
+    final requiresCleanup = !billing.downgradeEligible;
+    final confirmationController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel plan?'),
-        content: const Text('Your plan will revert to the free tier at the end of the period.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Paid access remains active until expiry, then the account moves to Free. Client records are preserved.'),
+            if (requiresCleanup) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const Text('Excess non-client plan data will be removed at expiry. Type DELETE EXCESS PLAN DATA to confirm.'),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(controller: confirmationController),
+            ],
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => context.pop(false), child: const Text('Keep plan')),
           FilledButton(
-            onPressed: () => context.pop(true),
+            onPressed: () => context.pop(
+              !requiresCleanup || confirmationController.text.trim() == 'DELETE EXCESS PLAN DATA',
+            ),
             style: FilledButton.styleFrom(
               backgroundColor: context.colors.error,
               minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -125,12 +200,17 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
         ],
       ),
     );
+    final confirmation = confirmationController.text.trim();
+    confirmationController.dispose();
     if (confirmed != true) return;
     try {
-      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan();
-      _toast(message.isNotEmpty ? message : 'Plan cancelled.');
-      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
-      if (mounted) setState(() => _billing = billing);
+      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan(
+            forceCleanup: requiresCleanup,
+            confirmation: confirmation,
+          );
+      _toast(message.isNotEmpty ? message : 'Cancellation scheduled.');
+      final refreshed = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      if (mounted) setState(() => _billing = refreshed);
     } catch (error) {
       _toast(error is ApiException ? error.message : 'Could not cancel the plan.');
     }
@@ -344,7 +424,10 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     rows: [
                       ('Current plan', _billing!.planName.isNotEmpty ? _billing!.planName : '—'),
                       if (_billing!.planRenewsAt != null)
-                        ('Renews', shortDate(_billing!.planRenewsAt!)),
+                        ('Expires / renews', shortDate(_billing!.planRenewsAt!)),
+                      if (_billing!.cancellationEffectiveAt != null)
+                        ('Cancellation effective', shortDate(_billing!.cancellationEffectiveAt!)),
+                      ('Free storage usage', '${_billing!.freeStoragePercent}%'),
                     ],
                   ),
                   if (_billing!.testMode) ...[
@@ -359,7 +442,7 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                       child: SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _billingBusy ? null : () => _changePlan(tier),
+                          onPressed: _billingBusy ? null : () => _choosePlan(tier),
                           child: Text('Switch to ${ProfessionalUpgradeTier.label(tier)}'),
                         ),
                       ),
@@ -378,11 +461,15 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                         if (_billing!.billingConfigured) const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: _cancelPlan,
+                            onPressed: _billing!.cancellationEffectiveAt == null ? _cancelPlan : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: context.colors.error,
                             ),
-                            child: const Text('Cancel plan'),
+                            child: Text(
+                              _billing!.cancellationEffectiveAt == null
+                                  ? 'Cancel membership'
+                                  : 'Cancellation scheduled',
+                            ),
                           ),
                         ),
                       ],

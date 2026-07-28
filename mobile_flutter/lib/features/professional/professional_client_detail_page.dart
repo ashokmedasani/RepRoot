@@ -414,33 +414,50 @@ class _ProfessionalClientDetailPageState
     if (time == null || !mounted) return;
     final notesCtrl = TextEditingController();
     final titleCtrl = TextEditingController();
+    var durationMinutes = 30;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Schedule meeting'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(labelText: 'Title (optional)'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: notesCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Notes (optional)'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Schedule video meeting'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: durationMinutes,
+                decoration: const InputDecoration(labelText: 'Meeting length'),
+                items: const [
+                  DropdownMenuItem(value: 15, child: Text('15 minutes')),
+                  DropdownMenuItem(value: 30, child: Text('30 minutes')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => durationMinutes = value);
+                  }
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'Title (optional)'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                controller: notesCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'Notes (optional)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => context.pop(true),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              child: const Text('Schedule'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => context.pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
-            child: const Text('Schedule'),
-          ),
-        ],
       ),
     );
     if (confirmed != true) {
@@ -453,6 +470,7 @@ class _ProfessionalClientDetailPageState
       final meeting = await ref.read(schedulingApiProvider).createMeeting(
             client: widget.clientId,
             start: start.toIso8601String(),
+            durationMinutes: durationMinutes,
             title: titleCtrl.text.trim(),
             notes: notesCtrl.text.trim(),
           );

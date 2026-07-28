@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/client_api.dart';
@@ -52,6 +56,29 @@ class _ClientMeetingsPageState extends ConsumerState<ClientMeetingsPage> {
   Future<void> join(String link) async {
     final uri = Uri.tryParse(link);
     if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> addToCalendar(ClientMeetingRecord meeting) async {
+    try {
+      final bytes =
+          await ref.read(clientApiProvider).downloadMeetingCalendarInvite(meeting.id);
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/reproot-meeting-${meeting.id}.ics');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/calendar')],
+          subject: meeting.title,
+          text: 'Add this RepRoot meeting to your mobile calendar.',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The calendar invite could not be opened.')),
+      );
+    }
   }
 
   @override
@@ -108,6 +135,12 @@ class _ClientMeetingsPageState extends ConsumerState<ClientMeetingsPage> {
                         TextButton(
                           onPressed: () => join(meeting.meetingUrl),
                           child: const Text('Join meeting'),
+                        ),
+                      if (meeting.status == 'scheduled')
+                        TextButton.icon(
+                          onPressed: () => addToCalendar(meeting),
+                          icon: const Icon(Icons.calendar_month_outlined),
+                          label: const Text('Add to calendar'),
                         ),
                     ],
                   ),

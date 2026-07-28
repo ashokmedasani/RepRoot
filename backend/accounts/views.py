@@ -26,7 +26,7 @@ from rest_framework.views import APIView
 
 from admin_portal.models import ErrorLog, FinanceLedgerEntry, record_error
 
-from . import account_lifecycle, billing, feature_access, recycle_bin
+from . import account_lifecycle, billing, feature_access, razorpay_billing, recycle_bin, subscription_cancellation
 from .models import (
   default_client_registration_fields,
   ChatMessage,
@@ -50,6 +50,8 @@ from .models import (
   ProfessionalGroup,
   ProfessionalLeadForm,
   ProfessionalProfile,
+  ProfessionalAvailabilityWindow,
+  ProfessionalSchedulingSettings,
   ProfessionalReference,
 )
 from .serializers import (
@@ -350,8 +352,14 @@ class ProfessionalCodeAvailabilityView(APIView):
   throttle_classes = [ScopedRateThrottle]
   throttle_scope = 'directory'
 
+  def get(self, request):
+    return self._check(request.query_params.get('professional_code', ''))
+
   def post(self, request):
-    code = str(request.data.get('professional_code', '')).strip().lower()
+    return self._check(request.data.get('professional_code', ''))
+
+  def _check(self, raw_code):
+    code = str(raw_code).strip().lower()
 
     if len(code) < 4 or len(code) > 32:
       return Response({'available': False, 'message': 'Professional code must be 4 to 32 characters.'})
@@ -625,6 +633,85 @@ class ProfessionalDataUsageView(APIView):
     return Response(calculate_professional_data_usage(request.user))
 
 
+class ProfessionalOnboardingStatusView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    checks = {
+      'profile': request.user.professional_profile.profile_setup_completed,
+      'form': ProfessionalLeadForm.objects.filter(professional=request.user).exists(),
+      'group': ProfessionalGroup.objects.filter(professional=request.user, is_active=True).exists(),
+      'template': TrackingTemplate.objects.filter(professional=request.user, is_active=True).exists(),
+      'reference': ProfessionalReference.objects.filter(professional=request.user).exists(),
+      'meeting_setup': ProfessionalAvailabilityWindow.objects.filter(
+        professional=request.user, is_active=True
+      ).exists(),
+    }
+    routes = {
+      'profile': '/professional/profile',
+      'form': '/professional/forms/create',
+      'group': '/professional/groups/create',
+      'template': '/professional/templates/create',
+      'reference': '/professional/references',
+      'meeting_setup': '/professional/schedule',
+    }
+    labels = {
+      'profile': 'Complete Profile',
+      'form': 'Create Form',
+      'group': 'Create Group',
+      'template': 'Create Template',
+      'reference': 'Add Reference',
+      'meeting_setup': 'Complete Meeting Setup',
+    }
+    missing = [key for key, complete in checks.items() if not complete]
+    return Response({
+      'profile_complete': checks['profile'],
+      'form_created': checks['form'],
+      'group_created': checks['group'],
+      'template_created': checks['template'],
+      'reference_created': checks['reference'],
+      'meeting_setup_complete': checks['meeting_setup'],
+      'missing_actions': missing,
+      'actions': [
+        {'code': key, 'label': labels[key], 'route': routes[key]}
+        for key in missing
+      ],
+      'message': (
+        ''
+        if not missing
+        else 'Action required: complete ' + ', '.join(labels[key].lower() for key in missing) + '.'
+      ),
+    })
+
+
+class ProfessionalMeetingEligibilityView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    scheduling = ProfessionalSchedulingSettings.objects.filter(professional=request.user).first()
+    has_availability = ProfessionalAvailabilityWindow.objects.filter(
+      professional=request.user, is_active=True
+    ).exists()
+    missing = []
+    if scheduling is None or not scheduling.timezone:
+      missing.append('timezone')
+    if scheduling is None or scheduling.default_duration_minutes <= 0:
+      missing.append('meeting_duration')
+    if scheduling is None or scheduling.buffer_minutes < 0:
+      missing.append('buffer_time')
+    if not has_availability:
+      missing.append('weekly_availability')
+    return Response({
+      'can_enable': not missing,
+      'missing_requirements': missing,
+      'message': (
+        'Meeting scheduling is ready to enable.'
+        if not missing
+        else 'Complete your meeting setup and add your weekly availability before enabling meeting scheduling.'
+      ),
+    })
+
+
 class RecycleBinListView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
@@ -667,19 +754,37 @@ class ProfessionalBillingStatusView(APIView):
 
   def get(self, request):
     profile = request.user.professional_profile
+    subscription_cancellation.apply_due_cancellation(profile)
+    profile.refresh_from_db()
+    country_code = next((
+      str(request.META.get(header, '')).strip().upper()
+      for header in ('HTTP_CF_IPCOUNTRY', 'HTTP_X_VERCEL_IP_COUNTRY', 'HTTP_X_COUNTRY_CODE')
+      if request.META.get(header)
+    ), '')
+    profile_country = str(profile.country or '').strip().lower()
+    is_india = country_code == 'IN' or (not country_code and profile_country in ('india', 'in', 'ind'))
     return Response(
       {
         'plan': professional_plan(request.user),
         'plan_renews_at': profile.plan_renews_at,
-        'has_billing_account': bool(profile.stripe_customer_id),
-        'billing_configured': bool(settings.STRIPE_SECRET_KEY) or settings.REPROOT_BILLING_TEST_MODE,
+        'cancellation_requested_at': profile.cancellation_requested_at,
+        'cancellation_effective_at': profile.cancellation_effective_at,
+        'cancellation_force_cleanup': profile.cancellation_force_cleanup,
+        'downgrade_assessment': subscription_cancellation.downgrade_assessment(request.user),
+        'has_billing_account': bool(profile.razorpay_payment_link_id or profile.stripe_customer_id),
+        'billing_configured': settings.REPROOT_BILLING_TEST_MODE,
         'test_mode': settings.REPROOT_BILLING_TEST_MODE,
+        'billing_currency': 'INR' if is_india else 'USD',
+        'billing_region': 'India' if is_india else 'International',
+        'support_email': settings.SUPPORT_EMAIL,
         # A tier is offered once it either has a real Stripe price configured,
         # or test mode is on (which applies the tier directly with no charge).
-        'available_upgrades': {
-          tier: bool(price_id) or settings.REPROOT_BILLING_TEST_MODE
-          for tier, price_id in billing.TARGET_TIER_PRICE_IDS.items()
-        },
+        'available_upgrades': {tier: settings.REPROOT_BILLING_TEST_MODE for tier in razorpay_billing.PLAN_PRICES},
+        'catalog': razorpay_billing.public_catalog(),
+        'plans': [
+          {'code': code, **settings.REPROOT_PLAN_TIERS[code]}
+          for code in ('starter_free', 'pro', 'premium_unlimited')
+        ],
       }
     )
 
@@ -689,15 +794,60 @@ class ProfessionalBillingCheckoutView(APIView):
 
   def post(self, request):
     target_tier = str(request.data.get('target_tier', '')).strip().lower()
-    if target_tier not in billing.TARGET_TIER_PRICE_IDS:
+    allowed_tiers = tuple(razorpay_billing.PLAN_PRICES)
+    if target_tier not in allowed_tiers:
       return Response(
-        {'message': 'target_tier must be one of: ' + ', '.join(billing.TARGET_TIER_PRICE_IDS)},
+        {'message': 'target_tier must be one of: ' + ', '.join(allowed_tiers)},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
     profile = request.user.professional_profile
     if profile.plan_tier == target_tier:
       return Response({'message': f'This professional is already on {target_tier}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    billing_cycle = str(request.data.get('billing_cycle', 'monthly')).strip().lower()
+    if settings.REPROOT_BILLING_TEST_MODE:
+      cycle_price = razorpay_billing.PLAN_PRICES.get(target_tier, {}).get(billing_cycle)
+      profile.plan_tier = target_tier
+      profile.plan_renews_at = (
+        razorpay_billing.renewal_date(cycle_price['months'])
+        if cycle_price else None
+      )
+      profile.cancellation_requested_at = None
+      profile.cancellation_effective_at = None
+      profile.cancellation_force_cleanup = False
+      profile.save(update_fields=[
+        'plan_tier', 'plan_renews_at', 'cancellation_requested_at',
+        'cancellation_effective_at', 'cancellation_force_cleanup',
+      ])
+      account_lifecycle.reactivate_on_upgrade(profile)
+      return Response({
+        'applied': True,
+        'test_mode': True,
+        'message': f'Plan updated to {professional_plan(request.user)["name"]} for testing.',
+      })
+
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      return Response(
+        {'message': 'Subscription payments are not available yet.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+      )
+
+    profile_country = str(profile.country or '').strip().lower()
+    currency = 'INR' if profile_country in ('india', 'in', 'ind') else 'USD'
+    try:
+      payment_link = razorpay_billing.create_payment_link(profile, target_tier, billing_cycle, currency)
+    except ValueError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    except razorpay_billing.RazorpayError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+    profile.razorpay_payment_link_id = payment_link.get('id', '')
+    profile.save(update_fields=['razorpay_payment_link_id'])
+    return Response({
+      'checkout_url': payment_link.get('short_url', ''),
+      'provider': 'razorpay',
+      'payment_link_id': payment_link.get('id', ''),
+    })
 
     has_real_price = bool(billing.price_id_for_tier(target_tier))
 
@@ -731,10 +881,59 @@ class ProfessionalBillingCancelView(APIView):
 
   permission_classes = [ProfessionalAccessPermission]
 
+  def get(self, request):
+    return Response(subscription_cancellation.downgrade_assessment(request.user))
+
   def post(self, request):
     profile = request.user.professional_profile
     if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
       return Response({'message': 'This professional is already on Starter Free.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    assessment = subscription_cancellation.downgrade_assessment(request.user)
+    force_cleanup = bool(request.data.get('force_cleanup'))
+    if not assessment['storage']['eligible']:
+      support = settings.SUPPORT_EMAIL or 'the configured support team'
+      return Response({
+        'message': (
+          f'Your storage is {assessment["storage"]["free_tier_percent"]}% of the Free allowance. '
+          f'Self-service cancellation is blocked because storage cannot be deleted automatically. Contact {support}.'
+        ),
+        'assessment': assessment,
+      }, status=status.HTTP_409_CONFLICT)
+
+    if not assessment['eligible'] and not force_cleanup:
+      return Response({
+        'message': 'Your workspace exceeds one or more Free-plan limits. Review the listed items or confirm forced cleanup.',
+        'requires_force_confirmation': True,
+        'assessment': assessment,
+      }, status=status.HTTP_409_CONFLICT)
+
+    confirmation = str(request.data.get('confirmation', '')).strip()
+    if force_cleanup and confirmation != 'DELETE EXCESS PLAN DATA':
+      return Response({
+        'message': 'Type DELETE EXCESS PLAN DATA to schedule forced cleanup.',
+        'requires_force_confirmation': True,
+        'assessment': assessment,
+      }, status=status.HTTP_400_BAD_REQUEST)
+
+    effective_at = subscription_cancellation.schedule_cancellation(profile, force_cleanup=force_cleanup)
+    return Response({
+      'message': 'Membership cancellation scheduled. Your paid plan remains active until the displayed expiry date.',
+      'cancellation_effective_at': effective_at,
+      'forced_cleanup_scheduled': force_cleanup,
+      'clients_preserved': True,
+      'assessment': assessment,
+    })
+
+  def legacy_post(self, request):
+    profile = request.user.professional_profile
+    if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
+      return Response({'message': 'This professional is already on Starter Free.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if profile.razorpay_payment_id:
+      return Response({
+        'message': 'Razorpay prepaid plans do not auto-renew. Your paid plan remains active until its renewal date.'
+      })
 
     if profile.stripe_subscription_id and settings.STRIPE_SECRET_KEY:
       try:
@@ -755,6 +954,11 @@ class ProfessionalBillingPortalView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
+    if settings.REPROOT_BILLING_PROVIDER == 'razorpay':
+      if not settings.RAZORPAY_PERSONAL_LINK:
+        return Response({'message': 'Billing support link is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+      return Response({'portal_url': settings.RAZORPAY_PERSONAL_LINK})
+
     if not settings.STRIPE_SECRET_KEY:
       return Response({'message': 'Billing is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -768,6 +972,67 @@ class ProfessionalBillingPortalView(APIView):
       return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
     return Response({'portal_url': portal_url})
+
+
+@csrf_exempt
+def razorpay_webhook(request):
+  if request.method != 'POST':
+    return HttpResponse(status=405)
+  if not settings.RAZORPAY_WEBHOOK_SECRET:
+    return HttpResponse(status=503)
+  signature = request.META.get('HTTP_X_RAZORPAY_SIGNATURE', '')
+  if not razorpay_billing.verify_webhook(request.body, signature):
+    return HttpResponse(status=400)
+
+  payload = json.loads(request.body.decode('utf-8'))
+  if payload.get('event') not in ('payment_link.paid', 'payment.captured'):
+    return HttpResponse(status=200)
+  event_payload = payload.get('payload') or {}
+  payment_link = (event_payload.get('payment_link') or {}).get('entity') or {}
+  payment = (event_payload.get('payment') or {}).get('entity') or {}
+  notes = payment_link.get('notes') or payment.get('notes') or {}
+  user_id = notes.get('professional_user_id')
+  target_tier = notes.get('target_tier')
+  profile = ProfessionalProfile.objects.filter(user_id=user_id).first() if user_id else None
+  if profile is None or target_tier not in razorpay_billing.PLAN_PRICES:
+    return HttpResponse(status=200)
+
+  payment_id = payment.get('id', '')
+  if payment_id and FinanceLedgerEntry.objects.filter(
+    provider='razorpay', external_reference=payment_id
+  ).exists():
+    return HttpResponse(status=200)
+
+  profile.plan_tier = target_tier
+  profile.razorpay_payment_link_id = payment_link.get('id', profile.razorpay_payment_link_id)
+  profile.razorpay_payment_id = payment_id
+  profile.plan_renews_at = razorpay_billing.renewal_date(notes.get('months', 1))
+  profile.save(update_fields=[
+    'plan_tier', 'razorpay_payment_link_id', 'razorpay_payment_id', 'plan_renews_at',
+  ])
+  account_lifecycle.reactivate_on_upgrade(profile)
+
+  amount = (payment.get('amount') or payment_link.get('amount') or 0) / 100
+  currency = (payment.get('currency') or payment_link.get('currency') or 'INR').upper()
+  FinanceLedgerEntry.objects.create(
+    entry_type=FinanceLedgerEntry.TYPE_SUBSCRIPTION,
+    status=FinanceLedgerEntry.STATUS_COMPLETED,
+    amount=amount,
+    currency=currency,
+    professional=profile.user,
+    description=f'{profile.get_plan_tier_display()} subscription started',
+    external_reference=payment_id or payment_link.get('id', ''),
+    source='platform_subscription',
+    professional_reference=profile.internal_reference_code,
+    original_amount=amount,
+    original_currency=currency,
+    reporting_amount=amount,
+    reporting_currency=currency,
+    provider='razorpay',
+    metadata={'target_tier': target_tier, 'billing_cycle': notes.get('billing_cycle', '')},
+    occurred_at=timezone.now(),
+  )
+  return HttpResponse(status=200)
 
 
 @csrf_exempt
@@ -977,6 +1242,7 @@ class ProfessionalAccountView(APIView):
       platform='web',
       priority=SupportIncident.PRIORITY_HIGH,
     )
+    _notify_support_team(incident)
     return Response({
       'incident_id': incident.incident_id,
       'message': 'Deletion request sent to support. Your account remains active until identity and consent are verified.',
@@ -998,11 +1264,8 @@ class FormsGroupsOverviewView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    # Note: the lead form is a OneToOneField on `professional`, so at most one
-    # row ever exists per professional. We intentionally do not filter on
-    # `is_active` here -- the overview page needs to show the form (and its
-    # enable/disable toggle) even while it is switched off.
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
+    lead_forms = ProfessionalLeadForm.objects.filter(professional=request.user).order_by('created_at')
+    lead_form = lead_forms.first()
     groups = ProfessionalGroup.objects.filter(professional=request.user, is_active=True).select_related('client_registration_form')
     submissions = LeadSubmission.objects.filter(lead_form__professional=request.user).select_related('client_access__group')
     pending_submissions = submissions.filter(status=LeadSubmission.STATUS_PENDING)
@@ -1013,6 +1276,8 @@ class FormsGroupsOverviewView(APIView):
       {
         'has_lead_form': lead_form is not None,
         'lead_form': ProfessionalLeadFormSerializer(lead_form, context={'request': request}).data if lead_form else None,
+        'lead_forms': ProfessionalLeadFormSerializer(lead_forms, many=True, context={'request': request}).data,
+        'max_lead_forms': plan_limit(request.user, 'lead_forms'),
         'groups': ProfessionalGroupSerializer(groups, many=True).data,
         'pending_forms': LeadSubmissionSerializer(pending_submissions, many=True).data,
         'approved_forms': LeadSubmissionSerializer(approved_submissions, many=True).data,
@@ -1027,9 +1292,20 @@ class ProfessionalLeadFormView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
-    # See FormsGroupsOverviewView.get -- do not filter on `is_active` since
-    # the professional may be editing the form while it is switched off.
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
+    form_id = request.data.get('form_id')
+    lead_form = None
+    if form_id:
+      lead_form = ProfessionalLeadForm.objects.filter(id=form_id, professional=request.user).first()
+      if lead_form is None:
+        return Response({'message': 'Lead form not found.'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+      form_limit = plan_limit(request.user, 'lead_forms')
+      current_count = ProfessionalLeadForm.objects.filter(professional=request.user).count()
+      if form_limit is not None and current_count >= form_limit:
+        return Response(
+          {'message': f'Your current plan supports {form_limit} lead form{"s" if form_limit != 1 else ""}.'},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
     serializer = ProfessionalLeadFormSerializer(
       lead_form,
       data=request.data,
@@ -1059,7 +1335,9 @@ class ProfessionalLeadFormStatusView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def put(self, request):
-    lead_form = ProfessionalLeadForm.objects.filter(professional=request.user).first()
+    form_id = request.data.get('form_id')
+    forms = ProfessionalLeadForm.objects.filter(professional=request.user)
+    lead_form = forms.filter(id=form_id).first() if form_id else forms.first()
 
     if lead_form is None:
       return Response({'message': 'Create the lead form first.'}, status=status.HTTP_404_NOT_FOUND)
@@ -3440,6 +3718,28 @@ def _support_reporter_identity(role, reporter):
   return f'{reporter.first_name} {reporter.last_name}'.strip() or reporter.username, reporter.email
 
 
+def _notify_support_team(incident):
+  if not settings.SUPPORT_EMAIL:
+    return
+  send_mail_background(
+    subject=f'[{incident.incident_id}] {incident.subject}',
+    message=(
+      f'New RepRoot support request\n\n'
+      f'Reference: {incident.incident_id}\n'
+      f'Reporter: {incident.reporter_name}\n'
+      f'Reporter email: {incident.reporter_email}\n'
+      f'Category: {incident.get_category_display()}\n'
+      f'Priority: {incident.get_priority_display()}\n'
+      f'Platform: {incident.platform}\n\n'
+      f'{incident.description}\n\n'
+      f'Open the RepRoot admin support queue to respond.'
+    ),
+    from_email=settings.DEFAULT_FROM_EMAIL,
+    recipient_list=[settings.SUPPORT_EMAIL],
+    fail_silently=False,
+  )
+
+
 def _support_incident_list(request, role, reporter):
   incidents = SupportIncident.objects.filter(**_support_reporter_filter(role, reporter)).prefetch_related('messages')
   return Response({
@@ -3474,6 +3774,7 @@ def _support_incident_create(request, role, reporter):
     device_info=values.get('device_info', '').strip(),
     screenshot=values.get('screenshot'),
   )
+  _notify_support_team(incident)
   return Response(
     {
       'incident': SupportIncidentSerializer(incident, context={'request': request}).data,
