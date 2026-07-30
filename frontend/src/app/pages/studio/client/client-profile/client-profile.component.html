@@ -397,11 +397,11 @@
 
             @if (templateTab === 'references') {
               <section class="portal-card">
-                <h2>References</h2>
-                @if (template.references?.length) {
-                  <app-references-accordion [references]="template.references || []" />
+                <h2>Resources</h2>
+                @if (template.resources?.length) {
+                  <app-references-accordion [references]="template.resources || []" />
                 } @else {
-                  <p>No references assigned to this template yet.</p>
+                  <p>No resources assigned to this template yet.</p>
                 }
               </section>
             }
@@ -412,7 +412,7 @@
                   <p class="view-only-note">This template is view-only. Your professional logs entries here; you can review them below.</p>
                 }
                 @if (isTemplateEditable(template)) {
-                <form class="entry-form" (ngSubmit)="submitEntry(template)">
+                <form class="entry-form" (ngSubmit)="openReviewDialog(template)">
                   <div class="datetime-fields">
                     <label class="date-field">
                       <span>Entry date</span>
@@ -487,11 +487,34 @@
 
                   <div class="entry-submit-row">
                     <button type="submit" class="primary-action" [disabled]="savingTemplateId === template.id">
-                      {{ savingTemplateId === template.id ? 'Saving...' : (editingEntryId ? 'Update Entry' : 'Submit Entry') }}
+                      {{ savingTemplateId === template.id ? 'Saving...' : (editingEntryId ? 'Review Update' : 'Review & Submit') }}
                     </button>
                     <button type="button" class="ghost-action" (click)="clearEntryForm(template)">Clear Form</button>
                   </div>
                 </form>
+                }
+
+                @if (reviewingTemplate; as reviewTemplate) {
+                  <div class="verify-backdrop" (click)="closeReviewDialog()">
+                    <div class="verify-modal" (click)="$event.stopPropagation()">
+                      <h3>{{ editingEntryId ? 'Confirm updated entry' : 'Confirm your entry' }}</h3>
+                      <p class="verify-modal-subtitle">Please review the details below before submitting to your professional.</p>
+                      <div class="review-rows">
+                        @for (row of reviewRows(reviewTemplate); track row.label) {
+                          <div class="review-row">
+                            <span class="review-label">{{ row.label }}</span>
+                            <span class="review-value">{{ row.value }}</span>
+                          </div>
+                        }
+                      </div>
+                      <div class="verify-modal-actions">
+                        <button type="button" class="ghost-action" [disabled]="savingTemplateId === reviewTemplate.id" (click)="closeReviewDialog()">Go Back</button>
+                        <button type="button" class="primary-action" [disabled]="savingTemplateId === reviewTemplate.id" (click)="confirmSubmitEntry()">
+                          {{ savingTemplateId === reviewTemplate.id ? 'Submitting...' : 'Confirm Submission' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 }
 
                 <div class="recent-entries">

@@ -111,6 +111,7 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
 
   methods: ManualPaymentMethodRecord[] = [];
   maxActiveMethods = 5;
+  isLoadingMethods = true;
   methodsError = '';
   showMethodForm = false;
   editingMethodId: number | null = null;
@@ -195,9 +196,11 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
       next: (response) => {
         this.methods = response.methods;
         this.maxActiveMethods = response.max_active;
+        this.isLoadingMethods = false;
       },
       error: (error: unknown) => {
         this.methodsError = formatApiError(error, 'Payment methods could not be loaded.');
+        this.isLoadingMethods = false;
       }
     });
   }

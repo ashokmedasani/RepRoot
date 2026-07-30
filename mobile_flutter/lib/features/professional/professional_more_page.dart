@@ -163,8 +163,8 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
               ),
               _MenuItem(
                 icon: Icons.folder_open_outlined,
-                label: 'Reference Library',
-                onTap: () => context.go(Routes.professionalReferences),
+                label: 'Resource Library',
+                onTap: () => context.go(Routes.professionalResources),
               ),
               _MenuItem(
                 icon: Icons.storage_outlined,

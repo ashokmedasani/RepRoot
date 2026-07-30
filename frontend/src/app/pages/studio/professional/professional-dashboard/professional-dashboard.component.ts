@@ -1,10 +1,16 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { ChatApiService } from '@core/api/chat-api.service';
-import { PaymentActionItem, PaymentsApiService, RevenuePeriod, RevenueSummaryResponse } from '@core/api/payments-api.service';
+import {
+  PaymentActionItem,
+  PaymentNotificationItem,
+  PaymentsApiService,
+  RevenuePeriod,
+  RevenueSummaryResponse
+} from '@core/api/payments-api.service';
 import {
   ClientProfileEditActivity,
   ClientReminder,
@@ -47,6 +53,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   private readonly paymentsApi = inject(PaymentsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
+  private readonly router = inject(Router);
 
   activeTab: DashboardTab = 'activity';
   isLoading = true;
@@ -67,6 +74,14 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   paymentActions: PaymentActionItem[] = [];
   paymentReviewCount = 0;
   paymentOverdueCount = 0;
+  // Unread payment *notifications* (new request/proof/approval/etc events) -
+  // a distinct concept from paymentReviewCount/paymentOverdueCount above,
+  // which reflect live request status. Folded into a single `paymentsBadgeCount`
+  // (see getter below) alongside paymentsActionCount rather than shown as its
+  // own badge - two separate numbers on one tab pill was confusing.
+  paymentsUnreadCount = 0;
+  paymentNotifications: PaymentNotificationItem[] = [];
+  private paymentUnreadPoll: ReturnType<typeof setInterval> | null = null;
 
   // Revenue dashboard — only meaningful once a reporting currency is chosen,
   // Revenue is shown only after the professional permanently confirms a reporting currency.
@@ -143,6 +158,8 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
         this.revenueUnlocked = response.settings.reporting_currency_locked;
         if (this.paymentsEnabled) {
           this.loadPaymentActions();
+          this.loadPaymentUnread();
+          this.paymentUnreadPoll = setInterval(() => this.loadPaymentUnread(), 10000);
           if (this.revenueUnlocked) {
             this.loadRevenueSummary();
           }
@@ -195,6 +212,9 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.unreadPoll) {
       clearInterval(this.unreadPoll);
+    }
+    if (this.paymentUnreadPoll) {
+      clearInterval(this.paymentUnreadPoll);
     }
   }
 
@@ -249,6 +269,23 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
   initialsForName(name: string): string {
     const [first, ...rest] = name.split(' ');
     return initialsFor(first || '', rest.join(' '));
+  }
+
+  /** "Unlimited" when the backend reports no cap for this resource (plan_limits
+   *  is always the source of truth -- never hard-code a limit on the frontend). */
+  resourceUsageDisplay(resourceKey: string): string {
+    const usage = this.planUsage?.resource_usage?.[resourceKey];
+
+    if (!usage) {
+      return '—';
+    }
+
+    return usage.limit === null || usage.limit === undefined ? `${usage.used}` : `${usage.used} / ${usage.limit}`;
+  }
+
+  resourceUsageCaption(resourceKey: string): string {
+    const usage = this.planUsage?.resource_usage?.[resourceKey];
+    return usage && (usage.limit === null || usage.limit === undefined) ? 'Unlimited' : 'Used';
   }
 
   private loadUnreadMessages(): void {
@@ -310,8 +347,49 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadPaymentUnread(): void {
+    this.paymentsApi.getProfessionalPaymentUnread().subscribe({
+      next: (response) => {
+        this.paymentsUnreadCount = response.unread_count;
+        this.paymentNotifications = response.items;
+      },
+      error: () => {
+        this.paymentsUnreadCount = 0;
+        this.paymentNotifications = [];
+      }
+    });
+  }
+
   get paymentsActionCount(): number {
     return this.paymentReviewCount + this.paymentOverdueCount;
+  }
+
+  /** Single number shown on the Payments tab pill - combines "needs review or
+   *  overdue" with "unread updates" so the trainer sees one count instead of
+   *  two side-by-side badges. Each underlying item (Needs Action table row,
+   *  or a notification below) has its own link straight to the specific
+   *  client/request, so nothing is lost by not splitting the number. */
+  get paymentsBadgeCount(): number {
+    return this.paymentsActionCount + this.paymentsUnreadCount;
+  }
+
+  /** A payment notification's payload carries a specific action_url (set by
+   *  the backend per notification type) pointing at the exact client/request
+   *  that triggered it - e.g. /professional/clients/5?tab=payments. Falls
+   *  back to the Payments tab if an older notification predates that field. */
+  openPaymentNotification(item: PaymentNotificationItem): void {
+    const requestId = typeof item.payload?.['request_id'] === 'string' ? (item.payload['request_id'] as string) : undefined;
+    this.paymentsApi.markProfessionalPaymentNotificationsRead(requestId).subscribe({
+      next: () => this.loadPaymentUnread(),
+      error: () => this.loadPaymentUnread()
+    });
+
+    const actionUrl = typeof item.payload?.['action_url'] === 'string' ? (item.payload['action_url'] as string) : '';
+    if (actionUrl) {
+      void this.router.navigateByUrl(actionUrl);
+    } else {
+      this.activeTab = 'payments';
+    }
   }
 
   get paymentsChart(): ChartSpec {

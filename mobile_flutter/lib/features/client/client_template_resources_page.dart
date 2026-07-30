@@ -5,13 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../app/router.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/models/template_models.dart';
-import '../../core/api/references_api.dart';
+import '../../core/api/resources_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/video/open_resource.dart';
 import '../../shared/widgets/app_widgets.dart';
 
-/// The references a professional attached to one program — reached from the
-/// References tab rather than living inside the Program/Log entry flow.
+/// The resources a professional attached to one program — reached from the
+/// Resources tab rather than living inside the Program/Log entry flow.
 class ClientTemplateResourcesPage extends ConsumerStatefulWidget {
   const ClientTemplateResourcesPage({super.key, required this.templateId});
 
@@ -47,20 +47,20 @@ class _ClientTemplateResourcesPageState
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _message = 'Could not load references.';
+        _message = 'Could not load resources.';
         _loading = false;
       });
     }
   }
 
-  Future<void> _open(TemplateReference reference) async {
-    final raw = reference.link.isNotEmpty ? reference.link : reference.fileUrl;
+  Future<void> _open(TemplateResource resource) async {
+    final raw = resource.link.isNotEmpty ? resource.link : resource.fileUrl;
     if (raw.isEmpty) return;
     await openResource(
       context,
       raw,
-      title: reference.title,
-      description: reference.description,
+      title: resource.title,
+      description: resource.description,
       failureMessage: 'Could not open this resource.',
     );
   }
@@ -73,7 +73,7 @@ class _ClientTemplateResourcesPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(template?.name ?? 'References'),
+        title: Text(template?.name ?? 'Resources'),
         leading: BackButton(onPressed: () => context.go(Routes.clientPrograms)),
       ),
       body: _loading
@@ -91,39 +91,39 @@ class _ClientTemplateResourcesPageState
                     icon: Icons.folder_open_outlined,
                     message: 'This program could not be found.',
                   )
-                else if (template.references.isEmpty)
+                else if (template.resources.isEmpty)
                   EmptyState(
                     compact: false,
                     icon: Icons.folder_open_outlined,
                     message:
-                        'Your professional has not shared any references for ${template.name} yet.',
+                        'Your professional has not shared any resources for ${template.name} yet.',
                   )
                 else
-                  for (final reference in template.references)
+                  for (final resource in template.resources)
                     RowItem(
-                      title: reference.title,
+                      title: resource.title,
                       subtitle: [
-                        ReferenceType.label(reference.referenceType),
-                        if (reference.categoryName.isNotEmpty)
-                          reference.categoryName,
-                        if (reference.subcategory.isNotEmpty)
-                          reference.subcategory,
+                        ResourceType.label(resource.resourceType),
+                        if (resource.categoryName.isNotEmpty)
+                          resource.categoryName,
+                        if (resource.subcategory.isNotEmpty)
+                          resource.subcategory,
                       ].join(' · '),
                       leading: Icon(
-                        switch (reference.referenceType) {
-                          ReferenceType.videoLink => Icons.play_circle_outline,
-                          ReferenceType.pdf => Icons.picture_as_pdf_outlined,
-                          ReferenceType.image => Icons.image_outlined,
+                        switch (resource.resourceType) {
+                          ResourceType.videoLink => Icons.play_circle_outline,
+                          ResourceType.pdf => Icons.picture_as_pdf_outlined,
+                          ResourceType.image => Icons.image_outlined,
                           _ => Icons.notes_outlined,
                         },
                         size: 22,
                         color: accent ?? context.colors.primary,
                       ),
-                      trailing: reference.link.isNotEmpty ||
-                              reference.fileUrl.isNotEmpty
+                      trailing: resource.link.isNotEmpty ||
+                              resource.fileUrl.isNotEmpty
                           ? const Icon(Icons.open_in_new, size: AppSize.iconRow)
                           : null,
-                      onTap: () => _open(reference),
+                      onTap: () => _open(resource),
                     ),
               ],
             ),

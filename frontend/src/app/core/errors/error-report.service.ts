@@ -7,6 +7,7 @@ declare global {
     APP_CONFIG?: {
       apiBaseUrl?: string;
       supportEmail?: string;
+      googleClientId?: string;
     };
   }
 }

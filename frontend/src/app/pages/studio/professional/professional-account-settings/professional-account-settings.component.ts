@@ -1,10 +1,11 @@
-import { DatePipe, KeyValuePipe } from '@angular/common';
+import { DatePipe, KeyValuePipe, SlicePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import {
+  DowngradeAssessment,
   ProfessionalAuthApiService,
   ProfessionalBillingStatus,
   ProfessionalDataUsageResponse,
@@ -18,6 +19,8 @@ import {
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ProfessionalProfileFormComponent } from '@studio-shared/professional-profile-form/professional-profile-form.component';
 import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { PasswordRequirementsComponent } from '@studio-shared/password-requirements/password-requirements.component';
+import { isPasswordStrong } from '@studio-shared/password-requirements/password-requirements.util';
 import { ThemeSwitcherComponent } from '@shared/theme-switcher/theme-switcher.component';
 import { SupportIncidentsComponent } from '@studio-shared/support-incidents/support-incidents.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
@@ -41,11 +44,13 @@ type SettingsSection =
   imports: [
     DatePipe,
     KeyValuePipe,
+    SlicePipe,
     FormsModule,
     RouterLink,
     ProfessionalPageShellComponent,
     ProfessionalProfileFormComponent,
     PasswordInputComponent,
+    PasswordRequirementsComponent,
     ThemeSwitcherComponent,
     SupportIncidentsComponent,
     ProfessionalPaymentSettingsComponent
@@ -96,12 +101,40 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   billingActionMessage = '';
   billingActionMessageType: 'success' | 'error' = 'success';
 
+  // Premium professionals can choose Pro as a softer downgrade target
+  // instead of dropping straight to Free. selectedAssessment mirrors
+  // whichever target is currently chosen (Free's assessment ships inline
+  // with billing status; Pro's is fetched on demand since it's a less
+  // common path).
+  downgradeTarget: 'starter_free' | 'pro' = 'starter_free';
+  selectedAssessment?: DowngradeAssessment;
+  isLoadingAssessment = false;
+
+  onDowngradeTargetChange(target: 'starter_free' | 'pro'): void {
+    this.downgradeTarget = target;
+    if (target === 'starter_free') {
+      this.selectedAssessment = this.billingStatus?.downgrade_assessment;
+      return;
+    }
+
+    this.isLoadingAssessment = true;
+    this.professionalAuthApi.getDowngradeAssessment(target).subscribe({
+      next: (assessment) => {
+        this.selectedAssessment = assessment;
+        this.isLoadingAssessment = false;
+      },
+      error: () => {
+        this.isLoadingAssessment = false;
+      }
+    });
+  }
+
   readonly professionalUsageLabels: Record<string, string> = {
     professional_profile: 'Professional profile',
     forms_groups: 'Forms & groups',
     clients: 'Client profiles',
     schedules_progress: 'Schedules & progress',
-    references: 'References',
+    resources: 'Resources',
     templates_tracking: 'Templates & tracking',
     messages: 'Messages'
   };
@@ -119,14 +152,13 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     { title: 'Client Creation Form', route: '/professional/forms-groups', detail: 'Each group has its own registration form. Customize intake questions, share its public link, and convert completed registrations into client accounts.' },
     { title: 'Templates', route: '/professional/templates', detail: 'Create reusable tracking templates, choose fields and cadence, then assign them to any client without losing historical entries.' },
     { title: 'Clients', route: '/professional/clients', detail: 'Search all clients, add clients manually, open a profile, assign templates, schedule follow-ups, review entries, and record progress.' },
-    { title: 'References', route: '/professional/references', detail: 'Organize PDFs, images, and YouTube resources by category. Share selected references with each client assignment.' },
+    { title: 'Resource Library', route: '/professional/resource', detail: 'Organize PDFs, images, and YouTube resources by category. Share selected resources with each client assignment.' },
     { title: 'Profile', route: '/professional/profile', detail: 'Maintain the professional information clients can see, upload portfolio media, and control the visibility of each profile section.' },
     { title: 'Settings', route: '/professional/account-settings', detail: 'Manage your account, security, professional code, notifications, theme, plan storage, support links, and legal information.' },
     { title: 'Client Portal', route: '/client/login', detail: 'Clients use your professional code and their credentials to complete templates, review progress, message you, maintain settings, and submit approval requests.' }
   ];
 
   readonly passwordForm = {
-    currentPassword: '',
     password: '',
     confirmPassword: ''
   };
@@ -135,7 +167,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   notificationMessage = '';
   readonly notificationLabels: Record<string, string> = {
     chat: 'Client messages', forms: 'Form submissions', meetings: 'Meetings', clients: 'Client requests',
-    templates: 'Templates', progress: 'Progress and tracking', reminders: 'Reminders', references: 'References',
+    templates: 'Templates', progress: 'Progress and tracking', reminders: 'Reminders', resources: 'Resources',
     payments: 'Payments', support: 'Support', account: 'Account lifecycle', storage: 'Storage usage',
     security: 'Security', system: 'System notices'
   };
@@ -155,6 +187,11 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     this.loadRecycleBin();
     this.loadBillingStatus();
 
+    const sectionParam = this.route.snapshot.queryParamMap.get('section') as SettingsSection | null;
+    if (sectionParam && this.menu.some((item) => item.id === sectionParam)) {
+      this.activeSection = sectionParam;
+    }
+
     const billingParam = this.route.snapshot.queryParamMap.get('billing');
     if (billingParam === 'success') {
       this.activeSection = 'billing';
@@ -167,12 +204,27 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     }
   }
 
-  private loadBillingStatus(): void {
+  selectSection(id: SettingsSection): void {
+    this.activeSection = id;
+    // Billing state can change from outside this page (checkout redirect,
+    // a plan change applied elsewhere) and was previously only ever fetched
+    // once in ngOnInit, so switching into these tabs could show stale data
+    // until a full page reload. Refetch every time the tab is opened.
+    if (id === 'billing') {
+      this.loadBillingStatus();
+    } else if (id === 'storage') {
+      this.refreshDataUsage();
+    }
+  }
+
+  loadBillingStatus(): void {
     this.billingError = '';
     this.professionalAuthApi.getBillingStatus().subscribe({
       next: (status) => {
         this.billingStatus = status;
         this.selectedCurrency = status.billing_currency;
+        this.downgradeTarget = 'starter_free';
+        this.selectedAssessment = status.downgrade_assessment;
       },
       error: () => (this.billingError = 'Plan and billing details are temporarily unavailable.')
     });
@@ -251,38 +303,63 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   }
 
   async cancelPlan(): Promise<void> {
-    const assessment = this.billingStatus?.downgrade_assessment;
+    const assessment = this.selectedAssessment;
     if (!assessment) return;
+    const targetName = assessment.target_tier_name || (this.downgradeTarget === 'pro' ? 'Pro' : 'Free');
     if (!assessment.storage.eligible) {
       this.billingActionMessageType = 'error';
-      this.billingActionMessage = `Cancellation is blocked because storage is ${assessment.storage.free_tier_percent}% of the Free allowance. Contact ${assessment.support_email || 'support'}.`;
+      this.billingActionMessage = `Cancellation is blocked because storage is ${assessment.storage.free_tier_percent}% of the ${targetName} allowance. Contact ${assessment.support_email || 'support'}.`;
       return;
     }
 
-    const requiresCleanup = !assessment.eligible;
+    // Nothing here is ever deleted -- anything over the target plan's
+    // limits simply locks (in priority order), and reverses automatically
+    // on upgrade. The confirmation dialog spells out exactly what would
+    // lock, by name, plus the category-cascade rule and which clients
+    // would lose portal access -- no generic "may be deleted" copy, no
+    // confirmation phrase to type.
+    const lockLines = Object.entries(assessment.locks)
+      .filter(([, info]) => info.locked_count > 0)
+      .map(([key, info]) => {
+        const label = this.lockSectionLabel(key);
+        const names = info.locked_names.slice(0, 5).join(', ');
+        const more = info.locked_count > info.locked_names.length ? '…' : '';
+        return `${info.locked_count} ${label}${info.locked_count === 1 ? '' : 's'} would lock (${names}${more})`;
+      });
+
+    if (assessment.category_cascade_resource_count > 0) {
+      lockLines.push(
+        `${assessment.category_cascade_resource_count} resource${assessment.category_cascade_resource_count === 1 ? '' : 's'} would lock because the category they're in would lock, regardless of how many resources are in it`
+      );
+    }
+
+    if (assessment.clients_losing_access_count > 0) {
+      const clientNames = assessment.clients_losing_access.slice(0, 5).map((c) => `${c.client_name} (${c.group_name})`).join(', ');
+      const more = assessment.clients_losing_access_count > 5 ? '…' : '';
+      lockLines.push(
+        `${assessment.clients_losing_access_count} client${assessment.clients_losing_access_count === 1 ? '' : 's'} would lose portal access until you upgrade again: ${clientNames}${more}`
+      );
+    }
+
+    const impact = lockLines.length
+      ? `Your paid access remains active until the expiry date, then the account moves to ${targetName}. Nothing is ever deleted. At that point: ${lockLines.join('; ')}.`
+      : `Your paid access remains active until the expiry date, then the account moves to ${targetName}. Nothing is deleted, and your workspace already fits within the ${targetName} plan's limits.`;
+
     const confirmed = await this.confirmation.confirm({
       kind: 'warning',
       title: 'Cancel plan',
       target: 'your current plan',
-      impact: requiresCleanup
-        ? 'At the end of the billing period, excess forms, unused groups, unused templates, references, and empty categories may be deleted. Client records are preserved.'
-        : 'Your paid access remains active until the expiry date, then the account moves to Free. Client records are preserved.',
-      confirmLabel: requiresCleanup ? 'Continue to forced cleanup' : 'Schedule cancellation'
+      impact,
+      confirmLabel: 'Schedule cancellation'
     });
 
     if (!confirmed) {
       return;
     }
 
-    let confirmation = '';
-    if (requiresCleanup) {
-      confirmation = window.prompt('Type DELETE EXCESS PLAN DATA to confirm deletion of excess non-client plan data at expiry.') || '';
-      if (confirmation !== 'DELETE EXCESS PLAN DATA') return;
-    }
-
     this.billingActionMessage = '';
     this.isCancellingPlan = true;
-    this.professionalAuthApi.cancelBillingPlan(requiresCleanup, confirmation).subscribe({
+    this.professionalAuthApi.cancelBillingPlan(this.downgradeTarget).subscribe({
       next: (response) => {
         this.billingActionMessageType = 'success';
         this.billingActionMessage = response.message;
@@ -298,87 +375,40 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     });
   }
 
-  readonly upgradeTierCopy: Record<ProfessionalUpgradeTier, { name: string; blurb: string }> = {
-    pro: { name: 'Pro', blurb: '1 GB included storage with a temporary 20% buffer.' },
-    premium_unlimited: { name: 'Premium', blurb: '5 GB storage, 25 groups, 250 references, and no trainer ads.' }
-  };
+  private lockSectionLabel(key: string): string {
+    const labels: Record<string, string> = {
+      lead_forms: 'lead form',
+      groups: 'group',
+      templates: 'template',
+      resources: 'resource',
+      categories: 'category',
+    };
+    return labels[key] || key;
+  }
 
-  isUpdatePlanOpen = false;
-  selectedUpgradeTier: ProfessionalUpgradeTier | null = null;
   selectedBillingCycle = 'monthly';
   selectedCurrency: 'INR' | 'USD' = 'INR';
 
-  private readonly planRank: Record<ProfessionalPlanCode, number> = {
-    starter_free: 0,
-    starter: 0,
-    pro: 1,
-    premium_unlimited: 2,
-    premium: 2
-  };
+  // Regional formatting per currency - Indian grouping (lakh/crore) for INR,
+  // standard grouping for USD. Backend stays the source of truth for the
+  // actual amount and which currency applies (visitor-country detected,
+  // see ProfessionalBillingStatusView); this only controls presentation.
+  private static readonly CURRENCY_LOCALES: Record<'INR' | 'USD', string> = { INR: 'en-IN', USD: 'en-US' };
 
-  /** Tiers that are both Stripe-configured and strictly above the professional's current plan. */
-  availableUpgradeTiers(billing: ProfessionalBillingStatus): ProfessionalUpgradeTier[] {
-    const currentRank = this.planRank[billing.plan.code] ?? 0;
-    return (['pro', 'premium_unlimited'] as ProfessionalUpgradeTier[]).filter(
-      (tier) => billing.available_upgrades[tier] && this.planRank[tier] > currentRank
-    );
-  }
-
-  openUpdatePlan(): void {
-    this.billingActionMessage = '';
-    this.selectedUpgradeTier = null;
-    this.isUpdatePlanOpen = true;
-  }
-
-  closeUpdatePlan(): void {
-    this.isUpdatePlanOpen = false;
-  }
-
-  selectUpgradeTier(tier: ProfessionalUpgradeTier): void {
-    this.selectedUpgradeTier = tier;
-  }
-
-  confirmUpdatePlan(): void {
-    if (!this.selectedUpgradeTier) return;
-    this.billingActionMessage = '';
-    this.isStartingCheckout = true;
-    this.professionalAuthApi.createBillingCheckout(
-      this.selectedUpgradeTier,
-      this.selectedBillingCycle,
-      this.selectedCurrency
-    ).subscribe({
-      next: (response) => {
-        if (response.checkout_url) {
-          window.location.href = response.checkout_url;
-        } else {
-          this.billingActionMessageType = 'success';
-          this.billingActionMessage = response.message || 'Test plan updated.';
-          this.isStartingCheckout = false;
-          this.closeUpdatePlan();
-          this.loadBillingStatus();
-          this.refreshDataUsage();
-        }
-      },
-      error: (error: unknown) => {
-        this.billingActionMessageType = 'error';
-        this.billingActionMessage = this.formatApiError(error, 'Could not start checkout.');
-        this.isStartingCheckout = false;
-      }
-    });
-  }
-
-  selectedPrice(billing: ProfessionalBillingStatus, tier: ProfessionalUpgradeTier): string {
-    const price = billing.catalog?.trainer?.[tier]?.[this.selectedBillingCycle]?.[this.selectedCurrency];
-    if (!price) return '—';
-    return `${this.selectedCurrency === 'INR' ? '₹' : '$'}${price}`;
+  formatPlanPrice(amount: number, currency: 'INR' | 'USD'): string {
+    return new Intl.NumberFormat(ProfessionalAccountSettingsComponent.CURRENCY_LOCALES[currency], {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0
+    }).format(amount);
   }
 
   planPrice(billing: ProfessionalBillingStatus, code: ProfessionalPlanCode): string {
-    if (code === 'starter_free' || code === 'starter') return this.selectedCurrency === 'INR' ? '₹0' : '$0';
+    if (code === 'starter_free' || code === 'starter') return this.formatPlanPrice(0, this.selectedCurrency);
     const tier = code === 'premium' ? 'premium_unlimited' : code;
     const value = billing.catalog?.trainer?.[tier as ProfessionalUpgradeTier]?.[this.selectedBillingCycle]?.[this.selectedCurrency];
     if (!value) return '—';
-    return `${this.selectedCurrency === 'INR' ? '₹' : '$'}${value}`;
+    return this.formatPlanPrice(Number(value), this.selectedCurrency);
   }
 
   storageLabel(bytes: number): string {
@@ -433,11 +463,6 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
 
   storageSize(bytes: number): string {
     return bytes >= 1024 ** 3 ? `${bytes / 1024 ** 3} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
-  }
-
-  /** Paid tiers that have already maxed out what an upgrade buys — Premium Unlimited plus the legacy Premium tier. */
-  isTopTier(code: ProfessionalPlanCode | undefined): boolean {
-    return code === 'premium_unlimited' || code === 'premium';
   }
 
   gracePeriodDaysLeft(endsAt: string | null): number {
@@ -522,15 +547,24 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     });
   }
 
+  get isNewPasswordRequirementsMet(): boolean {
+    return isPasswordStrong(this.passwordForm.password);
+  }
+
   changePassword(): void {
     this.accountMessage = '';
-    const currentPassword = this.passwordForm.currentPassword;
     const password = this.passwordForm.password;
     const confirmPassword = this.passwordForm.confirmPassword;
 
-    if (!currentPassword || !password || !confirmPassword) {
+    if (!password || !confirmPassword) {
       this.accountMessageType = 'error';
-      this.accountMessage = 'Current Password, New Password, and Confirm New Password are required.';
+      this.accountMessage = 'New Password and Confirm New Password are required.';
+      return;
+    }
+
+    if (!isPasswordStrong(password)) {
+      this.accountMessageType = 'error';
+      this.accountMessage = 'New password does not meet all requirements listed below the field.';
       return;
     }
 
@@ -542,7 +576,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
 
     this.isChangingPassword = true;
 
-    this.professionalAuthApi.changePassword(currentPassword, password, confirmPassword).subscribe({
+    this.professionalAuthApi.changePassword(password, confirmPassword).subscribe({
       next: (response) => {
         this.clearProfessionalSession();
         window.sessionStorage.setItem('professional-login-notice', response.message);

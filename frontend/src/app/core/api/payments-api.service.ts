@@ -252,6 +252,21 @@ export interface PaymentActionsResponse {
   action_count: number;
 }
 
+export interface PaymentNotificationItem {
+  id: number;
+  notif_type: string;
+  title: string;
+  body: string;
+  payload: { request_id?: string; [key: string]: unknown };
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface PaymentNotificationsResponse {
+  unread_count: number;
+  items: PaymentNotificationItem[];
+}
+
 export interface PaymentConfirmation {
   payment_record_id: string;
   request_reference: string;
@@ -518,16 +533,19 @@ export class PaymentsApiService {
     });
   }
 
-  getProfessionalPaymentUnread(): Observable<{ unread_count: number }> {
-    return this.http.get<{ unread_count: number }>(`${this.apiBaseUrl}/professional/payments/notifications/`, {
+  getProfessionalPaymentUnread(): Observable<PaymentNotificationsResponse> {
+    return this.http.get<PaymentNotificationsResponse>(`${this.apiBaseUrl}/professional/payments/notifications/`, {
       headers: this.getProfessionalAuthHeaders()
     });
   }
 
-  markProfessionalPaymentNotificationsRead(): Observable<{ unread_count: number }> {
+  /** Pass a requestId to clear just that request's unread notifications (the
+   * normal path, called when its detail page is opened); omit it and pass
+   * markAll=true only for an explicit "mark all as read" action. */
+  markProfessionalPaymentNotificationsRead(requestId?: string, markAll = false): Observable<{ unread_count: number }> {
     return this.http.post<{ unread_count: number }>(
       `${this.apiBaseUrl}/professional/payments/notifications/`,
-      {},
+      requestId ? { request_id: requestId } : { mark_all: markAll || true },
       { headers: this.getProfessionalAuthHeaders() }
     );
   }
@@ -545,16 +563,19 @@ export class PaymentsApiService {
     );
   }
 
-  getClientPaymentUnread(): Observable<{ unread_count: number }> {
-    return this.http.get<{ unread_count: number }>(`${this.apiBaseUrl}/client/payments/notifications/`, {
+  getClientPaymentUnread(): Observable<PaymentNotificationsResponse> {
+    return this.http.get<PaymentNotificationsResponse>(`${this.apiBaseUrl}/client/payments/notifications/`, {
       headers: this.getClientAuthHeaders()
     });
   }
 
-  markClientPaymentNotificationsRead(): Observable<{ unread_count: number }> {
+  /** Pass a requestId to clear just that request's unread notifications (the
+   * normal path, called when its detail page is opened); omit it and pass
+   * markAll=true only for an explicit "mark all as read" action. */
+  markClientPaymentNotificationsRead(requestId?: string, markAll = false): Observable<{ unread_count: number }> {
     return this.http.post<{ unread_count: number }>(
       `${this.apiBaseUrl}/client/payments/notifications/`,
-      {},
+      requestId ? { request_id: requestId } : { mark_all: markAll || true },
       { headers: this.getClientAuthHeaders() }
     );
   }

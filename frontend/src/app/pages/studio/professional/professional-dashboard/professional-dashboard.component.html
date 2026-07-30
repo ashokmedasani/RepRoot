@@ -30,11 +30,28 @@
     }
 
     @if (planUsage; as usage) {
-      <div class="attention-kpi-row" aria-label="Current plan usage">
-        <article class="attention-kpi clear"><span>Plan</span><strong>{{ usage.plan_name }}</strong><small>Current subscription</small></article>
-        <article class="attention-kpi"><span>Groups</span><strong>{{ usage.resource_usage['groups'].used }} / {{ usage.resource_usage['groups'].limit }}</strong><small>Used</small></article>
-        <article class="attention-kpi"><span>References</span><strong>{{ usage.resource_usage['references'].used }} / {{ usage.resource_usage['references'].limit }}</strong><small>Used</small></article>
-        <article class="attention-kpi"><span>Lead Forms</span><strong>{{ usage.resource_usage['lead_forms'].used }} / {{ usage.resource_usage['lead_forms'].limit }}</strong><small>Used</small></article>
+      <p class="current-plan-line">Current Plan: <strong>{{ usage.plan_name }}</strong></p>
+      <div class="attention-kpi-row" aria-label="Workspace totals">
+        <article class="attention-kpi clear">
+          <span>Total Clients</span>
+          <strong>{{ resourceUsageDisplay('clients') }}</strong>
+          <small>{{ resourceUsageCaption('clients') }}</small>
+        </article>
+        <article class="attention-kpi">
+          <span>Total Groups</span>
+          <strong>{{ resourceUsageDisplay('groups') }}</strong>
+          <small>{{ resourceUsageCaption('groups') }}</small>
+        </article>
+        <article class="attention-kpi">
+          <span>Total Templates</span>
+          <strong>{{ resourceUsageDisplay('templates') }}</strong>
+          <small>{{ resourceUsageCaption('templates') }}</small>
+        </article>
+        <article class="attention-kpi">
+          <span>Total Resources</span>
+          <strong>{{ resourceUsageDisplay('resources') }}</strong>
+          <small>{{ resourceUsageCaption('resources') }}</small>
+        </article>
       </div>
     }
 
@@ -46,7 +63,7 @@
       @if (paymentsEnabled) {
         <button type="button" class="dash-tab" [class.active]="activeTab === 'payments'" (click)="selectTab('payments')">
           <span>Payments</span>
-          @if (paymentsActionCount > 0) { <span class="tab-badge">{{ paymentsActionCount }}</span> }
+          @if (paymentsBadgeCount > 0) { <span class="tab-badge" title="Needs review, overdue, or has unread updates">{{ paymentsBadgeCount }}</span> }
         </button>
       }
       <button type="button" class="dash-tab" [class.active]="activeTab === 'schedules'" (click)="selectTab('schedules')">
@@ -301,6 +318,25 @@
         <div class="dash-chart-row">
           <app-chart-renderer [spec]="paymentsChart" />
         </div>
+
+        @if (paymentNotifications.length) {
+          <div class="panel-heading">
+            <div>
+              <h2>Recent Updates</h2>
+              <p>Tap one to go straight to that client's payment.</p>
+            </div>
+          </div>
+          <ul class="payment-notification-list">
+            @for (item of paymentNotifications; track item.id) {
+              <li>
+                <button type="button" class="payment-notification-row" (click)="openPaymentNotification(item)">
+                  <span class="payment-notification-title">{{ item.title }}</span>
+                  <span class="payment-notification-time">{{ item.created_at | date: 'MMM d, h:mm a' }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
 
         <div class="panel-heading">
           <div>

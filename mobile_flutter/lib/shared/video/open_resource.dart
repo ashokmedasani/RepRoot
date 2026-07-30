@@ -9,9 +9,9 @@ import 'youtube_player_page.dart';
 /// else (PDFs, images, arbitrary links) goes to the system handler as before.
 ///
 /// The three screens that surface professional links — client Programs, client
-/// Professional profile, professional References — each grew their own copy of this, all
+/// Professional profile, professional Resources — each grew their own copy of this, all
 /// pushing every link out to the browser. Videos are the reason the backend
-/// insists a video reference *be* a YouTube link ("so they can be streamed
+/// insists a video resource *be* a YouTube link ("so they can be streamed
 /// in-app"), so that promise is kept here, in one place.
 ///
 /// [rawUrl] may be relative; it goes through [Env.mediaUrl] like every other

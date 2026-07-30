@@ -47,7 +47,7 @@ class NotificationCategory {
   const NotificationCategory._();
   static const all = [
     'chat', 'forms', 'meetings', 'clients', 'templates', 'progress',
-    'reminders', 'references', 'payments', 'support', 'account',
+    'reminders', 'resources', 'payments', 'support', 'account',
     'storage', 'security', 'system',
   ];
 
@@ -62,7 +62,7 @@ class NotificationCategory {
         'templates' => 'Templates',
         'progress' => 'Progress',
         'reminders' => 'Reminders',
-        'references' => 'References',
+        'resources' => 'Resources',
         'payments' => 'Payments',
         'support' => 'Support',
         'account' => 'Account',

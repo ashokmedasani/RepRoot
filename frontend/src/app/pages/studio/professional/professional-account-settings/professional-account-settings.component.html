@@ -12,7 +12,7 @@
           type="button"
           class="settings-tab"
           [class.active]="activeSection === item.id"
-          (click)="activeSection = item.id"
+          (click)="selectSection(item.id)"
         >
           {{ item.label }}
         </button>
@@ -67,18 +67,18 @@
             </div>
             <form class="password-form" (ngSubmit)="changePassword()">
               <label>
-                <span class="field-label">Current Password</span>
-                <app-password-input name="currentPassword" autocomplete="current-password" [(ngModel)]="passwordForm.currentPassword" />
-              </label>
-              <label>
                 <span class="field-label">New Password</span>
                 <app-password-input name="password" autocomplete="new-password" [(ngModel)]="passwordForm.password" />
+                <app-password-requirements [password]="passwordForm.password" />
               </label>
               <label>
                 <span class="field-label">Confirm New Password</span>
                 <app-password-input name="confirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" />
+                @if (passwordForm.confirmPassword && passwordForm.password !== passwordForm.confirmPassword) {
+                  <span class="field-help error-text">Confirm password must match new password.</span>
+                }
               </label>
-              <button type="submit" class="primary-action" [disabled]="isChangingPassword">
+              <button type="submit" class="primary-action" [disabled]="isChangingPassword || !isNewPasswordRequirementsMet || passwordForm.password !== passwordForm.confirmPassword">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}
               </button>
             </form>
@@ -97,9 +97,12 @@
       @if (activeSection === 'billing') {
         <div class="account-content">
           <section class="account-section" aria-labelledby="billing-title">
-            <div>
-              <h2 id="billing-title">Plan & Billing</h2>
-              <p class="section-note">Compare Free, Pro, and Premium usage, pricing, and limits. Paid trainer plans never display advertisements.</p>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="billing-title">Plan & Billing</h2>
+                <p class="section-note">Compare Free, Pro, and Premium usage, pricing, and limits. Paid trainer plans never display advertisements.</p>
+              </div>
+              <button type="button" class="ghost-action compact" (click)="loadBillingStatus()" title="Reload your plan and billing status">Refresh</button>
             </div>
 
             @if (billingError) {
@@ -119,9 +122,10 @@
                     <div class="usage-resources">
                       <div><span>Groups</span><strong>{{ usage.resource_usage['groups'].used }} / {{ usage.resource_usage['groups'].limit }}</strong></div>
                       <div><span>Templates</span><strong>{{ usage.resource_usage['templates'].used }} / {{ usage.resource_usage['templates'].limit }}</strong></div>
-                      <div><span>References</span><strong>{{ usage.resource_usage['references'].used }} / {{ usage.resource_usage['references'].limit }}</strong></div>
+                      <div><span>Resources</span><strong>{{ usage.resource_usage['resources'].used }} / {{ usage.resource_usage['resources'].limit }}</strong></div>
                       <div><span>Storage</span><strong>{{ usage.usage_percent }}%</strong></div>
                     </div>
+                    <button type="button" class="secondary-action compact" (click)="activeSection = 'storage'">Data usage</button>
                   </section>
                 }
 
@@ -139,6 +143,12 @@
                     <span class="detected-region">{{ billing.billing_region }} · {{ billing.billing_currency }}</span>
                   </div>
                 </div>
+
+                @if (billing.has_billing_account) {
+                  <button type="button" class="secondary-action compact" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
+                    {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
+                  </button>
+                }
 
                 <div class="plan-card-grid">
                   @for (plan of billing.plans; track plan.code; let index = $index) {
@@ -160,8 +170,9 @@
                         <li>{{ plan.clients === null ? 'Unlimited clients' : (plan.clients + ' clients') }}</li>
                         <li>{{ storageLabel(plan.professional_storage_bytes) }} storage</li>
                         <li>{{ plan.groups }} groups</li>
-                        <li>{{ plan.references }} references</li>
+                        <li>{{ plan.resources }} resources</li>
                         <li>{{ plan.categories }} categories</li>
+                        <li>{{ plan.client_data_retention_days }}-day client history</li>
                       </ul>
                       <button
                         type="button"
@@ -177,11 +188,21 @@
                 </div>
 
                 @if (billing.plan.code !== 'starter_free' && billing.plan.code !== 'starter') {
-                  <section class="membership-cancellation" aria-labelledby="membership-cancellation-title">
-                    <div>
-                      <h3 id="membership-cancellation-title">Membership</h3>
+                  <details class="membership-cancellation">
+                    <summary>
+                      <h3>Membership</h3>
                       @if (billing.cancellation_effective_at) {
-                        <p>Your cancellation is scheduled. Paid access ends {{ billing.cancellation_effective_at | date: 'mediumDate' }}, then your account moves to Free.</p>
+                        <span>Cancellation scheduled — access ends {{ billing.cancellation_effective_at | date: 'mediumDate' }}</span>
+                      } @else if (billing.plan_renews_at) {
+                        <span>Renews {{ billing.plan_renews_at | date: 'mediumDate' }}</span>
+                      } @else {
+                        <span>Active</span>
+                      }
+                    </summary>
+
+                    <div>
+                      @if (billing.cancellation_effective_at) {
+                        <p>Your cancellation is scheduled. Paid access ends {{ billing.cancellation_effective_at | date: 'mediumDate' }}, then your account moves to {{ selectedAssessment?.target_tier_name || 'Free' }}.</p>
                       } @else if (billing.plan_renews_at) {
                         <p>Your {{ billing.plan.name }} plan expires or renews on {{ billing.plan_renews_at | date: 'mediumDate' }}.</p>
                       } @else {
@@ -189,40 +210,78 @@
                       }
                     </div>
 
-                    <div class="downgrade-assessment">
-                      <h4>Free-plan eligibility</h4>
-                      <p>
-                        Storage would use {{ billing.downgrade_assessment.storage.free_tier_percent }}% of the Free allowance.
-                        @if (billing.downgrade_assessment.storage.exceeded_by_percent > 0) {
-                          This is {{ billing.downgrade_assessment.storage.exceeded_by_percent }}% over the Free allowance.
-                        }
-                      </p>
-                      <ul>
-                        @for (item of billing.downgrade_assessment.resources | keyvalue; track item.key) {
-                          <li [class.exceeded]="!item.value.eligible">
-                            {{ item.key.replace('_', ' ') }}: {{ item.value.used }} / {{ item.value.free_limit }}
-                            @if (!item.value.eligible) { <strong>Exceeded by {{ item.value.exceeded_by }}</strong> }
-                          </li>
-                        }
-                      </ul>
-                      <p>Client records are never deleted by membership cancellation.</p>
-                      @if (!billing.downgrade_assessment.storage.eligible) {
-                        <p class="message error-message">
-                          Self-service cancellation is unavailable because storage exceeds the Free allowance.
-                          Contact {{ billing.downgrade_assessment.support_email || 'customer support' }}.
-                        </p>
-                      } @else if (!billing.downgrade_assessment.eligible) {
-                        <p class="message">
-                          Reduce the exceeded items first, or choose forced cleanup. Forced cleanup removes excess non-client plan data when paid access expires.
-                        </p>
-                      }
-                    </div>
+                    @if (!billing.cancellation_effective_at && (billing.plan.code === 'premium_unlimited' || billing.plan.code === 'premium')) {
+                      <div class="downgrade-target-picker">
+                        <span>Step down to:</span>
+                        <label>
+                          <input type="radio" name="downgradeTarget" value="pro" [checked]="downgradeTarget === 'pro'" (change)="onDowngradeTargetChange('pro')">
+                          Pro
+                        </label>
+                        <label>
+                          <input type="radio" name="downgradeTarget" value="starter_free" [checked]="downgradeTarget === 'starter_free'" (change)="onDowngradeTargetChange('starter_free')">
+                          Free
+                        </label>
+                      </div>
+                    }
+
+                    @if (isLoadingAssessment) {
+                      <p class="message">Loading what would change...</p>
+                    } @else if (selectedAssessment; as assessment) {
+                      <details class="downgrade-assessment">
+                        <summary>What happens if you move to {{ assessment.target_tier_name || 'Free' }}</summary>
+                        <div>
+                          <p>
+                            Storage would use {{ assessment.storage.free_tier_percent }}% of the {{ assessment.target_tier_name || 'Free' }} allowance.
+                            @if (assessment.storage.exceeded_by_percent > 0) {
+                              This is {{ assessment.storage.exceeded_by_percent }}% over the {{ assessment.target_tier_name || 'Free' }} allowance.
+                            }
+                          </p>
+                          <p class="message">Nothing is ever deleted. Anything over the {{ assessment.target_tier_name || 'Free' }} plan's limits below would simply lock, in priority order, and unlock again the moment you upgrade.</p>
+                          <ul>
+                            @for (item of assessment.locks | keyvalue; track item.key) {
+                              <li [class.exceeded]="item.value.locked_count > 0">
+                                {{ item.key.replace('_', ' ') }}: {{ item.value.free_limit }} allowed on {{ assessment.target_tier_name || 'Free' }}
+                                @if (item.value.locked_count > 0) {
+                                  <strong>{{ item.value.locked_count }} would lock</strong>
+                                  @if (item.value.locked_names.length) {
+                                    ({{ item.value.locked_names.join(', ') }})
+                                  }
+                                }
+                              </li>
+                            }
+                          </ul>
+                          @if (assessment.category_cascade_resource_count > 0) {
+                            <p class="message">
+                              {{ assessment.category_cascade_resource_count }} resource(s) would lock because the category they're in would lock —
+                              every resource inside a locked category locks too, regardless of how many resources it contains.
+                            </p>
+                          }
+                          @if (assessment.clients_losing_access_count > 0) {
+                            <p class="message">
+                              {{ assessment.clients_losing_access_count }} client(s) would lose portal access until you upgrade again
+                              (their data is kept, only login pauses):
+                              @for (client of assessment.clients_losing_access | slice:0:5; track client.client_id; let last = $last) {
+                                <span>{{ client.client_name }} ({{ client.group_name }})@if (!last) {, }</span>
+                              }
+                              @if (assessment.clients_losing_access_count > 5) { … }
+                            </p>
+                          }
+                          <p>Client records are never deleted by membership cancellation.</p>
+                          @if (!assessment.storage.eligible) {
+                            <p class="message error-message">
+                              Self-service cancellation is unavailable because storage exceeds the {{ assessment.target_tier_name || 'Free' }} allowance.
+                              Contact {{ assessment.support_email || 'customer support' }}.
+                            </p>
+                          }
+                        </div>
+                      </details>
+                    }
 
                     @if (!billing.cancellation_effective_at) {
                       <button
                         type="button"
                         class="link-action danger"
-                        [disabled]="isCancellingPlan || !billing.downgrade_assessment.storage.eligible"
+                        [disabled]="isCancellingPlan || isLoadingAssessment || !selectedAssessment || !selectedAssessment.storage.eligible"
                         (click)="cancelPlan()"
                       >
                         {{ isCancellingPlan ? 'Scheduling...' : 'Cancel membership' }}
@@ -231,124 +290,10 @@
                     @if (billingActionMessage) {
                       <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
                     }
-                  </section>
+                  </details>
                 }
               </div>
 
-              @if (billingStatus; as billing) {
-              <div class="plan-summary" hidden>
-                <div class="plan-summary-header">
-                  <span class="plan-badge" [class.premium]="isTopTier(billing.plan.code)">{{ billing.plan.name }}</span>
-                  @if (isTopTier(billing.plan.code) && billing.plan_renews_at) {
-                    <span class="plan-renews">Renews {{ billing.plan_renews_at | date: 'mediumDate' }}</span>
-                  }
-                </div>
-
-                <div class="storage-summary">
-                  <div>
-                    <span>Lead forms</span>
-                    <strong>{{ billing.plan['lead_forms'] }}</strong>
-                  </div>
-                  <div>
-                    <span>Groups</span>
-                    <strong>{{ billing.plan['groups'] }}</strong>
-                  </div>
-                  <div>
-                    <span>Clients</span>
-                    <strong aria-label="Unlimited clients">∞ Unlimited</strong>
-                  </div>
-                  <div>
-                    <span>Templates</span>
-                    <strong>{{ billing.plan['templates'] }}</strong>
-                  </div>
-                  <div>
-                    <span>References</span>
-                    <strong>{{ billing.plan['references'] }}</strong>
-                  </div>
-                  <div>
-                    <span>Categories</span>
-                    <strong>{{ billing.plan['categories'] }}</strong>
-                  </div>
-                </div>
-
-                <div class="plan-actions">
-                  @if (billing.has_billing_account) {
-                    <button type="button" class="primary-action" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
-                      {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
-                    </button>
-                  }
-                  @if (availableUpgradeTiers(billing).length > 0) {
-                    <button type="button" class="secondary-action" (click)="openUpdatePlan()">Update plan</button>
-                  } @else if (!billing.billing_configured) {
-                    <p class="section-note">Upgrades aren't open yet — check back soon.</p>
-                  }
-                  @if (billing.plan.code !== 'starter_free' && billing.plan.code !== 'starter') {
-                    <button type="button" class="link-action danger" [disabled]="isCancellingPlan" (click)="cancelPlan()">
-                      {{ isCancellingPlan ? 'Cancelling...' : 'Cancel plan / back to Starter Free' }}
-                    </button>
-                  }
-                </div>
-
-                @if (billingActionMessage) {
-                  <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
-                }
-              </div>
-
-              @if (isUpdatePlanOpen) {
-                <div class="update-plan-overlay" (click)="closeUpdatePlan()">
-                  <div class="update-plan-dialog" role="dialog" aria-modal="true" aria-labelledby="update-plan-title" (click)="$event.stopPropagation()">
-                    <h3 id="update-plan-title">Update plan</h3>
-                    <p class="section-note">Pick the tier that fits where your business is headed.</p>
-                    <div class="tier-options" role="group" aria-label="Billing period">
-                      @for (cycle of billing.catalog.cycles; track cycle.code) {
-                        <button type="button" class="tier-option" [class.selected]="selectedBillingCycle === cycle.code" (click)="selectedBillingCycle = cycle.code">
-                          <strong>{{ cycle.name }}</strong>
-                          <span>{{ cycle.code === 'monthly' ? 'Standard monthly price' : ('Pay for ' + cycle.charged_months + ' months') }}</span>
-                        </button>
-                      }
-                    </div>
-                    <div class="tier-options" role="group" aria-label="Currency">
-                      <button type="button" class="tier-option" [class.selected]="selectedCurrency === 'INR'" (click)="selectedCurrency = 'INR'">India · INR</button>
-                      <button type="button" class="tier-option" [class.selected]="selectedCurrency === 'USD'" (click)="selectedCurrency = 'USD'">International · USD</button>
-                    </div>
-                    @if (billing.test_mode) {
-                      <p class="test-mode-note">🧪 Test environment — this applies the plan instantly with no real payment.</p>
-                    }
-
-                    <div class="tier-options">
-                      @for (tier of availableUpgradeTiers(billing); track tier) {
-                        <button
-                          type="button"
-                          class="tier-option"
-                          [class.selected]="selectedUpgradeTier === tier"
-                          (click)="selectUpgradeTier(tier)"
-                        >
-                          <strong>{{ upgradeTierCopy[tier].name }}</strong>
-                          <span>{{ upgradeTierCopy[tier].blurb }}</span>
-                          <strong>{{ selectedPrice(billing, tier) }}</strong>
-                        </button>
-                      }
-                    </div>
-
-                    @if (billingActionMessage) {
-                      <p class="message" [class.error-message]="billingActionMessageType === 'error'">{{ billingActionMessage }}</p>
-                    }
-
-                    <div class="update-plan-actions">
-                      <button type="button" class="secondary-action" (click)="closeUpdatePlan()">Cancel</button>
-                      <button
-                        type="button"
-                        class="primary-action"
-                        [disabled]="!selectedUpgradeTier || isStartingCheckout"
-                        (click)="confirmUpdatePlan()"
-                      >
-                        {{ isStartingCheckout ? 'Applying...' : (billing.test_mode ? 'Apply plan (test)' : 'Continue to checkout') }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              }
-              }
             }
           </section>
         </div>
@@ -476,13 +421,23 @@
               <div class="usage-table-wrap">
                 <table class="usage-table">
                   <thead>
-                    <tr><th>Section</th><th>Records</th><th>Of plan</th></tr>
+                    <tr>
+                      <th>Section</th>
+                      <th>Records</th>
+                      @if (usage.plan_code === 'pro' || usage.plan_code === 'premium_unlimited') {
+                        <th>Size</th>
+                      }
+                      <th>Of plan</th>
+                    </tr>
                   </thead>
                   <tbody>
                     @for (row of usageRows(usage.sections, professionalUsageLabels); track row.key) {
                       <tr>
                         <td><strong>{{ row.label }}</strong></td>
                         <td>{{ row.usage.record_count }}</td>
+                        @if (usage.plan_code === 'pro' || usage.plan_code === 'premium_unlimited') {
+                          <td>{{ row.usage.total_bytes !== undefined ? storageSize(row.usage.total_bytes) : '—' }}</td>
+                        }
                         <td><strong>{{ row.usage.percent_of_quota }}%</strong></td>
                       </tr>
                     }
@@ -494,7 +449,7 @@
                 <div class="recycle-bin-header">
                   <div>
                     <h3 id="recycle-bin-title">Recycle Bin</h3>
-                    <p class="section-note">Deleted client accounts, chat images, and references stay here for 14 days before they're gone for good.</p>
+                    <p class="section-note">Deleted client accounts, chat images, and resources stay here for 14 days before they're gone for good.</p>
                   </div>
                   <button type="button" class="secondary-action" [disabled]="isLoadingRecycleBin" (click)="loadRecycleBin()">
                     {{ isLoadingRecycleBin ? 'Loading...' : 'Refresh' }}
@@ -562,7 +517,7 @@
             </div>
             <div class="guide-flow">
               <strong>Recommended workflow</strong>
-              <p>Complete Profile → create Forms & Groups → add or approve Clients → build Templates → assign References → monitor entries and schedules from Dashboard.</p>
+              <p>Complete Profile → create Forms & Groups → add or approve Clients → build Templates → assign Resources → monitor entries and schedules from Dashboard.</p>
             </div>
           </section>
         </div>

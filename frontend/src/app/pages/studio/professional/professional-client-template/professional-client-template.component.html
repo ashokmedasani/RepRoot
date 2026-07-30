@@ -5,7 +5,7 @@
   activeSection="clients"
   titleId="client-template-title"
 >
-  <button page-actions type="button" class="secondary-action" (click)="openShareDialog()">Share References</button>
+  <button page-actions type="button" class="secondary-action" (click)="openShareDialog()">Share Resources</button>
   <button page-actions type="button" class="primary-action" (click)="openAddEntry()">Start New Entry</button>
   <button page-actions type="button" class="ghost-action" (click)="goBack()" aria-label="Back">&#8592; Back</button>
 
@@ -21,7 +21,7 @@
     <section class="panel detail-panel">
       <nav class="detail-tabs" aria-label="Template sections">
         <button type="button" [class.active]="detailTab === 'overview'" (click)="setDetailTab('overview')">Overview</button>
-        <button type="button" [class.active]="detailTab === 'references'" (click)="setDetailTab('references')">References</button>
+        <button type="button" [class.active]="detailTab === 'references'" (click)="setDetailTab('references')">Resources</button>
         <button type="button" [class.active]="detailTab === 'entries'" (click)="setDetailTab('entries')">Data Entries</button>
         <button type="button" [class.active]="detailTab === 'progress'" (click)="setDetailTab('progress')">Progress</button>
       </nav>
@@ -29,10 +29,10 @@
       @if (detailTab === 'references') {
         <div class="detail-section">
           <div class="section-head">
-            <h3>Assigned References</h3>
-            <button type="button" class="secondary-action compact" (click)="openShareDialog()">Share References</button>
+            <h3>Assigned Resources</h3>
+            <button type="button" class="secondary-action compact" (click)="openShareDialog()">Share Resources</button>
           </div>
-          <app-references-accordion [references]="assignment.references" />
+          <app-references-accordion [references]="assignment.resources" />
         </div>
 
         @if (template?.purpose) {
@@ -225,7 +225,7 @@
         <div class="dialog-panel">
           <div class="dialog-header">
             <div>
-              <h3 id="share-dialog-title">Share References - {{ assignment.template_name }}</h3>
+              <h3 id="share-dialog-title">Share Resources - {{ assignment.template_name }}</h3>
               <p>Pick only what {{ client.first_name }} needs. You can change this anytime.</p>
             </div>
             <button type="button" class="icon-button" title="Close" (click)="closeShareDialog()">x</button>
@@ -234,7 +234,7 @@
           <input
             type="search"
             class="reference-search"
-            placeholder="Search references..."
+            placeholder="Search resources..."
             [(ngModel)]="referenceSearch"
             name="shareReferenceSearch"
           >
@@ -253,14 +253,14 @@
                       >
                       <span>
                         <strong>{{ reference.title }}</strong>
-                        <small>{{ reference.subcategory || reference.reference_type }}</small>
+                        <small>{{ reference.subcategory || reference.resource_type }}</small>
                       </span>
                     </label>
                   }
                 </div>
               }
             } @empty {
-              <p class="empty-note">No references yet. Add resources in the References Library first.</p>
+              <p class="empty-note">No resources yet. Add resources in the Resource Library first.</p>
             }
           </div>
 

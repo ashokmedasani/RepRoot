@@ -1666,7 +1666,7 @@ class _ProfessionalClientDetailPageState
               title: assignment.templateName,
               subtitle:
                   '${TemplateCadence.label(assignment.templateCadence)}'
-                  '${assignment.references.isNotEmpty ? ' · ${assignment.references.length} refs' : ''}'
+                  '${assignment.resources.isNotEmpty ? ' · ${assignment.resources.length} resources' : ''}'
                   ' · ${TemplateClientAccessLevel.label(assignment.clientAccessLevel)}',
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

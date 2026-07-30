@@ -6,6 +6,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ProfessionalAuthApiService, ProfessionalSignupPayload } from '@core/api/professional-auth-api.service';
 import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
 import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { PasswordRequirementsComponent } from '@studio-shared/password-requirements/password-requirements.component';
+import { isPasswordStrong } from '@studio-shared/password-requirements/password-requirements.util';
+import { GoogleSigninButtonComponent } from '@studio-shared/google-signin-button/google-signin-button.component';
 
 type EmailOtpStatus = 'idle' | 'sending' | 'sent' | 'verified' | 'failed';
 type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
@@ -13,7 +16,7 @@ type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
 @Component({
   selector: 'app-professional-signup',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
+  imports: [FormsModule, RouterLink, PasswordInputComponent, PasswordRequirementsComponent, GoogleSigninButtonComponent, AuthPageShellComponent],
   templateUrl: './professional-signup.component.html',
   styleUrl: './professional-signup.component.scss'
 })
@@ -38,6 +41,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
   isEmailAlreadyRegistered = false;
   resendCountdown = 0;
   agreedToTerms = false;
+  isGoogleAvailable = true;
+  isGoogleSubmitting = false;
 
   readonly signupForm = {
     email: '',
@@ -218,7 +223,7 @@ export class ProfessionalSignupComponent implements OnDestroy {
         this.localDebugOtp = '';
         this.emailCheckMessage = this.formatApiError(
           error,
-          'Could not check email. Start Django on port 8000 and try again.'
+          'We could not check this email right now. Please try again shortly.'
         );
         this.isCheckingEmail = false;
       }
@@ -290,6 +295,42 @@ export class ProfessionalSignupComponent implements OnDestroy {
         this.usernameCheckMessage = '';
         this.usernameSuggestions = [];
         this.isCheckingUsername = false;
+      }
+    });
+  }
+
+  handleGoogleUnavailable(): void {
+    this.isGoogleAvailable = false;
+  }
+
+  handleGoogleLoadError(message: string): void {
+    this.signupMessage = '';
+    this.fieldErrors.general = message;
+  }
+
+  handleGoogleCredential(credential: string): void {
+    this.isGoogleSubmitting = true;
+    this.fieldErrors.general = '';
+    this.signupMessage = 'Verifying with Google...';
+
+    this.professionalAuthApi.googleAuth(credential).subscribe({
+      next: (response) => {
+        window.localStorage.setItem('professional-auth-token', response.token);
+        window.localStorage.setItem('professional-account-id', String(response.professional.id));
+        window.localStorage.setItem('professional-account-username', response.professional.username);
+        this.isGoogleSubmitting = false;
+        // New Google signups always need Profile Setup; existing Google
+        // logins from this page follow the same profile-completion check as
+        // the regular login flow. Either way we never send the user back to
+        // the login screen.
+        void this.router.navigate([
+          response.professional.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup'
+        ]);
+      },
+      error: (error: unknown) => {
+        this.signupMessage = '';
+        this.fieldErrors.general = this.formatApiError(error, 'Google sign-up failed. Please try again.');
+        this.isGoogleSubmitting = false;
       }
     });
   }
@@ -402,7 +443,7 @@ export class ProfessionalSignupComponent implements OnDestroy {
         this.localDebugOtp = '';
         const message = this.formatApiError(
           error,
-          'Could not send OTP. Start Django on port 8000 and try again.'
+          'We could not send the verification code right now. Please try again shortly.'
         );
         this.isEmailAlreadyRegistered = message.toLowerCase().includes('already registered');
         this.emailCheckMessage = this.isEmailAlreadyRegistered ? 'Email exists already.' : message;
@@ -449,8 +490,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
       isValid = false;
     }
 
-    if (!this.isPasswordStrong(form.password)) {
-      this.fieldErrors.password = 'Password must be at least 8 characters and include 1 special character.';
+    if (!isPasswordStrong(form.password)) {
+      this.fieldErrors.password = 'Password does not meet all requirements below.';
       isValid = false;
     }
 
@@ -465,8 +506,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
     return isValid;
   }
 
-  private isPasswordStrong(password: string): boolean {
-    return password.length >= 8 && /[^A-Za-z0-9]/.test(password);
+  get isPasswordRequirementsMet(): boolean {
+    return isPasswordStrong(this.signupForm.password);
   }
 
   private applySignupApiErrors(error: unknown): void {

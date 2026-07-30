@@ -7,17 +7,30 @@ import { catchError, forkJoin, of } from 'rxjs';
 import { ClientAccessRecord, FormsGroupsApiService } from '@core/api/forms-groups-api.service';
 import {
   AvailabilityWindowRecord,
+  DateOffRecord,
   LeadFormMeetingRecord,
   SchedulingSettingsRecord,
   ScheduledMeetingRecord,
   SchedulingApiService,
-  SlotsByDate
+  SlotsByDate,
+  WeekdayOffRecord
 } from '@core/api/scheduling-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
 
 const WEEKDAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+interface CalendarCell {
+  iso: string;
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
+  isDayOff: boolean;
+  meetingCount: number;
+  bookedMinutes: number;
+  occupancy: 'open' | 'light' | 'moderate' | 'busy';
+}
 
 @Component({
   selector: 'app-professional-schedule',
@@ -73,6 +86,27 @@ export class ProfessionalScheduleComponent implements OnInit {
   newWindow = { weekday: 0, start_time: '09:00', end_time: '17:00' };
   isSavingWindow = false;
   isSavingSettings = false;
+
+  // Used as the date input's `min` so a day off can't be backdated -- a past
+  // date off would never show up in the backend's own list (it only
+  // returns today-or-later), so allowing one to be entered just meant it'd
+  // vanish again on reload.
+  readonly todayIso = new Date().toISOString().slice(0, 10);
+
+  // Days off — specific blocked-off dates, layered on top of the recurring
+  // weekly windows above rather than replacing them. Opened from a button
+  // next to the calendar rather than living inline in the availability
+  // panel, since it's a secondary, occasional action.
+  showDaysOffModal = false;
+  dateOffs: DateOffRecord[] = [];
+  newDateOff = '';
+  isSavingDateOff = false;
+
+  // Recurring weekly days off (e.g. "every Monday off") -- a toggle per
+  // weekday, separate from the specific-date offs above. Lives in the same
+  // dialog.
+  weekdayOffs: WeekdayOffRecord[] = [];
+  savingWeekdayOff: number | null = null;
   settingsForm = { timezone: 'UTC', default_duration_minutes: 30, slot_interval_minutes: 30, buffer_minutes: 15 };
 
   // Searchable list of real IANA timezone names for the Meeting defaults
@@ -89,6 +123,26 @@ export class ProfessionalScheduleComponent implements OnInit {
     }
   })();
 
+  /** "IANA name -> UTC offset" (e.g. "GMT+5:30"), precomputed once up front
+   * rather than in the template — calling Intl.DateTimeFormat for ~400
+   * zones on every change-detection pass would be wasteful, and a plain
+   * object lookup in the template is cheap. Shows the offset numbers
+   * alongside each zone name since most people know their zone as "+5:30",
+   * not by its IANA name alone. */
+  readonly timezoneOffsetLabels: Record<string, string> = (() => {
+    const labels: Record<string, string> = {};
+    const now = new Date();
+    for (const zone of this.timezoneOptions) {
+      try {
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(now);
+        labels[zone] = parts.find((p) => p.type === 'timeZoneName')?.value || '';
+      } catch {
+        labels[zone] = '';
+      }
+    }
+    return labels;
+  })();
+
 
   // Schedule-meeting form
   showScheduleForm = false;
@@ -100,6 +154,20 @@ export class ProfessionalScheduleComponent implements OnInit {
   isLoadingSlots = false;
   isSavingMeeting = false;
 
+  // Weekly availability only governs the public lead-form booking page --
+  // booking directly with an existing client here shouldn't be blocked just
+  // because no weekly hours are set. The slot chips above are a convenience
+  // when hours exist; this manual field lets a trainer pick any exact date
+  // and time regardless, in whichever zone "Show times in" is set to.
+  manualSlotLocal = '';
+
+  // Slot times always come back from the backend as absolute timestamps, so
+  // re-labeling them for display never changes what actually gets booked —
+  // this just lets a trainer preview a slot picker in, say, a client's time
+  // zone instead of only ever seeing their own. Defaults to the trainer's own
+  // scheduling timezone whenever a booking/reschedule modal opens.
+  viewTimezone = 'UTC';
+
   // Calendar view
   calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   selectedCalendarDate: string | null = null;
@@ -109,6 +177,7 @@ export class ProfessionalScheduleComponent implements OnInit {
   rescheduleDate = '';
   rescheduleSlots: SlotsByDate = {};
   selectedRescheduleSlot = '';
+  manualRescheduleLocal = '';
   isLoadingRescheduleSlots = false;
   isSavingReschedule = false;
 
@@ -136,6 +205,8 @@ export class ProfessionalScheduleComponent implements OnInit {
         this.isLoading = false;
         this.loadMeetings();
         this.loadClients();
+        this.loadDateOffs();
+        this.loadWeekdayOffs();
       },
       error: () => {
         this.isLoading = false;
@@ -277,7 +348,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     return this.calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   }
 
-  get calendarWeeks(): { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[][] {
+  get calendarWeeks(): CalendarCell[][] {
     const year = this.calendarMonth.getFullYear();
     const month = this.calendarMonth.getMonth();
     const firstOfMonth = new Date(year, month, 1);
@@ -288,24 +359,33 @@ export class ProfessionalScheduleComponent implements OnInit {
     const countsByDate = this.meetingCountsByDate();
     const minutesByDate = this.meetingMinutesByDate();
 
-    const cells: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[] = [];
+    // Both flavors of "day off" gray out the calendar: a recurring weekday
+    // (every Monday) grays out every occurrence of that weekday, a specific
+    // date grays out just that one cell.
+    const offWeekdays = new Set(this.weekdayOffs.map((w) => w.weekday));
+    const offDates = new Set(this.dateOffs.map((d) => d.date));
+
+    const cells: CalendarCell[] = [];
     for (let i = 0; i < 42; i++) {
       const cellDate = new Date(gridStart);
       cellDate.setDate(gridStart.getDate() + i);
       const iso = cellDate.toISOString().slice(0, 10);
       const bookedMinutes = minutesByDate[iso] || 0;
+      // JS getDay(): Sun=0..Sat=6. Our weekday fields: Mon=0..Sun=6.
+      const ourWeekday = (cellDate.getDay() + 6) % 7;
       cells.push({
         iso,
         day: cellDate.getDate(),
         inMonth: cellDate.getMonth() === month,
         isToday: iso === todayIso,
+        isDayOff: offWeekdays.has(ourWeekday) || offDates.has(iso),
         meetingCount: countsByDate[iso] || 0,
         bookedMinutes,
         occupancy: bookedMinutes === 0 ? 'open' : bookedMinutes <= 60 ? 'light' : bookedMinutes <= 180 ? 'moderate' : 'busy'
       });
     }
 
-    const weeks: { iso: string; day: number; inMonth: boolean; isToday: boolean; meetingCount: number; bookedMinutes: number; occupancy: 'open' | 'light' | 'moderate' | 'busy' }[][] = [];
+    const weeks: CalendarCell[][] = [];
     for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
     return weeks;
   }
@@ -337,11 +417,6 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   goToNextMonth(): void {
     this.calendarMonth = new Date(this.calendarMonth.getFullYear(), this.calendarMonth.getMonth() + 1, 1);
-  }
-
-  goToToday(): void {
-    const now = new Date();
-    this.calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
   selectCalendarDay(iso: string): void {
@@ -392,6 +467,16 @@ export class ProfessionalScheduleComponent implements OnInit {
     });
   }
 
+  /** Each weekday row has its own "+ Add" affordance rather than a separate
+   * inline form per row — clicking it just preselects that day in the one
+   * shared Day/Start/End form above and scrolls it into view. */
+  @ViewChild('addWindowRow') private addWindowRowRef?: ElementRef<HTMLElement>;
+
+  quickAddForWeekday(weekday: number): void {
+    this.newWindow.weekday = weekday;
+    this.addWindowRowRef?.nativeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   removeAvailabilityWindow(window: AvailabilityWindowRecord): void {
     this.schedulingApi.deleteAvailabilityWindow(window.id).subscribe({
       next: () => {
@@ -400,6 +485,136 @@ export class ProfessionalScheduleComponent implements OnInit {
       error: (error: unknown) => {
         this.messageType = 'error';
         this.message = formatApiError(error, 'Could not remove that availability window.');
+      }
+    });
+  }
+
+  /** Each block is already saved the instant it's added or removed above --
+   * there's no separate draft state to persist. This just gives Weekly
+   * availability its own explicit confirmation, mirroring the "Save meeting
+   * defaults" button above it, rather than only Meeting defaults having a
+   * visible save action. */
+  confirmWeeklyAvailabilitySaved(): void {
+    this.messageType = 'success';
+    this.message = 'Weekly availability saved.';
+    this.showAvailabilityPanel = false;
+  }
+
+  // --- Days off (specific-date overrides) ---------------------------------
+
+  private loadDateOffs(): void {
+    this.schedulingApi.listDateOffs().subscribe({
+      next: (response) => (this.dateOffs = response.date_offs),
+      error: () => (this.dateOffs = [])
+    });
+  }
+
+  addDateOff(): void {
+    if (!this.newDateOff) return;
+    this.isSavingDateOff = true;
+    this.message = '';
+    this.schedulingApi.addDateOff(this.newDateOff).subscribe({
+      next: (response) => {
+        this.dateOffs = [...this.dateOffs, response.date_off].sort((a, b) => a.date.localeCompare(b.date));
+        this.newDateOff = '';
+        this.isSavingDateOff = false;
+        this.messageType = 'success';
+        this.message = response.message;
+      },
+      error: (error: unknown) => {
+        this.isSavingDateOff = false;
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not mark that date as a day off.');
+      }
+    });
+  }
+
+  removeDateOff(dateOff: DateOffRecord): void {
+    this.schedulingApi.deleteDateOff(dateOff.id).subscribe({
+      next: () => {
+        this.dateOffs = this.dateOffs.filter((d) => d.id !== dateOff.id);
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not remove that day off.');
+      }
+    });
+  }
+
+  formatDateOff(iso: string): string {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(year, (month || 1) - 1, day || 1).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  openDaysOffModal(): void {
+    this.showDaysOffModal = true;
+  }
+
+  closeDaysOffModal(): void {
+    this.showDaysOffModal = false;
+  }
+
+  // --- Days off (recurring weekday overrides) ------------------------------
+
+  private loadWeekdayOffs(): void {
+    this.schedulingApi.listWeekdayOffs().subscribe({
+      next: (response) => (this.weekdayOffs = response.weekday_offs),
+      error: () => (this.weekdayOffs = [])
+    });
+  }
+
+  isWeekdayOff(weekday: number): boolean {
+    return this.weekdayOffs.some((w) => w.weekday === weekday);
+  }
+
+  /** True if the given calendar date (either through a recurring weekday
+   * off or a specific date off) has no bookable hours -- used to swap the
+   * "no meetings" empty state for a clearer "you're on a day off" message
+   * when a grayed-out calendar day is selected. */
+  isDateOff(iso: string): boolean {
+    const [year, month, day] = iso.split('-').map(Number);
+    const weekday = (new Date(year, (month || 1) - 1, day || 1).getDay() + 6) % 7;
+    return this.isWeekdayOff(weekday) || this.dateOffs.some((d) => d.date === iso);
+  }
+
+  /** Toggles a whole weekday (e.g. every Monday) on or off as a recurring
+   * day off — separate from, and layered on top of, the specific-date offs
+   * above. Editable any time: toggling it back off resumes normal slots for
+   * that weekday without touching the availability blocks themselves. */
+  toggleWeekdayOff(weekday: number): void {
+    const existing = this.weekdayOffs.find((w) => w.weekday === weekday);
+    this.savingWeekdayOff = weekday;
+    this.message = '';
+
+    if (existing) {
+      this.schedulingApi.deleteWeekdayOff(existing.id).subscribe({
+        next: () => {
+          this.weekdayOffs = this.weekdayOffs.filter((w) => w.id !== existing.id);
+          this.savingWeekdayOff = null;
+        },
+        error: (error: unknown) => {
+          this.savingWeekdayOff = null;
+          this.messageType = 'error';
+          this.message = formatApiError(error, 'Could not remove that recurring day off.');
+        }
+      });
+      return;
+    }
+
+    this.schedulingApi.addWeekdayOff(weekday).subscribe({
+      next: (response) => {
+        this.weekdayOffs = [...this.weekdayOffs, response.weekday_off].sort((a, b) => a.weekday - b.weekday);
+        this.savingWeekdayOff = null;
+      },
+      error: (error: unknown) => {
+        this.savingWeekdayOff = null;
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not set that recurring day off.');
       }
     });
   }
@@ -453,6 +668,10 @@ export class ProfessionalScheduleComponent implements OnInit {
         this.isSavingSettings = false;
         this.messageType = 'success';
         this.message = response.message;
+        // Collapse the whole Manage availability panel back to its normal,
+        // closed state once saved -- the confirmation message above still
+        // shows (it lives outside the panel), it just doesn't stay expanded.
+        this.showAvailabilityPanel = false;
       },
       error: (error: unknown) => {
         this.isSavingSettings = false;
@@ -473,9 +692,85 @@ export class ProfessionalScheduleComponent implements OnInit {
     };
     this.clientSearchQuery = '';
     this.selectedSlot = '';
+    this.manualSlotLocal = '';
     this.slots = {};
+    this.viewTimezone = this.settingsForm.timezone || 'UTC';
     this.showScheduleForm = true;
     this.loadSlots();
+  }
+
+  /** Converts a "YYYY-MM-DDTHH:mm" wall-clock string -- as typed into a
+   * datetime-local input -- into the absolute instant it represents when
+   * read in the given IANA zone. Needed because manual entry lets a trainer
+   * pick any exact time regardless of computed slots, in whichever zone
+   * "Show times in" is set to; a plain `new Date(value)` would instead
+   * assume the browser's own local zone. */
+  private zonedWallClockToIso(localValue: string, timeZone: string): string | null {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(localValue);
+    if (!match) return null;
+    const [year, month, day, hour, minute] = match.slice(1).map(Number);
+
+    let guessMs = Date.UTC(year, month - 1, day, hour, minute);
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(new Date(guessMs));
+      const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+      const shownHour = get('hour') % 24; // some locales report midnight as "24"
+      const shownMs = Date.UTC(get('year'), get('month') - 1, get('day'), shownHour, get('minute'));
+      guessMs += guessMs - shownMs;
+    } catch {
+      // An invalid/unrecognized zone string falls back to the browser's own
+      // local-time interpretation rather than throwing.
+      return new Date(localValue).toISOString();
+    }
+    return new Date(guessMs).toISOString();
+  }
+
+  applyManualSlot(): void {
+    const iso = this.zonedWallClockToIso(this.manualSlotLocal, this.viewTimezone || 'UTC');
+    if (iso) this.selectedSlot = iso;
+  }
+
+  applyManualRescheduleSlot(): void {
+    const iso = this.zonedWallClockToIso(this.manualRescheduleLocal, this.viewTimezone || 'UTC');
+    if (iso) this.selectedRescheduleSlot = iso;
+  }
+
+  /** Slot day-group keys are plain 'YYYY-MM-DD' dates (no time), so this
+   * formats them directly rather than through Intl's timeZone conversion --
+   * there's no instant-in-time to re-express in another zone here, only the
+   * calendar date the slots underneath were grouped by. */
+  formatSlotDay(iso: string): string {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(year, (month || 1) - 1, day || 1).toLocaleDateString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  /** Slot start times ARE absolute instants, so these do need re-expressing
+   * in whichever zone the trainer picked via `viewTimezone`. */
+  formatSlotTime(startIso: string): string {
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: this.viewTimezone || undefined
+      }).format(new Date(startIso));
+    } catch {
+      // An invalid/partially-typed timezone string (still mid-search in the
+      // datalist input) falls back to the browser's local zone rather than
+      // throwing and blanking out every slot chip.
+      return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(startIso));
+    }
   }
 
   toggleClientSelection(clientId: number): void {
@@ -559,7 +854,9 @@ export class ProfessionalScheduleComponent implements OnInit {
     this.reschedulingMeeting = meeting;
     this.rescheduleDate = meeting.start_at.slice(0, 10);
     this.selectedRescheduleSlot = '';
+    this.manualRescheduleLocal = '';
     this.rescheduleSlots = {};
+    this.viewTimezone = this.settingsForm.timezone || 'UTC';
     this.loadRescheduleSlots();
   }
 

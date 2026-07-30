@@ -424,7 +424,7 @@
           } @else {
             <select [(ngModel)]="newInfo.reference_id" name="infoReference">
               <option value="">Select a reference from your library</option>
-              @for (reference of referenceLibrary; track reference.id) {
+              @for (reference of resourceLibrary; track reference.id) {
                 <option [value]="reference.id">{{ reference.title }}</option>
               }
             </select>

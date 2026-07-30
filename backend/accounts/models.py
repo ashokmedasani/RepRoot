@@ -95,9 +95,16 @@ UNIVERSAL_CLIENT_FORM_FIELDS = [
 
 
 def default_client_registration_fields():
-  """Core fields plus the universal personal-information template (fresh copies)."""
+  """Only the three mandatory core fields (fresh copies).
+
+  UNIVERSAL_CLIENT_FORM_FIELDS below is intentionally NOT auto-inserted here
+  anymore -- per the "Fixes after 1 Test Launch" spec (Priority 5, item 7), a
+  new group's registration form must start with only the locked core fields.
+  The universal template remains available as an opt-in suggestion in the
+  frontend's form builder (see FormFieldBuilderComponent.recommendedFields),
+  which the trainer must explicitly click to add.
+  """
   fields = [field.copy() for field in UNIVERSAL_CORE_FIELDS]
-  fields += [field.copy() for field in UNIVERSAL_CLIENT_FORM_FIELDS]
   return fields
 
 
@@ -166,6 +173,16 @@ class ProfessionalProfile(models.Model):
   plan_renews_at = models.DateTimeField(null=True, blank=True)
   cancellation_requested_at = models.DateTimeField(null=True, blank=True)
   cancellation_effective_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  # Which tier a scheduled cancellation downgrades to once cancellation_effective_at
+  # passes. Blank means Free (starter_free) -- the only option before a Premium
+  # professional could choose to step down to Pro instead of all the way to Free.
+  cancellation_target_tier = models.CharField(max_length=20, choices=PLAN_CHOICES, blank=True, default='')
+  # Deprecated: used to gate the old "delete excess plan data on cancel"
+  # flow, which the plan-limit lock system replaced entirely -- nothing is
+  # ever deleted on downgrade/cancellation anymore, only locked (see
+  # subscription_cancellation.py). No code path sets or reads this anymore;
+  # left in place rather than migrated away to avoid an unnecessary schema
+  # change for a single always-False boolean.
   cancellation_force_cleanup = models.BooleanField(default=False)
 
   # NEW: Account lifecycle fields
@@ -214,6 +231,11 @@ class ProfessionalProfile(models.Model):
   profile_visibility = models.JSONField(default=dict, blank=True)
   terms_accepted = models.BooleanField(default=False)
   privacy_policy_accepted = models.BooleanField(default=False)
+  google_sub = models.CharField(
+    max_length=64, unique=True, null=True, blank=True, db_index=True,
+    help_text='Stable Google account identifier ("sub" claim) linked for Google sign-in, if any.',
+  )
+  google_linked_at = models.DateTimeField(null=True, blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -239,6 +261,11 @@ class ProfessionalLeadForm(models.Model):
   introductory_meeting_max_advance_days = models.PositiveIntegerField(default=30)
   introductory_meeting_buffer_minutes = models.PositiveIntegerField(default=15)
   introductory_meeting_requires_approval = models.BooleanField(default=True)
+  # Plan-limit lock system: rank among a professional's lead forms, lowest
+  # first, defaulting to creation order. Only ever changed via the reorder
+  # endpoint, and only while the professional isn't currently frozen -- see
+  # accounts/plan_lock_status.py for how this determines locked vs active.
+  priority_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -254,6 +281,8 @@ class ProfessionalGroup(models.Model):
   name = models.CharField(max_length=120)
   description = models.TextField(blank=True)
   is_active = models.BooleanField(default=True, db_index=True)
+  # Plan-limit lock system: see ProfessionalLeadForm.priority_rank comment.
+  priority_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -433,6 +462,12 @@ class ClientAccess(models.Model):
   professional_notes_updated_at = models.DateTimeField(null=True, blank=True)
   must_change_password = models.BooleanField(default=True)
   is_active = models.BooleanField(default=True, db_index=True)
+  # Distinguishes an automatic suspension (this client's group got locked by
+  # the plan-limit lock system) from a professional's own manual suspension.
+  # Only clients suspended FOR this reason get automatically reactivated when
+  # their group unlocks -- a client the professional suspended on purpose
+  # must never be silently reactivated just because their group came back.
+  suspended_by_plan_lock = models.BooleanField(default=False, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -675,6 +710,51 @@ class ProfessionalAvailabilityWindow(models.Model):
     return f'{self.professional.username} availability: weekday {self.weekday} {self.start_time}-{self.end_time}'
 
 
+class ProfessionalDateOff(models.Model):
+  """A single specific calendar date a professional has blocked off (e.g. a
+  holiday, vacation day, or one-off personal day). This overrides
+  ProfessionalAvailabilityWindow for that date only -- no slots are ever
+  computed for a date listed here, regardless of what the recurring weekly
+  schedule says -- without touching the recurring weekly blocks themselves,
+  so nothing needs to be re-entered once the day off has passed."""
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='date_offs')
+  date = models.DateField()
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'professional_date_offs'
+    ordering = ['date']
+    constraints = [
+      models.UniqueConstraint(fields=['professional', 'date'], name='unique_professional_date_off'),
+    ]
+
+  def __str__(self) -> str:
+    return f'{self.professional.username} day off: {self.date}'
+
+
+class ProfessionalWeekdayOff(models.Model):
+  """A recurring weekly day off (e.g. "every Monday off"). Unlike
+  ProfessionalDateOff (a single specific date), this repeats indefinitely --
+  toggle it on to stop slots being generated for that weekday every week,
+  toggle it off any time to resume, without touching the actual
+  ProfessionalAvailabilityWindow blocks set for that day."""
+
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='weekday_offs')
+  weekday = models.PositiveSmallIntegerField()  # 0=Monday .. 6=Sunday, matches AvailabilityWindow
+  created_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'professional_weekday_offs'
+    ordering = ['weekday']
+    constraints = [
+      models.UniqueConstraint(fields=['professional', 'weekday'], name='unique_professional_weekday_off'),
+    ]
+
+  def __str__(self) -> str:
+    return f'{self.professional.username} recurring day off: weekday {self.weekday}'
+
+
 class ProfessionalSchedulingSettings(models.Model):
   """Local, self-contained scheduling configuration for a professional — no
   third-party account required. Slots are computed from this plus the
@@ -799,16 +879,20 @@ class ProgressEntry(models.Model):
     return f'{self.title} - {self.client.username} ({self.date})'
 
 
-class ReferenceCategory(models.Model):
-  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reference_categories')
+class ResourceCategory(models.Model):
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='resource_categories')
   name = models.CharField(max_length=120)
   description = models.TextField(blank=True)
   subcategories = models.JSONField(default=list)
+  # Plan-limit lock system: see ProfessionalLeadForm.priority_rank comment.
+  # Categories are evaluated for locking before resources -- a locked category
+  # takes every resource inside it down regardless of the resource's own rank.
+  priority_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'reference_categories'
+    db_table = 'resource_categories'
     ordering = ['created_at']
     unique_together = ('professional', 'name')
 
@@ -816,33 +900,36 @@ class ReferenceCategory(models.Model):
     return f'{self.name} ({self.professional.username})'
 
 
-class ProfessionalReference(models.Model):
+class ProfessionalResource(models.Model):
   TYPE_VIDEO_LINK = 'video_link'
   TYPE_PDF = 'pdf'
   TYPE_IMAGE = 'image'
   TYPE_TEXT_NOTE = 'text_note'
 
-  REFERENCE_TYPE_CHOICES = [
+  RESOURCE_TYPE_CHOICES = [
     (TYPE_VIDEO_LINK, 'Video Link'),
     (TYPE_PDF, 'PDF Link'),
     (TYPE_TEXT_NOTE, 'Text'),
     (TYPE_IMAGE, 'Image'),
   ]
 
-  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='professional_references')
-  category = models.ForeignKey(ReferenceCategory, on_delete=models.PROTECT, related_name='references')
+  professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='professional_resources')
+  category = models.ForeignKey(ResourceCategory, on_delete=models.PROTECT, related_name='resources')
   subcategory = models.CharField(max_length=120, blank=True)
   title = models.CharField(max_length=180)
-  reference_type = models.CharField(max_length=20, choices=REFERENCE_TYPE_CHOICES)
+  resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPE_CHOICES)
   description = models.TextField(blank=True)
   link = models.URLField(blank=True)
-  file = models.FileField(upload_to='professional-references/', blank=True)
+  file = models.FileField(upload_to='professional-resources/', blank=True)
   tags = models.JSONField(default=list)
+  # Plan-limit lock system: only meaningful within a category that's itself
+  # still active -- see ProfessionalLeadForm.priority_rank comment.
+  priority_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
   class Meta:
-    db_table = 'professional_references'
+    db_table = 'professional_resources'
     ordering = ['-created_at']
 
   def __str__(self) -> str:
@@ -868,6 +955,8 @@ class TrackingTemplate(models.Model):
   fields = models.JSONField(default=list)
   standard_key = models.CharField(max_length=40, blank=True)
   is_active = models.BooleanField(default=True, db_index=True)
+  # Plan-limit lock system: see ProfessionalLeadForm.priority_rank comment.
+  priority_rank = models.PositiveIntegerField(null=True, blank=True, db_index=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -893,7 +982,7 @@ class TemplateAssignment(models.Model):
 
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='template_assignments')
   template = models.ForeignKey(TrackingTemplate, on_delete=models.CASCADE, related_name='assignments')
-  references = models.ManyToManyField(ProfessionalReference, blank=True, related_name='template_assignments')
+  resources = models.ManyToManyField(ProfessionalResource, blank=True, related_name='template_assignments')
   client_access_level = models.CharField(
     max_length=20, choices=CLIENT_ACCESS_LEVEL_CHOICES, default=ACCESS_EDITABLE
   )
@@ -1496,7 +1585,7 @@ class NotificationDeliveryAttempt(models.Model):
 class RecycleBinItem(models.Model):
   """
   Soft-delete shadow table — scoped deliberately narrow. Only things worth the
-  overhead of restorability land here: chat images and references (the
+  overhead of restorability land here: chat images and resources (the
   storage-heavy, file-bearing content), and whole client accounts (bundled
   with all their chat/tracking/progress/reminders/assignments, since deleting
   an entire client is consequential enough to always be fully recoverable).
@@ -1505,12 +1594,12 @@ class RecycleBinItem(models.Model):
   """
 
   CATEGORY_CHAT_MESSAGE = 'chat_message'
-  CATEGORY_REFERENCE = 'reference'
+  CATEGORY_RESOURCE = 'resource'
   CATEGORY_CLIENT_ACCOUNT = 'client_account'
 
   CATEGORY_CHOICES = [
     (CATEGORY_CHAT_MESSAGE, 'Chat message'),
-    (CATEGORY_REFERENCE, 'Reference'),
+    (CATEGORY_RESOURCE, 'Resource'),
     (CATEGORY_CLIENT_ACCOUNT, 'Client account'),
   ]
 

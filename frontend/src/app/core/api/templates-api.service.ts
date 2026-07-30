@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { MessageResponse } from './forms-groups-api.service';
-import { ReferenceType } from './references-api.service';
+import { ResourceType } from './resources-api.service';
 
 export type TemplateFieldType = 'number' | 'short_text' | 'long_text' | 'yes_no' | 'dropdown' | 'rating';
 export type TemplateCadence = 'daily' | 'weekly' | 'monthly';
@@ -18,10 +18,10 @@ export interface TemplateField {
   scale?: number | null;
 }
 
-export interface TemplateReference {
+export interface TemplateResource {
   id: number;
   title: string;
-  reference_type: ReferenceType;
+  resource_type: ResourceType;
   category_name: string;
   subcategory: string;
   description: string;
@@ -43,7 +43,7 @@ export interface TrackingTemplateRecord {
   created_at: string;
   updated_at: string;
   assignment_id?: number;
-  references?: TemplateReference[];
+  resources?: TemplateResource[];
   client_access_level?: TemplateClientAccessLevel;
 }
 
@@ -71,7 +71,7 @@ export interface TemplateAssignmentRecord {
   template_name: string;
   template_cadence: TemplateCadence;
   template_accent: string;
-  references: TemplateReference[];
+  resources: TemplateResource[];
   client_access_level: TemplateClientAccessLevel;
   assigned_at: string;
 }

@@ -10,10 +10,10 @@ import {
   ProgressEntry
 } from '@core/api/forms-groups-api.service';
 import {
-  ReferenceCategoryRecord,
-  ReferencesApiService,
-  ProfessionalReferenceRecord
-} from '@core/api/references-api.service';
+  ResourceCategoryRecord,
+  ResourcesApiService,
+  ProfessionalResourceRecord
+} from '@core/api/resources-api.service';
 import {
   TemplateAssignmentRecord,
   TemplateClientAccessLevel,
@@ -50,7 +50,7 @@ export class ProfessionalClientTemplateComponent implements OnInit {
   private readonly location = inject(Location);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
-  private readonly referencesApi = inject(ReferencesApiService);
+  private readonly referencesApi = inject(ResourcesApiService);
 
   clientId = 0;
   assignmentId = 0;
@@ -63,8 +63,8 @@ export class ProfessionalClientTemplateComponent implements OnInit {
   messageType: 'success' | 'error' = 'success';
   detailTab: DetailTab = 'overview';
 
-  referenceCategories: ReferenceCategoryRecord[] = [];
-  referenceLibrary: ProfessionalReferenceRecord[] = [];
+  referenceCategories: ResourceCategoryRecord[] = [];
+  referenceLibrary: ProfessionalResourceRecord[] = [];
   isShareDialogOpen = false;
   shareSelectedIds = new Set<number>();
   referenceSearch = '';
@@ -360,7 +360,7 @@ export class ProfessionalClientTemplateComponent implements OnInit {
 
   openShareDialog(): void {
     this.isShareDialogOpen = true;
-    this.shareSelectedIds = new Set((this.assignment?.references || []).map((reference) => reference.id));
+    this.shareSelectedIds = new Set((this.assignment?.resources || []).map((reference) => reference.id));
     this.referenceSearch = '';
   }
 
@@ -369,7 +369,7 @@ export class ProfessionalClientTemplateComponent implements OnInit {
     this.shareSelectedIds = new Set<number>();
   }
 
-  toggleSharedReference(reference: ProfessionalReferenceRecord): void {
+  toggleSharedReference(reference: ProfessionalResourceRecord): void {
     if (this.shareSelectedIds.has(reference.id)) {
       this.shareSelectedIds.delete(reference.id);
     } else {
@@ -377,11 +377,11 @@ export class ProfessionalClientTemplateComponent implements OnInit {
     }
   }
 
-  isSharedReference(reference: ProfessionalReferenceRecord): boolean {
+  isSharedReference(reference: ProfessionalResourceRecord): boolean {
     return this.shareSelectedIds.has(reference.id);
   }
 
-  get filteredReferenceLibrary(): ProfessionalReferenceRecord[] {
+  get filteredReferenceLibrary(): ProfessionalResourceRecord[] {
     const search = this.referenceSearch.trim().toLowerCase();
 
     if (!search) {
@@ -396,7 +396,7 @@ export class ProfessionalClientTemplateComponent implements OnInit {
     );
   }
 
-  referencesForCategory(category: ReferenceCategoryRecord): ProfessionalReferenceRecord[] {
+  referencesForCategory(category: ResourceCategoryRecord): ProfessionalResourceRecord[] {
     return this.filteredReferenceLibrary.filter((reference) => reference.category === category.id);
   }
 
@@ -576,8 +576,8 @@ export class ProfessionalClientTemplateComponent implements OnInit {
       next: (response) => (this.referenceCategories = response.categories),
       error: () => (this.referenceCategories = [])
     });
-    this.referencesApi.getReferences().subscribe({
-      next: (response) => (this.referenceLibrary = response.references),
+    this.referencesApi.getResources().subscribe({
+      next: (response) => (this.referenceLibrary = response.resources),
       error: () => (this.referenceLibrary = [])
     });
   }

@@ -76,7 +76,14 @@
       </button>
     </div>
 
-    @if (!sharedMethods.length) {
+    @if (!hasAnyActivePaymentMethod) {
+      <div class="empty-methods-note">
+        <p>Add a payment method before requesting a payment.</p>
+        <a routerLink="/professional/account-settings" [queryParams]="{ section: 'payments' }" class="primary-action compact">
+          Go to Payment Settings
+        </a>
+      </div>
+    } @else if (!sharedMethods.length) {
       <p class="section-note">Share a payment method with {{ clientName || 'this client' }} (Available Payment Methods) before requesting a payment.</p>
     }
 
@@ -140,13 +147,17 @@
       </form>
     }
 
-    @if (!requests.length && !showRequestForm) {
+    @if (isLoadingRequests) {
+      <p class="state-note">Loading payment requests...</p>
+    }
+
+    @if (!isLoadingRequests && !requests.length && !showRequestForm) {
       <div class="placeholder-block">
         <p>No payment requests yet for this client.</p>
       </div>
     }
 
-    @if (requests.length) {
+    @if (!isLoadingRequests && requests.length) {
       <div class="request-list">
         @for (request of requests; track request.request_id) {
           <article class="request-row">

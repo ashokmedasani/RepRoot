@@ -53,6 +53,7 @@ export class ClientPaymentsTabComponent implements OnInit {
   @Input() clientName = '';
 
   requests: PaymentRequestRecord[] = [];
+  isLoadingRequests = true;
   requestsMessage = '';
   requestsMessageType: 'success' | 'error' = 'success';
   showRequestForm = false;
@@ -303,6 +304,14 @@ export class ClientPaymentsTabComponent implements OnInit {
     return this.methods.filter((method) => method.shared && method.status === 'active');
   }
 
+  /** Distinguishes "no payment method configured anywhere" (go create one in
+   *  Settings) from "methods exist but none are shared with this client yet"
+   *  (go share one, further down this same tab) -- Request Payment must not
+   *  open a broken form in either case. */
+  get hasAnyActivePaymentMethod(): boolean {
+    return this.methods.some((method) => method.status === 'active');
+  }
+
   get selectedMethodIds(): number[] {
     return Object.entries(this.allowedMethodSelection)
       .filter(([, selected]) => selected)
@@ -316,10 +325,14 @@ export class ClientPaymentsTabComponent implements OnInit {
   loadRequests(): void {
     if (!this.clientId) return;
     this.paymentsApi.getClientPaymentRequests(this.clientId).subscribe({
-      next: (response) => (this.requests = response.requests),
+      next: (response) => {
+        this.requests = response.requests;
+        this.isLoadingRequests = false;
+      },
       error: (error: unknown) => {
         this.requestsMessageType = 'error';
         this.requestsMessage = formatApiError(error, 'Payment requests could not be loaded.');
+        this.isLoadingRequests = false;
       }
     });
   }

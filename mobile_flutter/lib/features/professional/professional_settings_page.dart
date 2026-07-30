@@ -166,8 +166,39 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
       );
       return;
     }
-    final requiresCleanup = !billing.downgradeEligible;
-    final confirmationController = TextEditingController();
+    // Nothing here is ever deleted -- anything over the Free plan's limits
+    // simply locks (in priority order) and unlocks automatically the moment
+    // you upgrade again. The dialog spells out exactly what would lock, by
+    // name, plus the category-cascade rule and which clients would lose
+    // portal access -- no generic "may be deleted" copy, nothing to type.
+    final lockLines = <String>[];
+    const labels = {
+      'lead_forms': 'lead form',
+      'groups': 'group',
+      'templates': 'template',
+      'resources': 'resource',
+      'categories': 'category',
+    };
+    for (final entry in billing.downgradeLocks.entries) {
+      final lockedCount = (entry.value['locked_count'] as num?)?.toInt() ?? 0;
+      if (lockedCount == 0) continue;
+      final names = (entry.value['locked_names'] as List<dynamic>? ?? []).take(5).join(', ');
+      final label = labels[entry.key] ?? entry.key;
+      lockLines.add('$lockedCount $label${lockedCount == 1 ? '' : 's'} would lock ($names)');
+    }
+    if (billing.categoryCascadeResourceCount > 0) {
+      lockLines.add(
+        '${billing.categoryCascadeResourceCount} resource(s) would lock because their category would lock, regardless of how many resources it contains',
+      );
+    }
+    if (billing.clientsLosingAccess.isNotEmpty) {
+      final names = billing.clientsLosingAccess
+          .take(5)
+          .map((c) => '${c['client_name']} (${c['group_name']})')
+          .join(', ');
+      lockLines.add('${billing.clientsLosingAccess.length} client(s) would lose portal access until you upgrade again: $names');
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -176,21 +207,17 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Paid access remains active until expiry, then the account moves to Free. Client records are preserved.'),
-            if (requiresCleanup) ...[
+            const Text('Paid access remains active until expiry, then the account moves to Free. Nothing is ever deleted.'),
+            for (final line in lockLines) ...[
               const SizedBox(height: AppSpacing.sm),
-              const Text('Excess non-client plan data will be removed at expiry. Type DELETE EXCESS PLAN DATA to confirm.'),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(controller: confirmationController),
+              Text(line),
             ],
           ],
         ),
         actions: [
           TextButton(onPressed: () => context.pop(false), child: const Text('Keep plan')),
           FilledButton(
-            onPressed: () => context.pop(
-              !requiresCleanup || confirmationController.text.trim() == 'DELETE EXCESS PLAN DATA',
-            ),
+            onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: context.colors.error,
               minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -200,14 +227,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
         ],
       ),
     );
-    final confirmation = confirmationController.text.trim();
-    confirmationController.dispose();
     if (confirmed != true) return;
     try {
-      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan(
-            forceCleanup: requiresCleanup,
-            confirmation: confirmation,
-          );
+      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan();
       _toast(message.isNotEmpty ? message : 'Cancellation scheduled.');
       final refreshed = await ref.read(professionalAuthApiProvider).getBillingStatus();
       if (mounted) setState(() => _billing = refreshed);

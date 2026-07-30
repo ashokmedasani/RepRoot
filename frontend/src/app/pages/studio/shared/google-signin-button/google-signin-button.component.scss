@@ -1,0 +1,45 @@
+// Custom-built button (not Google's own iframe-rendered widget) so it can use
+// the site's own font and match the surrounding form fields exactly. Still
+// follows Google's sign-in branding basics: their multi-color "G" mark, an
+// outlined white surface, and "<Verb> with Google" text -- only the
+// typography and sizing are ours.
+.google-signin-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: var(--app-control-height);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.5rem 1rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--app-transition-fast);
+}
+
+.google-signin-button:hover:not(:disabled),
+.google-signin-button:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--app-primary) 30%, var(--app-border));
+  background: var(--app-surface-soft);
+}
+
+.google-signin-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.google-signin-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.google-signin-button__logo {
+  flex: 0 0 auto;
+}
+
+.google-signin-button__text {
+  font-size: 0.92rem;
+}

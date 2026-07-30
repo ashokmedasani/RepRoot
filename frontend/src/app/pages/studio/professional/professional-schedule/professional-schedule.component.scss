@@ -96,7 +96,6 @@ textarea {
   border-radius: var(--app-panel-radius);
   padding: 1.25rem;
   background: var(--app-surface);
-  max-width: 40rem;
 }
 
 .section-note {
@@ -118,10 +117,6 @@ textarea {
 }
 
 /* ---- Weekly availability ---- */
-.availability-panel {
-  max-width: none;
-}
-
 .settings-heading {
   margin-top: 0.5rem;
 }
@@ -140,6 +135,69 @@ textarea {
   border-radius: 0.6rem;
   padding: 0.55rem 0.75rem;
   background: var(--app-surface-soft);
+}
+
+.availability-day-row .availability-blocks {
+  flex: 1 1 auto;
+}
+
+.availability-day-row.day-row-off {
+  opacity: 0.55;
+  background: var(--app-border);
+}
+
+.weekday-off-badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  background: rgba(217, 45, 32, 0.1);
+  color: #d92d20;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.panel-save-action {
+  margin-top: 0.5rem;
+  width: fit-content;
+  min-height: 2.5rem;
+  padding: 0 1.5rem;
+}
+
+.day-off-note {
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--app-border);
+  color: var(--app-text);
+  font-weight: 700;
+}
+
+.zone-offset-hint {
+  color: var(--app-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.quick-add-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--app-primary);
+  border-radius: 999px;
+  padding: 0;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.quick-add-block:hover {
+  background: var(--app-primary);
+  color: var(--app-surface);
 }
 
 .weekday-tag {
@@ -196,6 +254,13 @@ textarea {
   min-width: 8rem;
 }
 
+@media (max-width: 720px) {
+  .add-window-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ---- Calendar ---- */
 .calendar-section {
   margin-bottom: 1.75rem;
@@ -239,6 +304,13 @@ textarea {
 .calendar-nav .ghost-action {
   min-height: 2.1rem;
   padding: 0 0.75rem;
+}
+
+.day-off-button {
+  margin-right: 0.5rem;
+  border-color: var(--app-primary);
+  color: var(--app-primary-strong);
+  background: var(--app-primary-soft);
 }
 
 .calendar-month-label {
@@ -291,7 +363,26 @@ textarea {
   background: var(--app-surface-soft);
   color: var(--app-text);
   cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
+
+/* Plain <button> elements pick up a native hover/tap highlight in most
+ * browsers, which was clashing with the "today" outline and the occupancy
+ * tints (a flash of unrelated grey on hover). Defining our own hover state
+ * here overrides that, keeping each day's existing border/background intent
+ * (today's outline, the selected fill, the occupancy tint) intact instead of
+ * being replaced by a jarring native color. */
+.calendar-day:hover:not(.is-selected):not(.occupancy-light):not(.occupancy-moderate):not(.occupancy-busy):not(.day-off) {
+  background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface-soft));
+}
+
+.calendar-day.is-selected:hover {
+  background: var(--app-primary);
+}
+
+.calendar-day.occupancy-light:hover:not(.is-selected) { background: color-mix(in srgb, #86efac 35%, #dcfce7); }
+.calendar-day.occupancy-moderate:hover:not(.is-selected) { background: color-mix(in srgb, #fcd34d 35%, #fef3c7); }
+.calendar-day.occupancy-busy:hover:not(.is-selected) { background: color-mix(in srgb, #fca5a5 35%, #fee2e2); }
 
 .calendar-day.outside-month {
   opacity: 0.4;
@@ -299,6 +390,9 @@ textarea {
 
 .calendar-day.is-today {
   border-color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 18%, var(--app-surface-soft));
+  color: var(--app-primary-strong);
+  font-weight: 800;
 }
 
 .calendar-day.is-selected {
@@ -309,6 +403,20 @@ textarea {
 .calendar-day.occupancy-light:not(.is-selected) { border-color: #86efac; background: #dcfce7; color: #166534; }
 .calendar-day.occupancy-moderate:not(.is-selected) { border-color: #fcd34d; background: #fef3c7; color: #92400e; }
 .calendar-day.occupancy-busy:not(.is-selected) { border-color: #fca5a5; background: #fee2e2; color: #991b1b; }
+
+/* A day off (recurring weekday or a specific blocked date) always reads as
+ * unavailable, regardless of any occupancy tint or today's outline -- placed
+ * last so it wins the cascade over the rules above. */
+.calendar-day.day-off:not(.is-selected) {
+  border-color: var(--app-border);
+  background: var(--app-border);
+  color: var(--app-muted);
+  opacity: 0.7;
+}
+
+.calendar-day.day-off:hover:not(.is-selected) {
+  background: var(--app-border);
+}
 
 .calendar-day-number {
   font-weight: 700;
@@ -551,6 +659,17 @@ textarea {
   max-width: 16rem;
 }
 
+.slot-picker-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.slot-timezone-picker {
+  max-width: 16rem;
+  flex: 1 1 12rem;
+}
+
 .slot-days {
   display: grid;
   gap: 0.85rem;
@@ -592,4 +711,63 @@ textarea {
   border-color: var(--app-primary);
   background: var(--app-primary);
   color: #ffffff;
+}
+
+.manual-slot-row {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--app-border);
+}
+
+.manual-slot-input {
+  max-width: 20rem;
+}
+
+/* ---- Days off modal ---- */
+.days-off-section {
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.days-off-section:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.days-off-section h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.weekday-off-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.weekday-off-chip {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.weekday-off-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.weekday-off-chip-active {
+  border-color: #d92d20;
+  background: rgba(217, 45, 32, 0.08);
+  color: #d92d20;
 }

@@ -14,16 +14,17 @@ from .models import (
   GroupRegistrationSubmission,
   LeadSubmission,
   ProgressEntry,
-  ReferenceCategory,
+  ResourceCategory,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
   ProfessionalGroup,
   ProfessionalLeadForm,
   ProfessionalProfile,
-  ProfessionalReference,
+  ProfessionalResource,
 )
 from .plan_limits import professional_plan
+from .plan_lock_status import compute_lock_status
 
 
 def _serialized_size(value) -> int:
@@ -66,11 +67,16 @@ def _percent_of_quota(byte_count: int, quota_bytes: int) -> float:
   return round((byte_count / quota_bytes) * 100, 2)
 
 
-def _sanitize_sections(sections: dict, quota_bytes: int) -> dict:
+def _sanitize_sections(sections: dict, quota_bytes: int, include_bytes: bool = False) -> dict:
+  # Free tier stays exactly as it's always been -- percentage + record count
+  # only. Paid tiers (Pro/Premium) additionally get the actual byte total per
+  # section so a paying professional can see both "you're at 12%" and "that's
+  # 340MB" and identify which section is actually driving usage.
   return {
     name: {
       'percent_of_quota': min(100, _percent_of_quota(section['total_bytes'], quota_bytes)),
       'record_count': section['record_count'],
+      **({'total_bytes': section['total_bytes']} if include_bytes else {}),
     }
     for name, section in sections.items()
   }
@@ -98,7 +104,7 @@ def _data_usage_cache_key(professional_pk) -> str:
 
 def bust_professional_data_usage_cache(professional) -> None:
   """Call this after any write that changes a professional's counted records
-  (clients, forms, templates, references, ...) so Settings > Data Usage
+  (clients, forms, templates, resources, ...) so Settings > Data Usage
   reflects the change immediately instead of waiting out the cache TTL.
   Safe to call with either a User instance or a raw pk."""
   pk = getattr(professional, 'pk', professional)
@@ -129,20 +135,39 @@ def calculate_professional_data_usage(professional) -> dict:
       profile.training_photo,
     ]
 
-  assignments = TemplateAssignment.objects.filter(client__professional=professional)
-  assignment_links = TemplateAssignment.references.through.objects.filter(
-    templateassignment__client__professional=professional
+  # Plan-limit lock system: a group/lead-form/template/resource/category that
+  # is currently locked (over the plan's count limit) is already hidden and
+  # inaccessible to the professional -- counting its bytes against the same
+  # professional's storage quota would be double jeopardy (see
+  # DOWNGRADE_LOCK_SYSTEM_PLAN.md 3.7). Excluded here: the locked rows
+  # themselves, plus resource file bytes and template-assignment rows that
+  # only exist because of a locked template. Historical TrackingEntry rows
+  # are deliberately NOT excluded -- past client progress data stays real and
+  # visible regardless of whether the template that produced it is currently
+  # locked.
+  lock_status = compute_lock_status(professional)
+  locked_group_ids = lock_status['groups']['locked_ids']
+  locked_lead_form_ids = lock_status['lead_forms']['locked_ids']
+  locked_template_ids = lock_status['templates']['locked_ids']
+  locked_category_ids = lock_status['categories']['locked_ids']
+  locked_resource_ids = lock_status['resources']['locked_ids']
+
+  assignments = TemplateAssignment.objects.filter(client__professional=professional).exclude(
+    template_id__in=locked_template_ids
   )
-  references = ProfessionalReference.objects.filter(professional=professional)
+  assignment_links = TemplateAssignment.resources.through.objects.filter(
+    templateassignment__client__professional=professional
+  ).exclude(templateassignment__template_id__in=locked_template_ids)
+  resources = ProfessionalResource.objects.filter(professional=professional).exclude(id__in=locked_resource_ids)
   sections = {
     'professional_profile': _section_usage(values=profile_values, files=profile_files),
     'forms_groups': _section_usage(
       querysets=[
-        ProfessionalLeadForm.objects.filter(professional=professional),
-        ProfessionalGroup.objects.filter(professional=professional),
-        ClientRegistrationForm.objects.filter(group__professional=professional),
-        LeadSubmission.objects.filter(lead_form__professional=professional),
-        GroupRegistrationSubmission.objects.filter(group__professional=professional),
+        ProfessionalLeadForm.objects.filter(professional=professional).exclude(id__in=locked_lead_form_ids),
+        ProfessionalGroup.objects.filter(professional=professional).exclude(id__in=locked_group_ids),
+        ClientRegistrationForm.objects.filter(group__professional=professional).exclude(group_id__in=locked_group_ids),
+        LeadSubmission.objects.filter(lead_form__professional=professional).exclude(lead_form_id__in=locked_lead_form_ids),
+        GroupRegistrationSubmission.objects.filter(group__professional=professional).exclude(group_id__in=locked_group_ids),
       ]
     ),
     'clients': _section_usage(
@@ -158,13 +183,16 @@ def calculate_professional_data_usage(professional) -> dict:
         ProgressEntry.objects.filter(professional=professional),
       ]
     ),
-    'references': _section_usage(
-      querysets=[ReferenceCategory.objects.filter(professional=professional), references],
-      files=[reference.file for reference in references.only('file')],
+    'resources': _section_usage(
+      querysets=[
+        ResourceCategory.objects.filter(professional=professional).exclude(id__in=locked_category_ids),
+        resources,
+      ],
+      files=[resource.file for resource in resources.only('file')],
     ),
     'templates_tracking': _section_usage(
       querysets=[
-        TrackingTemplate.objects.filter(professional=professional),
+        TrackingTemplate.objects.filter(professional=professional).exclude(id__in=locked_template_ids),
         assignments,
         assignment_links,
         TrackingEntry.objects.filter(client__professional=professional),
@@ -216,8 +244,8 @@ def calculate_professional_data_usage(professional) -> dict:
     'clients': ClientAccess.objects.filter(professional=professional).count(),
     'groups': ProfessionalGroup.objects.filter(professional=professional).count(),
     'templates': TrackingTemplate.objects.filter(professional=professional).count(),
-    'references': ProfessionalReference.objects.filter(professional=professional).count(),
-    'categories': ReferenceCategory.objects.filter(professional=professional).count(),
+    'resources': ProfessionalResource.objects.filter(professional=professional).count(),
+    'categories': ResourceCategory.objects.filter(professional=professional).count(),
   }
   resource_usage = {
     key: {
@@ -265,7 +293,7 @@ def calculate_professional_data_usage(professional) -> dict:
     'hard_limit_bytes': int(quota_bytes * settings.REPROOT_STORAGE_HARD_LIMIT_PERCENT / 100),
     'usage_label': _usage_status_label(usage_percent),
     'record_count': sum(section['record_count'] for section in sections.values()),
-    'sections': _sanitize_sections(sections, quota_bytes),
+    'sections': _sanitize_sections(sections, quota_bytes, include_bytes=plan['code'] in ('pro', 'premium_unlimited')),
 
     # NEW: Warning & account lifecycle fields
     'warning_threshold_percent': warning_threshold,

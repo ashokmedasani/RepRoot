@@ -83,7 +83,7 @@
     <label class="wide-field">
       <span class="field-label">Password <span class="required">*</span></span>
       <app-password-input name="password" [(ngModel)]="signupForm.password" (ngModelChange)="handlePasswordChange()" autocomplete="new-password" [required]="true" />
-      <span class="field-help">Minimum 8 characters and 1 special character.</span>
+      <app-password-requirements [password]="signupForm.password" />
       @if (fieldErrors.password) {
         <span class="field-help error-text">{{ fieldErrors.password }}</span>
       }
@@ -107,7 +107,7 @@
       </span>
     </label>
 
-    <button type="submit" class="primary-action wide-field" [disabled]="isSubmitting || !agreedToTerms">Create Account</button>
+    <button type="submit" class="primary-action wide-field" [disabled]="isSubmitting || !agreedToTerms || !isPasswordRequirementsMet || signupForm.password !== signupForm.confirmPassword">Create Account</button>
 
     @if (signupMessage) {
       <p class="form-message wide-field">{{ signupMessage }}</p>
@@ -117,4 +117,14 @@
       <p class="form-message error-message wide-field">{{ fieldErrors.general }}</p>
     }
   </form>
+
+  @if (isGoogleAvailable) {
+    <div class="auth-divider"><span>or</span></div>
+    <app-google-signin-button
+      variant="signup"
+      [disabled]="isGoogleSubmitting"
+      (credential)="handleGoogleCredential($event)"
+      (unavailable)="handleGoogleUnavailable()"
+      (loadError)="handleGoogleLoadError($event)" />
+  }
 </app-auth-page-shell>

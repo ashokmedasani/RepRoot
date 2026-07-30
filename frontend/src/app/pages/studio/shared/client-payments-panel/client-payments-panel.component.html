@@ -12,9 +12,12 @@
       <h2 id="open-requests-title">Needs your attention</h2>
       <div class="request-list">
         @for (request of openRequests; track request.request_id) {
-          <a class="request-card" [routerLink]="['/client/payments/requests', request.request_id]">
+          <a class="request-card" [class.unread]="isUnread(request)" [routerLink]="['/client/payments/requests', request.request_id]">
             <div class="request-main">
-              <strong>{{ request.title }}</strong>
+              <strong>
+                {{ request.title }}
+                @if (isUnread(request)) { <span class="unread-dot" aria-label="Unread">•</span> }
+              </strong>
               <small>
                 {{ request.requested_amount }} {{ request.requested_currency }}
                 @if (request.due_date) { &middot; due {{ request.due_date | date: 'MMM d, y' }} }

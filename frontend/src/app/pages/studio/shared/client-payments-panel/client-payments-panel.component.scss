@@ -61,6 +61,18 @@
   opacity: 0.75;
 }
 
+.request-card.unread {
+  border-color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface));
+}
+
+.unread-dot {
+  color: var(--app-primary-strong);
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-left: 0.35rem;
+}
+
 .request-main {
   display: grid;
   gap: 0.2rem;

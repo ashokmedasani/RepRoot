@@ -6,13 +6,15 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
 import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
 import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
+import { PasswordRequirementsComponent } from '@studio-shared/password-requirements/password-requirements.component';
+import { isPasswordStrong } from '@studio-shared/password-requirements/password-requirements.util';
 
 type ResetOtpStatus = 'idle' | 'sent' | 'verified' | 'failed';
 
 @Component({
   selector: 'app-professional-forgot-password',
   standalone: true,
-  imports: [FormsModule, RouterLink, PasswordInputComponent, AuthPageShellComponent],
+  imports: [FormsModule, RouterLink, PasswordInputComponent, PasswordRequirementsComponent, AuthPageShellComponent],
   templateUrl: './professional-forgot-password.component.html',
   styleUrl: './professional-forgot-password.component.scss'
 })
@@ -163,7 +165,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
       },
       error: (error: unknown) => {
         this.resetOtpStatus = 'failed';
-        this.resetOtpMessage = this.formatApiError(error, 'Could not check email. Start Django on port 8000 and try again.');
+        this.resetOtpMessage = this.formatApiError(error, 'We could not check this email right now. Please try again shortly.');
         this.isRequestingOtp = false;
       }
     });
@@ -220,8 +222,8 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
       return;
     }
 
-    if (!this.isPasswordStrong(this.resetForm.password)) {
-      this.resetFieldErrors.password = 'Password must be at least 8 characters and include 1 special character.';
+    if (!isPasswordStrong(this.resetForm.password)) {
+      this.resetFieldErrors.password = 'Password does not meet all requirements below.';
       return;
     }
 
@@ -326,8 +328,8 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
     }
   }
 
-  private isPasswordStrong(password: string): boolean {
-    return password.length >= 8 && /[^A-Za-z0-9]/.test(password);
+  get isResetPasswordRequirementsMet(): boolean {
+    return isPasswordStrong(this.resetForm.password);
   }
 
   private applyResetApiErrors(error: unknown): void {

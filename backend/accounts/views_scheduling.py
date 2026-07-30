@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from uuid import UUID
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -32,6 +33,8 @@ from .models import (
   LeadMeetingRequest,
   LeadSubmission,
   ProfessionalAvailabilityWindow,
+  ProfessionalDateOff,
+  ProfessionalWeekdayOff,
   ProfessionalLeadForm,
   ScheduledMeeting,
   ScheduledMeetingGuest,
@@ -52,6 +55,8 @@ from .scheduling_engine import (
 from .serializers import (
   LeadMeetingRequestSerializer,
   ProfessionalAvailabilityWindowSerializer,
+  ProfessionalDateOffSerializer,
+  ProfessionalWeekdayOffSerializer,
   ProfessionalLeadFormSerializer,
   ProfessionalSchedulingSettingsSerializer,
   ScheduledMeetingSerializer,
@@ -418,7 +423,7 @@ class ProfessionalAvailabilityWindowsView(APIView):
     return Response({'availability_windows': ProfessionalAvailabilityWindowSerializer(windows, many=True).data})
 
   def post(self, request):
-    serializer = ProfessionalAvailabilityWindowSerializer(data=request.data)
+    serializer = ProfessionalAvailabilityWindowSerializer(data=request.data, context={'professional': request.user})
     serializer.is_valid(raise_exception=True)
     window = serializer.save(professional=request.user)
     return Response(
@@ -437,7 +442,9 @@ class ProfessionalAvailabilityWindowDetailView(APIView):
     window = self._get_window(request, window_id)
     if window is None:
       return Response({'message': 'Availability window not found.'}, status=status.HTTP_404_NOT_FOUND)
-    serializer = ProfessionalAvailabilityWindowSerializer(window, data=request.data, partial=True)
+    serializer = ProfessionalAvailabilityWindowSerializer(
+      window, data=request.data, partial=True, context={'professional': request.user}
+    )
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response({'availability_window': ProfessionalAvailabilityWindowSerializer(window).data, 'message': 'Availability window updated.'})
@@ -448,6 +455,146 @@ class ProfessionalAvailabilityWindowDetailView(APIView):
       return Response({'message': 'Availability window not found.'}, status=status.HTTP_404_NOT_FOUND)
     window.delete()
     return Response({'message': 'Availability window removed.'})
+
+
+class ProfessionalAvailabilityWindowCopyView(APIView):
+  """Copy every block from one weekday onto one or more other weekdays --
+  backs "Copy Monday's schedule to selected days" / "Apply to all weekdays"
+  in the Schedule availability UI. Existing blocks on a target day are left
+  alone; only non-overlapping source blocks are added."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request):
+    from_weekday = request.data.get('from_weekday')
+    to_weekdays = request.data.get('to_weekdays') or []
+
+    if not isinstance(to_weekdays, list) or from_weekday is None:
+      return Response({'message': 'from_weekday and to_weekdays are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      from_weekday = int(from_weekday)
+      to_weekdays = [int(day) for day in to_weekdays]
+    except (TypeError, ValueError):
+      return Response({'message': 'Weekdays must be integers 0-6.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not (0 <= from_weekday <= 6) or any(not (0 <= day <= 6) for day in to_weekdays):
+      return Response({'message': 'Weekdays must be between 0 (Monday) and 6 (Sunday).'}, status=status.HTTP_400_BAD_REQUEST)
+
+    source_windows = list(
+      ProfessionalAvailabilityWindow.objects.filter(professional=request.user, weekday=from_weekday)
+    )
+
+    if not source_windows:
+      return Response({'message': 'The selected day has no availability blocks to copy.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    created = []
+    skipped = 0
+
+    with transaction.atomic():
+      for target_day in to_weekdays:
+        if target_day == from_weekday:
+          continue
+
+        for source in source_windows:
+          overlapping = ProfessionalAvailabilityWindow.objects.filter(
+            professional=request.user,
+            weekday=target_day,
+            start_time__lt=source.end_time,
+            end_time__gt=source.start_time,
+          )
+          if overlapping.exists():
+            skipped += 1
+            continue
+
+          created.append(
+            ProfessionalAvailabilityWindow.objects.create(
+              professional=request.user,
+              weekday=target_day,
+              start_time=source.start_time,
+              end_time=source.end_time,
+            )
+          )
+
+    message = f'Copied {len(created)} block(s).'
+    if skipped:
+      message += f' Skipped {skipped} that would have overlapped an existing block.'
+
+    return Response({
+      'availability_windows': ProfessionalAvailabilityWindowSerializer(created, many=True).data,
+      'message': message,
+    })
+
+
+class ProfessionalDateOffsView(APIView):
+  """Specific calendar dates a professional has blocked off (holidays,
+  vacation days, one-off personal days) — separate from and layered on top
+  of the recurring weekly ProfessionalAvailabilityWindow rows, so the regular
+  schedule never needs to be re-entered once the date has passed."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    # Deliberately not filtered to today-or-later: the calendar still needs
+    # to gray out a date off after it's passed (it's a record of a day that
+    # WAS off, not just an upcoming plan), so a past entry has to keep
+    # showing up here rather than quietly disappearing once its date passes.
+    date_offs = ProfessionalDateOff.objects.filter(professional=request.user).order_by('date')
+    return Response({'date_offs': ProfessionalDateOffSerializer(date_offs, many=True).data})
+
+  def post(self, request):
+    serializer = ProfessionalDateOffSerializer(data=request.data, context={'professional': request.user})
+    serializer.is_valid(raise_exception=True)
+    date_off = serializer.save(professional=request.user)
+    return Response(
+      {'date_off': ProfessionalDateOffSerializer(date_off).data, 'message': f'{date_off.date} marked as a day off.'},
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ProfessionalDateOffDetailView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def delete(self, request, date_off_id):
+    date_off = ProfessionalDateOff.objects.filter(id=date_off_id, professional=request.user).first()
+    if date_off is None:
+      return Response({'message': 'Day off not found.'}, status=status.HTTP_404_NOT_FOUND)
+    date_off.delete()
+    return Response({'message': 'Day off removed.'})
+
+
+class ProfessionalWeekdayOffsView(APIView):
+  """Recurring weekly days off (e.g. "every Monday off") — repeats
+  indefinitely until removed, unlike the one-off ProfessionalDateOff rows
+  above. Layered on top of the recurring ProfessionalAvailabilityWindow
+  blocks rather than deleting them, so a professional can toggle a weekday
+  off and back on later without re-entering their hours."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    weekday_offs = ProfessionalWeekdayOff.objects.filter(professional=request.user).order_by('weekday')
+    return Response({'weekday_offs': ProfessionalWeekdayOffSerializer(weekday_offs, many=True).data})
+
+  def post(self, request):
+    serializer = ProfessionalWeekdayOffSerializer(data=request.data, context={'professional': request.user})
+    serializer.is_valid(raise_exception=True)
+    weekday_off = serializer.save(professional=request.user)
+    return Response(
+      {'weekday_off': ProfessionalWeekdayOffSerializer(weekday_off).data, 'message': 'That weekday is now a recurring day off.'},
+      status=status.HTTP_201_CREATED,
+    )
+
+
+class ProfessionalWeekdayOffDetailView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def delete(self, request, weekday_off_id):
+    weekday_off = ProfessionalWeekdayOff.objects.filter(id=weekday_off_id, professional=request.user).first()
+    if weekday_off is None:
+      return Response({'message': 'Recurring day off not found.'}, status=status.HTTP_404_NOT_FOUND)
+    weekday_off.delete()
+    return Response({'message': 'Recurring day off removed.'})
 
 
 class ProfessionalSchedulingSlotsView(APIView):

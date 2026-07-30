@@ -7,6 +7,7 @@ declare global {
     APP_CONFIG?: {
       apiBaseUrl?: string;
       supportEmail?: string;
+      googleClientId?: string;
     };
   }
 }
@@ -65,6 +66,10 @@ export interface ProfessionalAuthResponse {
   message: string;
 }
 
+export interface ProfessionalGoogleAuthResponse extends ProfessionalAuthResponse {
+  is_new_account: boolean;
+}
+
 export interface ProfessionalSignupPayload {
   email: string;
   username: string;
@@ -112,6 +117,9 @@ export interface ProfessionalDataUsageResponse {
 export interface ProfessionalDataUsageSection {
   percent_of_quota: number;
   record_count: number;
+  // Only present for Pro/Premium plans -- Free tier stays percentage +
+  // record count only, exactly as before (see data_usage.py _sanitize_sections).
+  total_bytes?: number;
 }
 
 export interface ProfessionalOnboardingStatus {
@@ -119,7 +127,7 @@ export interface ProfessionalOnboardingStatus {
   form_created: boolean;
   group_created: boolean;
   template_created: boolean;
-  reference_created: boolean;
+  resource_created: boolean;
   meeting_setup_complete: boolean;
   missing_actions: string[];
   actions: { code: string; label: string; route: string }[];
@@ -167,19 +175,27 @@ export interface SupportIncidentListResponse {
 export type ProfessionalUpgradeTier = 'pro' | 'premium_unlimited';
 
 export interface DowngradeAssessment {
+  // Never blocked by the plan-limit lock system -- only genuine storage
+  // overage (storage.eligible below) can block self-serve cancellation.
+  // Anything over the Free tier's counted limits simply locks; nothing is
+  // ever deleted.
   eligible: boolean;
+  target_tier_code?: 'starter_free' | 'pro';
+  target_tier_name?: string;
   storage: {
     free_tier_percent: number;
     exceeded_by_percent: number;
     eligible: boolean;
   };
-  resources: Record<string, {
-    used: number;
+  locks: Record<string, {
+    locked_count: number;
+    locked_names: string[];
     free_limit: number;
-    exceeded_by: number;
-    eligible: boolean;
   }>;
-  clients_preserved: boolean;
+  category_cascade_resource_count: number;
+  clients_losing_access: Array<{ client_id: number; client_name: string; group_name: string }>;
+  clients_losing_access_count: number;
+  nothing_is_deleted: true;
   support_email: string;
 }
 
@@ -192,7 +208,6 @@ export interface ProfessionalBillingStatus {
   plan_renews_at: string | null;
   cancellation_requested_at: string | null;
   cancellation_effective_at: string | null;
-  cancellation_force_cleanup: boolean;
   downgrade_assessment: DowngradeAssessment;
   has_billing_account: boolean;
   billing_configured: boolean;
@@ -216,15 +231,16 @@ export interface ProfessionalBillingStatus {
     clients: number | null;
     groups: number;
     templates: number;
-    references: number;
+    resources: number;
     categories: number;
     professional_storage_bytes: number;
+    client_data_retention_days: number;
   }[];
 }
 
-// The Recycle Bin is scoped narrow: only chat images, references, and whole
+// The Recycle Bin is scoped narrow: only chat images, resources, and whole
 // client accounts go through it — see backend/accounts/recycle_bin.py.
-export type RecycleBinCategory = 'chat_message' | 'reference' | 'client_account';
+export type RecycleBinCategory = 'chat_message' | 'resource' | 'client_account';
 
 export interface RecycleBinItem {
   id: number;
@@ -371,6 +387,13 @@ export class ProfessionalAuthApiService {
     return this.http.post<ProfessionalAuthResponse>(`${this.apiBaseUrl}/professional/login/`, { identifier, password });
   }
 
+  /** Used for both "Continue with Google" signup and "Log in with Google" -- the
+   *  backend decides whether to create, link, or just log in based on the
+   *  verified Google account. */
+  googleAuth(credential: string): Observable<ProfessionalGoogleAuthResponse> {
+    return this.http.post<ProfessionalGoogleAuthResponse>(`${this.apiBaseUrl}/professional/auth/google/`, { credential });
+  }
+
   logout(): Observable<MessageResponse> {
     return this.http.post<MessageResponse>(
       `${this.apiBaseUrl}/professional/logout/`,
@@ -387,11 +410,10 @@ export class ProfessionalAuthApiService {
     });
   }
 
-  changePassword(currentPassword: string, password: string, confirmPassword: string): Observable<MessageResponse> {
+  changePassword(password: string, confirmPassword: string): Observable<MessageResponse> {
     return this.http.post<MessageResponse>(
       `${this.apiBaseUrl}/professional/account/change-password/`,
       {
-        current_password: currentPassword,
         password,
         confirm_password: confirmPassword
       },
@@ -483,20 +505,25 @@ export class ProfessionalAuthApiService {
     );
   }
 
-  cancelBillingPlan(forceCleanup = false, confirmation = ''): Observable<{
+  cancelBillingPlan(targetTier: 'starter_free' | 'pro' = 'starter_free'): Observable<{
     message: string;
     cancellation_effective_at?: string;
-    forced_cleanup_scheduled?: boolean;
     assessment?: DowngradeAssessment;
   }> {
     return this.http.post<{
       message: string;
       cancellation_effective_at?: string;
-      forced_cleanup_scheduled?: boolean;
       assessment?: DowngradeAssessment;
     }>(
       `${this.apiBaseUrl}/professional/billing/cancel/`,
-      { force_cleanup: forceCleanup, confirmation },
+      { target_tier: targetTier },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getDowngradeAssessment(targetTier: 'starter_free' | 'pro'): Observable<DowngradeAssessment> {
+    return this.http.get<DowngradeAssessment>(
+      `${this.apiBaseUrl}/professional/billing/cancel/?target_tier=${targetTier}`,
       { headers: this.getAuthHeaders() }
     );
   }
@@ -551,6 +578,12 @@ export class ProfessionalAuthApiService {
 
   saveProfile(profileData: FormData): Observable<ProfessionalProfileSaveResponse> {
     return this.http.post<ProfessionalProfileSaveResponse>(`${this.apiBaseUrl}/professional/profile/`, profileData, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  removeProfilePhoto(): Observable<ProfessionalProfileSaveResponse> {
+    return this.http.delete<ProfessionalProfileSaveResponse>(`${this.apiBaseUrl}/professional/profile/photo/`, {
       headers: this.getAuthHeaders()
     });
   }

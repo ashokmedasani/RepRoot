@@ -26,9 +26,34 @@
         <h2>Suggested Fields</h2>
         <p>Tap a suggestion to add it, then customize.</p>
       </div>
-      <button type="button" class="link-toggle" (click)="toggleAllChips()">
-        {{ showAllChips ? 'Show less' : 'More' }}
-      </button>
+      @if (!suggestionSearch && selectedCategory === 'All') {
+        <button type="button" class="link-toggle" (click)="toggleAllChips()">
+          {{ showAllChips ? 'Show less' : 'More' }}
+        </button>
+      }
+    </div>
+
+    <div class="suggestion-filters">
+      <input
+        type="search"
+        class="suggestion-search"
+        placeholder="Search suggested fields..."
+        [(ngModel)]="suggestionSearch"
+        name="suggestionSearch"
+        aria-label="Search suggested fields"
+      >
+      <div class="category-chip-row">
+        @for (category of recommendedCategories; track category) {
+          <button
+            type="button"
+            class="category-chip"
+            [class.category-chip-active]="selectedCategory === category"
+            (click)="selectCategory(category)"
+          >
+            {{ category }}
+          </button>
+        }
+      </div>
     </div>
 
     <div class="chip-row">
@@ -43,9 +68,38 @@
         >
           <span class="chip-plus">{{ isRecommendedFieldAdded(template) ? '✓' : '+' }}</span>{{ template.label }}
         </button>
+      } @empty {
+        <p class="empty-note">No suggested fields match your search.</p>
       }
     </div>
   </section>
+
+  @for (group of externalSuggestionGroups; track group.title) {
+    @if (group.fields.length) {
+      <section class="recommended-section" aria-label="{{ group.title }}">
+        <div class="section-heading compact">
+          <div>
+            <h2>{{ group.title }}</h2>
+            <p>Tap a field to add it to this form, then customize.</p>
+          </div>
+        </div>
+        <div class="chip-row">
+          @for (field of group.fields; track field.label) {
+            <button
+              type="button"
+              class="field-chip"
+              [class.field-chip-added]="isFieldLabelAdded(field.label)"
+              [disabled]="isFieldLabelAdded(field.label)"
+              (click)="addExternalSuggestedField(field)"
+              [title]="isFieldLabelAdded(field.label) ? field.label + ' is already on this form' : field.help_text"
+            >
+              <span class="chip-plus">{{ isFieldLabelAdded(field.label) ? '✓' : '+' }}</span>{{ field.label }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+  }
 
   <section class="custom-builder" aria-label="Custom field builder">
     <div class="section-heading">

@@ -41,6 +41,11 @@ interface EntryDraft {
   note: string;
 }
 
+interface EntryReviewRow {
+  label: string;
+  value: string;
+}
+
 @Component({
   selector: 'app-client-profile',
   standalone: true,
@@ -66,6 +71,7 @@ export class ClientProfileComponent implements OnInit {
   settingsTab: SettingsTab = 'account';
   selectedTemplateId: number | null = null;
   areTemplatesExpanded = true;
+  reviewingTemplate: TrackingTemplateRecord | null = null;
   message = '';
   messageType: 'success' | 'error' = 'success';
   savingTemplateId = 0;
@@ -101,7 +107,7 @@ export class ClientProfileComponent implements OnInit {
   ];
   readonly templateTabs: { id: TemplateTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'references', label: 'References' },
+    { id: 'references', label: 'Resources' },
     { id: 'data-entry', label: 'Data Entry' },
     { id: 'progress', label: 'Progress' }
   ];
@@ -264,6 +270,51 @@ export class ClientProfileComponent implements OnInit {
     return (template.client_access_level || 'editable') !== 'view_only';
   }
 
+  // Builds the itemized list shown in the review-confirmation dialog before
+  // an entry is actually submitted, so the client can double-check what
+  // they're about to send.
+  reviewRows(template: TrackingTemplateRecord): EntryReviewRow[] {
+    const draft = this.draftFor(template);
+    const rows: EntryReviewRow[] = [
+      { label: 'Entry date', value: draft.entryDate || '—' },
+      { label: 'Entry time', value: draft.entryTime || '—' }
+    ];
+
+    for (const field of template.fields) {
+      const key = field.key || field.label;
+      const value = draft.answers[key];
+      rows.push({ label: field.label, value: value && value.trim() ? value : '—' });
+    }
+
+    rows.push({ label: 'Note', value: draft.note.trim() ? draft.note.trim() : '—' });
+
+    return rows;
+  }
+
+  // Opens the review dialog instead of submitting directly, so the client
+  // gets a chance to confirm everything before it's sent to their professional.
+  openReviewDialog(template: TrackingTemplateRecord): void {
+    const draft = this.draftFor(template);
+
+    if (!draft.entryDate || this.savingTemplateId || !this.isTemplateEditable(template)) {
+      return;
+    }
+
+    this.reviewingTemplate = template;
+  }
+
+  closeReviewDialog(): void {
+    this.reviewingTemplate = null;
+  }
+
+  confirmSubmitEntry(): void {
+    if (!this.reviewingTemplate) {
+      return;
+    }
+
+    this.submitEntry(this.reviewingTemplate);
+  }
+
   submitEntry(template: TrackingTemplateRecord): void {
     const draft = this.draftFor(template);
 
@@ -279,6 +330,7 @@ export class ClientProfileComponent implements OnInit {
       this.savingTemplateId = 0;
       this.editingEntryId = null;
       this.drafts[template.id] = { entryDate: this.todayIso(), entryTime: this.nowTime(), answers: {}, note: '' };
+      this.reviewingTemplate = null;
       this.loadEntries();
     };
 
@@ -286,6 +338,7 @@ export class ClientProfileComponent implements OnInit {
       this.messageType = 'error';
       this.message = formatApiError(error, 'Entry could not be saved.');
       this.savingTemplateId = 0;
+      this.reviewingTemplate = null;
     };
 
     if (this.editingEntryId) {

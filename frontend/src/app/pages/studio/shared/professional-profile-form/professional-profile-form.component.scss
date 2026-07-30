@@ -39,6 +39,18 @@ label {
   margin-top: 0.35rem;
 }
 
+.hero-copy .photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+}
+
+.hero-copy .photo-actions .secondary-action {
+  margin-top: 0;
+}
+
 .profile-hero {
   overflow: visible;
   border: 1px solid var(--app-border);

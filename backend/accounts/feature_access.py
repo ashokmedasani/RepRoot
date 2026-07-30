@@ -10,7 +10,7 @@ Locked features:
 - Templates (cannot create/edit, cannot submit entries)
 - Forms (cannot access lead forms, client registration blocked)
 - Client Management (cannot add clients, cannot edit client profiles)
-- References (limited access)
+- Resources (limited access)
 - Chat (disabled)
 """
 
@@ -38,7 +38,7 @@ def get_feature_access_status(professional_profile):
         'can_manage_templates': bool,
         'can_manage_forms': bool,
         'can_add_clients': bool,
-        'can_manage_references': bool,
+        'can_manage_resources': bool,
         'can_use_chat': bool,
         'is_locked': bool,
         'lock_reason': str or None,
@@ -55,7 +55,7 @@ def get_feature_access_status(professional_profile):
         'can_manage_templates': not is_locked,
         'can_manage_forms': not is_locked,
         'can_add_clients': not is_locked,
-        'can_manage_references': not is_locked,
+        'can_manage_resources': not is_locked,
         'can_use_chat': not is_locked,
         'can_add_storage': not is_locked and not is_storage_blocked,
         'is_locked': is_locked,
@@ -93,8 +93,8 @@ def can_edit_client(professional_profile) -> bool:
     return True
 
 
-def can_manage_references(professional_profile) -> bool:
-    """Check if professional can upload/manage references."""
+def can_manage_resources(professional_profile) -> bool:
+    """Check if professional can upload/manage resources."""
     if professional_profile.is_locked:
         return False
     return True
@@ -149,11 +149,11 @@ def assert_can_edit_client(professional_profile):
         raise FeatureAccessError(f'Client management feature is locked: {reason}')
 
 
-def assert_can_manage_references(professional_profile):
-    """Raise FeatureAccessError if references cannot be managed."""
-    if not can_manage_references(professional_profile):
+def assert_can_manage_resources(professional_profile):
+    """Raise FeatureAccessError if resources cannot be managed."""
+    if not can_manage_resources(professional_profile):
         reason = FeatureLockReason.ACCOUNT_LOCKED if professional_profile.is_locked else FeatureLockReason.OVER_QUOTA
-        raise FeatureAccessError(f'References feature is locked: {reason}')
+        raise FeatureAccessError(f'Resources feature is locked: {reason}')
 
 
 def assert_can_use_chat(professional_profile):
@@ -178,3 +178,43 @@ def check_feature_limits(professional_profile, feature_name: str, current_count:
         return True  # No limit defined
 
     return current_count < limit
+
+
+# --- Per-item plan-limit locks (distinct from the whole-account checks above) ---
+#
+# The functions above answer "is this professional's whole account locked
+# (storage overage, frozen, etc.)?" These answer a narrower question: "is
+# this *specific* group/lead-form/template/resource/category locked because
+# it falls outside the current plan's count limit?" A professional can be
+# fully unlocked at the account level and still have individual items locked
+# this way after a downgrade -- see accounts/plan_lock_status.py for how
+# locked/active is actually computed (rank vs. plan limit, with categories
+# cascading to the resources inside them).
+
+LOCK_ITEM_LABELS = {
+    'groups': 'group',
+    'lead_forms': 'lead form',
+    'templates': 'template',
+    'resources': 'resource',
+    'categories': 'category',
+}
+
+
+def is_item_locked(professional, model_key: str, item_id: int) -> bool:
+    from accounts.plan_lock_status import compute_lock_status
+
+    status = compute_lock_status(professional)
+    return item_id in status.get(model_key, {}).get('locked_ids', [])
+
+
+def assert_item_not_locked(professional, model_key: str, item_id: int):
+    """Raise FeatureAccessError if this specific item is locked. Deleting a
+    locked item is still allowed (that's how a professional frees a slot for
+    the next-ranked item to be promoted) -- only editing/opening it is
+    blocked, so call this from update/detail views, not delete views."""
+    if is_item_locked(professional, model_key, item_id):
+        label = LOCK_ITEM_LABELS.get(model_key, 'item')
+        raise FeatureAccessError(
+            f'This {label} is locked because it is over your current plan\'s limit. '
+            f'Upgrade your plan, or free up a slot by removing another {label}, to unlock it.'
+        )

@@ -5,7 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ActivityNotification, ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
 import { ChatApiService } from '@core/api/chat-api.service';
 
-type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'schedule' | 'references' | 'settings';
+type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'schedule' | 'resource' | 'settings';
 
 @Component({
   selector: 'app-professional-page-shell',

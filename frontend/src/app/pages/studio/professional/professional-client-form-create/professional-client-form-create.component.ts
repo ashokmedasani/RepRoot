@@ -4,8 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 
 import { DynamicField, FormsGroupsApiService, ProfessionalGroup } from '@core/api/forms-groups-api.service';
-import { buildUniversalClientFormFields } from '@core/forms/universal-client-form';
-import { FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
+import { ExternalSuggestionGroup, FormFieldBuilderComponent } from '@studio-shared/form-field-builder/form-field-builder.component';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 
 @Component({
@@ -22,6 +21,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
 
   group: ProfessionalGroup | null = null;
   customFields: DynamicField[] = [];
+  externalSuggestionGroups: ExternalSuggestionGroup[] = [];
   isMandatory = true;
   isLoading = true;
   isSaving = false;
@@ -46,17 +46,19 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
           .map((field) => ({ ...field }));
         this.isMandatory = this.group.registration_form?.is_mandatory ?? true;
 
-        // First-time setup: reuse the custom fields the professional already built
-        // on the Lead Form so the same questions never have to be recreated.
-        // Groups without a lead-form field set fall back to the universal
-        // template so the form is never empty.
-        if (this.customFields.length === 0) {
-          const leadFormFields = (overview.lead_form?.fields || [])
-            .filter((field) => !field.is_core)
-            .map((field) => ({ ...field, isEditing: false }));
-
-          this.customFields = leadFormFields.length ? leadFormFields : buildUniversalClientFormFields();
-        }
+        // Never auto-copy or pre-populate fields here (Fixes after 1 Test
+        // Launch, Priority 5 item 7) -- the group form starts with only the
+        // locked core fields (seeded server-side) plus whatever the trainer
+        // already saved. Every existing lead form's custom fields are offered
+        // as a separate, clearly-labeled, opt-in suggestion section instead;
+        // only sections that actually have fields are shown.
+        const leadForms = overview.lead_forms?.length ? overview.lead_forms : (overview.lead_form ? [overview.lead_form] : []);
+        this.externalSuggestionGroups = leadForms
+          .map((leadForm, index) => ({
+            title: leadForms.length > 1 ? `${leadForm.title || `Lead Form ${index + 1}`} Fields` : `${leadForm.title || 'Lead Form'} Fields`,
+            fields: (leadForm.fields || []).filter((field) => !field.is_core)
+          }))
+          .filter((group) => group.fields.length > 0);
 
         this.isLoading = false;
       },
@@ -73,12 +75,9 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
       return;
     }
 
-    if (this.customFields.length === 0) {
-      this.messageType = 'error';
-      this.message = 'Add at least one client detail field before saving the form.';
-      return;
-    }
-
+    // The three core fields (First Name, Last Name, Email) are always
+    // present server-side, so a group form with zero additional custom
+    // fields is a valid, deliberate choice -- not an error.
     this.isSaving = true;
     this.message = '';
     this.formsGroupsApi.saveRegistrationForm(this.group.id, this.customFields, this.isMandatory).subscribe({

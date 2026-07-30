@@ -3,7 +3,7 @@ Recycle bin for RepRoot Studio — scoped narrow on purpose.
 
 Only three things go through soft_delete_*() instead of a raw .delete():
   - chat messages that carry an image (the text itself is cheap to lose)
-  - references (they're a curated content library, often file-backed)
+  - resources (they're a curated content library, often file-backed)
   - whole client accounts (bundled with all their chat/tracking/progress/
     reminders/assignments — deleting an entire client is consequential
     enough to always be fully recoverable)
@@ -16,7 +16,7 @@ via the client_account bundle if the whole client goes with them.
 A RecycleBinItem snapshot is written first, then the live row is removed.
 The item stays restorable for REPROOT_RECYCLE_BIN_DAYS; purge_expired()
 removes anything past that window for good, including any underlying file
-(chat image / reference upload) it was still holding onto.
+(chat image / resource upload) it was still holding onto.
 
 Underlying files are deliberately NOT deleted at soft-delete time — restore
 needs them to still exist on disk/S3. They're only removed at permanent
@@ -36,9 +36,9 @@ from .models import (
   GroupRegistrationSubmission,
   LeadSubmission,
   ProfessionalGroup,
-  ProfessionalReference,
+  ProfessionalResource,
   ProgressEntry,
-  ReferenceCategory,
+  ResourceCategory,
   RecycleBinItem,
   TemplateAssignment,
   TrackingEntry,
@@ -96,47 +96,47 @@ def _restore_chat_message(item):
 # (see views.py) unless they're part of a whole client_account bundle below,
 # where losing the client makes them worth preserving alongside the client.
 
-# ---- Reference ----
+# ---- Resource ----
 
-def soft_delete_reference(reference, deleted_by=RecycleBinItem.DELETED_BY_PROFESSIONAL):
+def soft_delete_resource(resource, deleted_by=RecycleBinItem.DELETED_BY_PROFESSIONAL):
   RecycleBinItem.objects.create(
-    professional=reference.professional,
-    category=RecycleBinItem.CATEGORY_REFERENCE,
-    title=reference.title,
+    professional=resource.professional,
+    category=RecycleBinItem.CATEGORY_RESOURCE,
+    title=resource.title,
     payload={
-      'category_id': reference.category_id,
-      'subcategory': reference.subcategory,
-      'title': reference.title,
-      'reference_type': reference.reference_type,
-      'description': reference.description,
-      'link': reference.link,
-      'file': reference.file.name if reference.file else '',
-      'tags': reference.tags,
+      'category_id': resource.category_id,
+      'subcategory': resource.subcategory,
+      'title': resource.title,
+      'resource_type': resource.resource_type,
+      'description': resource.description,
+      'link': resource.link,
+      'file': resource.file.name if resource.file else '',
+      'tags': resource.tags,
     },
     deleted_by=deleted_by,
     expires_at=_expires_at(),
   )
-  reference.delete()
+  resource.delete()
 
 
-def _restore_reference(item):
-  category = ReferenceCategory.objects.filter(id=item.payload.get('category_id')).first()
+def _restore_resource(item):
+  category = ResourceCategory.objects.filter(id=item.payload.get('category_id')).first()
   if not category:
-    raise RestoreError('The category this reference belonged to no longer exists.')
+    raise RestoreError('The category this resource belonged to no longer exists.')
 
-  reference = ProfessionalReference(
+  resource = ProfessionalResource(
     professional=item.professional,
     category=category,
     subcategory=item.payload.get('subcategory', ''),
     title=item.payload.get('title', ''),
-    reference_type=item.payload.get('reference_type', ProfessionalReference.TYPE_TEXT_NOTE),
+    resource_type=item.payload.get('resource_type', ProfessionalResource.TYPE_TEXT_NOTE),
     description=item.payload.get('description', ''),
     link=item.payload.get('link', ''),
     tags=item.payload.get('tags', []),
   )
   if item.payload.get('file'):
-    reference.file.name = item.payload['file']
-  reference.save()
+    resource.file.name = item.payload['file']
+  resource.save()
 
 
 # ---- Client account (bundles the client plus its chat/tracking/progress/
@@ -189,7 +189,7 @@ def soft_delete_client_account(client, deleted_by=RecycleBinItem.DELETED_BY_PROF
     for r in ClientReminder.objects.filter(client=client).values('title', 'date', 'time', 'notes', 'status')
   ]
   assignments = [
-    {'template_id': a.template_id, 'reference_ids': list(a.references.values_list('id', flat=True))}
+    {'template_id': a.template_id, 'resource_ids': list(a.resources.values_list('id', flat=True))}
     for a in TemplateAssignment.objects.filter(client=client)
   ]
 
@@ -319,13 +319,13 @@ def _restore_client_account(item):
     if not TrackingTemplate.objects.filter(id=a['template_id']).exists():
       continue
     assignment = TemplateAssignment.objects.create(client=client, template_id=a['template_id'])
-    reference_ids = ProfessionalReference.objects.filter(id__in=a.get('reference_ids', [])).values_list('id', flat=True)
-    assignment.references.set(reference_ids)
+    resource_ids = ProfessionalResource.objects.filter(id__in=a.get('resource_ids', [])).values_list('id', flat=True)
+    assignment.resources.set(resource_ids)
 
 
 _RESTORE_HANDLERS = {
   RecycleBinItem.CATEGORY_CHAT_MESSAGE: _restore_chat_message,
-  RecycleBinItem.CATEGORY_REFERENCE: _restore_reference,
+  RecycleBinItem.CATEGORY_RESOURCE: _restore_resource,
   RecycleBinItem.CATEGORY_CLIENT_ACCOUNT: _restore_client_account,
 }
 
@@ -342,12 +342,12 @@ def restore_item(item: RecycleBinItem) -> None:
 
 def _delete_underlying_file(item: RecycleBinItem) -> None:
   """Removes whatever files a recycle bin entry was still holding onto —
-  a single image/file for chat messages and references, or every chat
+  a single image/file for chat messages and resources, or every chat
   image bundled into a client_account snapshot."""
   paths = []
   if item.category == RecycleBinItem.CATEGORY_CHAT_MESSAGE:
     paths = [item.payload.get('image')]
-  elif item.category == RecycleBinItem.CATEGORY_REFERENCE:
+  elif item.category == RecycleBinItem.CATEGORY_RESOURCE:
     paths = [item.payload.get('file')]
   elif item.category == RecycleBinItem.CATEGORY_CLIENT_ACCOUNT:
     paths = [m.get('image') for m in item.payload.get('chat_messages', [])]

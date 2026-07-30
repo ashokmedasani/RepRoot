@@ -174,12 +174,28 @@
   font-weight: 800;
 }
 
+/* Without an explicit width, a bare <textarea> falls back to its intrinsic
+ * ~20-column browser default and renders as a narrow box in the corner of
+ * this panel instead of filling it. */
+.notes-card textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 8rem;
+}
+
+.notes-body {
+  width: 100%;
+}
+
 .notes-body .notes-text {
+  width: 100%;
   color: var(--app-text);
   font-size: 0.92rem;
   font-weight: 500;
   line-height: 1.6;
   white-space: pre-line;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .notes-stamp {

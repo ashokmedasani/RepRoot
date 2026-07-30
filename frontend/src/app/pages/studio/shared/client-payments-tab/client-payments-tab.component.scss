@@ -66,6 +66,23 @@ h3 {
   line-height: 1.55;
 }
 
+.empty-methods-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--app-border);
+  border-radius: var(--app-radius-md);
+}
+
+.empty-methods-note p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.88rem;
+}
+
 .share-list {
   display: grid;
   gap: 0.6rem;

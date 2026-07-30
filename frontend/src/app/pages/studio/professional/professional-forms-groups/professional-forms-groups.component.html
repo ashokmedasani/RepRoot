@@ -48,17 +48,19 @@
         <a routerLink="/professional/forms/create" [queryParams]="{ new: 1 }" class="primary-action">Create Form</a>
       </div>
       @if (overview.lead_forms.length > 1) {
-        <div class="lead-form-list" aria-label="Lead forms">
-          @for (form of overview.lead_forms; track form.id) {
-            <article>
-              <div>
-                <strong>{{ form.title }}</strong>
-                <small>{{ form.is_active ? 'Active' : 'Disabled' }}</small>
-              </div>
-              <a routerLink="/professional/forms/create" [queryParams]="{ formId: form.id }" class="ghost-action">Edit</a>
-            </article>
-          }
-        </div>
+        <label class="lead-form-select">
+          <span>Viewing form</span>
+          <select
+            aria-label="Select lead form"
+            [ngModel]="selectedLeadFormId"
+            (ngModelChange)="selectLeadForm($event)"
+            name="selectedLeadForm"
+          >
+            @for (form of overview.lead_forms; track form.id) {
+              <option [ngValue]="form.id">{{ form.title }} ({{ form.is_active ? 'Active' : 'Disabled' }})</option>
+            }
+          </select>
+        </label>
       }
       @if (!overview.has_lead_form) {
         <section class="empty-state" aria-labelledby="empty-form-title">
@@ -79,22 +81,22 @@
           <div class="lead-form-header">
             <div>
               <p class="eyebrow">Public enquiry form</p>
-              <h2 id="lead-form-title">{{ overview.lead_form?.title }}</h2>
-              <p>{{ overview.lead_form?.is_active ? 'People with the link can submit this form.' : 'The public form is unavailable until you enable it.' }}</p>
+              <h2 id="lead-form-title">{{ selectedLeadForm?.title }}</h2>
+              <p>{{ selectedLeadForm?.is_active ? 'People with the link can submit this form.' : 'The public form is unavailable until you enable it.' }}</p>
             </div>
             <label class="switch-control">
               <input
                 type="checkbox"
-                [checked]="overview.lead_form?.is_active"
+                [checked]="selectedLeadForm?.is_active"
                 [disabled]="isSaving"
                 (change)="toggleLeadFormActive($event)"
               >
               <span class="switch-track" aria-hidden="true"><span></span></span>
-              <span class="switch-state">{{ overview.lead_form?.is_active ? 'Enabled' : 'Disabled' }}</span>
+              <span class="switch-state">{{ selectedLeadForm?.is_active ? 'Enabled' : 'Disabled' }}</span>
             </label>
           </div>
 
-          @if (overview.lead_form?.is_active) {
+          @if (selectedLeadForm?.is_active) {
             <div class="lead-main">
               <div class="panel-title">
                 <h2>Public Lead Form</h2>
@@ -103,14 +105,14 @@
 
               <div class="form-name-block">
                 <span>Form Name</span>
-                <h3>{{ overview.lead_form?.title }}</h3>
+                <h3>{{ selectedLeadForm?.title }}</h3>
                 <p>For unknown potential clients and initial enquiries. Approved leads move into client creation.</p>
               </div>
 
               <div class="form-link-box">
                 <span>Form Link</span>
                 <div>
-                  <a [href]="overview.lead_form?.public_link" target="_blank" rel="noreferrer">{{ overview.lead_form?.public_link }}</a>
+                  <a [href]="selectedLeadForm?.public_link" target="_blank" rel="noreferrer">{{ selectedLeadForm?.public_link }}</a>
                   <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>
                 </div>
               </div>
@@ -145,20 +147,20 @@
                 <li>Last Name (Required)</li>
                 <li>Email Address (Required)</li>
               </ul>
-              @if ((overview.lead_form?.fields?.length || 0) > 3) {
-                <p>{{ (overview.lead_form?.fields?.length || 0) - 3 }} more fields</p>
+              @if ((selectedLeadForm?.fields?.length || 0) > 3) {
+                <p>{{ (selectedLeadForm?.fields?.length || 0) - 3 }} more fields</p>
               }
             </aside>
 
-            <a routerLink="/professional/forms/create" class="secondary-action edit-form-action">Edit Form</a>
+            <a routerLink="/professional/forms/create" [queryParams]="{ formId: selectedLeadForm?.id }" class="secondary-action edit-form-action">Edit Form</a>
 
             <div class="meeting-settings-summary nested-meeting-settings" aria-labelledby="meeting-settings-title">
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">After form submission</p>
                   <h2 id="meeting-settings-title">Introductory Meeting Settings</h2>
-                  @if (overview.lead_form?.introductory_meeting_enabled) {
-                    <p>Applicants can request <strong>{{ overview.lead_form?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
+                  @if (selectedLeadForm?.introductory_meeting_enabled) {
+                    <p>Applicants can request <strong>{{ selectedLeadForm?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
                   } @else {
                     <p>Applicants currently submit the form without receiving an introductory-meeting option.</p>
                   }
@@ -166,16 +168,16 @@
                 <label class="switch-control">
                   <input
                     type="checkbox"
-                    [checked]="overview.lead_form?.introductory_meeting_enabled"
+                    [checked]="selectedLeadForm?.introductory_meeting_enabled"
                     [disabled]="isSaving"
                     (change)="toggleIntroMeetingEnabled($event)"
                   >
                   <span class="switch-track" aria-hidden="true"><span></span></span>
-                  <span class="switch-state">{{ overview.lead_form?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
+                  <span class="switch-state">{{ selectedLeadForm?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </label>
               </div>
 
-              @if (overview.lead_form?.introductory_meeting_enabled) {
+              @if (selectedLeadForm?.introductory_meeting_enabled) {
                 @if (meetingRequests.length) {
                   <div class="lead-meeting-preview" aria-labelledby="meeting-requests-title">
                     <div class="preview-heading">
@@ -202,10 +204,10 @@
                   </div>
                 }
                 <div class="meeting-rule-grid">
-                  <div><span>Duration</span><strong>{{ overview.lead_form?.introductory_meeting_duration_minutes }} minutes</strong></div>
-                  <div><span>Minimum notice</span><strong>{{ overview.lead_form?.introductory_meeting_min_notice_hours }} hours</strong></div>
-                  <div><span>Booking window</span><strong>{{ overview.lead_form?.introductory_meeting_max_advance_days }} days</strong></div>
-                  <div><span>Buffer</span><strong>{{ overview.lead_form?.introductory_meeting_buffer_minutes }} minutes</strong></div>
+                  <div><span>Duration</span><strong>{{ selectedLeadForm?.introductory_meeting_duration_minutes }} minutes</strong></div>
+                  <div><span>Minimum notice</span><strong>{{ selectedLeadForm?.introductory_meeting_min_notice_hours }} hours</strong></div>
+                  <div><span>Booking window</span><strong>{{ selectedLeadForm?.introductory_meeting_max_advance_days }} days</strong></div>
+                  <div><span>Buffer</span><strong>{{ selectedLeadForm?.introductory_meeting_buffer_minutes }} minutes</strong></div>
                 </div>
 
                 <div class="lead-meeting-preview">
@@ -241,8 +243,8 @@
                 }
               }
 
-              <a routerLink="/professional/forms/create" [queryParams]="{ step: 'meeting' }" class="secondary-action meeting-settings-action">
-                {{ overview.lead_form?.introductory_meeting_enabled ? 'Edit meeting settings' : 'Set up introductory meetings' }}
+              <a routerLink="/professional/forms/create" [queryParams]="{ step: 'meeting', formId: selectedLeadForm?.id }" class="secondary-action meeting-settings-action">
+                {{ selectedLeadForm?.introductory_meeting_enabled ? 'Edit meeting settings' : 'Set up introductory meetings' }}
               </a>
             </div>
           }
@@ -333,10 +335,14 @@
             <a routerLink="/professional/groups/create" class="primary-action group-create-action">Create Group</a>
           </div>
 
-          <div class="group-list">
-            @for (group of overview.groups; track group.id) {
-              <article class="group-row">
+          @if (orderedActiveGroups().length) {
+            <p class="drag-hint">Drag a group by its ⠿ handle to change which groups lock first if you go over plan.</p>
+          }
+          <div class="group-list" cdkDropList (cdkDropListDropped)="dropGroup($event)">
+            @for (group of orderedActiveGroups(); track group.id) {
+              <article class="group-row" cdkDrag>
                 <div class="group-summary">
+                  <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
                   <span class="group-caret">&rsaquo;</span>
                   <div>
                     <h3>{{ group.name }}</h3>
@@ -359,6 +365,35 @@
               </article>
             }
           </div>
+
+          @if (lockedGroupsList().length) {
+            <div class="locked-section-heading">
+              <span class="locked-divider"></span>
+              <h3>Locked Groups</h3>
+              <span class="locked-divider"></span>
+            </div>
+            <div class="group-list locked-list">
+              @for (group of lockedGroupsList(); track group.id) {
+                <article class="group-row locked">
+                  <div class="group-summary">
+                    <span class="group-caret">&rsaquo;</span>
+                    <div>
+                      <h3>{{ group.name }}
+                        <span class="lock-badge" title="Over your current plan's group limit. Clients in this group lose portal access (their data is kept) until it unlocks.">🔒 Locked</span>
+                      </h3>
+                      <p>{{ group.description || 'No description added yet.' }}</p>
+                    </div>
+                    <span class="status-pill">Locked</span>
+                  </div>
+                  <div class="group-actions">
+                    <span>{{ group.has_registration_form ? 'Group registration form ready' : 'Group registration form needed' }}</span>
+                    <button type="button" class="ghost-action" disabled title="This group is locked. Upgrade or free a slot to reopen it.">Open group</button>
+                    <button type="button" class="secondary-action" disabled title="This group is locked. Upgrade or free a slot to edit its form.">Edit form</button>
+                  </div>
+                </article>
+              }
+            </div>
+          }
         </section>
       }
     }

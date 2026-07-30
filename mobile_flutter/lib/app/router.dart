@@ -32,7 +32,7 @@ import '../features/professional/professional_manage_page.dart';
 import '../features/professional/professional_more_page.dart';
 import '../features/professional/professional_payments_page.dart';
 import '../features/professional/professional_profile_page.dart';
-import '../features/professional/professional_references_page.dart';
+import '../features/professional/professional_resources_page.dart';
 import '../features/professional/professional_schedule_page.dart';
 import '../features/professional/professional_settings_page.dart';
 import '../features/professional/professional_tabs_shell.dart';
@@ -59,7 +59,7 @@ class Routes {
   static const professionalFormsGroups =
       '/professional/tabs/manage/forms-groups';
   static const professionalTemplates = '/professional/tabs/manage/templates';
-  static const professionalReferences = '/professional/tabs/manage/references';
+  static const professionalResources = '/professional/tabs/manage/resource';
   static const professionalSchedule = '/professional/tabs/manage/schedule';
   static const professionalPayments = '/professional/tabs/manage/payments';
   static const professionalProfile = '/professional/tabs/more/profile';
@@ -175,9 +175,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                         const ProfessionalTemplatesPage(),
                   ),
                   GoRoute(
-                    path: 'references',
+                    path: 'resource',
                     builder: (context, state) =>
-                        const ProfessionalReferencesPage(),
+                        const ProfessionalResourcesPage(),
                   ),
                   GoRoute(
                     path: 'schedule',

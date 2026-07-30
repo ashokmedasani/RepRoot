@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 
 from accounts import account_lifecycle
 from accounts.data_usage import calculate_professional_data_usage
-from accounts.models import ActivityNotification, ChatMessage, ClientAccess, LeadSubmission, NotificationDeliveryAttempt, ProfessionalGroup, ProfessionalLeadForm, ProfessionalProfile, ProfessionalReference, RecycleBinItem, ScheduledMeeting, SupportIncident, SupportIncidentMessage, TemplateAssignment, TrackingEntry, TrackingTemplate, ClientReminder
+from accounts.models import ActivityNotification, ChatMessage, ClientAccess, LeadSubmission, NotificationDeliveryAttempt, ProfessionalGroup, ProfessionalLeadForm, ProfessionalProfile, ProfessionalResource, RecycleBinItem, ScheduledMeeting, SupportIncident, SupportIncidentMessage, TemplateAssignment, TrackingEntry, TrackingTemplate, ClientReminder
 from accounts.serializers import SupportIncidentSerializer
 
 from .audit import record_admin_action
@@ -182,7 +182,7 @@ class AdminDashboardView(APIView):
       'usage': {
         'lead_forms': ProfessionalLeadForm.objects.count(), 'active_lead_forms': ProfessionalLeadForm.objects.filter(is_active=True).count(),
         'form_submissions': LeadSubmission.objects.count(), 'groups': ProfessionalGroup.objects.count(),
-        'templates': TrackingTemplate.objects.count(), 'references': ProfessionalReference.objects.count(),
+        'templates': TrackingTemplate.objects.count(), 'resources': ProfessionalResource.objects.count(),
         'scheduled_followups': ClientReminder.objects.filter(status='pending').count(),
       },
     }
@@ -252,7 +252,7 @@ class AdminOperationsView(APIView):
     modules={
       'Forms':ProfessionalLeadForm.objects.all(),'Submissions':LeadSubmission.objects.all(),'Groups':ProfessionalGroup.objects.all(),
       'Clients':ClientAccess.objects.all(),'Templates':TrackingTemplate.objects.all(),'Assignments':TemplateAssignment.objects.all(),
-      'Entries':TrackingEntry.objects.all(),'References':ProfessionalReference.objects.all(),'Schedules':ScheduledMeeting.objects.all(),
+      'Entries':TrackingEntry.objects.all(),'Resources':ProfessionalResource.objects.all(),'Schedules':ScheduledMeeting.objects.all(),
       'Reminders':ClientReminder.objects.all(),'Chat':ChatMessage.objects.all(),'Notifications':ActivityNotification.objects.all(),
     }
     events=ranged(OperationEvent.objects.all(),'occurred_at',start,end)
@@ -263,7 +263,7 @@ class AdminOperationsView(APIView):
     funnel=[
       {'stage':'Registered','count':professionals.count()},
       {'stage':'Profile completed','count':professionals.filter(professional_profile__profile_setup_completed=True).count()},
-      {'stage':'Created form','count':professionals.filter(lead_form__isnull=False).distinct().count()},
+      {'stage':'Created form','count':professionals.filter(lead_forms__isnull=False).distinct().count()},
       {'stage':'Created group','count':professionals.filter(professional_groups__isnull=False).distinct().count()},
       {'stage':'Added client','count':professionals.filter(client_access_records__isnull=False).distinct().count()},
       {'stage':'Created template','count':professionals.filter(tracking_templates__isnull=False).distinct().count()},

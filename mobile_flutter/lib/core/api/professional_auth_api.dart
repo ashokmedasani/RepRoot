@@ -229,17 +229,11 @@ class ProfessionalAuthApi {
     });
   }
 
-  Future<String> cancelBillingPlan({
-    bool forceCleanup = false,
-    String confirmation = '',
-  }) {
+  Future<String> cancelBillingPlan() {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/billing/cancel/',
-        data: {
-          'force_cleanup': forceCleanup,
-          'confirmation': confirmation,
-        },
+        data: <String, dynamic>{},
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';

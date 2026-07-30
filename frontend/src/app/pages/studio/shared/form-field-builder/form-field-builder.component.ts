@@ -9,9 +9,16 @@ interface FieldTypeOption {
   label: string;
 }
 
+export interface ExternalSuggestionGroup {
+  /** e.g. "Lead Form 1 Fields" -- only groups with at least one field should be passed in. */
+  title: string;
+  fields: DynamicField[];
+}
+
 interface FitnessFieldTemplate {
   icon: string;
   label: string;
+  category: string;
   field_type: DynamicFieldType;
   placeholder: string;
   help_text: string;
@@ -28,6 +35,11 @@ interface FitnessFieldTemplate {
 })
 export class FormFieldBuilderComponent {
   @Input({ required: true }) customFields: DynamicField[] = [];
+  /** Additional labeled suggestion sections, e.g. one per existing lead form,
+   *  shown below the standard suggestions -- never auto-inserted, same
+   *  click-to-add pattern as the built-in recommended fields. Only sections
+   *  with at least one field should be included by the caller. */
+  @Input() externalSuggestionGroups: ExternalSuggestionGroup[] = [];
 
   readonly fieldTypes: FieldTypeOption[] = [
     { value: 'short_text', label: 'Short Text' },
@@ -48,6 +60,7 @@ export class FormFieldBuilderComponent {
     {
       icon: 'PH',
       label: 'Phone Number',
+      category: 'Contact',
       field_type: 'phone',
       placeholder: 'Mobile number',
       help_text: 'Country code selector plus mobile number input.',
@@ -61,6 +74,7 @@ export class FormFieldBuilderComponent {
     {
       icon: 'GO',
       label: 'Primary Goal',
+      category: 'Fitness Profile',
       field_type: 'dropdown',
       placeholder: 'Select primary goal',
       help_text: 'Capture the client goal before assigning a program.',
@@ -70,6 +84,7 @@ export class FormFieldBuilderComponent {
     {
       icon: 'EX',
       label: 'Training Experience',
+      category: 'Fitness Profile',
       field_type: 'dropdown',
       placeholder: 'Select experience level',
       help_text: 'Beginner, intermediate, or advanced training history.',
@@ -78,6 +93,7 @@ export class FormFieldBuilderComponent {
     {
       icon: 'MC',
       label: 'Medical Conditions or Injuries',
+      category: 'Health',
       field_type: 'long_text',
       placeholder: 'List medical conditions or past injuries',
       help_text: 'Important health context before training begins.'
@@ -85,6 +101,7 @@ export class FormFieldBuilderComponent {
     {
       icon: 'TM',
       label: 'Preferred Training Mode',
+      category: 'Preferences',
       field_type: 'dropdown',
       placeholder: 'Select mode',
       help_text: 'Online, in person, or hybrid coaching preference.',
@@ -92,7 +109,11 @@ export class FormFieldBuilderComponent {
     }
   ];
 
+  readonly recommendedCategories = ['All', ...new Set(this.recommendedFields.map((field) => field.category))];
+
   showAllChips = false;
+  suggestionSearch = '';
+  selectedCategory = 'All';
 
   private readonly primaryChips = [
     'Phone Number',
@@ -103,20 +124,35 @@ export class FormFieldBuilderComponent {
   ];
 
   get visibleRecommended(): FitnessFieldTemplate[] {
-    const primary = this.primaryChips
-      .map((label) => this.recommendedFields.find((field) => field.label === label))
-      .filter((field): field is FitnessFieldTemplate => Boolean(field));
+    const isFiltering = Boolean(this.suggestionSearch.trim()) || this.selectedCategory !== 'All';
 
-    if (!this.showAllChips) {
-      return primary;
+    if (!isFiltering) {
+      const primary = this.primaryChips
+        .map((label) => this.recommendedFields.find((field) => field.label === label))
+        .filter((field): field is FitnessFieldTemplate => Boolean(field));
+
+      if (!this.showAllChips) {
+        return primary;
+      }
+
+      const rest = this.recommendedFields.filter((field) => !this.primaryChips.includes(field.label));
+      return [...primary, ...rest];
     }
 
-    const rest = this.recommendedFields.filter((field) => !this.primaryChips.includes(field.label));
-    return [...primary, ...rest];
+    const query = this.suggestionSearch.trim().toLowerCase();
+    return this.recommendedFields.filter((field) => {
+      const matchesCategory = this.selectedCategory === 'All' || field.category === this.selectedCategory;
+      const matchesSearch = !query || field.label.toLowerCase().includes(query) || field.help_text.toLowerCase().includes(query);
+      return matchesCategory && matchesSearch;
+    });
   }
 
   toggleAllChips(): void {
     this.showAllChips = !this.showAllChips;
+  }
+
+  selectCategory(category: string): void {
+    this.selectedCategory = category;
   }
 
   addField(): void {
@@ -124,8 +160,7 @@ export class FormFieldBuilderComponent {
   }
 
   isRecommendedFieldAdded(template: FitnessFieldTemplate): boolean {
-    const label = template.label.trim().toLowerCase();
-    return this.customFields.some((field) => (field.label || '').trim().toLowerCase() === label);
+    return this.isFieldLabelAdded(template.label);
   }
 
   addRecommendedField(template: FitnessFieldTemplate): void {
@@ -136,6 +171,24 @@ export class FormFieldBuilderComponent {
     }
     // Insert the suggested field and open its settings panel immediately.
     this.customFields.push(this.createFieldFromTemplate(template, true));
+  }
+
+  isFieldLabelAdded(label: string): boolean {
+    const normalized = label.trim().toLowerCase();
+    return this.customFields.some((field) => (field.label || '').trim().toLowerCase() === normalized);
+  }
+
+  addExternalSuggestedField(field: DynamicField): void {
+    if (this.isFieldLabelAdded(field.label)) {
+      return;
+    }
+
+    this.customFields.push({
+      ...field,
+      options: [...(field.options || [])],
+      is_core: false,
+      isEditing: true
+    });
   }
 
   removeField(index: number): void {

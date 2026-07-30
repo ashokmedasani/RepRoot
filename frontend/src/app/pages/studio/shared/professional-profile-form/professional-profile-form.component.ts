@@ -5,6 +5,7 @@ import { Country, State } from 'country-state-city';
 
 import { ProfessionalAuthApiService, ProfessionalProfile, ProfessionalProfileVisibility } from '@core/api/professional-auth-api.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
 /**
  * Editable professional profile form. Embedded inside Settings -> My Account.
@@ -20,6 +21,7 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 export class ProfessionalProfileFormComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
+  private readonly confirmation = inject(ConfirmationDialogService);
 
   readonly months = [
     { value: 1, label: 'January' },
@@ -52,6 +54,7 @@ export class ProfessionalProfileFormComponent implements OnInit {
   };
   selectedFileNames: Record<string, string> = {};
   selectedProfilePhotoPreview = '';
+  isRemovingPhoto = false;
   profileImages: { category: string; title: string; url: string }[] = [];
   profileLinks: { title: string; url: string }[] = [];
   profileVisibility: ProfessionalProfileVisibility = this.defaultVisibility();
@@ -91,6 +94,11 @@ export class ProfessionalProfileFormComponent implements OnInit {
   get previewName(): string {
     const value = this.profileForm.getRawValue();
     return `${value.first_name} ${value.last_name}`.trim() || 'Professional name';
+  }
+
+  /** Remove Picture only makes sense once a custom image actually exists. */
+  get hasCustomProfilePhoto(): boolean {
+    return Boolean(this.selectedProfilePhotoPreview || this.loadedProfile?.profile_photo_url);
   }
 
   ngOnInit(): void {
@@ -150,6 +158,48 @@ export class ProfessionalProfileFormComponent implements OnInit {
     if (fieldName === 'profile_photo') {
       this.selectedProfilePhotoPreview = file ? URL.createObjectURL(file) : '';
     }
+  }
+
+  async removeProfilePhoto(): Promise<void> {
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Remove profile picture',
+      target: 'your profile picture',
+      impact: 'Your profile picture will be replaced with the default avatar everywhere it appears.',
+      confirmLabel: 'Remove Picture'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    // Clear any newly selected (not yet saved) file first -- if the user
+    // picked a new photo and then hits Remove, they mean "start over", not
+    // "remove the one that's already saved".
+    if (this.selectedFiles['profile_photo']) {
+      this.selectedFiles['profile_photo'] = null;
+      this.selectedFileNames['profile_photo'] = '';
+      this.selectedProfilePhotoPreview = '';
+
+      if (!this.loadedProfile?.profile_photo_url) {
+        return;
+      }
+    }
+
+    this.isRemovingPhoto = true;
+    this.profileMessage = '';
+
+    this.professionalAuthApi.removeProfilePhoto().subscribe({
+      next: (response) => {
+        this.loadedProfile = response.profile;
+        this.profileMessage = response.message;
+        this.isRemovingPhoto = false;
+      },
+      error: (error: unknown) => {
+        this.profileMessage = formatApiError(error, 'Profile picture could not be removed.');
+        this.isRemovingPhoto = false;
+      }
+    });
   }
 
   addProfileImage(): void {

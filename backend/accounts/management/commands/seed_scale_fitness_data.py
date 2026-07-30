@@ -19,14 +19,14 @@ from accounts.models import (
   ClientReminder,
   LeadSubmission,
   ProgressEntry,
-  ReferenceCategory,
+  ResourceCategory,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
   ProfessionalGroup,
   ProfessionalLeadForm,
   ProfessionalProfile,
-  ProfessionalReference,
+  ProfessionalResource,
   default_client_registration_fields,
 )
 
@@ -67,7 +67,7 @@ EXPERIENCE = ['Beginner', 'Intermediate', 'Advanced']
 MODES = ['Online', 'In Person', 'Hybrid']
 
 
-REFERENCE_CATEGORIES = [
+RESOURCE_CATEGORIES = [
   ('Movement Library', 'Exercise demos, regressions, and form checkpoints.', ['Squat', 'Hinge', 'Push', 'Pull', 'Core']),
   ('Conditioning', 'Cardio, intervals, zone work, and conditioning plans.', ['Intervals', 'Zone 2', 'Warm-up']),
   ('Nutrition Coaching', 'Food quality, portions, protein, hydration, and planning.', ['Protein', 'Meal Prep', 'Hydration']),
@@ -76,7 +76,7 @@ REFERENCE_CATEGORIES = [
 ]
 
 
-REFERENCES = [
+RESOURCES = [
   ('Movement Library', 'Squat', 'Bodyweight Squat Basics', 'video_link', 'Foot pressure, knee tracking, and depth for beginner squat practice.', 'https://www.youtube.com/watch?v=aclHkVaku9U', ['squat', 'form']),
   ('Movement Library', 'Hinge', 'Hip Hinge Pattern', 'video_link', 'Learn the hinge before deadlift and kettlebell variations.', 'https://www.youtube.com/watch?v=wYREQkVtvEc', ['hinge']),
   ('Movement Library', 'Push', 'Incline Push-Up Progression', 'video_link', 'Scalable push-up tutorial for different strength levels.', 'https://www.youtube.com/watch?v=IODxDxX7oi4', ['push']),
@@ -302,9 +302,9 @@ class Command(BaseCommand):
       groups = self.seed_groups(professional)
       lead_form = self.seed_lead_form(professional)
       clients = self.seed_clients(professional, groups, lead_form)
-      references = self.seed_references(professional)
+      resources = self.seed_resources(professional)
       templates = self.seed_templates(professional)
-      self.seed_assignments(clients, templates, references)
+      self.seed_assignments(clients, templates, resources)
       self.seed_featured_tracking(clients[0], templates)
       self.seed_reminders(professional, clients)
       self.seed_progress(professional, clients[0])
@@ -323,7 +323,7 @@ class Command(BaseCommand):
     self.stdout.write(f'Featured client token: {client_token.key}')
     featured_entry_count = TrackingEntry.objects.filter(client=clients[0], template__in=templates).count()
     reminder_count = ClientReminder.objects.filter(professional=professional).count()
-    self.stdout.write(f'Created/updated: 1 professional, {len(groups)} groups, {len(clients)} clients, {len(references)} references, {len(templates)} templates, {reminder_count} reminders, {featured_entry_count} six-month tracking entries for {clients[0].first_name}.')
+    self.stdout.write(f'Created/updated: 1 professional, {len(groups)} groups, {len(clients)} clients, {len(resources)} resources, {len(templates)} templates, {reminder_count} reminders, {featured_entry_count} six-month tracking entries for {clients[0].first_name}.')
 
   def seed_professional(self):
     professional, _created = User.objects.get_or_create(
@@ -482,32 +482,32 @@ class Command(BaseCommand):
       'Watch right knee response on lunges and running. Strong compliance when meals are planned before work.'
     )
 
-  def seed_references(self, professional):
+  def seed_resources(self, professional):
     categories = {}
-    for name, description, subcategories in REFERENCE_CATEGORIES:
-      category, _created = ReferenceCategory.objects.update_or_create(
+    for name, description, subcategories in RESOURCE_CATEGORIES:
+      category, _created = ResourceCategory.objects.update_or_create(
         professional=professional,
         name=name,
         defaults={'description': description, 'subcategories': subcategories},
       )
       categories[name] = category
 
-    references = []
-    for category_name, subcategory, title, reference_type, description, link, tags in REFERENCES:
-      reference, _created = ProfessionalReference.objects.update_or_create(
+    resources = []
+    for category_name, subcategory, title, resource_type, description, link, tags in RESOURCES:
+      resource, _created = ProfessionalResource.objects.update_or_create(
         professional=professional,
         title=title,
         defaults={
           'category': categories[category_name],
           'subcategory': subcategory,
-          'reference_type': reference_type,
+          'resource_type': resource_type,
           'description': description,
           'link': link,
           'tags': tags,
         },
       )
-      references.append(reference)
-    return references
+      resources.append(resource)
+    return resources
 
   def seed_templates(self, professional):
     templates = []
@@ -527,11 +527,11 @@ class Command(BaseCommand):
       templates.append(template)
     return templates
 
-  def seed_assignments(self, clients, templates, references):
+  def seed_assignments(self, clients, templates, resources):
     for client in clients:
       for template in templates:
         assignment, _created = TemplateAssignment.objects.get_or_create(client=client, template=template)
-        assignment.references.set(references[:8] if template.name != 'Nutrition Reflection' else references[8:14])
+        assignment.resources.set(resources[:8] if template.name != 'Nutrition Reflection' else resources[8:14])
 
   def seed_featured_tracking(self, client, templates):
     end_date = date.today()

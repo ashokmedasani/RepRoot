@@ -17,6 +17,8 @@ from .models import (
   ClientRegistrationForm,
   ClientReminder,
   ProfessionalAvailabilityWindow,
+  ProfessionalDateOff,
+  ProfessionalWeekdayOff,
   ProfessionalSchedulingSettings,
   ScheduledMeeting,
   ScheduledMeetingGuest,
@@ -24,7 +26,7 @@ from .models import (
   LeadSubmission,
   LeadMeetingRequest,
   ProgressEntry,
-  ReferenceCategory,
+  ResourceCategory,
   SupportIncident,
   SupportIncidentMessage,
   TemplateAssignment,
@@ -38,7 +40,7 @@ from .models import (
   ProfessionalLeadForm,
   ProfessionalPaymentSettings,
   ProfessionalProfile,
-  ProfessionalReference,
+  ProfessionalResource,
   RecycleBinItem,
   UNIVERSAL_CORE_FIELDS,
 )
@@ -295,6 +297,31 @@ def validate_password_strength(password: str) -> None:
     raise serializers.ValidationError('Password must be at least 8 characters and include 1 special character.')
 
 
+def validate_strong_password(password: str) -> None:
+  """Stricter password policy for professional accounts.
+
+  Applied only on account creation, password reset, and voluntary password
+  change so existing password hashes are never invalidated retroactively.
+  """
+  errors = []
+
+  if len(password) < 8:
+    errors.append('at least 8 characters')
+  if not re.search(r'[A-Z]', password):
+    errors.append('one uppercase letter')
+  if not re.search(r'[a-z]', password):
+    errors.append('one lowercase letter')
+  if not re.search(r'[0-9]', password):
+    errors.append('one number')
+  if not re.search(r'[^A-Za-z0-9]', password):
+    errors.append('one special character')
+
+  if errors:
+    raise serializers.ValidationError(
+      'Password must contain ' + ', '.join(errors) + '.'
+    )
+
+
 USERNAME_ALLOWED_PATTERN = re.compile(r'^[A-Za-z0-9.\-]+$')
 USERNAME_CHARSET_MESSAGE = "Only letters, numbers, '.' and '-' are allowed."
 
@@ -376,7 +403,7 @@ class ProfessionalSignupSerializer(serializers.Serializer):
 
   def validate(self, attrs):
     try:
-      validate_password_strength(attrs['password'])
+      validate_strong_password(attrs['password'])
     except serializers.ValidationError as error:
       raise serializers.ValidationError({'password': error.detail[0]})
 
@@ -406,6 +433,27 @@ class ProfessionalSignupSerializer(serializers.Serializer):
     return user
 
 
+def _reject_login_if_locked(user):
+  """Block sign-in for a professional whose account is frozen/recycled.
+
+  Previously nothing checked this at login: freezing only deleted the auth
+  token and left `User.is_active` untouched, so a frozen professional could
+  simply log back in and get a brand-new token, fully bypassing the freeze.
+  This is the fix -- login now genuinely enforces the lock, matching what a
+  "frozen account" is supposed to mean. There is deliberately no self-service
+  way back in from here: restoring access for a genuinely frozen professional
+  (e.g. so they can reach billing to upgrade) is an admin-side action, tracked
+  separately in ADMIN_CONTROLS_NEEDED.md, not built as part of this change.
+  """
+  profile = getattr(user, 'professional_profile', None)
+  if profile is None:
+    return
+  if profile.is_locked or profile.lifecycle_status == profile.LIFECYCLE_RECYCLED:
+    raise serializers.ValidationError(
+      'This account is frozen due to a billing overage. Contact support to restore access.'
+    )
+
+
 class ProfessionalLoginSerializer(serializers.Serializer):
   identifier = serializers.CharField()
   password = serializers.CharField(write_only=True)
@@ -427,7 +475,36 @@ class ProfessionalLoginSerializer(serializers.Serializer):
     if not hasattr(user, 'professional_profile'):
       raise serializers.ValidationError('This account is not a professional account.')
 
+    _reject_login_if_locked(user)
+
     attrs['user'] = user
+    return attrs
+
+
+class ProfessionalGoogleAuthSerializer(serializers.Serializer):
+  """Verifies a Google Identity Services credential and resolves it to a user.
+
+  Used for both "Continue with Google" signup and "Log in with Google" -- the
+  frontend uses the same button/callback for both, matching Google's own
+  recommended flow, and the backend decides create-vs-link-vs-login.
+  """
+
+  credential = serializers.CharField(write_only=True)
+
+  def validate(self, attrs):
+    from . import google_oauth
+
+    try:
+      claims = google_oauth.verify_google_id_token(attrs['credential'])
+      user, created = google_oauth.get_or_create_professional_for_google(claims)
+    except google_oauth.GoogleAuthError as error:
+      raise serializers.ValidationError({'credential': str(error)})
+
+    if not created:
+      _reject_login_if_locked(user)
+
+    attrs['user'] = user
+    attrs['created'] = created
     return attrs
 
 
@@ -457,7 +534,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
   def validate(self, attrs):
     try:
-      validate_password_strength(attrs['password'])
+      validate_strong_password(attrs['password'])
     except serializers.ValidationError as error:
       raise serializers.ValidationError({'password': error.detail[0]})
 
@@ -477,18 +554,16 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 class ProfessionalPasswordChangeSerializer(serializers.Serializer):
-  current_password = serializers.CharField(write_only=True)
+  # Deliberately no current_password field: the request is already
+  # authenticated (ProfessionalAccessPermission requires a valid token), so
+  # re-confirming the current password here was judged unnecessary friction
+  # for this flow.
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
 
   def validate(self, attrs):
-    user = self.context['user']
-
-    if not user.check_password(attrs['current_password']):
-      raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
-
     try:
-      validate_password_strength(attrs['password'])
+      validate_strong_password(attrs['password'])
     except serializers.ValidationError as error:
       raise serializers.ValidationError({'password': error.detail[0]})
 
@@ -1211,16 +1286,16 @@ def normalize_template_fields(fields):
   return normalized_fields
 
 
-class ReferenceCategorySerializer(serializers.ModelSerializer):
-  reference_count = serializers.SerializerMethodField()
+class ResourceCategorySerializer(serializers.ModelSerializer):
+  resource_count = serializers.SerializerMethodField()
 
   class Meta:
-    model = ReferenceCategory
-    fields = ['id', 'name', 'description', 'subcategories', 'reference_count', 'created_at', 'updated_at']
-    read_only_fields = ['id', 'reference_count', 'created_at', 'updated_at']
+    model = ResourceCategory
+    fields = ['id', 'name', 'description', 'subcategories', 'resource_count', 'created_at', 'updated_at']
+    read_only_fields = ['id', 'resource_count', 'created_at', 'updated_at']
 
-  def get_reference_count(self, obj):
-    return obj.references.count()
+  def get_resource_count(self, obj):
+    return obj.resources.count()
 
   def validate_name(self, value):
     name = value.strip()
@@ -1237,20 +1312,20 @@ class ReferenceCategorySerializer(serializers.ModelSerializer):
     return [str(subcategory).strip() for subcategory in value if str(subcategory).strip()]
 
 
-class ProfessionalReferenceSerializer(serializers.ModelSerializer):
+class ProfessionalResourceSerializer(serializers.ModelSerializer):
   category_name = serializers.CharField(source='category.name', read_only=True)
   file_url = serializers.SerializerMethodField()
   file_name = serializers.SerializerMethodField()
 
   class Meta:
-    model = ProfessionalReference
+    model = ProfessionalResource
     fields = [
       'id',
       'category',
       'category_name',
       'subcategory',
       'title',
-      'reference_type',
+      'resource_type',
       'description',
       'link',
       'file',
@@ -1297,11 +1372,11 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
     return super().to_internal_value(data)
 
   def validate(self, attrs):
-    reference_type = attrs.get('reference_type') or (self.instance.reference_type if self.instance else '')
+    resource_type = attrs.get('resource_type') or (self.instance.resource_type if self.instance else '')
     link = (attrs.get('link') if 'link' in attrs else (self.instance.link if self.instance else '')) or ''
     file = attrs.get('file') if 'file' in attrs else (self.instance.file if self.instance else None)
 
-    if reference_type == ProfessionalReference.TYPE_VIDEO_LINK:
+    if resource_type == ProfessionalResource.TYPE_VIDEO_LINK:
       if not link:
         raise serializers.ValidationError({'link': 'Video URL is required.'})
 
@@ -1312,7 +1387,7 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
 
     upload = attrs.get('file')
 
-    if reference_type == ProfessionalReference.TYPE_PDF:
+    if resource_type == ProfessionalResource.TYPE_PDF:
       if not link and not file:
         raise serializers.ValidationError({'file': 'Upload a PDF or paste a PDF URL.'})
 
@@ -1322,14 +1397,14 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
       if upload and detect_upload_content_type(upload) != 'application/pdf':
         raise serializers.ValidationError({'file': 'The file content does not match a valid PDF.'})
 
-    if reference_type == ProfessionalReference.TYPE_TEXT_NOTE:
+    if resource_type == ProfessionalResource.TYPE_TEXT_NOTE:
       if not attrs.get('description', '').strip():
         raise serializers.ValidationError({'description': 'Text is required.'})
 
       attrs['link'] = ''
       attrs['file'] = None
 
-    if reference_type == ProfessionalReference.TYPE_IMAGE:
+    if resource_type == ProfessionalResource.TYPE_IMAGE:
       if not file:
         raise serializers.ValidationError({'file': 'Image upload is required.'})
 
@@ -1345,15 +1420,15 @@ class ProfessionalReferenceSerializer(serializers.ModelSerializer):
     return attrs
 
 
-class TrackingTemplateReferenceSerializer(serializers.ModelSerializer):
-  """Read-only, compact reference representation shared with a client via an assignment."""
+class TrackingTemplateResourceSerializer(serializers.ModelSerializer):
+  """Read-only, compact resource representation shared with a client via an assignment."""
 
   category_name = serializers.CharField(source='category.name', read_only=True)
   file_url = serializers.SerializerMethodField()
 
   class Meta:
-    model = ProfessionalReference
-    fields = ['id', 'title', 'reference_type', 'category_name', 'subcategory', 'description', 'link', 'file_url', 'tags']
+    model = ProfessionalResource
+    fields = ['id', 'title', 'resource_type', 'category_name', 'subcategory', 'description', 'link', 'file_url', 'tags']
     read_only_fields = fields
 
   def get_file_url(self, obj):
@@ -1417,7 +1492,7 @@ class TemplateAssignmentSerializer(serializers.ModelSerializer):
   template_name = serializers.CharField(source='template.name', read_only=True)
   template_cadence = serializers.CharField(source='template.cadence', read_only=True)
   template_accent = serializers.CharField(source='template.accent', read_only=True)
-  references = TrackingTemplateReferenceSerializer(many=True, read_only=True)
+  resources = TrackingTemplateResourceSerializer(many=True, read_only=True)
 
   class Meta:
     model = TemplateAssignment
@@ -1427,7 +1502,7 @@ class TemplateAssignmentSerializer(serializers.ModelSerializer):
       'template_name',
       'template_cadence',
       'template_accent',
-      'references',
+      'resources',
       'client_access_level',
       'assigned_at',
     ]
@@ -1779,9 +1854,67 @@ class ProfessionalAvailabilityWindowSerializer(serializers.ModelSerializer):
   def validate(self, attrs):
     start_time = attrs.get('start_time', getattr(self.instance, 'start_time', None))
     end_time = attrs.get('end_time', getattr(self.instance, 'end_time', None))
+    weekday = attrs.get('weekday', getattr(self.instance, 'weekday', None))
+
     if start_time and end_time and start_time >= end_time:
       raise serializers.ValidationError({'end_time': 'End time must be after start time.'})
+
+    professional = self.context.get('professional')
+    if professional and start_time and end_time and weekday is not None:
+      overlapping = ProfessionalAvailabilityWindow.objects.filter(
+        professional=professional,
+        weekday=weekday,
+        start_time__lt=end_time,
+        end_time__gt=start_time,
+      )
+      if self.instance is not None:
+        overlapping = overlapping.exclude(id=self.instance.id)
+      if overlapping.exists():
+        raise serializers.ValidationError(
+          {'start_time': 'This overlaps with an existing availability block on this day.'}
+        )
+
     return attrs
+
+
+class ProfessionalDateOffSerializer(serializers.ModelSerializer):
+  """A single blocked-off calendar date -- see ProfessionalDateOff for why
+  this is separate from the recurring weekly ProfessionalAvailabilityWindow
+  rows."""
+
+  class Meta:
+    model = ProfessionalDateOff
+    fields = ['id', 'date', 'created_at']
+    read_only_fields = ['id', 'created_at']
+
+  def validate_date(self, value):
+    from django.utils import timezone as dj_timezone
+
+    if value < dj_timezone.now().date():
+      raise serializers.ValidationError('Cannot mark a date in the past as a day off.')
+    professional = self.context.get('professional')
+    if professional and ProfessionalDateOff.objects.filter(professional=professional, date=value).exists():
+      raise serializers.ValidationError('This date is already marked as a day off.')
+    return value
+
+
+class ProfessionalWeekdayOffSerializer(serializers.ModelSerializer):
+  """A recurring weekly day off (e.g. every Monday) -- see
+  ProfessionalWeekdayOff for how this differs from the one-off
+  ProfessionalDateOff rows above."""
+
+  class Meta:
+    model = ProfessionalWeekdayOff
+    fields = ['id', 'weekday', 'created_at']
+    read_only_fields = ['id', 'created_at']
+
+  def validate_weekday(self, value):
+    if value < 0 or value > 6:
+      raise serializers.ValidationError('Weekday must be between 0 (Monday) and 6 (Sunday).')
+    professional = self.context.get('professional')
+    if professional and ProfessionalWeekdayOff.objects.filter(professional=professional, weekday=value).exists():
+      raise serializers.ValidationError('This weekday is already marked as a recurring day off.')
+    return value
 
 
 class ScheduledMeetingGuestSerializer(serializers.ModelSerializer):

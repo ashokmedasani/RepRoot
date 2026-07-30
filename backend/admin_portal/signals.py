@@ -3,7 +3,7 @@ from django.dispatch import receiver
 
 from accounts.models import (
   ActivityNotification, ChatMessage, ClientAccess, ClientReminder, LeadSubmission,
-  ProfessionalGroup, ProfessionalLeadForm, ProfessionalReference, ScheduledMeeting,
+  ProfessionalGroup, ProfessionalLeadForm, ProfessionalResource, ScheduledMeeting,
   SupportIncident, TemplateAssignment, TrackingEntry, TrackingTemplate,
 )
 
@@ -14,7 +14,7 @@ MODEL_EVENTS = {
   ProfessionalLeadForm: ('forms', 'lead_form_created'), LeadSubmission: ('submissions', 'lead_form_submitted'),
   ProfessionalGroup: ('groups', 'group_created'), ClientAccess: ('clients', 'client_added'),
   TrackingTemplate: ('templates', 'template_created'), TemplateAssignment: ('assignments', 'template_assigned'),
-  TrackingEntry: ('entries', 'template_entry_submitted'), ProfessionalReference: ('references', 'reference_shared'),
+  TrackingEntry: ('entries', 'template_entry_submitted'), ProfessionalResource: ('resources', 'resource_shared'),
   ScheduledMeeting: ('schedules', 'schedule_created'), ClientReminder: ('reminders', 'reminder_created'),
   ChatMessage: ('chat', 'chat_message_sent'), SupportIncident: ('support', 'support_ticket_created'),
   ActivityNotification: ('notifications', 'notification_created'), ErrorLog: ('errors', 'error_recorded'),

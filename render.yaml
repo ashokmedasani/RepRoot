@@ -11,6 +11,8 @@ services:
         value: https://api.rep-root.com
       - key: SUPPORT_EMAIL
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
     routes:
       - type: rewrite
         source: /*

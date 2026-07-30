@@ -22,6 +22,10 @@
       locked, only support can make a correction and that change must be audited.
     </p>
 
+    @if (!settings && !loadError) {
+      <p class="state-note">Loading payment settings...</p>
+    }
+
     @if (settings) {
       <div class="dashboard-lock-row">
         <span class="lock-status" [class.unlocked]="!settings.reporting_currency_locked">
@@ -88,28 +92,34 @@
           private until you share them with a specific client. {{ activeMethodCount }}/{{ maxActiveMethods }} active.
         </p>
       </div>
-      <button
-        type="button"
-        class="primary-action"
-        [disabled]="activeMethodCount >= maxActiveMethods"
-        [title]="activeMethodCount >= maxActiveMethods ? 'Deactivate a method to add another' : ''"
-        (click)="openCreateMethod()">
-        Add Payment Method
-      </button>
+      @if (!isLoadingMethods && methods.length > 0) {
+        <button
+          type="button"
+          class="primary-action"
+          [disabled]="activeMethodCount >= maxActiveMethods"
+          [title]="activeMethodCount >= maxActiveMethods ? 'Deactivate a method to add another' : ''"
+          (click)="openCreateMethod()">
+          Add Payment Method
+        </button>
+      }
     </div>
 
     @if (methodsError) {
       <p class="message error-message">{{ methodsError }}</p>
     }
 
-    @if (!methods.length && !showMethodForm) {
+    @if (isLoadingMethods) {
+      <p class="state-note">Loading payment methods...</p>
+    }
+
+    @if (!isLoadingMethods && !methods.length && !showMethodForm) {
       <div class="placeholder-card">
-        <p>You haven't added a payment method yet. Clients can't see payment options until you add one.</p>
+        <p>No payment methods added yet.</p>
         <button type="button" class="primary-action" (click)="openCreateMethod()">Add Payment Method</button>
       </div>
     }
 
-    @if (methods.length) {
+    @if (!isLoadingMethods && methods.length) {
       <div class="method-list">
         @for (method of methods; track method.id) {
           <article class="method-row" [class.inactive]="method.status === 'inactive'">
@@ -269,18 +279,8 @@
 @if (activeSection === 'integrated') {
   <section class="payment-section" aria-labelledby="integrated-title">
     <h3 id="integrated-title">Integrated Payments</h3>
-    <p class="section-note">
-      Connect a payment provider to let clients pay you online directly. Connections use each
-      provider's own secure onboarding — RepRoot never asks for API keys or account passwords.
-    </p>
-    <div class="provider-grid">
-      @for (provider of ['India Domestic Provider', 'International-to-India Provider']; track provider) {
-        <article class="provider-card">
-          <strong>{{ provider }}</strong>
-          <span class="status-pill" data-status="not_connected">Not Connected</span>
-          <button type="button" class="ghost-action" disabled>Select provider <small>(coming soon)</small></button>
-        </article>
-      }
+    <div class="placeholder-card">
+      <p>Coming soon.</p>
     </div>
   </section>
 }

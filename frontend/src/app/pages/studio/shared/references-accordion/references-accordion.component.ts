@@ -1,7 +1,7 @@
 import { Component, Input, inject } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
-import { TemplateReference } from '@core/api/templates-api.service';
+import { TemplateResource } from '@core/api/templates-api.service';
 
 /**
  * Compact accordion for a template's assigned references. Reused on the professional
@@ -20,12 +20,12 @@ import { TemplateReference } from '@core/api/templates-api.service';
             <button type="button" class="ref-head" (click)="toggle(reference.id)">
               <span class="ref-caret" [class.open]="expandedId === reference.id">&rsaquo;</span>
               <span class="ref-title">{{ reference.title }}</span>
-              <span class="ref-type">{{ typeLabel(reference.reference_type) }}</span>
+              <span class="ref-type">{{ typeLabel(reference.resource_type) }}</span>
             </button>
 
             @if (expandedId === reference.id) {
               <div class="ref-body">
-                @if (reference.reference_type === 'video_link' && embedUrl(reference.link); as safeUrl) {
+                @if (reference.resource_type === 'video_link' && embedUrl(reference.link); as safeUrl) {
                   <div class="ref-video">
                     <iframe
                       [src]="safeUrl"
@@ -34,17 +34,17 @@ import { TemplateReference } from '@core/api/templates-api.service';
                       allowfullscreen
                     ></iframe>
                   </div>
-                } @else if (reference.reference_type === 'image' && reference.file_url) {
+                } @else if (reference.resource_type === 'image' && reference.file_url) {
                   <img class="ref-image" [src]="reference.file_url" [alt]="reference.title">
-                } @else if (reference.reference_type === 'text_note') {
+                } @else if (reference.resource_type === 'text_note') {
                   <p class="ref-text">{{ reference.description || 'No text added.' }}</p>
                 } @else {
                   <button type="button" class="ref-open" (click)="open(reference)">
-                    Open {{ reference.reference_type === 'pdf' ? 'PDF' : 'resource' }}
+                    Open {{ reference.resource_type === 'pdf' ? 'PDF' : 'resource' }}
                   </button>
                 }
 
-                @if (reference.description && reference.reference_type !== 'text_note') {
+                @if (reference.description && reference.resource_type !== 'text_note') {
                   <p class="ref-desc">{{ reference.description }}</p>
                 }
               </div>
@@ -53,7 +53,7 @@ import { TemplateReference } from '@core/api/templates-api.service';
         }
       </div>
     } @else {
-      <p class="ref-empty">No references assigned to this template.</p>
+      <p class="ref-empty">No resources assigned to this template.</p>
     }
   `,
   styles: [
@@ -162,14 +162,14 @@ import { TemplateReference } from '@core/api/templates-api.service';
 export class ReferencesAccordionComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
-  @Input() references: TemplateReference[] = [];
+  @Input() references: TemplateResource[] = [];
   expandedId = 0;
 
   toggle(id: number): void {
     this.expandedId = this.expandedId === id ? 0 : id;
   }
 
-  open(reference: TemplateReference): void {
+  open(reference: TemplateResource): void {
     const url = reference.file_url || reference.link;
 
     if (url) {

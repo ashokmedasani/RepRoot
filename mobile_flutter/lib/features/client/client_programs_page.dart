@@ -11,10 +11,10 @@ import '../../shared/widgets/app_widgets.dart';
 import '../professional/professional_format.dart';
 import 'client_progress_section.dart';
 
-enum ProgramsTab { progress, program, log, references }
+enum ProgramsTab { progress, program, log, resources }
 
 /// Client programs — Progress opens first (the charts are the attractive
-/// part), then pick a template to log an entry or see history. References
+/// part), then pick a template to log an entry or see history. Resources
 /// live one level down per template (see ClientTemplateResourcesPage).
 /// Replica of mobile/src/app/pages/client/programs/client-programs.page.ts.
 class ClientProgramsPage extends ConsumerStatefulWidget {
@@ -198,7 +198,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
                 ButtonSegment(value: ProgramsTab.program, label: Text('Program')),
                 ButtonSegment(value: ProgramsTab.log, label: Text('Log')),
                 ButtonSegment(
-                    value: ProgramsTab.references, label: Text('References')),
+                    value: ProgramsTab.resources, label: Text('Resources')),
               ],
               selected: {_tab},
               showSelectedIcon: false,
@@ -214,7 +214,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               ProgramsTab.progress => const ClientProgressSection(),
               ProgramsTab.program => _programTab(),
               ProgramsTab.log => _logTab(),
-              ProgramsTab.references => _referencesTab(),
+              ProgramsTab.resources => _resourcesTab(),
             },
           ),
         ],
@@ -455,7 +455,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
   /// Every assigned program, each linking to its own resources page —
   /// resources are a top-level section reached through Templates, not part
   /// of the Program/Log entry-logging flow.
-  Widget _referencesTab() {
+  Widget _resourcesTab() {
     return PagePad(
       onRefresh: _load,
       children: [
@@ -470,7 +470,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
             RowItem(
               title: template.name,
               subtitle:
-                  '${TemplateCadence.label(template.cadence)} · ${template.references.length} reference${template.references.length == 1 ? '' : 's'}',
+                  '${TemplateCadence.label(template.cadence)} · ${template.resources.length} resource${template.resources.length == 1 ? '' : 's'}',
               leading: Icon(Icons.folder_open_outlined,
                   size: 22, color: parseAccentColor(template.accent)),
               trailing: const Icon(Icons.chevron_right, size: AppSize.iconRow),

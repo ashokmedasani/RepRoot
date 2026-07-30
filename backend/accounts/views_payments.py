@@ -22,6 +22,7 @@ from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
 from .access_permissions import ProfessionalAccessPermission
 from .data_retention import visible_client_data_cutoff
 from .models import (
+  ActivityNotification,
   ClientAccess,
   ClientPaymentMethodAccess,
   ManualPaymentProfile,
@@ -34,6 +35,7 @@ from .models import (
 )
 from .payment_audit import record_payment_action
 from . import payment_notifications
+from . import web_routes
 from .payment_constants import FEATURED_CURRENCIES, ISO_4217_CODES
 from .serializers import (
   PaymentConfirmationSerializer,
@@ -54,6 +56,35 @@ def _currency_options():
   featured = list(FEATURED_CURRENCIES)
   rest = sorted(ISO_4217_CODES - set(featured))
   return featured + rest
+
+
+def _serialize_payment_notification(row):
+  return {
+    'id': row.id, 'notif_type': row.notif_type, 'title': row.title,
+    'body': row.body, 'payload': row.payload, 'is_read': row.is_read,
+    'created_at': row.created_at,
+  }
+
+
+def _mark_payment_notifications_read(recipient_filter, *, request_id=None):
+  """Marks PaymentNotification rows read for one recipient. Scoping to a single
+  request_id lets a "view this request" action clear just that item's unread
+  state, instead of the previous all-or-nothing mark-all behavior.
+
+  Also mirrors the same mark-read onto ActivityNotification (category=
+  'payments') for the same recipient/request, since payment_notifications.py
+  dual-writes every payment event into both tables. Without this, the
+  general notification bell and the payments-specific unread count could
+  disagree about the same event - exactly the "separate conflicting
+  counters" the client reported."""
+  qs = PaymentNotification.objects.filter(is_read=False, **recipient_filter)
+  activity_filter = {key: value for key, value in recipient_filter.items() if key != 'created_at__gte'}
+  activity_qs = ActivityNotification.objects.filter(is_read=False, category='payments', **activity_filter)
+  if request_id:
+    qs = qs.filter(payload__request_id=request_id)
+    activity_qs = activity_qs.filter(payload__request_id=request_id)
+  qs.update(is_read=True)
+  activity_qs.update(is_read=True, read_at=timezone.now())
 
 
 class ProfessionalPaymentSettingsView(APIView):
@@ -385,7 +416,7 @@ class PaymentRequestListView(APIView):
           f'"{payment_request.title}" - {payment_request.requested_amount} {payment_request.requested_currency}{due_text}. '
           f'View details: {payment_notifications.request_link_for_client(payment_request.request_id)}'
         ),
-        payload={'request_id': payment_request.request_id},
+        payload={'request_id': payment_request.request_id, 'action_url': web_routes.client_payment_request(payment_request.request_id)},
       )
 
     return Response(
@@ -404,6 +435,10 @@ class PaymentRequestDetailView(APIView):
     payment_request = PaymentRequest.objects.filter(request_id=request_id, professional=request.user).first()
     if payment_request is None:
       return Response({'message': 'Payment request not found.'}, status=status.HTTP_404_NOT_FOUND)
+    # Viewing a request's detail is the moment the professional has actually
+    # reviewed it, so this is where its unread payment notifications clear -
+    # not an implicit "mark everything read" the instant the tab opens.
+    _mark_payment_notifications_read({'recipient_professional': request.user}, request_id=request_id)
     return Response(
       {
         'request': PaymentRequestSerializer(payment_request).data,
@@ -486,9 +521,16 @@ class ClientPaymentRequestDetailView(APIView):
           f'{client.first_name or client.username} opened the payment request "{payment_request.title}". '
           f'Track it here: {payment_notifications.request_link_for_professional(payment_request.request_id)}'
         ),
-        payload={'request_id': payment_request.request_id},
+        payload={
+          'request_id': payment_request.request_id,
+          'action_url': f'{web_routes.professional_client(payment_request.client_id)}?tab=payments',
+        },
         email=False,
       )
+
+    # Same rule as the professional side: opening this specific request's
+    # detail page is what clears its unread notifications for this client.
+    _mark_payment_notifications_read({'recipient_client': request.auth}, request_id=request_id)
 
     return Response({'request': ClientPaymentRequestSerializer(payment_request).data})
 
@@ -498,16 +540,21 @@ class ProfessionalPaymentNotificationsView(APIView):
 
   def get(self, request):
     cutoff = visible_client_data_cutoff(request.user)
-    unread = PaymentNotification.objects.filter(
-      recipient_professional=request.user, is_read=False, created_at__gte=cutoff
-    ).count()
-    return Response({'unread_count': unread})
+    qs = PaymentNotification.objects.filter(recipient_professional=request.user, created_at__gte=cutoff)
+    unread_qs = qs.filter(is_read=False)
+    return Response({
+      'unread_count': unread_qs.count(),
+      'items': [_serialize_payment_notification(row) for row in unread_qs[:20]],
+    })
 
   def post(self, request):
-    PaymentNotification.objects.filter(
-      recipient_professional=request.user, is_read=False, created_at__gte=visible_client_data_cutoff(request.user)
-    ).update(is_read=True)
-    return Response({'unread_count': 0})
+    recipient_filter = {'recipient_professional': request.user, 'created_at__gte': visible_client_data_cutoff(request.user)}
+    request_id = request.data.get('request_id')
+    if not request_id and not request.data.get('mark_all'):
+      return Response({'message': 'Provide request_id or mark_all.'}, status=status.HTTP_400_BAD_REQUEST)
+    _mark_payment_notifications_read(recipient_filter, request_id=request_id)
+    unread = PaymentNotification.objects.filter(is_read=False, **recipient_filter).count()
+    return Response({'unread_count': unread})
 
 
 class ClientPaymentNotificationsView(APIView):
@@ -516,15 +563,21 @@ class ClientPaymentNotificationsView(APIView):
 
   def get(self, request):
     cutoff = visible_client_data_cutoff(request.auth.professional)
-    unread = PaymentNotification.objects.filter(recipient_client=request.auth, is_read=False, created_at__gte=cutoff).count()
-    return Response({'unread_count': unread})
+    qs = PaymentNotification.objects.filter(recipient_client=request.auth, created_at__gte=cutoff)
+    unread_qs = qs.filter(is_read=False)
+    return Response({
+      'unread_count': unread_qs.count(),
+      'items': [_serialize_payment_notification(row) for row in unread_qs[:20]],
+    })
 
   def post(self, request):
-    PaymentNotification.objects.filter(
-      recipient_client=request.auth, is_read=False,
-      created_at__gte=visible_client_data_cutoff(request.auth.professional),
-    ).update(is_read=True)
-    return Response({'unread_count': 0})
+    recipient_filter = {'recipient_client': request.auth, 'created_at__gte': visible_client_data_cutoff(request.auth.professional)}
+    request_id = request.data.get('request_id')
+    if not request_id and not request.data.get('mark_all'):
+      return Response({'message': 'Provide request_id or mark_all.'}, status=status.HTTP_400_BAD_REQUEST)
+    _mark_payment_notifications_read(recipient_filter, request_id=request_id)
+    unread = PaymentNotification.objects.filter(is_read=False, **recipient_filter).count()
+    return Response({'unread_count': unread})
 
 
 def _sync_request_status_from_records(payment_request):
@@ -648,7 +701,11 @@ class PaymentProofSubmitView(APIView):
         f'({proof.reported_amount} {proof.reported_currency}). Review it here: '
         f'{payment_notifications.request_link_for_professional(payment_request.request_id)}'
       ),
-      payload={'request_id': payment_request.request_id, 'proof_id': proof.id},
+      payload={
+        'request_id': payment_request.request_id,
+        'proof_id': proof.id,
+        'action_url': f'{web_routes.professional_client(payment_request.client_id)}?tab=payments',
+      },
     )
 
     return Response(
@@ -715,7 +772,7 @@ class PaymentProofAcknowledgeView(APIView):
         f'{request.user.first_name or request.user.username}. View details: '
         f'{payment_notifications.request_link_for_client(payment_request.request_id)}'
       ),
-      payload={'request_id': payment_request.request_id},
+      payload={'request_id': payment_request.request_id, 'action_url': web_routes.client_payment_request(payment_request.request_id)},
     )
 
     return Response(
@@ -816,7 +873,7 @@ class PaymentProofRejectView(APIView):
         f'"{payment_request.title}". Reason: {reason}. Please resubmit: '
         f'{payment_notifications.request_link_for_client(payment_request.request_id)}'
       ),
-      payload={'request_id': payment_request.request_id},
+      payload={'request_id': payment_request.request_id, 'action_url': web_routes.client_payment_request(payment_request.request_id)},
     )
 
     return Response(
@@ -870,7 +927,7 @@ class PaymentProofRequestInfoView(APIView):
         f'"{payment_request.title}": "{note}". Respond here: '
         f'{payment_notifications.request_link_for_client(payment_request.request_id)}'
       ),
-      payload={'request_id': payment_request.request_id},
+      payload={'request_id': payment_request.request_id, 'action_url': web_routes.client_payment_request(payment_request.request_id)},
     )
 
     return Response(

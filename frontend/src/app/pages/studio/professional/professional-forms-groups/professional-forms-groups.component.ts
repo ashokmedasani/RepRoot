@@ -2,14 +2,18 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import {
   FormsGroupsApiService,
   FormsGroupsOverview,
+  LeadForm,
   LeadMeetingRequest,
-  LeadSubmission
+  LeadSubmission,
+  ProfessionalGroup
 } from '@core/api/forms-groups-api.service';
+import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
@@ -20,13 +24,66 @@ type WorkspaceTab = 'forms' | 'groups';
 @Component({
   selector: 'app-professional-forms-groups',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent],
+  imports: [DatePipe, FormsModule, RouterLink, DragDropModule, ProfessionalPageShellComponent, FixedHeightListComponent],
   templateUrl: './professional-forms-groups.component.html',
   styleUrl: './professional-forms-groups.component.scss'
 })
 export class ProfessionalFormsGroupsComponent implements OnInit {
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
+  private readonly planLockApi = inject(PlanLockApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  // Plan-limit lock system: a group beyond the current plan's count limit
+  // locks -- every client inside it loses portal access (data untouched)
+  // until it unlocks. Only currently-active groups can be reordered.
+  lockStatus: PlanLockStatus | null = null;
+
+  isGroupLocked(groupId: number): boolean {
+    return this.lockStatus?.groups.locked_ids.includes(groupId) ?? false;
+  }
+
+  // Display order is always derived from lockStatus.groups.active_ids --
+  // never a separately-tracked local array -- so dragging can never drift
+  // out of sync with what the backend thinks the order is.
+  orderedActiveGroups(): ProfessionalGroup[] {
+    const activeIds = this.lockStatus?.groups.active_ids ?? [];
+    const byId = new Map((this.overview?.groups ?? []).map((group) => [group.id, group]));
+    return activeIds.map((id) => byId.get(id)).filter((group): group is ProfessionalGroup => !!group);
+  }
+
+  lockedGroupsList(): ProfessionalGroup[] {
+    const lockedIds = new Set(this.lockStatus?.groups.locked_ids ?? []);
+    return (this.overview?.groups ?? []).filter((group) => lockedIds.has(group.id));
+  }
+
+  dropGroup(event: CdkDragDrop<ProfessionalGroup[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const reordered = this.orderedActiveGroups();
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    const orderedIds = reordered.map((group) => group.id);
+
+    if (this.lockStatus) {
+      this.lockStatus = { ...this.lockStatus, groups: { ...this.lockStatus.groups, active_ids: orderedIds } };
+    }
+
+    this.planLockApi.reorder('groups', orderedIds).subscribe({
+      next: (response) => (this.lockStatus = response.lock_status),
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = this.formatApiError(error, 'Could not reorder groups.');
+        this.loadLockStatus();
+      }
+    });
+  }
+
+  private loadLockStatus(): void {
+    this.planLockApi.getLockStatus().subscribe({
+      next: (response) => (this.lockStatus = response.lock_status)
+    });
+  }
 
   overview: FormsGroupsOverview | null = null;
   meetingRequests: LeadMeetingRequest[] = [];
@@ -40,9 +97,35 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
   monthFilter = '';
   readonly monthOptions = this.createLastSixMonthOptions();
 
+  /** Which lead form the detail panel below shows. With one form this is
+   * always that form (unchanged single-form layout); with 2+ forms the
+   * dropdown drives this, and it's mirrored into the `form` query param
+   * so a refresh keeps showing the same form's own state. */
+  selectedLeadFormId: number | null = null;
+
+  get selectedLeadForm(): LeadForm | null {
+    if (!this.overview) {
+      return null;
+    }
+    return this.overview.lead_forms.find((form) => form.id === this.selectedLeadFormId) || this.overview.lead_form;
+  }
+
   ngOnInit(): void {
+    const formIdParam = Number(this.route.snapshot.queryParamMap.get('form'));
+    this.selectedLeadFormId = Number.isFinite(formIdParam) && formIdParam > 0 ? formIdParam : null;
     this.loadOverview();
     this.loadMeetingRequests();
+    this.loadLockStatus();
+  }
+
+  selectLeadForm(formId: number): void {
+    this.selectedLeadFormId = formId;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { form: formId },
+      queryParamsHandling: 'merge',
+      replaceUrl: true
+    });
   }
 
   loadMeetingRequests(): void {
@@ -140,6 +223,10 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
       next: (overview) => {
         this.overview = overview;
         this.isLoading = false;
+        const stillExists = overview.lead_forms.some((form) => form.id === this.selectedLeadFormId);
+        if (!stillExists) {
+          this.selectedLeadFormId = overview.lead_form?.id ?? null;
+        }
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -157,30 +244,41 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
     this.activeWorkspaceTab = tab;
   }
 
+  /** Writes an updated LeadForm back into overview.lead_forms (and lead_form,
+   * if it happens to be the same form) so every reference to that form's
+   * state — the dropdown label, the detail panel, a future re-selection —
+   * stays consistent with what the backend just confirmed. */
+  private applyLeadFormUpdate(updated: LeadForm): void {
+    if (!this.overview) {
+      return;
+    }
+    this.overview.lead_forms = this.overview.lead_forms.map((form) => (form.id === updated.id ? updated : form));
+    if (this.overview.lead_form?.id === updated.id) {
+      this.overview.lead_form = updated;
+    }
+  }
+
   toggleLeadFormActive(event: Event): void {
-    if (!this.overview?.lead_form) {
+    const target = this.selectedLeadForm;
+    if (!target) {
       return;
     }
 
     const input = event.target as HTMLInputElement;
     const isActive = input.checked;
-    const previous = this.overview.lead_form.is_active;
-    this.overview.lead_form.is_active = isActive;
+    const previous = target.is_active;
+    this.applyLeadFormUpdate({ ...target, is_active: isActive });
     this.isSaving = true;
 
-    this.formsGroupsApi.updateLeadFormStatus(isActive).subscribe({
+    this.formsGroupsApi.updateLeadFormStatus(isActive, target.id).subscribe({
       next: (response) => {
-        if (this.overview) {
-          this.overview.lead_form = response.lead_form;
-        }
+        this.applyLeadFormUpdate(response.lead_form);
         this.messageType = 'success';
         this.message = response.message;
         this.isSaving = false;
       },
       error: (error: unknown) => {
-        if (this.overview?.lead_form) {
-          this.overview.lead_form.is_active = previous;
-        }
+        this.applyLeadFormUpdate({ ...target, is_active: previous });
         this.messageType = 'error';
         this.message = this.formatApiError(error, 'Lead form status could not be updated.');
         this.isSaving = false;
@@ -189,30 +287,27 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
   }
 
   toggleIntroMeetingEnabled(event: Event): void {
-    if (!this.overview?.lead_form) {
+    const target = this.selectedLeadForm;
+    if (!target) {
       return;
     }
 
     const input = event.target as HTMLInputElement;
     const isEnabled = input.checked;
-    const previous = this.overview.lead_form.introductory_meeting_enabled;
-    this.overview.lead_form.introductory_meeting_enabled = isEnabled;
+    const previous = target.introductory_meeting_enabled;
+    this.applyLeadFormUpdate({ ...target, introductory_meeting_enabled: isEnabled });
     this.isSaving = true;
 
-    this.formsGroupsApi.saveLeadMeetingSettings({ introductory_meeting_enabled: isEnabled }).subscribe({
+    this.formsGroupsApi.saveLeadMeetingSettings({ introductory_meeting_enabled: isEnabled, form_id: target.id }).subscribe({
       next: (response) => {
-        if (this.overview) {
-          this.overview.lead_form = response.lead_form;
-        }
+        this.applyLeadFormUpdate(response.lead_form);
         this.messageType = 'success';
         this.message = response.message;
         this.isSaving = false;
         this.loadMeetingRequests();
       },
       error: (error: unknown) => {
-        if (this.overview?.lead_form) {
-          this.overview.lead_form.introductory_meeting_enabled = previous;
-        }
+        this.applyLeadFormUpdate({ ...target, introductory_meeting_enabled: previous });
         this.messageType = 'error';
         this.message = this.formatApiError(error, 'Meeting setting could not be updated.');
         this.isSaving = false;
@@ -221,7 +316,7 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
   }
 
   copyPublicLink(): void {
-    const link = this.overview?.lead_form?.public_link || '';
+    const link = this.selectedLeadForm?.public_link || '';
 
     if (!link) {
       return;

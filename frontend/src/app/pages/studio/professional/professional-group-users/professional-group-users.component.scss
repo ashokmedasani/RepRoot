@@ -698,6 +698,23 @@ dd {
   color: var(--app-muted);
 }
 
+.missing-fields-note {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.pending-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.ghost-action.danger {
+  color: #d92d20;
+  border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
+}
+
 @media (max-width: 680px) {
   .registration-actions,
   .registration-list article {

@@ -17,7 +17,14 @@ from zoneinfo import ZoneInfo
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import LeadMeetingRequest, ProfessionalAvailabilityWindow, ProfessionalSchedulingSettings, ScheduledMeeting
+from .models import (
+  LeadMeetingRequest,
+  ProfessionalAvailabilityWindow,
+  ProfessionalDateOff,
+  ProfessionalWeekdayOff,
+  ProfessionalSchedulingSettings,
+  ScheduledMeeting,
+)
 
 
 def get_or_create_scheduling_settings(professional) -> ProfessionalSchedulingSettings:
@@ -55,6 +62,23 @@ def compute_available_slots(
   windows_by_weekday: dict[int, list[ProfessionalAvailabilityWindow]] = {}
   for window in windows:
     windows_by_weekday.setdefault(window.weekday, []).append(window)
+
+  # Specific calendar dates the professional has blocked off (holidays,
+  # vacation days, etc.) -- these skip slot generation entirely for that date
+  # regardless of what the recurring weekly windows above say, and don't
+  # touch the recurring schedule itself.
+  off_dates = set(
+    ProfessionalDateOff.objects.filter(
+      professional=professional, date__gte=start_date, date__lte=end_date
+    ).values_list('date', flat=True)
+  )
+
+  # Recurring weekly days off (e.g. "every Monday off") -- same skip
+  # behaviour as off_dates above, but keyed by weekday number instead of a
+  # specific date, so it applies every week until toggled off again.
+  off_weekdays = set(
+    ProfessionalWeekdayOff.objects.filter(professional=professional).values_list('weekday', flat=True)
+  )
 
   now = timezone.now()
   minimum_start = now + timedelta(hours=min_notice_hours)
@@ -94,6 +118,9 @@ def compute_available_slots(
   result: dict[str, list[dict]] = {}
   current = start_date
   while current <= end_date:
+    if current in off_dates or current.weekday() in off_weekdays:
+      current += timedelta(days=1)
+      continue
     day_windows = windows_by_weekday.get(current.weekday(), [])
     day_slots = []
     for window in day_windows:

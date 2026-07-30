@@ -20,6 +20,9 @@ from rest_framework.authtoken.models import Token
 from accounts.models import ClientAuthToken, ProfessionalProfile, RecycledProfessionalAccount
 from accounts.data_usage import calculate_professional_data_usage
 from accounts.email_utils import send_mail_background as send_mail
+from accounts.plan_lock_cascade import sync_group_lock_cascade
+from accounts.plan_lock_status import bust_lock_status_cache
+from accounts.resource_cold_storage import sync_resource_cold_storage
 
 User = get_user_model()
 
@@ -51,6 +54,10 @@ def process_downgrade(professional_profile):
         professional_profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
         professional_profile.save(update_fields=['grace_period_ends_at', 'lifecycle_status', 'lifecycle_reason'])
         send_downgrade_email(professional_profile)
+
+    bust_lock_status_cache(professional_profile.user_id)
+    sync_group_lock_cascade(professional_profile.user)
+    sync_resource_cold_storage(professional_profile.user)
 
 
 def downgrade_to_starter_free_voluntarily(professional_profile):
@@ -93,6 +100,54 @@ def downgrade_to_starter_free_voluntarily(professional_profile):
         professional_profile.save(update_fields=['lifecycle_status', 'lifecycle_reason'])
         send_downgrade_email(professional_profile)
 
+    bust_lock_status_cache(professional_profile.user_id)
+    sync_group_lock_cascade(professional_profile.user)
+    sync_resource_cold_storage(professional_profile.user)
+
+
+def downgrade_to_pro_voluntarily(professional_profile):
+    """
+    Self-serve "step down to Pro" -- lets a Premium professional choose a
+    softer landing than going all the way to Free. Same self-serve
+    guarantees as downgrade_to_starter_free_voluntarily(): no grace-period
+    banner, no lock, unless usage genuinely doesn't fit Pro's quota, in
+    which case the same 14-day grace period applies.
+    """
+    professional_profile.plan_tier = ProfessionalProfile.PLAN_PRO
+    professional_profile.stripe_subscription_id = ''
+    professional_profile.plan_renews_at = None
+    professional_profile.is_locked = False
+    professional_profile.locked_at = None
+    professional_profile.lock_reason = ''
+    professional_profile.downgraded_at = None
+    professional_profile.grace_period_ends_at = None
+    professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_ACTIVE
+    professional_profile.lifecycle_reason = ''
+    professional_profile.save(update_fields=[
+        'plan_tier', 'stripe_subscription_id', 'plan_renews_at',
+        'is_locked', 'locked_at', 'lock_reason', 'downgraded_at', 'grace_period_ends_at',
+        'lifecycle_status', 'lifecycle_reason',
+    ])
+
+    from django.core.cache import cache
+    cache.delete(f'professional-data-usage:v5:{professional_profile.user_id}')
+
+    usage = calculate_professional_data_usage(professional_profile.user)
+    if usage['is_over_quota']:
+        professional_profile.downgraded_at = timezone.now()
+        professional_profile.grace_period_ends_at = timezone.now() + timedelta(
+            days=settings.REPROOT_DOWNGRADE_GRACE_PERIOD_DAYS
+        )
+        professional_profile.save(update_fields=['downgraded_at', 'grace_period_ends_at'])
+        professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_OVER_QUOTA_GRACE
+        professional_profile.lifecycle_reason = ProfessionalProfile.LIFECYCLE_REASON_BILLING_OVERAGE
+        professional_profile.save(update_fields=['lifecycle_status', 'lifecycle_reason'])
+        send_downgrade_email(professional_profile)
+
+    bust_lock_status_cache(professional_profile.user_id)
+    sync_group_lock_cascade(professional_profile.user)
+    sync_resource_cold_storage(professional_profile.user)
+
 
 def reactivate_on_upgrade(professional_profile):
     """
@@ -115,6 +170,18 @@ def reactivate_on_upgrade(professional_profile):
     if not professional_profile.user.is_active:
         professional_profile.user.is_active = True
         professional_profile.user.save(update_fields=['is_active'])
+
+    # Every plan_tier upgrade write (test-mode checkout, Stripe/Razorpay
+    # webhooks) calls this right after saving the new tier, but the Settings >
+    # Data Usage response is cached for REPROOT_DATA_USAGE_CACHE_SECONDS and
+    # was never being invalidated here (unlike process_downgrade, which
+    # already does this below) -- so a professional who just upgraded could
+    # see their new plan badge immediately while the usage widget kept
+    # showing their old plan's limits for up to that TTL.
+    cache.delete(f'professional-data-usage:v5:{professional_profile.user_id}')
+    bust_lock_status_cache(professional_profile.user_id)
+    sync_group_lock_cascade(professional_profile.user)
+    sync_resource_cold_storage(professional_profile.user)
 
 
 def check_and_lock_overages():
@@ -257,7 +324,7 @@ def delete_professional_data(professional_profile):
     Permanently delete all data associated with a professional account.
     This is called after 30 days of being locked (non-recoverable).
     """
-    from accounts.models import ClientAccess, ChatMessage, ManualPaymentProfile, PaymentProof, PaymentRecord, ProfessionalReference, SupportIncident
+    from accounts.models import ClientAccess, ChatMessage, ManualPaymentProfile, PaymentProof, PaymentRecord, ProfessionalResource, SupportIncident
 
     user_id = professional_profile.user_id
     file_names = [
@@ -266,7 +333,7 @@ def delete_professional_data(professional_profile):
         professional_profile.transformation_photo.name,
         professional_profile.training_photo.name,
     ]
-    file_names += list(ProfessionalReference.objects.filter(professional_id=user_id).exclude(file='').values_list('file', flat=True))
+    file_names += list(ProfessionalResource.objects.filter(professional_id=user_id).exclude(file='').values_list('file', flat=True))
     file_names += list(ChatMessage.objects.filter(professional_id=user_id).exclude(image='').values_list('image', flat=True))
     file_names += list(ManualPaymentProfile.objects.filter(professional_id=user_id).exclude(qr_code='').values_list('qr_code', flat=True))
     file_names += list(PaymentProof.objects.filter(payment_request__professional_id=user_id).exclude(proof_file='').values_list('proof_file', flat=True))
@@ -291,7 +358,7 @@ def send_downgrade_email(professional_profile):
     message = f"""
 Hello {professional_profile.user.first_name},
 
-Your RepRoot subscription has been downgraded to Starter Free tier.
+Your RepRoot subscription has been downgraded to the Free tier.
 
 **What happens next:**
 - You have 14 days (grace period) to either:
@@ -351,7 +418,7 @@ def send_overage_notification_email(professional_profile, usage_data):
     message = f"""
 Hello {professional_profile.user.first_name},
 
-Your RepRoot account is using {usage_percent:.1f}% of your Starter Free storage quota.
+Your RepRoot account is using {usage_percent:.1f}% of your Free storage quota.
 
 **Time is running out:** Your grace period ends in {days_left} day(s) ({grace_ends.strftime('%B %d, %Y')}).
 
@@ -381,7 +448,7 @@ Your RepRoot account has been frozen for 30 days without resolution.
 
 **YOUR DATA IS NOW IN A 14-DAY RECYCLE PERIOD.**
 
-Support can restore the complete account during these 14 days. After the recycle period expires, all client data, templates, entries, references, files, and account history will be permanently deleted.
+Support can restore the complete account during these 14 days. After the recycle period expires, all client data, templates, entries, resources, files, and account history will be permanently deleted.
 
 **To prevent deletion, you must:**
 1. Upgrade to Pro or Premium Unlimited tier immediately

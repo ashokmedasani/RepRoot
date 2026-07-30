@@ -205,6 +205,13 @@ if GOOGLE_CALENDAR_ENABLED and not all([
     'Google Calendar is enabled but its OAuth client, refresh token, or calendar ID is missing.'
   )
 
+# Optional "Continue with Google" sign-in/signup for professionals. Disabled
+# (and silently ignored) until a real Web OAuth Client ID is provided. This is
+# a separate Google Cloud OAuth client from GOOGLE_CALENDAR_CLIENT_ID above —
+# it is a public client ID embedded in the frontend, not a secret.
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+GOOGLE_OAUTH_ENABLED = bool(GOOGLE_OAUTH_CLIENT_ID)
+
 CACHE_URL = os.environ.get('CACHE_URL', '').strip()
 if CACHE_URL:
   CACHES = {
@@ -297,8 +304,8 @@ REPROOT_DEFAULT_PLAN = os.environ.get('REPROOT_DEFAULT_PLAN', 'starter_free').st
 
 # Storage quotas are still being tuned against real usage data, so the
 # Starter Free byte limit stays a single env-configurable knob; Pro and
-# Premium Unlimited are derived as multiples of it (5x, 50x respectively —
-# i.e. Premium Unlimited is also 10x Pro) unless explicitly overridden.
+# Premium Unlimited are derived as multiples of it (10x, 50x respectively —
+# i.e. Premium Unlimited is also 5x Pro) unless explicitly overridden.
 REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES = int(
   os.environ.get('REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES', str(100 * 1024 * 1024))
 )
@@ -306,7 +313,7 @@ REPROOT_PRO_STORAGE_LIMIT_BYTES = int(
   os.environ.get('REPROOT_PRO_STORAGE_LIMIT_BYTES', str(1024 * 1024 * 1024))
 )
 REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES = int(
-  os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(5 * 1024 * 1024 * 1024))
+  os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(10 * 1024 * 1024 * 1024))
 )
 
 # 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
@@ -317,7 +324,15 @@ REPROOT_PLAN_TIERS = {
     'groups': int(os.environ.get('REPROOT_STARTER_FREE_GROUP_LIMIT', '3')),
     'clients': None,
     'templates': int(os.environ.get('REPROOT_STARTER_FREE_TEMPLATE_LIMIT', '5')),
-    'references': int(os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT', '30')),
+    # Reads the new RESOURCE env var name first, falling back to the old
+    # REFERENCE name (in case an existing deployment's .env still sets that)
+    # before the hardcoded default -- this feature was renamed from
+    # "Reference" to "Resource" but a live .env can't be renamed for you.
+    'resources': int(
+      os.environ.get('REPROOT_STARTER_FREE_RESOURCE_LIMIT')
+      or os.environ.get('REPROOT_STARTER_FREE_REFERENCE_LIMIT')
+      or '30'
+    ),
     'categories': int(os.environ.get('REPROOT_STARTER_FREE_CATEGORY_LIMIT', '5')),
     'subcategories_per_category': int(os.environ.get('REPROOT_STARTER_FREE_SUBCATEGORY_LIMIT', '3')),
     'professional_storage_bytes': REPROOT_STARTER_FREE_STORAGE_LIMIT_BYTES,
@@ -329,7 +344,11 @@ REPROOT_PLAN_TIERS = {
     'groups': int(os.environ.get('REPROOT_PRO_GROUP_LIMIT', '10')),
     'clients': None,
     'templates': int(os.environ.get('REPROOT_PRO_TEMPLATE_LIMIT', '15')),
-    'references': int(os.environ.get('REPROOT_PRO_REFERENCE_LIMIT', '100')),
+    'resources': int(
+      os.environ.get('REPROOT_PRO_RESOURCE_LIMIT')
+      or os.environ.get('REPROOT_PRO_REFERENCE_LIMIT')
+      or '100'
+    ),
     'categories': int(os.environ.get('REPROOT_PRO_CATEGORY_LIMIT', '20')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PRO_SUBCATEGORY_LIMIT', '10')),
     'professional_storage_bytes': REPROOT_PRO_STORAGE_LIMIT_BYTES,
@@ -341,7 +360,11 @@ REPROOT_PLAN_TIERS = {
     'groups': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_GROUP_LIMIT', '25')),
     'clients': None,
     'templates': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_TEMPLATE_LIMIT', '50')),
-    'references': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT', '250')),
+    'resources': int(
+      os.environ.get('REPROOT_PREMIUM_UNLIMITED_RESOURCE_LIMIT')
+      or os.environ.get('REPROOT_PREMIUM_UNLIMITED_REFERENCE_LIMIT')
+      or '250'
+    ),
     'categories': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_CATEGORY_LIMIT', '50')),
     'subcategories_per_category': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_SUBCATEGORY_LIMIT', '20')),
     'professional_storage_bytes': REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES,
@@ -351,14 +374,14 @@ REPROOT_PLAN_TIERS = {
   'starter': {
     'name': 'Starter (Legacy)',
     'lead_forms': 1, 'groups': 5, 'clients': None, 'templates': 5,
-    'references': 100, 'categories': 10, 'subcategories_per_category': 5,
+    'resources': 100, 'categories': 10, 'subcategories_per_category': 5,
     'professional_storage_bytes': 50 * 1024 * 1024,
     'client_data_retention_days': 60,
   },
   'premium': {
     'name': 'Premium (Legacy)',
     'lead_forms': 3, 'groups': 25, 'clients': None, 'templates': 50,
-    'references': 1000, 'categories': 50, 'subcategories_per_category': 20,
+    'resources': 1000, 'categories': 50, 'subcategories_per_category': 20,
     'professional_storage_bytes': 1024 * 1024 * 1024,
     'client_data_retention_days': 180,
   },

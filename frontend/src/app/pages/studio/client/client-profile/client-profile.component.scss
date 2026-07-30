@@ -375,6 +375,79 @@ textarea {
   margin-top: 0.5rem;
 }
 
+.verify-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(3px);
+}
+
+.verify-modal {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 32rem);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: 1.25rem;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.verify-modal h3 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.15rem;
+}
+
+.verify-modal-subtitle {
+  margin: -0.5rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+
+.review-rows {
+  display: grid;
+  gap: 0.6rem;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+  padding: 0.85rem 0;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 40%) 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.review-label {
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+}
+
+.review-value {
+  color: var(--app-text);
+  font-size: 0.92rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.verify-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
 .recent-entries {
   display: grid;
   gap: 0.85rem;

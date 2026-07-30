@@ -3,7 +3,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 /// The hosts the in-app player accepts.
 ///
 /// Deliberately the same tuple as YOUTUBE_HOSTS in backend/accounts/serializers.py.
-/// The backend rejects a video reference whose link isn't one of these ("Videos must
+/// The backend rejects a video resource whose link isn't one of these ("Videos must
 /// be YouTube links so they can be streamed in-app"), so anything else can't be
 /// saved as a video in the first place. If that list ever grows — music.youtube.com
 /// is the obvious candidate — grow both together or the app will hand a link to the

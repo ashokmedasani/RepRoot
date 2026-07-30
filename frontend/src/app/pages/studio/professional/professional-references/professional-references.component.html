@@ -1,11 +1,11 @@
 <app-professional-page-shell
-  title="References / Resources"
+  title="Resource Library"
   eyebrow="Professional library"
   subtitle="Store professional-owned reusable exercises, nutrition plans, documents, images, links, and notes."
-  activeSection="references"
-  titleId="references-title"
+  activeSection="resource"
+  titleId="resource-title"
 >
-  <div page-actions class="usage-counter">References Used: {{ referenceUsage().used }} / {{ referenceUsage().limit === null ? 'Unlimited' : referenceUsage().limit }}</div>
+  <div page-actions class="usage-counter">Resources Used: {{ referenceUsage().used }} / {{ referenceUsage().limit === null ? 'Unlimited' : referenceUsage().limit }}</div>
 
   @if (message()) {
     <p class="message">{{ message() }}</p>
@@ -13,24 +13,29 @@
 
   <div class="reference-guide" role="note">
     <strong>How this library is organised</strong>
-    <span><b>Category</b> is the main folder, <b>subcategory</b> narrows that folder, and <b>reference title</b> is the actual resource clients receive. Open any resource card to preview its client-facing details.</span>
+    <span><b>Category</b> is the main folder, <b>subcategory</b> narrows that folder, and <b>resource title</b> is the actual resource clients receive. Open any resource card to preview its client-facing details.</span>
   </div>
 
-  <section class="references-single" aria-label="References library">
+  <section class="references-single" aria-label="Resource library">
     @if (referenceLimitReached()) {
-      <p class="limit-message">You have reached the Version 1 reference limit.</p>
+      <p class="limit-message">You have reached the Version 1 resource limit.</p>
     }
     <div class="search-actions-row">
       <label class="search-box">
-        <span class="visually-hidden">Search references</span>
-        <input type="search" [ngModel]="query()" (ngModelChange)="setSearch($event)" placeholder="Search references...">
+        <span class="visually-hidden">Search resources</span>
+        <input type="search" [ngModel]="query()" (ngModelChange)="setSearch($event)" placeholder="Search resources...">
       </label>
       <button type="button" class="primary-action" (click)="addCategory()">+ Create Category</button>
     </div>
 
-    @for (category of categories(); track category.id) {
-      <div class="cat-accordion">
+    @if (orderedActiveCategories().length) {
+      <p class="drag-hint">Drag a category by its ⠿ handle to change which categories (and their resources) lock first if you go over plan.</p>
+    }
+    <div class="cat-list" cdkDropList (cdkDropListDropped)="dropCategory($event)">
+    @for (category of orderedActiveCategories(); track category.id) {
+      <div class="cat-accordion" cdkDrag>
         <div class="cat-header">
+          <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
           <button type="button" class="cat-expand" (click)="toggleCategory(category.name)" [attr.aria-expanded]="isCategoryOpen(category.name)">
             <span class="cat-caret" [class.open]="isCategoryOpen(category.name)">&rsaquo;</span>
             <span class="cat-title-copy">
@@ -39,7 +44,7 @@
             </span>
           </button>
           <span class="category-metric">{{ category.subcategories.length }} subcategories</span>
-          <span class="category-metric">{{ categoryCount(category.name) }} references</span>
+          <span class="category-metric">{{ categoryCount(category.name) }} resources</span>
           <button type="button" class="ghost-action compact" (click)="editCategory(category)">Edit</button>
           <button type="button" class="ghost-action compact danger" (click)="deleteCategory(category)">Delete</button>
         </div>
@@ -54,15 +59,18 @@
                   <h3>{{ subcategory }}</h3>
                   <div class="subcat-actions">
                     <button type="button" class="ghost-action compact danger" (click)="deleteSubcategory(category, subcategory)">Delete</button>
-                    <button type="button" class="primary-action compact" [disabled]="referenceLimitReached()" (click)="addReference('Video Link', category, subcategory)">+ Add Reference</button>
+                    <button type="button" class="primary-action compact" [disabled]="referenceLimitReached()" (click)="addReference('Video Link', category, subcategory)">+ Add Resource</button>
                   </div>
                 </div>
 
-                <div class="subcategory-references">
-                @for (reference of referencesForCategory(category.name); track reference.id) {
-                  @if (reference.subcategory === subcategory) {
-              <div class="ref-item" [class.open]="expandedReferenceId() === reference.id">
+                @if (orderedActiveResourcesFor(category.name, subcategory).length) {
+                  <p class="drag-hint">Drag a resource by its ⠿ handle to change its priority within this subcategory.</p>
+                }
+                <div class="subcategory-references" cdkDropList (cdkDropListDropped)="dropResource($event, category.name, subcategory)">
+                @for (reference of orderedActiveResourcesFor(category.name, subcategory); track reference.id) {
+              <div class="ref-item" cdkDrag [class.open]="expandedReferenceId() === reference.id">
                 <button type="button" class="ref-header" (click)="toggleReference(reference.id)">
+                  <span class="drag-handle" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
                   <span class="ref-caret" [class.open]="expandedReferenceId() === reference.id">&rsaquo;</span>
                   <span class="ref-title">{{ reference.title }}</span>
                   <span class="type-pill">{{ reference.type }}</span>
@@ -122,15 +130,38 @@
                   </div>
                 }
               </div>
-                  }
                 } @empty {
-                  <p class="cat-empty">No references in this subcategory yet.</p>
+                  <p class="cat-empty">No resources in this subcategory yet.</p>
                 }
                 </div>
+
+                @if (lockedResourcesFor(category.name, subcategory).length) {
+                  <div class="subcategory-references locked-list">
+                    @for (reference of lockedResourcesFor(category.name, subcategory); track reference.id) {
+                      <div class="ref-item locked" [class.open]="expandedReferenceId() === reference.id">
+                        <button type="button" class="ref-header" (click)="toggleReference(reference.id)">
+                          <span class="ref-caret" [class.open]="expandedReferenceId() === reference.id">&rsaquo;</span>
+                          <span class="ref-title">{{ reference.title }}</span>
+                          <span class="type-pill">{{ reference.type }}</span>
+                          <span class="lock-badge" title="Over your current plan's resource limit (or inside a locked category). Upgrade or free a slot to unlock.">🔒 Locked</span>
+                        </button>
+                        @if (expandedReferenceId() === reference.id) {
+                          <div class="ref-detail">
+                            <p class="message">This resource is locked and hidden from clients. It can still be deleted to free a slot, but not edited until it unlocks.</p>
+                            <div class="ref-actions">
+                              <button type="button" class="primary-action compact" (click)="openReference(reference)">Open</button>
+                              <button type="button" class="ghost-action compact danger" (click)="deleteReference(reference)">Delete</button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
               </section>
             } @empty {
               <p class="cat-empty">
-                No subcategories yet. Add a subcategory to start adding references.
+                No subcategories yet. Add a subcategory to start adding resources.
               </p>
             }
           </div>
@@ -142,13 +173,75 @@
         <button type="button" class="ghost-action" (click)="addCategory()">Create Category</button>
       </div>
     }
+    </div>
+
+    @if (lockedCategoriesList().length) {
+      <div class="cat-list locked-list">
+        @for (category of lockedCategoriesList(); track category.id) {
+          <div class="cat-accordion locked">
+            <div class="cat-header">
+              <button type="button" class="cat-expand" (click)="toggleCategory(category.name)" [attr.aria-expanded]="isCategoryOpen(category.name)">
+                <span class="cat-caret" [class.open]="isCategoryOpen(category.name)">&rsaquo;</span>
+                <span class="cat-title-copy">
+                  <strong class="cat-name">{{ category.name }}
+                    <span class="lock-badge" title="Over your current plan's category limit. Every resource inside also locks. Upgrade or free a slot to unlock.">🔒 Locked</span>
+                  </strong>
+                  @if (category.description) { <small>{{ category.description }}</small> }
+                </span>
+              </button>
+              <span class="category-metric">{{ category.subcategories.length }} subcategories</span>
+              <span class="category-metric">{{ categoryCount(category.name) }} resources</span>
+              <button type="button" class="ghost-action compact" disabled title="Locked categories can't be edited until they unlock">Edit</button>
+              <button type="button" class="ghost-action compact danger" (click)="deleteCategory(category)">Delete</button>
+            </div>
+
+            @if (isCategoryOpen(category.name)) {
+              <div class="cat-body">
+                @for (subcategory of category.subcategories; track subcategory) {
+                  <section class="subcat-block">
+                    <div class="subcat-header">
+                      <h3>{{ subcategory }}</h3>
+                    </div>
+                    <div class="subcategory-references">
+                      @for (reference of lockedResourcesFor(category.name, subcategory); track reference.id) {
+                        <div class="ref-item locked" [class.open]="expandedReferenceId() === reference.id">
+                          <button type="button" class="ref-header" (click)="toggleReference(reference.id)">
+                            <span class="ref-caret" [class.open]="expandedReferenceId() === reference.id">&rsaquo;</span>
+                            <span class="ref-title">{{ reference.title }}</span>
+                            <span class="type-pill">{{ reference.type }}</span>
+                            <span class="lock-badge" title="Over your current plan's resource limit (or inside a locked category). Upgrade or free a slot to unlock.">🔒 Locked</span>
+                          </button>
+                          @if (expandedReferenceId() === reference.id) {
+                            <div class="ref-detail">
+                              <p class="message">This resource is locked and hidden from clients. It can still be deleted to free a slot, but not edited until it unlocks.</p>
+                              <div class="ref-actions">
+                                <button type="button" class="primary-action compact" (click)="openReference(reference)">Open</button>
+                                <button type="button" class="ghost-action compact danger" (click)="deleteReference(reference)">Delete</button>
+                              </div>
+                            </div>
+                          }
+                        </div>
+                      } @empty {
+                        <p class="cat-empty">No resources in this subcategory yet.</p>
+                      }
+                    </div>
+                  </section>
+                } @empty {
+                  <p class="cat-empty">No subcategories yet.</p>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
   </section>
 
   @if (isEditorOpen()) {
-    <section class="editor-backdrop" aria-labelledby="reference-editor-title">
+    <section class="editor-backdrop" aria-labelledby="resource-editor-title">
       <form class="editor-panel" (ngSubmit)="saveReference()">
         <div class="editor-header">
-          <h2 id="reference-editor-title">{{ form.id ? 'Edit Reference' : 'Add Reference' }}</h2>
+          <h2 id="resource-editor-title">{{ form.id ? 'Edit Resource' : 'Add Resource' }}</h2>
           <button type="button" class="icon-button" title="Close" (click)="isEditorOpen.set(false)">x</button>
         </div>
 
@@ -245,7 +338,7 @@
 
         <div class="editor-actions">
           <button type="button" class="ghost-action" (click)="isEditorOpen.set(false)">Cancel</button>
-          <button type="submit" class="primary-action" [disabled]="isSaving()">Save Reference</button>
+          <button type="submit" class="primary-action" [disabled]="isSaving()">Save Resource</button>
         </div>
       </form>
     </section>

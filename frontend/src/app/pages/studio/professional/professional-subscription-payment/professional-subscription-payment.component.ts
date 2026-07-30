@@ -75,6 +75,11 @@ export class ProfessionalSubscriptionPaymentComponent implements OnInit {
           window.location.href = result.checkout_url;
           return;
         }
+        // Test-mode/no-gateway path applies the new plan_tier immediately
+        // (see ProfessionalBillingCheckoutView) -- drop the cached data-usage
+        // response so the account settings page re-fetches fresh limits for
+        // the new plan instead of showing the old tier's usage caps.
+        this.api.invalidateDataUsage();
         void this.router.navigate(['/professional/account-settings'], { queryParams: { section: 'billing', billing: 'success' } });
       },
       error: (error) => {

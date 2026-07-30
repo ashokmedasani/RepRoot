@@ -5,7 +5,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../core/theme/app_tokens.dart';
 import '../widgets/app_widgets.dart';
 
-/// Plays a professional's video reference inside the app.
+/// Plays a professional's video resource inside the app.
 ///
 /// ## Why this is built the way it is
 ///
@@ -25,7 +25,7 @@ import '../widgets/app_widgets.dart';
 ///    compliant response is to hand the viewer over, not to route around it.
 ///  * `privacyEnhancedMode` serves from youtube-nocookie.com, YouTube's own
 ///    privacy-preserving embed — clients watching a workout shouldn't pick up
-///    ad-tracking cookies from their professional's reference library.
+///    ad-tracking cookies from their professional's resource library.
 class YoutubePlayerPage extends StatefulWidget {
   const YoutubePlayerPage({
     super.key,

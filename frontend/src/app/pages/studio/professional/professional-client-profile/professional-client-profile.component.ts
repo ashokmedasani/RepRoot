@@ -12,7 +12,7 @@ import {
   ClientReminder,
   FormsGroupsApiService
 } from '@core/api/forms-groups-api.service';
-import { ReferencesApiService, ProfessionalReferenceRecord } from '@core/api/references-api.service';
+import { ResourcesApiService, ProfessionalResourceRecord } from '@core/api/resources-api.service';
 import {
   TemplateAssignmentRecord,
   TemplateClientAccessLevel,
@@ -43,7 +43,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly formsGroupsApi = inject(FormsGroupsApiService);
   private readonly templatesApi = inject(TemplatesApiService);
-  private readonly referencesApi = inject(ReferencesApiService);
+  private readonly resourcesApi = inject(ResourcesApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly chatApi = inject(ChatApiService);
@@ -95,7 +95,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
   changeReviewNote = '';
   isReviewingChange = false;
 
-  referenceLibrary: ProfessionalReferenceRecord[] = [];
+  resourceLibrary: ProfessionalResourceRecord[] = [];
   isSavingAdditional = false;
   newInfo: {
     title: string;
@@ -855,7 +855,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     } else if (this.newInfo.type === 'link') {
       item.link = this.newInfo.link.trim();
     } else {
-      const reference = this.referenceLibrary.find((ref) => ref.id === Number(this.newInfo.reference_id));
+      const reference = this.resourceLibrary.find((ref) => ref.id === Number(this.newInfo.reference_id));
 
       if (!reference) {
         this.messageType = 'error';
@@ -1313,12 +1313,12 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
         this.entries = [];
       }
     });
-    this.referencesApi.getReferences().subscribe({
+    this.resourcesApi.getResources().subscribe({
       next: (response) => {
-        this.referenceLibrary = response.references;
+        this.resourceLibrary = response.resources;
       },
       error: () => {
-        this.referenceLibrary = [];
+        this.resourceLibrary = [];
       }
     });
   }

@@ -14,14 +14,14 @@ from accounts.models import (
   ClientAccess,
   ClientRegistrationForm,
   LeadSubmission,
-  ReferenceCategory,
+  ResourceCategory,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
   ProfessionalGroup,
   ProfessionalLeadForm,
   ProfessionalProfile,
-  ProfessionalReference,
+  ProfessionalResource,
   default_client_registration_fields,
 )
 
@@ -57,7 +57,7 @@ CLIENTS = [
 ]
 
 
-REFERENCE_CATEGORIES = [
+RESOURCE_CATEGORIES = [
   ('Warm-Up and Mobility', ['Hips', 'Shoulders', 'Ankles', 'Spine']),
   ('Strength Technique', ['Squat', 'Hinge', 'Push', 'Pull', 'Core']),
   ('Nutrition Habits', ['Meal Planning', 'Protein', 'Hydration', 'Portions']),
@@ -65,7 +65,7 @@ REFERENCE_CATEGORIES = [
 ]
 
 
-REFERENCES = [
+RESOURCES = [
   ('Warm-Up and Mobility', 'Hips', 'Hip Mobility Flow', 'video_link', 'Use before lower-body days to open hips and improve squat depth.', 'https://www.youtube.com/watch?v=jj2AAH6jbHk', ['mobility', 'warm-up']),
   ('Warm-Up and Mobility', 'Shoulders', 'Shoulder Prep Sequence', 'video_link', 'Quick shoulder activation before push or pull sessions.', 'https://www.youtube.com/watch?v=Vwn5hSf3WEg', ['shoulders', 'warm-up']),
   ('Warm-Up and Mobility', 'Ankles', 'Ankle Mobility Drill', 'video_link', 'Simple ankle work for better squat mechanics and walking comfort.', 'https://www.youtube.com/watch?v=IikP_teeLkI', ['ankles', 'mobility']),
@@ -174,7 +174,7 @@ def entry_payload(template_name, day_index):
 
 
 class Command(BaseCommand):
-  help = 'Seed a complete demo professional, groups, clients, references, assignments, and 90 days of client inputs.'
+  help = 'Seed a complete demo professional, groups, clients, resources, assignments, and 90 days of client inputs.'
 
   def add_arguments(self, parser):
     parser.add_argument('--clients', type=int, default=50)
@@ -196,9 +196,9 @@ class Command(BaseCommand):
       groups = self.seed_groups(professional)
       lead_form = self.seed_lead_form(professional)
       clients = self.seed_clients(professional, groups, lead_form)
-      references = self.seed_references(professional)
+      resources = self.seed_resources(professional)
       templates = self.seed_templates(professional)
-      self.seed_assignments(clients, templates, references)
+      self.seed_assignments(clients, templates, resources)
       for client in clients:
         self.seed_tracking_entries(client, templates)
       self.seed_chat(professional, clients[0])
@@ -209,7 +209,7 @@ class Command(BaseCommand):
     self.stdout.write(self.style.SUCCESS('Demo fitness data seeded successfully.'))
     self.stdout.write(
       f'Created/updated: 1 trainer, {len(groups)} groups, {len(clients)} synthetic clients, '
-      f'{len(references)} references, {len(templates)} templates, and '
+      f'{len(resources)} resources, {len(templates)} templates, and '
       f'{self.history_days} days of tracking history per client.'
     )
     self.stdout.write('Credentials were read from the backend environment and were not printed.')
@@ -338,32 +338,32 @@ class Command(BaseCommand):
       clients.append(client)
     return clients
 
-  def seed_references(self, professional):
+  def seed_resources(self, professional):
     category_lookup = {}
-    for name, subcategories in REFERENCE_CATEGORIES:
-      category, _created = ReferenceCategory.objects.update_or_create(
+    for name, subcategories in RESOURCE_CATEGORIES:
+      category, _created = ResourceCategory.objects.update_or_create(
         professional=professional,
         name=name,
         defaults={'subcategories': subcategories},
       )
       category_lookup[name] = category
 
-    references = []
-    for category_name, subcategory, title, reference_type, description, link, tags in REFERENCES:
-      reference, _created = ProfessionalReference.objects.update_or_create(
+    resources = []
+    for category_name, subcategory, title, resource_type, description, link, tags in RESOURCES:
+      resource, _created = ProfessionalResource.objects.update_or_create(
         professional=professional,
         title=title,
         defaults={
           'category': category_lookup[category_name],
           'subcategory': subcategory,
-          'reference_type': reference_type,
+          'resource_type': resource_type,
           'description': description,
           'link': link,
           'tags': tags,
         },
       )
-      references.append(reference)
-    return references
+      resources.append(resource)
+    return resources
 
   def seed_templates(self, professional):
     templates = []
@@ -383,10 +383,10 @@ class Command(BaseCommand):
       templates.append(template)
     return templates
 
-  def seed_assignments(self, clients, templates, references):
-    nutrition_refs = [ref for ref in references if ref.category.name == 'Nutrition Habits'][:5]
-    strength_refs = [ref for ref in references if ref.category.name in ('Strength Technique', 'Warm-Up and Mobility')][:6]
-    recovery_refs = [ref for ref in references if ref.category.name == 'Recovery and Mindset'][:4]
+  def seed_assignments(self, clients, templates, resources):
+    nutrition_refs = [res for res in resources if res.category.name == 'Nutrition Habits'][:5]
+    strength_refs = [res for res in resources if res.category.name in ('Strength Technique', 'Warm-Up and Mobility')][:6]
+    recovery_refs = [res for res in resources if res.category.name == 'Recovery and Mindset'][:4]
     refs_by_template = {
       'Daily Nutrition Check-In': nutrition_refs,
       'Workout Performance Log': strength_refs,
@@ -396,7 +396,7 @@ class Command(BaseCommand):
     for client in clients:
       for template in templates:
         assignment, _created = TemplateAssignment.objects.get_or_create(client=client, template=template)
-        assignment.references.set(refs_by_template.get(template.name, []))
+        assignment.resources.set(refs_by_template.get(template.name, []))
 
   def seed_tracking_entries(self, client, templates):
     end_date = date.today()

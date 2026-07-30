@@ -168,6 +168,159 @@ p {
   gap: 0.6rem;
 }
 
+.template-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.template-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-left: 4px solid var(--app-primary);
+  border-radius: var(--app-radius-md);
+  padding: 0.7rem 1rem;
+  background: var(--app-surface-soft);
+  transition: box-shadow var(--app-transition-normal), border-color var(--app-transition-normal);
+}
+
+.template-row:hover {
+  box-shadow: var(--app-shadow);
+}
+
+.template-row.green { border-left-color: var(--app-success); }
+.template-row.blue { border-left-color: var(--app-primary); }
+.template-row.orange { border-left-color: #f79009; }
+.template-row.purple { border-left-color: #7a5af8; }
+
+.template-row.locked {
+  opacity: 0.85;
+}
+
+.template-row.empty-row {
+  border-left-color: var(--app-border);
+  color: var(--app-muted);
+}
+
+.row-name {
+  font-weight: 800;
+  color: var(--app-text);
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.row-pill {
+  border-radius: var(--app-radius-pill);
+  padding: 0.2rem 0.6rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.row-meta {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  padding: 0.18rem 0.55rem;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.row-purpose {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--app-muted);
+  font-weight: 600;
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.danger-action.compact {
+  min-height: 2.2rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: var(--app-radius-sm);
+}
+
+.template-row.cdk-drag-preview {
+  box-shadow: var(--app-shadow-lg);
+  background: var(--app-surface);
+}
+
+.template-row.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+.drag-hint {
+  color: var(--app-muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin-bottom: 0.6rem;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  padding: 0.1rem 0.3rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.template-card.cdk-drag-preview {
+  box-shadow: var(--app-shadow-lg);
+}
+
+.template-card.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+.template-grid.cdk-drop-list-dragging .template-card:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.locked-grid {
+  margin-top: 1rem;
+}
+
+.template-card.locked {
+  opacity: 0.85;
+}
+
+.lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  margin-left: 0.4rem;
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
 .adopted-pill {
   justify-self: start;
   border: 1px solid color-mix(in srgb, var(--app-success) 35%, var(--app-border));

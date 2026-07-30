@@ -111,11 +111,11 @@ class TemplateField {
       };
 }
 
-class TemplateReference {
-  const TemplateReference({
+class TemplateResource {
+  const TemplateResource({
     required this.id,
     required this.title,
-    required this.referenceType,
+    required this.resourceType,
     required this.categoryName,
     required this.subcategory,
     required this.description,
@@ -126,7 +126,7 @@ class TemplateReference {
 
   final int id;
   final String title;
-  final String referenceType;
+  final String resourceType;
   final String categoryName;
   final String subcategory;
   final String description;
@@ -134,11 +134,11 @@ class TemplateReference {
   final String fileUrl;
   final List<String> tags;
 
-  factory TemplateReference.fromJson(Map<String, dynamic> json) =>
-      TemplateReference(
+  factory TemplateResource.fromJson(Map<String, dynamic> json) =>
+      TemplateResource(
         id: json['id'] as int? ?? 0,
         title: json['title'] as String? ?? '',
-        referenceType: json['reference_type'] as String? ?? '',
+        resourceType: json['resource_type'] as String? ?? '',
         categoryName: json['category_name'] as String? ?? '',
         subcategory: json['subcategory'] as String? ?? '',
         description: json['description'] as String? ?? '',
@@ -162,7 +162,7 @@ class TrackingTemplateRecord {
     required this.createdAt,
     required this.updatedAt,
     this.assignmentId,
-    this.references = const [],
+    this.resources = const [],
   });
 
   final int id;
@@ -177,7 +177,7 @@ class TrackingTemplateRecord {
   final String createdAt;
   final String updatedAt;
   final int? assignmentId;
-  final List<TemplateReference> references;
+  final List<TemplateResource> resources;
 
   factory TrackingTemplateRecord.fromJson(Map<String, dynamic> json) =>
       TrackingTemplateRecord(
@@ -196,9 +196,9 @@ class TrackingTemplateRecord {
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
         assignmentId: json['assignment_id'] as int?,
-        references: (json['references'] as List<dynamic>? ?? [])
+        resources: (json['resources'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
-            .map(TemplateReference.fromJson)
+            .map(TemplateResource.fromJson)
             .toList(),
       );
 }
@@ -285,7 +285,7 @@ class TemplateAssignmentRecord {
     required this.templateName,
     required this.templateCadence,
     required this.templateAccent,
-    required this.references,
+    required this.resources,
     required this.assignedAt,
     this.clientAccessLevel = 'editable',
   });
@@ -295,7 +295,7 @@ class TemplateAssignmentRecord {
   final String templateName;
   final String templateCadence;
   final String templateAccent;
-  final List<TemplateReference> references;
+  final List<TemplateResource> resources;
   final String assignedAt;
   final String clientAccessLevel;
 
@@ -306,9 +306,9 @@ class TemplateAssignmentRecord {
         templateName: json['template_name'] as String? ?? '',
         templateCadence: json['template_cadence'] as String? ?? '',
         templateAccent: json['template_accent'] as String? ?? '',
-        references: (json['references'] as List<dynamic>? ?? [])
+        resources: (json['resources'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
-            .map(TemplateReference.fromJson)
+            .map(TemplateResource.fromJson)
             .toList(),
         assignedAt: json['assigned_at'] as String? ?? '',
         clientAccessLevel: json['client_access_level'] as String? ?? 'editable',

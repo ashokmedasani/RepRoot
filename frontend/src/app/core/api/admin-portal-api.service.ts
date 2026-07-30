@@ -18,7 +18,7 @@ export interface AdminDashboardSummary {
   accounts: { total_professionals: number; active_professionals: number; suspended_professionals: number; pending_deletion: number; new_professionals: number };
   clients: { total_clients: number; active_clients: number; inactive_clients: number; new_clients: number };
   users: { total_accounts: number; professional_accounts: number; client_accounts: number; internal_accounts: number };
-  usage: { lead_forms: number; active_lead_forms: number; form_submissions: number; groups: number; templates: number; references: number; scheduled_followups: number };
+  usage: { lead_forms: number; active_lead_forms: number; form_submissions: number; groups: number; templates: number; resources: number; scheduled_followups: number };
   storage: { total_bytes: number; total_mb: number; average_mb_per_professional: number };
   subscriptions: Record<string, number>;
 }

@@ -283,6 +283,24 @@ tr.selected {
   font-weight: 700;
 }
 
+.lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.reorder-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.4rem 0;
+}
+
 .detail-panel {
   display: grid;
   gap: 1rem;
@@ -459,7 +477,11 @@ label {
 .references-single {
   display: grid;
   gap: 0.6rem;
-  max-width: 60rem;
+  /* No max-width here on purpose -- this used to cap at 60rem while the
+     guide box above it (.reference-guide) had no cap and stretched to the
+     page shell's full width, so the search row and category list visibly
+     ended earlier than the guide box above them. Now both fill the same
+     width. */
 }
 
 .usage-counter {
@@ -492,11 +514,61 @@ label {
   margin: 0;
 }
 
+.cat-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .cat-accordion {
   border: 1px solid var(--app-border);
   border-radius: var(--app-panel-radius);
   background: var(--app-surface);
   overflow: hidden;
+}
+
+.cat-accordion.locked {
+  opacity: 0.85;
+}
+
+.drag-hint {
+  color: var(--app-muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin: 0.4rem 0;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  padding: 0.1rem 0.3rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.cat-accordion.cdk-drag-preview,
+.ref-item.cdk-drag-preview {
+  box-shadow: var(--app-shadow-lg);
+}
+
+.cat-accordion.cdk-drag-placeholder,
+.ref-item.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+.locked-list {
+  margin-top: 0.6rem;
+}
+
+.ref-item.locked {
+  opacity: 0.85;
 }
 
 .cat-header {

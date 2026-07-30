@@ -1,11 +1,13 @@
 import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import {
   StandardTemplateRecord,
   TemplatesApiService,
   TrackingTemplateRecord
 } from '@core/api/templates-api.service';
+import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
@@ -13,12 +15,13 @@ import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmat
 @Component({
   selector: 'app-professional-templates',
   standalone: true,
-  imports: [RouterLink, ProfessionalPageShellComponent],
+  imports: [RouterLink, DragDropModule, ProfessionalPageShellComponent],
   templateUrl: './professional-templates.component.html',
   styleUrl: './professional-templates.component.scss'
 })
 export class ProfessionalTemplatesComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
+  private readonly planLockApi = inject(PlanLockApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
   private readonly changeDetector = inject(ChangeDetectorRef);
 
@@ -30,8 +33,67 @@ export class ProfessionalTemplatesComponent implements OnInit {
   message = '';
   messageType: 'success' | 'error' = 'success';
 
+  // Plan-limit lock system: a template beyond the current plan's count limit
+  // locks (never deleted). Only currently-active templates can be reordered
+  // or edited; locked ones can still be deleted to free a slot.
+  lockStatus: PlanLockStatus | null = null;
+
+  isTemplateLocked(templateId: number): boolean {
+    return this.lockStatus?.templates.locked_ids.includes(templateId) ?? false;
+  }
+
+  // Display order is always derived from lockStatus.templates.active_ids --
+  // never a separately-tracked local array -- so dragging can never drift
+  // out of sync with what the backend thinks the order is.
+  orderedActiveTemplates(): TrackingTemplateRecord[] {
+    const activeIds = this.lockStatus?.templates.active_ids ?? [];
+    const byId = new Map(this.templates.map((template) => [template.id, template]));
+    return activeIds.map((id) => byId.get(id)).filter((template): template is TrackingTemplateRecord => !!template);
+  }
+
+  lockedTemplatesList(): TrackingTemplateRecord[] {
+    const lockedIds = new Set(this.lockStatus?.templates.locked_ids ?? []);
+    return this.templates.filter((template) => lockedIds.has(template.id));
+  }
+
+  dropTemplate(event: CdkDragDrop<TrackingTemplateRecord[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const reordered = this.orderedActiveTemplates();
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    const orderedIds = reordered.map((template) => template.id);
+
+    // Optimistic local update so the drag feels instant instead of snapping
+    // back until the network round trip finishes.
+    if (this.lockStatus) {
+      this.lockStatus = { ...this.lockStatus, templates: { ...this.lockStatus.templates, active_ids: orderedIds } };
+    }
+
+    this.planLockApi.reorder('templates', orderedIds).subscribe({
+      next: (response) => {
+        this.lockStatus = response.lock_status;
+        this.changeDetector.detectChanges();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not reorder templates.');
+        this.loadLockStatus();
+      }
+    });
+  }
+
+  private loadLockStatus(): void {
+    this.planLockApi.getLockStatus().subscribe({
+      next: (response) => {
+        this.lockStatus = response.lock_status;
+        this.changeDetector.detectChanges();
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.loadTemplates();
+    this.loadLockStatus();
   }
 
   get slotsUsed(): number {
@@ -54,6 +116,7 @@ export class ProfessionalTemplatesComponent implements OnInit {
         this.message = response.message;
         this.isSaving = false;
         this.loadTemplates();
+        this.loadLockStatus();
       },
       error: (error: unknown) => {
         this.messageType = 'error';
@@ -93,6 +156,7 @@ export class ProfessionalTemplatesComponent implements OnInit {
         this.messageType = 'success';
         this.message = response.message;
         this.loadTemplates();
+        this.loadLockStatus();
       },
       error: (error: unknown) => {
         this.messageType = 'error';

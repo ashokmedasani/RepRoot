@@ -75,38 +75,54 @@
         </div>
       </div>
 
-      <div class="template-grid">
-        @for (template of templates; track template.id) {
-          <article class="template-card" [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
-            <div class="template-card-head">
-              <div>
-                <h3>{{ template.name }}</h3>
-                <p>{{ cadenceLabel(template.cadence) }}</p>
-              </div>
-              <span>{{ template.fields.length }} fields</span>
-            </div>
-
+      @if (orderedActiveTemplates().length) {
+        <p class="drag-hint">Drag a row by its ⠿ handle to change which templates lock first if you go over plan.</p>
+      }
+      <div class="template-list" cdkDropList (cdkDropListDropped)="dropTemplate($event)">
+        @for (template of orderedActiveTemplates(); track template.id) {
+          <div class="template-row" cdkDrag [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
+            <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
+            <span class="row-name">{{ template.name }}</span>
+            <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
+            <span class="row-meta">{{ template.fields.length }} fields</span>
+            <span class="row-meta">{{ template.assigned_count }} clients assigned</span>
             @if (template.purpose) {
-              <p class="template-purpose">{{ template.purpose }}</p>
+              <span class="row-purpose">{{ template.purpose }}</span>
             }
-
-            <div class="template-stats">
-              <span>{{ template.fields.length }} fields</span>
-              <span>{{ template.assigned_count }} clients assigned</span>
+            <div class="row-actions">
+              <a [routerLink]="['/professional/templates', template.id, 'edit']" class="secondary-action compact">Edit</a>
+              <button type="button" class="danger-action compact" (click)="deleteTemplate(template)">Delete</button>
             </div>
-
-            <div class="template-actions">
-              <a [routerLink]="['/professional/templates', template.id, 'edit']" class="secondary-action">Edit</a>
-              <button type="button" class="danger-action" (click)="deleteTemplate(template)">Delete</button>
-            </div>
-          </article>
+          </div>
         } @empty {
-          <article class="template-card empty-card">
-            <h3>No templates yet</h3>
-            <p>Adopt a standard template above or create your own to start tracking client progress.</p>
-          </article>
+          <div class="template-row empty-row">
+            <span class="row-name">No templates yet</span>
+            <span class="row-purpose">Adopt a standard template above or create your own to start tracking client progress.</span>
+          </div>
         }
       </div>
+
+      @if (lockedTemplatesList().length) {
+        <div class="template-list locked-list">
+          @for (template of lockedTemplatesList(); track template.id) {
+            <div class="template-row locked" [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
+              <span class="row-name">{{ template.name }}
+                <span class="lock-badge" title="Over your current plan's template limit. Upgrade or free a slot to unlock.">🔒 Locked</span>
+              </span>
+              <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
+              <span class="row-meta">{{ template.fields.length }} fields</span>
+              <span class="row-meta">{{ template.assigned_count }} clients assigned</span>
+              @if (template.purpose) {
+                <span class="row-purpose">{{ template.purpose }}</span>
+              }
+              <div class="row-actions">
+                <button type="button" class="secondary-action compact" disabled title="Locked templates can't be edited until they unlock">Edit</button>
+                <button type="button" class="danger-action compact" (click)="deleteTemplate(template)">Delete</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
     </section>
   }
 </app-professional-page-shell>

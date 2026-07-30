@@ -9,7 +9,7 @@ from .models import ActivityNotification, NotificationPreference
 
 CATEGORIES = (
   'chat', 'forms', 'meetings', 'clients', 'templates', 'progress',
-  'reminders', 'references', 'payments', 'support', 'account',
+  'reminders', 'resources', 'payments', 'support', 'account',
   'storage', 'security', 'system',
 )
 MANDATORY_IN_APP = {'account', 'security', 'storage', 'system'}

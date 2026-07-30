@@ -3,28 +3,30 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import {
-  ReferenceCategoryRecord,
-  ReferencePayload,
-  ReferenceType,
-  ReferencesApiService,
-  ProfessionalReferenceRecord
-} from '@core/api/references-api.service';
+  ResourceCategoryRecord,
+  ResourcePayload,
+  ResourceType,
+  ResourcesApiService,
+  ProfessionalResourceRecord
+} from '@core/api/resources-api.service';
+import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 
 type ReferenceTypeLabel = 'Video Link' | 'PDF' | 'Text' | 'Image';
 
-const TYPE_LABELS: Record<ReferenceType, ReferenceTypeLabel> = {
+const TYPE_LABELS: Record<ResourceType, ReferenceTypeLabel> = {
   video_link: 'Video Link',
   pdf: 'PDF',
   image: 'Image',
   text_note: 'Text'
 };
 
-const TYPE_VALUES: Record<ReferenceTypeLabel, ReferenceType> = {
+const TYPE_VALUES: Record<ReferenceTypeLabel, ResourceType> = {
   'Video Link': 'video_link',
   'PDF': 'pdf',
   'Image': 'image',
@@ -69,18 +71,125 @@ interface CategoryForm {
 @Component({
   selector: 'app-professional-references',
   standalone: true,
-  imports: [DatePipe, FormsModule, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, DragDropModule, ProfessionalPageShellComponent],
   templateUrl: './professional-references.component.html',
   styleUrl: './professional-references.component.scss'
 })
 export class ProfessionalReferencesComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer);
-  private readonly referencesApi = inject(ReferencesApiService);
+  private readonly referencesApi = inject(ResourcesApiService);
+  private readonly planLockApi = inject(PlanLockApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+
+  // Plan-limit lock system: a category/resource beyond the current plan's
+  // count limit is "locked" (never deleted). Locked categories lock every
+  // resource inside them too, regardless of the resource's own rank. Only
+  // currently-active items can be reordered or edited; locked ones can
+  // still be deleted (which frees a slot and promotes the next one).
+  readonly lockStatus = signal<PlanLockStatus | null>(null);
+
+  isCategoryLocked(categoryId: number): boolean {
+    return this.lockStatus()?.categories.locked_ids.includes(categoryId) ?? false;
+  }
+
+  isResourceLocked(resourceId: number): boolean {
+    return this.lockStatus()?.resources.locked_ids.includes(resourceId) ?? false;
+  }
+
+  // Categories are a flat, professional-wide list, so display order is
+  // always derived straight from lockStatus.categories.active_ids -- never a
+  // separately-tracked local array -- so dragging can never drift out of
+  // sync with what the backend thinks the order is.
+  orderedActiveCategories(): ResourceCategoryRecord[] {
+    const activeIds = this.lockStatus()?.categories.active_ids ?? [];
+    const byId = new Map(this.categories().map((category) => [category.id, category]));
+    return activeIds.map((id) => byId.get(id)).filter((category): category is ResourceCategoryRecord => !!category);
+  }
+
+  lockedCategoriesList(): ResourceCategoryRecord[] {
+    const lockedIds = new Set(this.lockStatus()?.categories.locked_ids ?? []);
+    return this.categories().filter((category) => lockedIds.has(category.id));
+  }
+
+  dropCategory(event: CdkDragDrop<ResourceCategoryRecord[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const reordered = this.orderedActiveCategories();
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    const orderedIds = reordered.map((category) => category.id);
+
+    const current = this.lockStatus();
+    if (current) {
+      this.lockStatus.set({ ...current, categories: { ...current.categories, active_ids: orderedIds } });
+    }
+
+    this.planLockApi.reorder('categories', orderedIds).subscribe({
+      next: (response) => this.lockStatus.set(response.lock_status),
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Could not reorder categories.'));
+        this.loadLockStatus();
+      }
+    });
+  }
+
+  // Resources are ranked professional-wide (not per subcategory), but the
+  // library only shows one subcategory's worth at a time. Dragging within a
+  // subcategory reorders just that visible subset while preserving the
+  // exact slots those resources occupy in the full ranking, so priority
+  // between resources in other categories/subcategories is untouched.
+  orderedActiveResourcesFor(categoryName: string, subcategory: string): ProfessionalReferenceView[] {
+    const activeIds = this.lockStatus()?.resources.active_ids ?? [];
+    const byId = new Map(this.references().map((reference) => [reference.id, reference]));
+    return activeIds
+      .map((id) => byId.get(id))
+      .filter(
+        (reference): reference is ProfessionalReferenceView =>
+          !!reference && reference.category === categoryName && reference.subcategory === subcategory
+      );
+  }
+
+  lockedResourcesFor(categoryName: string, subcategory: string): ProfessionalReferenceView[] {
+    const lockedIds = new Set(this.lockStatus()?.resources.locked_ids ?? []);
+    return this.references().filter(
+      (reference) => reference.category === categoryName && reference.subcategory === subcategory && lockedIds.has(reference.id)
+    );
+  }
+
+  dropResource(event: CdkDragDrop<ProfessionalReferenceView[]>, categoryName: string, subcategory: string): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const scoped = this.orderedActiveResourcesFor(categoryName, subcategory);
+    moveItemInArray(scoped, event.previousIndex, event.currentIndex);
+    const scopedIds = scoped.map((reference) => reference.id);
+    const scopedIdSet = new Set(scopedIds);
+
+    const fullActiveIds = this.lockStatus()?.resources.active_ids ?? [];
+    let cursor = 0;
+    const mergedIds = fullActiveIds.map((id) => (scopedIdSet.has(id) ? scopedIds[cursor++] : id));
+
+    const current = this.lockStatus();
+    if (current) {
+      this.lockStatus.set({ ...current, resources: { ...current.resources, active_ids: mergedIds } });
+    }
+
+    this.planLockApi.reorder('resources', mergedIds).subscribe({
+      next: (response) => this.lockStatus.set(response.lock_status),
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Could not reorder resources.'));
+        this.loadLockStatus();
+      }
+    });
+  }
+
+  private loadLockStatus(): void {
+    this.planLockApi.getLockStatus().subscribe({
+      next: (response) => this.lockStatus.set(response.lock_status)
+    });
+  }
 
   readonly types: ReferenceTypeLabel[] = ['Video Link', 'PDF', 'Text', 'Image'];
   readonly references = signal<ProfessionalReferenceView[]>([]);
-  readonly categories = signal<ReferenceCategoryRecord[]>([]);
+  readonly categories = signal<ResourceCategoryRecord[]>([]);
   readonly selectedCategory = signal('All References');
   readonly selectedReferenceId = signal(0);
   readonly expandedCategory = signal('');
@@ -135,6 +244,7 @@ export class ProfessionalReferencesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadLibrary();
+    this.loadLockStatus();
   }
 
   selectCategory(category: string): void {
@@ -182,15 +292,15 @@ export class ProfessionalReferencesComponent implements OnInit {
     });
   }
 
-  addReference(type: ReferenceTypeLabel = 'Video Link', category?: ReferenceCategoryRecord, subcategory = ''): void {
+  addReference(type: ReferenceTypeLabel = 'Video Link', category?: ResourceCategoryRecord, subcategory = ''): void {
     if (this.referenceLimitReached()) {
-      this.message.set('You have reached the Version 1 reference limit.');
+      this.message.set('You have reached the Version 1 resource limit.');
       return;
     }
 
     if (!this.categories().length) {
       this.addCategory();
-      this.message.set('Create a category first, then add references inside it.');
+      this.message.set('Create a category first, then add resources inside it.');
       return;
     }
 
@@ -206,7 +316,7 @@ export class ProfessionalReferencesComponent implements OnInit {
     this.message.set('');
   }
 
-  addSubcategory(category: ReferenceCategoryRecord): void {
+  addSubcategory(category: ResourceCategoryRecord): void {
     this.categoryEditorMode.set('subcategory');
     this.categoryForm = {
       categoryId: category.id,
@@ -218,7 +328,7 @@ export class ProfessionalReferencesComponent implements OnInit {
     this.message.set('');
   }
 
-  editCategory(category: ReferenceCategoryRecord): void {
+  editCategory(category: ResourceCategoryRecord): void {
     this.categoryEditorMode.set('edit');
     this.categoryForm = {
       categoryId: category.id,
@@ -260,6 +370,7 @@ export class ProfessionalReferencesComponent implements OnInit {
         this.isCategoryEditorOpen.set(false);
         this.isSaving.set(false);
         this.message.set(response.message);
+        this.loadLockStatus();
       },
       error: (error: unknown) => {
         this.isSaving.set(false);
@@ -287,29 +398,29 @@ export class ProfessionalReferencesComponent implements OnInit {
 
   duplicateReference(reference: ProfessionalReferenceView): void {
     if (this.referenceLimitReached()) {
-      this.message.set('You have reached the Version 1 reference limit.');
+      this.message.set('You have reached the Version 1 resource limit.');
       return;
     }
 
-    const payload: ReferencePayload = {
+    const payload: ResourcePayload = {
       category: reference.categoryId,
       subcategory: reference.subcategory,
       title: `${reference.title} Copy`,
-      reference_type: TYPE_VALUES[reference.type],
+      resource_type: TYPE_VALUES[reference.type],
       description: reference.description,
       link: reference.link || reference.fileUrl,
       tags: reference.tags
     };
 
-    this.referencesApi.createReference(payload).subscribe({
+    this.referencesApi.createResource(payload).subscribe({
       next: (response) => {
-        this.references.set([this.toView(response.reference), ...this.references()]);
+        this.references.set([this.toView(response.resource), ...this.references()]);
         this.referenceUsage.update((usage) => ({ ...usage, used: usage.used + 1 }));
-        this.selectedReferenceId.set(response.reference.id);
-        this.message.set('Reference duplicated.');
+        this.selectedReferenceId.set(response.resource.id);
+        this.message.set('Resource duplicated.');
       },
       error: (error: unknown) => {
-        this.message.set(formatApiError(error, 'Reference could not be duplicated.'));
+        this.message.set(formatApiError(error, 'Resource could not be duplicated.'));
       }
     });
   }
@@ -319,35 +430,36 @@ export class ProfessionalReferencesComponent implements OnInit {
       kind: 'delete',
       title: 'Delete',
       target: reference.title,
-      impact: 'This reference will be removed from the library and may no longer be available to connected templates. This action may not be reversible.',
-      confirmLabel: 'Delete Reference'
+      impact: 'This resource will be removed from the library and may no longer be available to connected templates. This action may not be reversible.',
+      confirmLabel: 'Delete Resource'
     });
 
     if (!confirmed) {
       return;
     }
 
-    this.referencesApi.deleteReference(reference.id).subscribe({
+    this.referencesApi.deleteResource(reference.id).subscribe({
       next: () => {
         const remaining = this.references().filter((item) => item.id !== reference.id);
         this.references.set(remaining);
         this.referenceUsage.update((usage) => ({ ...usage, used: Math.max(0, usage.used - 1) }));
         this.selectedReferenceId.set(remaining[0]?.id || 0);
-        this.message.set('Reference deleted.');
+        this.message.set('Resource deleted.');
         this.loadCategoriesOnly();
+        this.loadLockStatus();
       },
       error: (error: unknown) => {
-        this.message.set(formatApiError(error, 'Reference could not be deleted.'));
+        this.message.set(formatApiError(error, 'Resource could not be deleted.'));
       }
     });
   }
 
-  async deleteCategory(category: ReferenceCategoryRecord): Promise<void> {
+  async deleteCategory(category: ResourceCategoryRecord): Promise<void> {
     const confirmed = await this.confirmation.confirm({
       kind: 'delete',
       title: 'Delete',
       target: category.name,
-      impact: 'This category can only be deleted when it contains no references. Connected content may be affected.',
+      impact: 'This category can only be deleted when it contains no resources. Connected content may be affected.',
       confirmLabel: 'Delete Category'
     });
 
@@ -359,17 +471,18 @@ export class ProfessionalReferencesComponent implements OnInit {
       next: (response) => {
         this.categories.set(this.categories().filter((item) => item.id !== category.id));
         this.message.set(response.message);
+        this.loadLockStatus();
       },
       error: (error: unknown) => this.message.set(formatApiError(error, 'Category could not be deleted.'))
     });
   }
 
-  async deleteSubcategory(category: ReferenceCategoryRecord, subcategory: string): Promise<void> {
+  async deleteSubcategory(category: ResourceCategoryRecord, subcategory: string): Promise<void> {
     const confirmed = await this.confirmation.confirm({
       kind: 'delete',
       title: 'Delete subcategory',
       target: subcategory,
-      impact: 'The subcategory can only be removed safely when its references have been moved or deleted.',
+      impact: 'The subcategory can only be removed safely when its resources have been moved or deleted.',
       confirmLabel: 'Delete Subcategory'
     });
 
@@ -395,11 +508,11 @@ export class ProfessionalReferencesComponent implements OnInit {
       return;
     }
 
-    const payload: ReferencePayload = {
+    const payload: ResourcePayload = {
       category: this.form.categoryId as number,
       subcategory: this.form.subcategory.trim(),
       title: this.form.title.trim(),
-      reference_type: TYPE_VALUES[this.form.type],
+      resource_type: TYPE_VALUES[this.form.type],
       description: this.form.description.trim(),
       link: this.form.link.trim(),
       tags: this.form.tagsText
@@ -410,13 +523,13 @@ export class ProfessionalReferencesComponent implements OnInit {
     };
     const isUpdate = Boolean(this.form.id);
     const request = isUpdate
-      ? this.referencesApi.updateReference(this.form.id, payload)
-      : this.referencesApi.createReference(payload);
+      ? this.referencesApi.updateResource(this.form.id, payload)
+      : this.referencesApi.createResource(payload);
 
     this.isSaving.set(true);
     request.subscribe({
       next: (response) => {
-        const view = this.toView(response.reference);
+        const view = this.toView(response.resource);
         const references = this.references();
         this.references.set(
           isUpdate ? references.map((reference) => (reference.id === view.id ? view : reference)) : [view, ...references]
@@ -430,10 +543,11 @@ export class ProfessionalReferencesComponent implements OnInit {
         this.isSaving.set(false);
         this.message.set(response.message);
         this.loadCategoriesOnly();
+        this.loadLockStatus();
       },
       error: (error: unknown) => {
         this.isSaving.set(false);
-        this.message.set(formatApiError(error, 'Reference could not be saved.'));
+        this.message.set(formatApiError(error, 'Resource could not be saved.'));
       }
     });
   }
@@ -448,12 +562,12 @@ export class ProfessionalReferencesComponent implements OnInit {
 
     if (this.form.type === 'PDF') {
       if (file.type !== 'application/pdf') {
-        this.message.set('Only PDF uploads are supported for PDF references.');
+        this.message.set('Only PDF uploads are supported for PDF resources.');
         input.value = '';
         return;
       }
     } else if (!file.type.startsWith('image/')) {
-      this.message.set('Only image uploads are supported for image references.');
+      this.message.set('Only image uploads are supported for image resources.');
       input.value = '';
       return;
     }
@@ -500,14 +614,14 @@ export class ProfessionalReferencesComponent implements OnInit {
       next: (response) => this.categories.set(response.categories),
       error: (error: unknown) => this.message.set(formatApiError(error, 'Categories could not be loaded.'))
     });
-    this.referencesApi.getReferences().subscribe({
+    this.referencesApi.getResources().subscribe({
       next: (response) => {
-        const views = response.references.map((reference) => this.toView(reference));
+        const views = response.resources.map((reference) => this.toView(reference));
         this.references.set(views);
         this.referenceUsage.set(response.usage);
         this.selectedReferenceId.set(views[0]?.id || 0);
       },
-      error: (error: unknown) => this.message.set(formatApiError(error, 'References could not be loaded.'))
+      error: (error: unknown) => this.message.set(formatApiError(error, 'Resources could not be loaded.'))
     });
   }
 
@@ -517,14 +631,14 @@ export class ProfessionalReferencesComponent implements OnInit {
     });
   }
 
-  private toView(reference: ProfessionalReferenceRecord): ProfessionalReferenceView {
+  private toView(reference: ProfessionalResourceRecord): ProfessionalReferenceView {
     return {
       id: reference.id,
       title: reference.title,
       category: reference.category_name,
       categoryId: reference.category,
       subcategory: reference.subcategory,
-      type: TYPE_LABELS[reference.reference_type],
+      type: TYPE_LABELS[reference.resource_type],
       description: reference.description,
       link: reference.link,
       fileName: reference.file_name,
@@ -536,7 +650,7 @@ export class ProfessionalReferencesComponent implements OnInit {
 
   private validateForm(): string {
     if (!this.form.title.trim()) {
-      return 'Add a title for this reference.';
+      return 'Add a title for this resource.';
     }
 
     if (!this.form.categoryId) {
@@ -562,7 +676,7 @@ export class ProfessionalReferencesComponent implements OnInit {
     }
 
     if (this.form.type === 'Text' && !this.form.description.trim()) {
-      return 'Add text for this reference.';
+      return 'Add text for this resource.';
     }
 
     if (this.form.type === 'Image' && !this.form.file && !this.form.fileName) {
@@ -572,7 +686,7 @@ export class ProfessionalReferencesComponent implements OnInit {
     return '';
   }
 
-  private emptyForm(type: ReferenceTypeLabel = 'Video Link', providedCategory?: ReferenceCategoryRecord, subcategory = ''): ReferenceForm {
+  private emptyForm(type: ReferenceTypeLabel = 'Video Link', providedCategory?: ResourceCategoryRecord, subcategory = ''): ReferenceForm {
     const selectedCategory = this.selectedCategory();
     const category =
       providedCategory ||

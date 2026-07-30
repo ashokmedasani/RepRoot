@@ -216,6 +216,12 @@ h3 {
   color: #b42318;
 }
 
+.state-note {
+  margin: 1rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.9rem;
+}
+
 .methods-header {
   display: flex;
   align-items: flex-start;

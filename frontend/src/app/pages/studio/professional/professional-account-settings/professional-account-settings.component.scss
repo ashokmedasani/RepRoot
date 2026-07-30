@@ -92,6 +92,13 @@ h2 {
   padding-top: 1.2rem;
 }
 
+.section-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .section-note {
   max-width: 42rem;
   margin: 0.35rem 0 0;
@@ -104,7 +111,20 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   gap: 1rem;
-  align-items: end;
+  align-items: start;
+}
+
+.field-help {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.45;
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.error-text {
+  color: #d92d20;
 }
 
 .code-form {
@@ -1098,17 +1118,95 @@ button:disabled {
   margin: 0;
 }
 
+.membership-cancellation summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.membership-cancellation summary::-webkit-details-marker {
+  display: none;
+}
+
+.membership-cancellation summary::after {
+  content: '▾';
+  color: var(--app-muted);
+  transition: transform var(--app-transition-fast, 0.15s ease);
+}
+
+.membership-cancellation[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.membership-cancellation summary span {
+  color: var(--app-muted);
+  font-size: 0.85rem;
+  margin-right: auto;
+  margin-left: 0.75rem;
+}
+
+.membership-cancellation > div,
+.membership-cancellation > .downgrade-assessment,
+.membership-cancellation > button,
+.membership-cancellation > .message {
+  margin-top: 1rem;
+}
+
+.downgrade-target-picker {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-weight: 600;
+}
+
+.downgrade-target-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
 .downgrade-assessment {
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface-soft);
+}
+
+.downgrade-assessment summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+}
+
+.downgrade-assessment summary::-webkit-details-marker {
+  display: none;
+}
+
+.downgrade-assessment summary::after {
+  content: '▾';
+  color: var(--app-muted);
+  transition: transform var(--app-transition-fast, 0.15s ease);
+}
+
+.downgrade-assessment[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.downgrade-assessment > div {
   display: grid;
   gap: 0.7rem;
-  border-radius: var(--app-radius-md);
-  padding: 1rem;
-  background: var(--app-surface-soft);
+  padding: 0 1rem 1rem;
 }
 
 .downgrade-assessment ul {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.5rem;
   margin: 0;
   padding: 0;
@@ -1118,11 +1216,13 @@ button:disabled {
 .downgrade-assessment li {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 0.6rem;
+  width: 100%;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-sm);
-  padding: 0.6rem;
+  padding: 0.6rem 0.9rem;
 }
 
 .downgrade-assessment li.exceeded {

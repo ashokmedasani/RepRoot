@@ -1,7 +1,11 @@
+import tempfile
 from datetime import timedelta
+from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -19,17 +23,20 @@ from .models import (
   ClientRegistrationForm,
   ClientReminder,
   ClientResetAudit,
+  GroupRegistrationSubmission,
   ManualPaymentProfile,
   PaymentAuditLog,
+  PaymentNotification,
   PaymentProof,
   PaymentRecord,
   PaymentRequest,
   ProfessionalPaymentSettings,
-  ReferenceCategory,
+  ResourceCategory,
   SupportIncident,
   SupportIncidentMessage,
   TemplateAssignment,
   TrackingTemplate,
+  ProfessionalAvailabilityWindow,
   ProfessionalGroup,
   ProfessionalProfile,
   UNIVERSAL_CORE_FIELDS,
@@ -168,6 +175,29 @@ class WorkflowRefinementTests(APITestCase):
     payload.update(overrides)
     return payload
 
+  @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+  def test_remove_profile_photo_deletes_file_and_clears_field(self):
+    photo = SimpleUploadedFile('avatar.png', b'fake-image-bytes', content_type='image/png')
+    self.profile.profile_photo = photo
+    self.profile.save(update_fields=['profile_photo'])
+    stored_name = self.profile.profile_photo.name
+    self.assertTrue(self.profile.profile_photo.storage.exists(stored_name))
+
+    response = self.client.delete('/api/accounts/professional/profile/photo/')
+
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertEqual(response.data['message'], 'Profile picture removed.')
+    self.assertEqual(response.data['profile']['profile_photo_url'], '')
+    self.profile.refresh_from_db()
+    self.assertFalse(self.profile.profile_photo)
+    self.assertFalse(self.profile.profile_photo.storage.exists(stored_name))
+
+  def test_remove_profile_photo_is_idempotent_when_no_photo_set(self):
+    response = self.client.delete('/api/accounts/professional/profile/photo/')
+
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertEqual(response.data['message'], 'No profile picture to remove.')
+
   def test_profile_status_preserves_completed_and_incomplete_states(self):
     response = self.client.get('/api/accounts/professional/profile/status/')
     self.assertEqual(response.status_code, 200)
@@ -242,7 +272,7 @@ class WorkflowRefinementTests(APITestCase):
     self.assertNotIn('total_bytes', response.data)
     self.assertNotIn('database_bytes', response.data)
     self.assertNotIn('quota_bytes', response.data)
-    self.assertEqual(response.data['plan_name'], 'Starter Free')
+    self.assertEqual(response.data['plan_name'], 'Free')
     self.assertGreaterEqual(response.data['usage_percent'], 0)
     self.assertIn('usage_label', response.data)
     self.assertIn('professional_profile', response.data['sections'])
@@ -271,6 +301,21 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(login.status_code, 200, login.data)
     self.assertTrue(login.data['client']['must_change_password'])
 
+  def test_new_group_registration_form_seeds_only_core_fields(self):
+    # Fixes after 1 Test Launch, Priority 5 item 7: a brand-new group's
+    # registration form must not be auto-populated with the universal
+    # personal-information template -- only the 3 locked core fields.
+    response = self.client.post(
+      '/api/accounts/professional/forms-groups/groups/',
+      {'name': 'New Cohort'},
+      format='json',
+    )
+    self.assertEqual(response.status_code, 201, response.data)
+    group_id = response.data['group']['id']
+    form = ClientRegistrationForm.objects.get(group_id=group_id)
+    field_keys = {field.get('key') for field in form.fields}
+    self.assertEqual(field_keys, {'first_name', 'last_name', 'email'})
+
   def test_group_registration_is_distinct_and_can_convert(self):
     self.client.force_authenticate(user=None)
     public_response = self.client.post(
@@ -295,6 +340,34 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(converted.status_code, 201, converted.data)
     self.assertEqual(converted.data['client_access']['onboarding_method'], ClientAccess.ONBOARDING_GROUP_REGISTRATION)
     self.assertEqual(converted.data['client_access']['reference_id'], reference_id)
+
+  def test_decline_pending_group_registration_does_not_create_client(self):
+    self.client.force_authenticate(user=None)
+    public_response = self.client.post(
+      f'/api/accounts/public/group-registration/{self.registration_form.public_slug}/',
+      {'answers': {'first_name': 'Deny', 'last_name': 'Me', 'email': 'deny@example.com'}},
+      format='json',
+    )
+    self.assertEqual(public_response.status_code, 201, public_response.data)
+
+    self.client.force_authenticate(self.user)
+    group_response = self.client.get(f'/api/accounts/professional/forms-groups/groups/{self.group.id}/clients/')
+    submission_id = group_response.data['registration_submissions'][0]['id']
+
+    decline_response = self.client.post(
+      f'/api/accounts/professional/forms-groups/groups/{self.group.id}/registration-submissions/{submission_id}/decline/'
+    )
+    self.assertEqual(decline_response.status_code, 200, decline_response.data)
+
+    submission = GroupRegistrationSubmission.objects.get(id=submission_id)
+    self.assertEqual(submission.status, GroupRegistrationSubmission.STATUS_DELETED)
+    self.assertFalse(ClientAccess.objects.filter(email='deny@example.com').exists())
+
+    # Declining again (already resolved) should not be found a second time.
+    repeat_response = self.client.post(
+      f'/api/accounts/professional/forms-groups/groups/{self.group.id}/registration-submissions/{submission_id}/decline/'
+    )
+    self.assertEqual(repeat_response.status_code, 404, repeat_response.data)
 
   def test_schedule_summary_includes_required_pending_and_completed_kpis(self):
     response = self.client.post(
@@ -373,16 +446,22 @@ class WorkflowRefinementTests(APITestCase):
     self.assertEqual(dashboard.data['summary']['due_7_days'], 2)
     self.assertEqual(dashboard.data['schedules'][0]['title'], 'Overdue check-in')
 
-  @override_settings(REPROOT_PLAN_LIMITS={'references': 1, 'categories': 10, 'subcategories_per_category': 5})
-  def test_reference_limit_is_reported_and_enforced(self):
-    category = ReferenceCategory.objects.create(professional=self.user, name='Exercises', subcategories=['Back'])
+  @override_settings(REPROOT_PLAN_TIERS={
+    **settings.REPROOT_PLAN_TIERS,
+    'starter_free': {
+      **settings.REPROOT_PLAN_TIERS['starter_free'],
+      'resources': 1, 'categories': 10, 'subcategories_per_category': 5,
+    },
+  })
+  def test_resource_limit_is_reported_and_enforced(self):
+    category = ResourceCategory.objects.create(professional=self.user, name='Exercises', subcategories=['Back'])
     first = self.client.post(
-      '/api/accounts/professional/references/',
+      '/api/accounts/professional/resources/',
       {
         'category': category.id,
         'subcategory': 'Back',
         'title': 'Row guide',
-        'reference_type': 'text_note',
+        'resource_type': 'text_note',
         'description': 'Keep the spine neutral.',
         'link': '',
         'tags': 'back',
@@ -390,15 +469,15 @@ class WorkflowRefinementTests(APITestCase):
       format='multipart',
     )
     self.assertEqual(first.status_code, 201, first.data)
-    listing = self.client.get('/api/accounts/professional/references/')
+    listing = self.client.get('/api/accounts/professional/resources/')
     self.assertEqual(listing.data['usage'], {'used': 1, 'limit': 1})
     second = self.client.post(
-      '/api/accounts/professional/references/',
+      '/api/accounts/professional/resources/',
       {
         'category': category.id,
         'subcategory': 'Back',
         'title': 'Second guide',
-        'reference_type': 'text_note',
+        'resource_type': 'text_note',
         'description': 'Blocked by the plan limit.',
         'link': '',
         'tags': '',
@@ -406,7 +485,7 @@ class WorkflowRefinementTests(APITestCase):
       format='multipart',
     )
     self.assertEqual(second.status_code, 400)
-    self.assertEqual(second.data['message'], 'You have reached the Version 1 reference limit.')
+    self.assertEqual(second.data['message'], 'You have reached the Version 1 resource limit.')
 
   def test_client_deletion_request_reaches_professional_and_deactivates_on_approval(self):
     created = self.client.post(
@@ -617,6 +696,61 @@ class WorkflowRefinementTests(APITestCase):
     deleted = self.client.delete(f'/api/accounts/professional/templates/{template_id}/')
     self.assertEqual(deleted.status_code, 200, deleted.data)
     self.assertFalse(TrackingTemplate.objects.filter(id=template_id).exists())
+
+
+class ProfessionalAvailabilityWindowTests(APITestCase):
+  def setUp(self):
+    self.user = get_user_model().objects.create_user(
+      username='schedule-pro', email='schedule-pro@example.com', password='Professional!123',
+    )
+    ProfessionalProfile.objects.create(user=self.user, professional_id='schedule-pro')
+    self.client.force_authenticate(self.user)
+
+  def test_overlapping_block_on_same_weekday_is_rejected(self):
+    first = self.client.post(
+      '/api/accounts/professional/scheduling/availability-windows/',
+      {'weekday': 0, 'start_time': '09:00', 'end_time': '12:00'},
+      format='json',
+    )
+    self.assertEqual(first.status_code, 201, first.data)
+
+    overlapping = self.client.post(
+      '/api/accounts/professional/scheduling/availability-windows/',
+      {'weekday': 0, 'start_time': '11:00', 'end_time': '13:00'},
+      format='json',
+    )
+    self.assertEqual(overlapping.status_code, 400, overlapping.data)
+
+    non_overlapping = self.client.post(
+      '/api/accounts/professional/scheduling/availability-windows/',
+      {'weekday': 0, 'start_time': '14:00', 'end_time': '16:00'},
+      format='json',
+    )
+    self.assertEqual(non_overlapping.status_code, 201, non_overlapping.data)
+
+  def test_copy_weekday_schedule_to_multiple_days_skips_overlaps(self):
+    ProfessionalAvailabilityWindow.objects.create(
+      professional=self.user, weekday=0, start_time='09:00', end_time='12:00'
+    )
+    # Tuesday already has a conflicting block -- it should be skipped, not duplicated or errored on.
+    ProfessionalAvailabilityWindow.objects.create(
+      professional=self.user, weekday=1, start_time='10:00', end_time='11:00'
+    )
+
+    response = self.client.post(
+      '/api/accounts/professional/scheduling/availability-windows/copy/',
+      {'from_weekday': 0, 'to_weekdays': [1, 2]},
+      format='json',
+    )
+
+    self.assertEqual(response.status_code, 200, response.data)
+    # Only Wednesday (weekday 2) should have received the copied block.
+    self.assertEqual(
+      ProfessionalAvailabilityWindow.objects.filter(professional=self.user, weekday=2).count(), 1
+    )
+    self.assertEqual(
+      ProfessionalAvailabilityWindow.objects.filter(professional=self.user, weekday=1).count(), 1
+    )
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -1083,3 +1217,177 @@ class ClientPaymentsWorkflowTests(APITestCase):
     row.description = 'rewritten'
     with self.assertRaises(ValueError):
       row.save()
+
+  # --- Priority 11: unread payment notifications, single source of truth ---
+
+  def test_client_unread_payment_count_clears_only_when_that_request_is_opened(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+    other_request_id = self.create_request(method_id, title='August Coaching Fee')
+
+    self.client.force_authenticate(user=None)
+    unread = self.client.get('/api/accounts/client/payments/notifications/', HTTP_AUTHORIZATION=self.client_auth_header)
+    self.assertEqual(unread.status_code, 200, unread.data)
+    self.assertEqual(unread.data['unread_count'], 2)
+    self.assertEqual({item['payload']['request_id'] for item in unread.data['items']}, {request_id, other_request_id})
+
+    detail = self.client.get(
+      '/api/accounts/client/payments/requests/' + request_id + '/', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(detail.status_code, 200, detail.data)
+
+    after = self.client.get('/api/accounts/client/payments/notifications/', HTTP_AUTHORIZATION=self.client_auth_header)
+    self.assertEqual(after.data['unread_count'], 1)
+    self.assertEqual(after.data['items'][0]['payload']['request_id'], other_request_id)
+
+  def test_professional_unread_payment_count_clears_when_request_is_opened(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    # Client viewing the request notifies the professional (request_viewed).
+    self.client.force_authenticate(user=None)
+    self.client.get('/api/accounts/client/payments/requests/' + request_id + '/', HTTP_AUTHORIZATION=self.client_auth_header)
+
+    self.client.force_authenticate(self.user)
+    unread = self.client.get('/api/accounts/professional/payments/notifications/')
+    self.assertEqual(unread.status_code, 200, unread.data)
+    self.assertEqual(unread.data['unread_count'], 1)
+
+    detail = self.client.get('/api/accounts/professional/payments/requests/' + request_id + '/')
+    self.assertEqual(detail.status_code, 200, detail.data)
+
+    after = self.client.get('/api/accounts/professional/payments/notifications/')
+    self.assertEqual(after.data['unread_count'], 0)
+
+  def test_general_notification_bell_stays_in_sync_with_payment_unread_count(self):
+    """payment_notifications.py dual-writes into both PaymentNotification (the
+    payments-specific counter) and ActivityNotification (category='payments',
+    backing the general bell). Viewing the request must clear both, or the
+    two indicators would disagree - the exact bug this priority item fixes."""
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    self.client.force_authenticate(user=None)
+    bell_before = self.client.get(
+      '/api/accounts/client/notifications/?category=payments', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(bell_before.status_code, 200, bell_before.data)
+    self.assertEqual(bell_before.data['unread_count'], 1)
+
+    detail = self.client.get(
+      '/api/accounts/client/payments/requests/' + request_id + '/', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(detail.status_code, 200, detail.data)
+
+    bell_after = self.client.get(
+      '/api/accounts/client/notifications/?category=payments', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(bell_after.data['unread_count'], 0)
+
+  def test_mark_read_requires_request_id_or_mark_all(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    self.create_request(method_id)
+
+    self.client.force_authenticate(user=None)
+    response = self.client.post(
+      '/api/accounts/client/payments/notifications/', {}, format='json', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(response.status_code, 400, response.data)
+
+  def test_mark_all_read_clears_every_unread_notification(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    self.create_request(method_id)
+    self.create_request(method_id, title='Second request')
+
+    self.client.force_authenticate(user=None)
+    response = self.client.post(
+      '/api/accounts/client/payments/notifications/', {'mark_all': True}, format='json',
+      HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertEqual(response.data['unread_count'], 0)
+    self.assertFalse(PaymentNotification.objects.filter(recipient_client_id=self.client_access_id, is_read=False).exists())
+
+
+def _fake_google_tokeninfo(email, sub, email_verified='true'):
+  response = type('Response', (), {})()
+  response.status_code = 200
+  response.json = lambda: {
+    'aud': 'test-google-client-id',
+    'iss': 'accounts.google.com',
+    'email': email,
+    'email_verified': email_verified,
+    'sub': sub,
+    'given_name': 'Test',
+    'family_name': 'Trainer',
+  }
+  return response
+
+
+@override_settings(GOOGLE_OAUTH_CLIENT_ID='test-google-client-id', GOOGLE_OAUTH_ENABLED=True)
+class ProfessionalGoogleAuthTests(APITestCase):
+  url = '/api/accounts/professional/auth/google/'
+
+  @patch('accounts.google_oauth.requests.get')
+  def test_new_google_user_creates_professional_account(self, mock_get):
+    mock_get.return_value = _fake_google_tokeninfo('new.trainer@example.test', 'google-sub-1')
+
+    response = self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+
+    self.assertEqual(response.status_code, 201, response.data)
+    self.assertTrue(response.data['is_new_account'])
+    self.assertIn('token', response.data)
+    self.assertEqual(response.data['professional']['email'], 'new.trainer@example.test')
+    self.assertFalse(response.data['professional']['profile_setup_completed'])
+
+    User = get_user_model()
+    user = User.objects.get(email='new.trainer@example.test')
+    self.assertFalse(user.has_usable_password())
+    self.assertEqual(user.professional_profile.google_sub, 'google-sub-1')
+
+  @patch('accounts.google_oauth.requests.get')
+  def test_returning_google_user_logs_in_without_duplicate_account(self, mock_get):
+    mock_get.return_value = _fake_google_tokeninfo('returning@example.test', 'google-sub-2')
+    self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+
+    User = get_user_model()
+    self.assertEqual(User.objects.filter(email='returning@example.test').count(), 1)
+
+    response = self.client.post(self.url, {'credential': 'fake-token-again'}, format='json')
+
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertFalse(response.data['is_new_account'])
+    self.assertEqual(User.objects.filter(email='returning@example.test').count(), 1)
+
+  @patch('accounts.google_oauth.requests.get')
+  def test_existing_password_account_is_linked_not_duplicated(self, mock_get):
+    User = get_user_model()
+    existing_user = User.objects.create_user('linkme', 'linkme@example.test', 'Strong!Pass7')
+    ProfessionalProfile.objects.create(user=existing_user)
+
+    mock_get.return_value = _fake_google_tokeninfo('linkme@example.test', 'google-sub-3')
+
+    response = self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertFalse(response.data['is_new_account'])
+    self.assertEqual(User.objects.filter(email='linkme@example.test').count(), 1)
+    existing_user.refresh_from_db()
+    self.assertEqual(existing_user.professional_profile.google_sub, 'google-sub-3')
+    # Password sign-in must still work after Google gets linked.
+    self.assertTrue(existing_user.check_password('Strong!Pass7'))
+
+  @patch('accounts.google_oauth.requests.get')
+  def test_unverified_google_email_is_rejected(self, mock_get):
+    mock_get.return_value = _fake_google_tokeninfo('unverified@example.test', 'google-sub-4', email_verified='false')
+
+    response = self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+
+    self.assertEqual(response.status_code, 400, response.data)
+    User = get_user_model()
+    self.assertFalse(User.objects.filter(email='unverified@example.test').exists())

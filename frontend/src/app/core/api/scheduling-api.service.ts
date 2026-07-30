@@ -7,6 +7,7 @@ declare global {
     APP_CONFIG?: {
       apiBaseUrl?: string;
       supportEmail?: string;
+      googleClientId?: string;
     };
   }
 }
@@ -39,6 +40,24 @@ export interface AvailabilityWindowRecord {
 export interface SchedulingSettingsResponse {
   settings: SchedulingSettingsRecord;
   availability_windows: AvailabilityWindowRecord[];
+}
+
+/** A single specific calendar date blocked off (holiday, vacation, one-off
+ * personal day) -- layered on top of the recurring weekly
+ * AvailabilityWindowRecord rows, not a replacement for them. */
+export interface DateOffRecord {
+  id: number;
+  date: string; // "YYYY-MM-DD"
+  created_at: string;
+}
+
+/** A recurring weekly day off (e.g. "every Monday off") -- repeats every
+ * week until removed, unlike DateOffRecord which is a single specific
+ * date. */
+export interface WeekdayOffRecord {
+  id: number;
+  weekday: number; // 0=Monday .. 6=Sunday
+  created_at: string;
 }
 
 export interface SlotEntry {
@@ -148,6 +167,60 @@ export class SchedulingApiService {
   deleteAvailabilityWindow(windowId: number): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(
       `${this.apiBaseUrl}/professional/scheduling/availability-windows/${windowId}/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  copyAvailabilityWindows(fromWeekday: number, toWeekdays: number[]): Observable<{ availability_windows: AvailabilityWindowRecord[]; message: string }> {
+    return this.http.post<{ availability_windows: AvailabilityWindowRecord[]; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/availability-windows/copy/`,
+      { from_weekday: fromWeekday, to_weekdays: toWeekdays },
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  // --- Days off (specific-date overrides) --------------------------------
+
+  listDateOffs(): Observable<{ date_offs: DateOffRecord[] }> {
+    return this.http.get<{ date_offs: DateOffRecord[] }>(
+      `${this.apiBaseUrl}/professional/scheduling/date-offs/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  addDateOff(date: string): Observable<{ date_off: DateOffRecord; message: string }> {
+    return this.http.post<{ date_off: DateOffRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/date-offs/`,
+      { date },
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  deleteDateOff(dateOffId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/date-offs/${dateOffId}/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  listWeekdayOffs(): Observable<{ weekday_offs: WeekdayOffRecord[] }> {
+    return this.http.get<{ weekday_offs: WeekdayOffRecord[] }>(
+      `${this.apiBaseUrl}/professional/scheduling/weekday-offs/`,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  addWeekdayOff(weekday: number): Observable<{ weekday_off: WeekdayOffRecord; message: string }> {
+    return this.http.post<{ weekday_off: WeekdayOffRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/weekday-offs/`,
+      { weekday },
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  deleteWeekdayOff(weekdayOffId: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/weekday-offs/${weekdayOffId}/`,
       { headers: this.getProfessionalAuthHeaders() }
     );
   }

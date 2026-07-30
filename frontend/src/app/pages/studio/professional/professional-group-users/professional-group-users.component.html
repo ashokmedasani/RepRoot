@@ -67,14 +67,19 @@
             </div>
             <div class="overview-cards">
               <div>
-                <span>Approved users</span>
-                <strong>{{ activeClients.length }}</strong>
-                <p>Clients with portal access.</p>
+                <span>Total users</span>
+                <strong>{{ clients.length }}</strong>
+                <p>All clients ever added to this group.</p>
               </div>
               <div>
-                <span>Form fields</span>
-                <strong>{{ registrationFields.length }}</strong>
-                <p>Registration fields saved for this group.</p>
+                <span>Approved count</span>
+                <strong>{{ activeClients.length }}</strong>
+                <p>Clients with active portal access.</p>
+              </div>
+              <div>
+                <span>Pending count</span>
+                <strong>{{ registrationSubmissions.length }}</strong>
+                <p>Registration requests awaiting your review.</p>
               </div>
               <div>
                 <span>Pending invites</span>
@@ -84,42 +89,10 @@
             </div>
           </article>
 
-          <article class="panel pending-registration-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Pending Group Registrations</h2>
-                <p>New form responses that need your review before client access is created.</p>
-              </div>
-              <span class="pending-count" [class.has-requests]="registrationSubmissions.length > 0">
-                {{ registrationSubmissions.length }}
-              </span>
-            </div>
-            <app-fixed-height-list [visibleRows]="5">
-              <div class="registration-list">
-                @for (submission of registrationSubmissions; track submission.id) {
-                  <article>
-                    <div>
-                      <strong>{{ submission.applicant_name }}</strong>
-                      <span>{{ submission.email }}</span>
-                      <small>{{ submission.reference_id }} &middot; {{ submission.submitted_at | date: 'medium' }}</small>
-                    </div>
-                    <a
-                      [routerLink]="['/professional/groups', group.id, 'clients', 'add']"
-                      [queryParams]="{ registrationSubmissionId: submission.id }"
-                      class="primary-action compact"
-                    >Review Request</a>
-                  </article>
-                } @empty {
-                  <p class="empty-registration-message">No pending registration requests.</p>
-                }
-              </div>
-            </app-fixed-height-list>
-          </article>
-
           <article class="panel recent-approved-panel">
             <div class="panel-header">
               <div>
-                <h2>Recent Approved Users</h2>
+                <h2>Recent Activity</h2>
                 <p>Latest active clients in this group.</p>
               </div>
             </div>
@@ -136,6 +109,58 @@
                 <p>No approved users yet.</p>
               }
             </div>
+          </article>
+        </section>
+      }
+
+      @if (activeTab === 'pending-users') {
+        <section class="overview-stack">
+          <article class="panel pending-registration-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Pending Users</h2>
+                <p>New registration requests that need your review before client access is created.</p>
+              </div>
+              <span class="pending-count" [class.has-requests]="registrationSubmissions.length > 0">
+                {{ registrationSubmissions.length }}
+              </span>
+            </div>
+            <app-fixed-height-list [visibleRows]="8">
+              <div class="registration-list">
+                @for (submission of registrationSubmissions; track submission.id) {
+                  <article>
+                    <div>
+                      <strong>{{ submission.applicant_name }}</strong>
+                      <span>{{ submission.email }}</span>
+                      <small>
+                        {{ submission.reference_id }} &middot; Source: Group Registration Form &middot;
+                        Submitted {{ submission.submitted_at | date: 'medium' }}
+                      </small>
+                      @if (missingRequiredFields(submission).length > 0) {
+                        <small class="missing-fields-note">
+                          Missing: {{ missingRequiredFields(submission).join(', ') }}
+                        </small>
+                      }
+                    </div>
+                    <div class="pending-actions">
+                      <a
+                        [routerLink]="['/professional/groups', group.id, 'clients', 'add']"
+                        [queryParams]="{ registrationSubmissionId: submission.id }"
+                        class="primary-action compact"
+                      >Approve</a>
+                      <button
+                        type="button"
+                        class="ghost-action compact danger"
+                        [disabled]="decliningSubmissionId === submission.id"
+                        (click)="declineSubmission(submission)"
+                      >{{ decliningSubmissionId === submission.id ? 'Declining...' : 'Decline' }}</button>
+                    </div>
+                  </article>
+                } @empty {
+                  <p class="empty-registration-message">No pending registration requests.</p>
+                }
+              </div>
+            </app-fixed-height-list>
           </article>
         </section>
       }

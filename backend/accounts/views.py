@@ -26,7 +26,16 @@ from rest_framework.views import APIView
 
 from admin_portal.models import ErrorLog, FinanceLedgerEntry, record_error
 
-from . import account_lifecycle, billing, feature_access, razorpay_billing, recycle_bin, subscription_cancellation
+from . import (
+  account_lifecycle,
+  billing,
+  feature_access,
+  plan_lock_status,
+  razorpay_billing,
+  recycle_bin,
+  resource_cold_storage,
+  subscription_cancellation,
+)
 from .models import (
   default_client_registration_fields,
   ChatMessage,
@@ -41,7 +50,7 @@ from .models import (
   ProgressEntry,
   RecycledProfessionalAccount,
   RecycleBinItem,
-  ReferenceCategory,
+  ResourceCategory,
   SupportIncident,
   SupportIncidentMessage,
   TemplateAssignment,
@@ -52,7 +61,7 @@ from .models import (
   ProfessionalProfile,
   ProfessionalAvailabilityWindow,
   ProfessionalSchedulingSettings,
-  ProfessionalReference,
+  ProfessionalResource,
 )
 from .serializers import (
   ChatMessageSerializer,
@@ -82,14 +91,15 @@ from .serializers import (
   PublicLeadFormSerializer,
   PublicLeadSubmissionSerializer,
   PublicGroupRegistrationSerializer,
-  ReferenceCategorySerializer,
+  ResourceCategorySerializer,
   SupportIncidentCreateSerializer,
   SupportIncidentSerializer,
   TemplateAssignmentSerializer,
   TrackingEntrySerializer,
-  TrackingTemplateReferenceSerializer,
+  TrackingTemplateResourceSerializer,
   TrackingTemplateSerializer,
   ProfessionalAccountSerializer,
+  ProfessionalGoogleAuthSerializer,
   ProfessionalGroupSerializer,
   ProfessionalLeadFormSerializer,
   ProfessionalLoginSerializer,
@@ -97,7 +107,7 @@ from .serializers import (
   ProfessionalProfileSerializer,
   normalize_profile_visibility,
   ProfessionalProfileStatusSerializer,
-  ProfessionalReferenceSerializer,
+  ProfessionalResourceSerializer,
   ProfessionalSignupSerializer,
   UsernameAvailabilitySerializer,
 )
@@ -526,6 +536,37 @@ class ProfessionalLoginView(APIView):
     )
 
 
+class ProfessionalGoogleAuthView(APIView):
+  """Handles both "Continue with Google" signup and "Log in with Google".
+
+  The frontend posts the same Google Identity Services credential regardless
+  of whether the professional is new; ProfessionalGoogleAuthSerializer /
+  google_oauth.get_or_create_professional_for_google decide whether to
+  create an account, link an existing password account, or just log in.
+  """
+
+  permission_classes = [permissions.AllowAny]
+  throttle_classes = [ScopedRateThrottle]
+  throttle_scope = 'auth'
+
+  def post(self, request):
+    serializer = ProfessionalGoogleAuthSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.validated_data['user']
+    created = serializer.validated_data['created']
+    token, _created = Token.objects.get_or_create(user=user)
+
+    return Response(
+      {
+        'token': token.key,
+        'professional': ProfessionalAccountSerializer(user).data,
+        'is_new_account': created,
+        'message': 'Professional account created successfully.' if created else 'Professional login successful.',
+      },
+      status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
+
+
 class ClientLoginView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
@@ -642,7 +683,7 @@ class ProfessionalOnboardingStatusView(APIView):
       'form': ProfessionalLeadForm.objects.filter(professional=request.user).exists(),
       'group': ProfessionalGroup.objects.filter(professional=request.user, is_active=True).exists(),
       'template': TrackingTemplate.objects.filter(professional=request.user, is_active=True).exists(),
-      'reference': ProfessionalReference.objects.filter(professional=request.user).exists(),
+      'resource': ProfessionalResource.objects.filter(professional=request.user).exists(),
       'meeting_setup': ProfessionalAvailabilityWindow.objects.filter(
         professional=request.user, is_active=True
       ).exists(),
@@ -652,7 +693,7 @@ class ProfessionalOnboardingStatusView(APIView):
       'form': '/professional/forms/create',
       'group': '/professional/groups/create',
       'template': '/professional/templates/create',
-      'reference': '/professional/references',
+      'resource': '/professional/resource',
       'meeting_setup': '/professional/schedule',
     }
     labels = {
@@ -660,27 +701,50 @@ class ProfessionalOnboardingStatusView(APIView):
       'form': 'Create Form',
       'group': 'Create Group',
       'template': 'Create Template',
-      'reference': 'Add Reference',
+      'resource': 'Add Resource',
       'meeting_setup': 'Complete Meeting Setup',
     }
+    # Short forms for the compact dashboard card -- deliberately terse so the
+    # "Action Required" card doesn't grow tall with a full sentence per item.
+    short_nouns = {
+      'profile': 'profile',
+      'form': 'form',
+      'group': 'group',
+      'template': 'template',
+      'resource': 'resource',
+      'meeting_setup': 'meeting setup',
+    }
+    single_action_phrases = {
+      'profile': 'completing your profile',
+      'form': 'creating a form',
+      'group': 'creating a group',
+      'template': 'creating a template',
+      'resource': 'adding a resource',
+      'meeting_setup': 'completing your meeting setup',
+    }
     missing = [key for key, complete in checks.items() if not complete]
+
+    if not missing:
+      message = ''
+    elif len(missing) == 1:
+      message = f'Complete your workspace by {single_action_phrases[missing[0]]}.'
+    else:
+      nouns = [short_nouns[key] for key in missing]
+      message = 'Complete your workspace: ' + ', '.join(nouns[:-1]) + f', and {nouns[-1]}.'
+
     return Response({
       'profile_complete': checks['profile'],
       'form_created': checks['form'],
       'group_created': checks['group'],
       'template_created': checks['template'],
-      'reference_created': checks['reference'],
+      'resource_created': checks['resource'],
       'meeting_setup_complete': checks['meeting_setup'],
       'missing_actions': missing,
       'actions': [
         {'code': key, 'label': labels[key], 'route': routes[key]}
         for key in missing
       ],
-      'message': (
-        ''
-        if not missing
-        else 'Action required: complete ' + ', '.join(labels[key].lower() for key in missing) + '.'
-      ),
+      'message': message,
     })
 
 
@@ -769,7 +833,6 @@ class ProfessionalBillingStatusView(APIView):
         'plan_renews_at': profile.plan_renews_at,
         'cancellation_requested_at': profile.cancellation_requested_at,
         'cancellation_effective_at': profile.cancellation_effective_at,
-        'cancellation_force_cleanup': profile.cancellation_force_cleanup,
         'downgrade_assessment': subscription_cancellation.downgrade_assessment(request.user),
         'has_billing_account': bool(profile.razorpay_payment_link_id or profile.stripe_customer_id),
         'billing_configured': settings.REPROOT_BILLING_TEST_MODE,
@@ -815,10 +878,8 @@ class ProfessionalBillingCheckoutView(APIView):
       )
       profile.cancellation_requested_at = None
       profile.cancellation_effective_at = None
-      profile.cancellation_force_cleanup = False
       profile.save(update_fields=[
-        'plan_tier', 'plan_renews_at', 'cancellation_requested_at',
-        'cancellation_effective_at', 'cancellation_force_cleanup',
+        'plan_tier', 'plan_renews_at', 'cancellation_requested_at', 'cancellation_effective_at',
       ])
       account_lifecycle.reactivate_on_upgrade(profile)
       return Response({
@@ -875,60 +936,74 @@ class ProfessionalBillingCheckoutView(APIView):
     return Response({'checkout_url': checkout_url})
 
 
+def _allowed_downgrade_targets(plan_tier):
+  """Which tiers a professional on the given plan_tier may self-serve
+  downgrade to. Premium can step down to Pro (a softer landing) or all the
+  way to Free; Pro can only go to Free, since there's nothing between Pro
+  and Free in the 3-tier lineup."""
+  if plan_tier in (ProfessionalProfile.PLAN_PREMIUM_UNLIMITED, ProfessionalProfile.PLAN_PREMIUM):
+    return ('starter_free', 'pro')
+  return ('starter_free',)
+
+
 class ProfessionalBillingCancelView(APIView):
   """Self-serve 'cancel plan' — the missing piece that left professionals
-  stuck once they'd been moved off Starter Free with no way back."""
+  stuck once they'd been moved off the Free plan with no way back. Also
+  lets a Premium professional choose Pro as a softer downgrade target
+  instead of dropping straight to Free."""
 
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    return Response(subscription_cancellation.downgrade_assessment(request.user))
+    profile = request.user.professional_profile
+    target_tier_code = request.query_params.get('target_tier', 'starter_free')
+    if target_tier_code not in _allowed_downgrade_targets(profile.plan_tier):
+      return Response({'message': 'Invalid downgrade target for your current plan.'}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(subscription_cancellation.downgrade_assessment(request.user, target_tier_code))
 
   def post(self, request):
     profile = request.user.professional_profile
     if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
-      return Response({'message': 'This professional is already on Starter Free.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'This professional is already on the Free plan.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    assessment = subscription_cancellation.downgrade_assessment(request.user)
-    force_cleanup = bool(request.data.get('force_cleanup'))
+    target_tier_code = request.data.get('target_tier', 'starter_free')
+    if target_tier_code not in _allowed_downgrade_targets(profile.plan_tier):
+      return Response({'message': 'Invalid downgrade target for your current plan.'}, status=status.HTTP_400_BAD_REQUEST)
+    target_name = settings.REPROOT_PLAN_TIERS[target_tier_code]['name']
+
+    # Nothing about the plan-limit lock system blocks cancellation -- any
+    # group/lead form/template/resource/category over the target tier's
+    # limits simply locks (never deleted), and any client in a group that
+    # locks loses portal access without losing their data. Only genuine
+    # storage overage -- the separate, unmodified byte-quota pipeline -- can
+    # still block a self-serve cancellation, since that data genuinely
+    # can't be deleted automatically.
+    assessment = subscription_cancellation.downgrade_assessment(request.user, target_tier_code)
     if not assessment['storage']['eligible']:
       support = settings.SUPPORT_EMAIL or 'the configured support team'
       return Response({
         'message': (
-          f'Your storage is {assessment["storage"]["free_tier_percent"]}% of the Free allowance. '
+          f'Your storage is {assessment["storage"]["free_tier_percent"]}% of the {target_name} allowance. '
           f'Self-service cancellation is blocked because storage cannot be deleted automatically. Contact {support}.'
         ),
         'assessment': assessment,
       }, status=status.HTTP_409_CONFLICT)
 
-    if not assessment['eligible'] and not force_cleanup:
-      return Response({
-        'message': 'Your workspace exceeds one or more Free-plan limits. Review the listed items or confirm forced cleanup.',
-        'requires_force_confirmation': True,
-        'assessment': assessment,
-      }, status=status.HTTP_409_CONFLICT)
-
-    confirmation = str(request.data.get('confirmation', '')).strip()
-    if force_cleanup and confirmation != 'DELETE EXCESS PLAN DATA':
-      return Response({
-        'message': 'Type DELETE EXCESS PLAN DATA to schedule forced cleanup.',
-        'requires_force_confirmation': True,
-        'assessment': assessment,
-      }, status=status.HTTP_400_BAD_REQUEST)
-
-    effective_at = subscription_cancellation.schedule_cancellation(profile, force_cleanup=force_cleanup)
+    effective_at = subscription_cancellation.schedule_cancellation(profile, target_tier_code)
     return Response({
-      'message': 'Membership cancellation scheduled. Your paid plan remains active until the displayed expiry date.',
+      'message': (
+        f'Membership cancellation scheduled. Your paid plan remains active until the displayed expiry date. '
+        f'Nothing is deleted at any point -- anything over the {target_name} plan\'s limits will simply lock, '
+        f'and you can unlock it again any time by upgrading.'
+      ),
       'cancellation_effective_at': effective_at,
-      'forced_cleanup_scheduled': force_cleanup,
-      'clients_preserved': True,
       'assessment': assessment,
     })
 
   def legacy_post(self, request):
     profile = request.user.professional_profile
     if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
-      return Response({'message': 'This professional is already on Starter Free.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'This professional is already on the Free plan.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if profile.razorpay_payment_id:
       return Response({
@@ -947,7 +1022,7 @@ class ProfessionalBillingCancelView(APIView):
       # it) have nothing for Stripe to cancel, so apply the downgrade directly.
       account_lifecycle.downgrade_to_starter_free_voluntarily(profile)
 
-    return Response({'message': 'Plan cancelled — moving to Starter Free.'})
+    return Response({'message': 'Plan cancelled — moving to the Free plan.'})
 
 
 class ProfessionalBillingPortalView(APIView):
@@ -1184,6 +1259,41 @@ class ProfessionalProfileView(APIView):
     return self.post(request)
 
 
+class ProfessionalProfilePhotoRemoveView(APIView):
+  """Dedicated, authorized action to remove a professional's custom profile
+  picture. Deleting via the generic profile save endpoint is intentionally
+  not supported for this field -- clearing a FileField through a partial
+  multipart update is error-prone, so removal gets its own explicit action
+  per the "Fixes after 1 Test Launch" spec (item 3)."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def delete(self, request):
+    profile = request.user.professional_profile
+    file_name = profile.profile_photo.name if profile.profile_photo else ''
+
+    if not file_name:
+      return Response(
+        {
+          'profile': ProfessionalProfileSerializer(profile, context={'request': request}).data,
+          'message': 'No profile picture to remove.',
+        }
+      )
+
+    if default_storage.exists(file_name):
+      default_storage.delete(file_name)
+
+    profile.profile_photo = ''
+    profile.save(update_fields=['profile_photo', 'updated_at'])
+
+    return Response(
+      {
+        'profile': ProfessionalProfileSerializer(profile, context={'request': request}).data,
+        'message': 'Profile picture removed.',
+      }
+    )
+
+
 class ProfessionalProfileVisibilityView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
@@ -1298,6 +1408,10 @@ class ProfessionalLeadFormView(APIView):
       lead_form = ProfessionalLeadForm.objects.filter(id=form_id, professional=request.user).first()
       if lead_form is None:
         return Response({'message': 'Lead form not found.'}, status=status.HTTP_404_NOT_FOUND)
+      try:
+        feature_access.assert_item_not_locked(request.user, 'lead_forms', lead_form.id)
+      except feature_access.FeatureAccessError as exc:
+        return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
     else:
       form_limit = plan_limit(request.user, 'lead_forms')
       current_count = ProfessionalLeadForm.objects.filter(professional=request.user).count()
@@ -1318,6 +1432,7 @@ class ProfessionalLeadFormView(APIView):
       serializer.save()
     else:
       serializer.save(professional=request.user, public_slug=generate_unique_slug())
+      plan_lock_status.bust_lock_status_cache(request.user)
 
     return Response(
       {
@@ -1368,6 +1483,8 @@ class ProfessionalGroupListView(APIView):
     except IntegrityError:
       return Response({'message': 'Group Name must be unique for this professional.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    plan_lock_status.bust_lock_status_cache(request.user)
+
     # Seed the universal client creation form so every group has one from the
     # start. A registration form is mandatory before a lead can be converted
     # into a client; the professional can still customise these fields afterwards.
@@ -1402,6 +1519,11 @@ class ProfessionalGroupDetailView(APIView):
     if group is None:
       return Response({'message': 'Group not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    try:
+      feature_access.assert_item_not_locked(request.user, 'groups', group.id)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
     serializer = ProfessionalGroupSerializer(group, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
 
@@ -1411,6 +1533,51 @@ class ProfessionalGroupDetailView(APIView):
       return Response({'message': 'Group Name must be unique for this professional.'}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({'group': ProfessionalGroupSerializer(group).data, 'message': 'Group updated successfully.'})
+
+
+class PlanLockStatusView(APIView):
+  """Read-only view of which of the professional's groups/lead forms/
+  templates/categories/resources are currently active vs. locked under the
+  plan-limit lock system, so the frontend can render lock badges/reasons
+  (and know which ids are eligible for the reorder endpoint below)."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    return Response({'lock_status': plan_lock_status.compute_lock_status(request.user)})
+
+
+class PlanLockReorderView(APIView):
+  """Lets a professional set their own priority order among their currently
+  ACTIVE items of one of the five counted models. Locked items can never be
+  reordered directly -- see plan_lock_status.reorder_active_items for the
+  full rationale. Expects {'model_key': 'groups'|'lead_forms'|'templates'|
+  'categories'|'resources', 'ordered_ids': [id, id, ...]}."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request):
+    model_key = request.data.get('model_key')
+    ordered_ids = request.data.get('ordered_ids')
+
+    if model_key not in plan_lock_status.MODEL_MAP:
+      return Response({'message': 'Unknown model_key.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not isinstance(ordered_ids, list) or not ordered_ids:
+      return Response({'message': 'ordered_ids must be a non-empty list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      plan_lock_status.reorder_active_items(request.user, model_key, ordered_ids)
+    except (plan_lock_status.ReorderError, ValueError, TypeError) as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Reordering categories changes which ones are active, which cascades to
+    # which resources are locked -- reordering resources changes the resource
+    # rank directly. Either way, heavy locked resources may need to move.
+    if model_key in ('categories', 'resources'):
+      resource_cold_storage.sync_resource_cold_storage(request.user)
+
+    return Response({'lock_status': plan_lock_status.compute_lock_status(request.user), 'message': 'Order updated.'})
 
 
 class ClientRegistrationFormView(APIView):
@@ -1817,6 +1984,33 @@ class GroupClientAccessListView(APIView):
         'registration_submissions': GroupRegistrationSubmissionSerializer(registration_submissions, many=True).data,
       }
     )
+
+
+class GroupRegistrationSubmissionDeclineView(APIView):
+  """Decline a pending group registration request (Pending Users tab).
+
+  Distinct from approval (ManualClientAccessCreateView with
+  registration_submission_id): no client account is created, and the
+  submission moves out of Pending Users without becoming Approved Users.
+  """
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, group_id, submission_id):
+    submission = GroupRegistrationSubmission.objects.filter(
+      id=submission_id,
+      group_id=group_id,
+      group__professional=request.user,
+      status=GroupRegistrationSubmission.STATUS_PENDING,
+    ).first()
+
+    if submission is None:
+      return Response({'message': 'Pending registration request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    submission.status = GroupRegistrationSubmission.STATUS_DELETED
+    submission.save(update_fields=['status', 'updated_at'])
+
+    return Response({'message': 'Registration request declined.'})
 
 
 class ClientAccessDetailView(APIView):
@@ -2604,20 +2798,20 @@ class ClientAccessDeleteView(APIView):
     return Response({'message': 'Client account moved to Recycle Bin.'})
 
 
-class ProfessionalReferenceCategoryListView(APIView):
+class ProfessionalResourceCategoryListView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    categories = ReferenceCategory.objects.filter(professional=request.user)
-    return Response({'categories': ReferenceCategorySerializer(categories, many=True).data})
+    categories = ResourceCategory.objects.filter(professional=request.user)
+    return Response({'categories': ResourceCategorySerializer(categories, many=True).data})
 
   def post(self, request):
     category_limit = plan_limit(request.user, 'categories')
 
-    if category_limit is not None and ReferenceCategory.objects.filter(professional=request.user).count() >= category_limit:
+    if category_limit is not None and ResourceCategory.objects.filter(professional=request.user).count() >= category_limit:
       return Response({'message': 'The Version 1 category limit has been reached.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer = ReferenceCategorySerializer(data=request.data)
+    serializer = ResourceCategorySerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
     subcategory_limit = plan_limit(request.user, 'subcategories_per_category')
@@ -2630,20 +2824,22 @@ class ProfessionalReferenceCategoryListView(APIView):
     except IntegrityError:
       return Response({'message': 'Category name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    plan_lock_status.bust_lock_status_cache(request.user)
+
     return Response(
       {
-        'category': ReferenceCategorySerializer(category).data,
+        'category': ResourceCategorySerializer(category).data,
         'message': 'Category saved successfully.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
-class ProfessionalReferenceCategoryDetailView(APIView):
+class ProfessionalResourceCategoryDetailView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get_category(self, request, category_id):
-    return ReferenceCategory.objects.filter(id=category_id, professional=request.user).first()
+    return ResourceCategory.objects.filter(id=category_id, professional=request.user).first()
 
   def put(self, request, category_id):
     category = self.get_category(request, category_id)
@@ -2651,7 +2847,12 @@ class ProfessionalReferenceCategoryDetailView(APIView):
     if category is None:
       return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = ReferenceCategorySerializer(category, data=request.data, partial=True)
+    try:
+      feature_access.assert_item_not_locked(request.user, 'categories', category.id)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ResourceCategorySerializer(category, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
 
     subcategory_limit = plan_limit(request.user, 'subcategories_per_category')
@@ -2665,7 +2866,7 @@ class ProfessionalReferenceCategoryDetailView(APIView):
     except IntegrityError:
       return Response({'message': 'Category name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'category': ReferenceCategorySerializer(category).data, 'message': 'Category updated successfully.'})
+    return Response({'category': ResourceCategorySerializer(category).data, 'message': 'Category updated successfully.'})
 
   def delete(self, request, category_id):
     category = self.get_category(request, category_id)
@@ -2677,76 +2878,89 @@ class ProfessionalReferenceCategoryDetailView(APIView):
       category.delete()
     except ProtectedError:
       return Response(
-        {'message': 'Category still has references. Move or delete them first.'},
+        {'message': 'Category still has resources. Move or delete them first.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
+
+    plan_lock_status.bust_lock_status_cache(request.user)
+    resource_cold_storage.sync_resource_cold_storage(request.user)
 
     return Response({'message': 'Category deleted.'})
 
 
-class ProfessionalReferenceListView(APIView):
+class ProfessionalResourceListView(APIView):
   permission_classes = [ProfessionalAccessPermission]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
   def get(self, request):
-    references = ProfessionalReference.objects.filter(professional=request.user).select_related('category')
-    reference_limit = plan_limit(request.user, 'references')
+    resources = ProfessionalResource.objects.filter(professional=request.user).select_related('category')
+    resource_limit = plan_limit(request.user, 'resources')
     return Response(
       {
-        'references': ProfessionalReferenceSerializer(references, many=True, context={'request': request}).data,
-        'usage': {'used': references.count(), 'limit': reference_limit},
+        'resources': ProfessionalResourceSerializer(resources, many=True, context={'request': request}).data,
+        'usage': {'used': resources.count(), 'limit': resource_limit},
       }
     )
 
   def post(self, request):
-    reference_limit = plan_limit(request.user, 'references')
+    resource_limit = plan_limit(request.user, 'resources')
 
-    if reference_limit is not None and ProfessionalReference.objects.filter(professional=request.user).count() >= reference_limit:
+    if resource_limit is not None and ProfessionalResource.objects.filter(professional=request.user).count() >= resource_limit:
       return Response(
-        {'message': 'You have reached the Version 1 reference limit.'},
+        {'message': 'You have reached the Version 1 resource limit.'},
         status=status.HTTP_400_BAD_REQUEST,
       )
 
-    serializer = ProfessionalReferenceSerializer(data=request.data, context={'request': request})
+    serializer = ProfessionalResourceSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
     category = serializer.validated_data.get('category')
 
     if category is None or category.professional_id != request.user.id:
       return Response({'message': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    reference = serializer.save(professional=request.user)
+    resource = serializer.save(professional=request.user)
+    plan_lock_status.bust_lock_status_cache(request.user)
+    # Covers the edge case of a resource created directly into an already-
+    # locked category -- it should land in cold storage immediately, not
+    # wait for the next unrelated lock-status change to notice it.
+    resource_cold_storage.sync_resource_cold_storage(request.user)
 
     return Response(
       {
-        'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data,
-        'message': 'Reference saved successfully.',
+        'resource': ProfessionalResourceSerializer(resource, context={'request': request}).data,
+        'message': 'Resource saved successfully.',
       },
       status=status.HTTP_201_CREATED,
     )
 
 
-class ProfessionalReferenceDetailView(APIView):
+class ProfessionalResourceDetailView(APIView):
   permission_classes = [ProfessionalAccessPermission]
   parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-  def get_reference(self, request, reference_id):
-    return ProfessionalReference.objects.filter(id=reference_id, professional=request.user).select_related('category').first()
+  def get_resource(self, request, resource_id):
+    return ProfessionalResource.objects.filter(id=resource_id, professional=request.user).select_related('category').first()
 
-  def get(self, request, reference_id):
-    reference = self.get_reference(request, reference_id)
+  def get(self, request, resource_id):
+    resource = self.get_resource(request, resource_id)
 
-    if reference is None:
-      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    return Response({'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data})
+    return Response({'resource': ProfessionalResourceSerializer(resource, context={'request': request}).data})
 
-  def put(self, request, reference_id):
-    reference = self.get_reference(request, reference_id)
+  def put(self, request, resource_id):
+    resource = self.get_resource(request, resource_id)
 
-    if reference is None:
-      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = ProfessionalReferenceSerializer(reference, data=request.data, partial=True, context={'request': request})
+    try:
+      feature_access.assert_item_not_locked(request.user, 'resources', resource.id)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ProfessionalResourceSerializer(resource, data=request.data, partial=True, context={'request': request})
     serializer.is_valid(raise_exception=True)
     category = serializer.validated_data.get('category')
 
@@ -2757,19 +2971,113 @@ class ProfessionalReferenceDetailView(APIView):
 
     return Response(
       {
-        'reference': ProfessionalReferenceSerializer(reference, context={'request': request}).data,
-        'message': 'Reference updated successfully.',
+        'resource': ProfessionalResourceSerializer(resource, context={'request': request}).data,
+        'message': 'Resource updated successfully.',
       }
     )
 
-  def delete(self, request, reference_id):
-    reference = self.get_reference(request, reference_id)
+  def delete(self, request, resource_id):
+    resource = self.get_resource(request, resource_id)
 
-    if reference is None:
-      return Response({'message': 'Reference not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    recycle_bin.soft_delete_reference(reference)
-    return Response({'message': 'Reference moved to Recycle Bin.'})
+    recycle_bin.soft_delete_resource(resource)
+    plan_lock_status.bust_lock_status_cache(request.user)
+    resource_cold_storage.sync_resource_cold_storage(request.user)
+    return Response({'message': 'Resource moved to Recycle Bin.'})
+
+
+class ResourceAssignedClientsView(APIView):
+  """Lists which clients currently have this resource shared with them via a
+  template assignment. Used by the professional-facing "locked resource"
+  view -- a locked resource that's still shared with clients needs to show
+  exactly who's affected, with a way to unassign it (see the two views
+  below), per the plan-lock design's 3.2."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get_resource(self, request, resource_id):
+    return ProfessionalResource.objects.filter(id=resource_id, professional=request.user).first()
+
+  def get(self, request, resource_id):
+    resource = self.get_resource(request, resource_id)
+
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignments = (
+      resource.template_assignments.select_related('client', 'template')
+      .order_by('client__first_name', 'client__last_name')
+    )
+
+    return Response({
+      'resource_id': resource.id,
+      'resource_title': resource.title,
+      'assigned_clients': [
+        {
+          'assignment_id': assignment.id,
+          'client_id': assignment.client_id,
+          'client_name': f'{assignment.client.first_name} {assignment.client.last_name}'.strip(),
+          'template_id': assignment.template_id,
+          'template_name': assignment.template.name,
+        }
+        for assignment in assignments
+      ],
+    })
+
+
+class ResourceUnassignClientView(APIView):
+  """Removes this resource from a single client's template assignment,
+  without deleting the resource or the assignment itself -- only the M2M
+  link between them. The counterpart bulk action is
+  ResourceUnassignAllClientsView below."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, resource_id):
+    resource = ProfessionalResource.objects.filter(id=resource_id, professional=request.user).first()
+
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment_id = request.data.get('assignment_id')
+    assignment = TemplateAssignment.objects.filter(
+      id=assignment_id, client__professional=request.user, resources=resource
+    ).select_related('client').first()
+
+    if assignment is None:
+      return Response({'message': 'Assignment not found for this resource.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignment.resources.remove(resource)
+
+    return Response({
+      'message': f'Unassigned {resource.title} from {assignment.client.first_name}.',
+    })
+
+
+class ResourceUnassignAllClientsView(APIView):
+  """Bulk version of ResourceUnassignClientView -- clears this resource from
+  every client it's currently shared with in one action."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, resource_id):
+    resource = ProfessionalResource.objects.filter(id=resource_id, professional=request.user).first()
+
+    if resource is None:
+      return Response({'message': 'Resource not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    assignments = TemplateAssignment.objects.filter(client__professional=request.user, resources=resource)
+    affected_count = assignments.count()
+
+    for assignment in assignments:
+      assignment.resources.remove(resource)
+
+    return Response({
+      'message': f'Unassigned {resource.title} from {affected_count} {"client" if affected_count == 1 else "clients"}.',
+      'affected_count': affected_count,
+    })
 
 
 class StandardTemplateListView(APIView):
@@ -2812,6 +3120,8 @@ class StandardTemplateAdoptView(APIView):
     except IntegrityError:
       return Response({'message': 'A template with this name already exists.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    plan_lock_status.bust_lock_status_cache(request.user)
+
     return Response(
       {
         'template': TrackingTemplateSerializer(template, context={'request': request}).data,
@@ -2847,6 +3157,8 @@ class TrackingTemplateListView(APIView):
     except IntegrityError:
       return Response({'message': 'Template name must be unique.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    plan_lock_status.bust_lock_status_cache(request.user)
+
     return Response(
       {
         'template': TrackingTemplateSerializer(template, context={'request': request}).data,
@@ -2875,6 +3187,11 @@ class TrackingTemplateDetailView(APIView):
 
     if template is None:
       return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+      feature_access.assert_item_not_locked(request.user, 'templates', template.id)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = TrackingTemplateSerializer(template, data=request.data, partial=True, context={'request': request})
     serializer.is_valid(raise_exception=True)
@@ -2917,6 +3234,7 @@ class TrackingTemplateDetailView(APIView):
       )
 
     template.delete()
+    plan_lock_status.bust_lock_status_cache(request.user)
     return Response({'message': 'Template deleted. Past client entries are kept.'})
 
 
@@ -2935,7 +3253,7 @@ class ClientTemplateAssignmentListView(APIView):
     assignments = (
       client_access.template_assignments.filter(template__is_active=True)
       .select_related('template')
-      .prefetch_related('references__category')
+      .prefetch_related('resources__category')
     )
     return Response({'assignments': TemplateAssignmentSerializer(assignments, many=True, context={'request': request}).data})
 
@@ -2954,6 +3272,11 @@ class ClientTemplateAssignmentListView(APIView):
     if template is None:
       return Response({'message': 'Template not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    try:
+      feature_access.assert_item_not_locked(request.user, 'templates', template.id)
+    except feature_access.FeatureAccessError as exc:
+      return Response({'message': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
     access_level = request.data.get('client_access_level') or TemplateAssignment.ACCESS_EDITABLE
     valid_access_levels = {choice for choice, _ in TemplateAssignment.CLIENT_ACCESS_LEVEL_CHOICES}
 
@@ -2967,7 +3290,7 @@ class ClientTemplateAssignmentListView(APIView):
     if not created:
       return Response({'message': 'Template is already assigned to this client.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    set_assignment_references(assignment, request.user, request.data.get('reference_ids'))
+    set_assignment_resources(assignment, request.user, request.data.get('reference_ids'))
 
     return Response(
       {
@@ -2978,12 +3301,16 @@ class ClientTemplateAssignmentListView(APIView):
     )
 
 
-def set_assignment_references(assignment, professional, reference_ids):
-  if reference_ids is None or not isinstance(reference_ids, list):
+def set_assignment_resources(assignment, professional, resource_ids):
+  if resource_ids is None or not isinstance(resource_ids, list):
     return
 
-  references = ProfessionalReference.objects.filter(professional=professional, id__in=reference_ids)
-  assignment.references.set(references)
+  # Locked resources (over the current plan's limit) are silently excluded --
+  # they shouldn't be assignable to a client while locked, but this isn't a
+  # user-facing error since the professional's UI shouldn't offer them anyway.
+  locked_ids = set(plan_lock_status.compute_lock_status(professional)['resources']['locked_ids'])
+  resources = ProfessionalResource.objects.filter(professional=professional, id__in=resource_ids).exclude(id__in=locked_ids)
+  assignment.resources.set(resources)
 
 
 class ClientTemplateAssignmentDetailView(APIView):
@@ -3002,7 +3329,7 @@ class ClientTemplateAssignmentDetailView(APIView):
     if assignment is None:
       return Response({'message': 'Template assignment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    set_assignment_references(assignment, request.user, request.data.get('reference_ids'))
+    set_assignment_resources(assignment, request.user, request.data.get('reference_ids'))
 
     if 'client_access_level' in request.data:
       access_level = request.data.get('client_access_level') or TemplateAssignment.ACCESS_EDITABLE
@@ -3259,7 +3586,10 @@ class ClientDashboardView(APIView):
     now = timezone.localtime()
     week_start = now.date() - timedelta(days=now.weekday())
     entries = client_access.tracking_entries.all()
-    assignments = client_access.template_assignments.filter(template__is_active=True)
+    locked_template_ids = plan_lock_status.compute_lock_status(client_access.professional)['templates']['locked_ids']
+    assignments = client_access.template_assignments.filter(template__is_active=True).exclude(
+      template_id__in=locked_template_ids
+    )
     reminders = list(client_access.reminders.filter(status=ClientReminder.STATUS_PENDING))
 
     def reminder_datetime(reminder):
@@ -3493,11 +3823,20 @@ class ClientTemplateListView(APIView):
   permission_classes = [IsAuthenticatedClient]
 
   def get(self, request):
+    # Plan-limit lock system: a locked template or resource simply doesn't
+    # exist from the client's point of view -- no error, no "unavailable"
+    # message, just absent, exactly as if it were never assigned. See
+    # DOWNGRADE_LOCK_SYSTEM_PLAN.md 3.3.
+    lock_status = plan_lock_status.compute_lock_status(request.auth.professional)
+    locked_template_ids = lock_status['templates']['locked_ids']
+    locked_resource_ids = set(lock_status['resources']['locked_ids'])
+
     assignments = (
       request.auth.template_assignments.filter(template__is_active=True)
       .exclude(client_access_level=TemplateAssignment.ACCESS_PRIVATE)
+      .exclude(template_id__in=locked_template_ids)
       .select_related('template')
-      .prefetch_related('references__category')
+      .prefetch_related('resources__category')
     )
     templates = []
 
@@ -3505,8 +3844,8 @@ class ClientTemplateListView(APIView):
       template_data = TrackingTemplateSerializer(assignment.template, context={'request': request}).data
       template_data['assignment_id'] = assignment.id
       template_data['client_access_level'] = assignment.client_access_level
-      template_data['references'] = TrackingTemplateReferenceSerializer(
-        assignment.references.all(),
+      template_data['resources'] = TrackingTemplateResourceSerializer(
+        assignment.resources.exclude(id__in=locked_resource_ids),
         many=True,
         context={'request': request},
       ).data
@@ -3563,6 +3902,11 @@ class ClientTrackingEntryView(APIView):
     ).select_related('template').first()
 
     if assignment is None or assignment.client_access_level == TemplateAssignment.ACCESS_PRIVATE:
+      return Response({'message': 'Template is not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if plan_lock_status.is_template_locked(client_access.professional, assignment.template_id):
+      # Same "doesn't exist" treatment as the list view -- a locked template
+      # simply isn't available to submit against, no different framing.
       return Response({'message': 'Template is not assigned to you.'}, status=status.HTTP_404_NOT_FOUND)
 
     if assignment.client_access_level == TemplateAssignment.ACCESS_VIEW_ONLY:

@@ -33,7 +33,9 @@ class ProfessionalBillingStatus {
     required this.downgradeEligible,
     required this.freeStoragePercent,
     required this.storageDowngradeEligible,
-    required this.downgradeResources,
+    required this.downgradeLocks,
+    required this.categoryCascadeResourceCount,
+    required this.clientsLosingAccess,
     required this.supportEmail,
   });
 
@@ -53,10 +55,15 @@ class ProfessionalBillingStatus {
   final String billingCurrency;
   final String billingRegion;
   final String? cancellationEffectiveAt;
+  // Never blocked by the plan-limit lock system -- only genuine storage
+  // overage (storageDowngradeEligible) can block self-serve cancellation.
+  // Nothing over the Free plan's counted limits is ever deleted; it locks.
   final bool downgradeEligible;
   final double freeStoragePercent;
   final bool storageDowngradeEligible;
-  final Map<String, Map<String, dynamic>> downgradeResources;
+  final Map<String, Map<String, dynamic>> downgradeLocks;
+  final int categoryCascadeResourceCount;
+  final List<Map<String, dynamic>> clientsLosingAccess;
   final String supportEmail;
 
   List<String> get upgradeTiers =>
@@ -86,19 +93,23 @@ class ProfessionalBillingStatus {
       downgradeEligible: assessment['eligible'] as bool? ?? true,
       freeStoragePercent: (storage['free_tier_percent'] as num?)?.toDouble() ?? 0,
       storageDowngradeEligible: storage['eligible'] as bool? ?? true,
-      downgradeResources:
-          (assessment['resources'] as Map<dynamic, dynamic>? ?? {}).map(
+      downgradeLocks: (assessment['locks'] as Map<dynamic, dynamic>? ?? {}).map(
         (key, value) => MapEntry(
           key.toString(),
           Map<String, dynamic>.from(value as Map<dynamic, dynamic>? ?? {}),
         ),
       ),
+      categoryCascadeResourceCount:
+          (assessment['category_cascade_resource_count'] as num?)?.toInt() ?? 0,
+      clientsLosingAccess: (assessment['clients_losing_access'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, dynamic>.from(e as Map<dynamic, dynamic>? ?? {}))
+          .toList(),
       supportEmail: assessment['support_email']?.toString() ?? '',
     );
   }
 }
 
-/// 'chat_message' | 'reference' | 'client_account'
+/// 'chat_message' | 'resource' | 'client_account'
 class RecycleBinItem {
   const RecycleBinItem({
     required this.id,

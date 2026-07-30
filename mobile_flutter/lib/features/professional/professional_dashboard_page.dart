@@ -405,11 +405,11 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
                 onTap: () => context.go(Routes.professionalFormsGroups),
               ),
               KpiTile(
-                label: 'References',
+                label: 'Resources',
                 icon: Icons.book_outlined,
-                value: _usage?.resourceUsage['references']?.label ?? '—',
+                value: _usage?.resourceUsage['resources']?.label ?? '—',
                 caption: 'plan usage',
-                onTap: () => context.go(Routes.professionalReferences),
+                onTap: () => context.go(Routes.professionalResources),
               ),
               KpiTile(
                 label: 'Lead Forms',

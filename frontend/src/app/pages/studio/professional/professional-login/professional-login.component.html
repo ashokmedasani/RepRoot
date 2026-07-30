@@ -29,4 +29,14 @@
       <p class="form-message">{{ loginMessage }}</p>
     }
   </form>
+
+  @if (isGoogleAvailable) {
+    <div class="auth-divider"><span>or</span></div>
+    <app-google-signin-button
+      variant="login"
+      [disabled]="isSubmitting"
+      (credential)="handleGoogleCredential($event)"
+      (unavailable)="handleGoogleUnavailable()"
+      (loadError)="handleGoogleLoadError($event)" />
+  }
 </app-auth-page-shell>

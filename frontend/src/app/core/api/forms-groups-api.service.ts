@@ -7,6 +7,7 @@ declare global {
     APP_CONFIG?: {
       apiBaseUrl?: string;
       supportEmail?: string;
+      googleClientId?: string;
     };
   }
 }
@@ -485,6 +486,14 @@ export class FormsGroupsApiService {
     return this.http.get<GroupUsersResponse>(`${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/clients/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  declineRegistrationSubmission(groupId: number, submissionId: number): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBaseUrl}/professional/forms-groups/groups/${groupId}/registration-submissions/${submissionId}/decline/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   previewGroupImport(groupId: number, file: File): Observable<GroupImportPreviewResponse> {

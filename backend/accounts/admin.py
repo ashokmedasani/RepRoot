@@ -7,14 +7,14 @@ from .models import (
   ClientRegistrationForm,
   LeadSubmission,
   RecycledProfessionalAccount,
-  ReferenceCategory,
+  ResourceCategory,
   TemplateAssignment,
   TrackingEntry,
   TrackingTemplate,
   ProfessionalGroup,
   ProfessionalLeadForm,
   ProfessionalProfile,
-  ProfessionalReference,
+  ProfessionalResource,
 )
 
 
@@ -67,17 +67,17 @@ class ClientAccessAdmin(admin.ModelAdmin):
   list_filter = ('is_active', 'must_change_password')
 
 
-@admin.register(ReferenceCategory)
-class ReferenceCategoryAdmin(admin.ModelAdmin):
+@admin.register(ResourceCategory)
+class ResourceCategoryAdmin(admin.ModelAdmin):
   list_display = ('name', 'professional', 'created_at', 'updated_at')
   search_fields = ('name', 'professional__username', 'professional__email')
 
 
-@admin.register(ProfessionalReference)
-class ProfessionalReferenceAdmin(admin.ModelAdmin):
-  list_display = ('title', 'professional', 'category', 'reference_type', 'created_at')
+@admin.register(ProfessionalResource)
+class ProfessionalResourceAdmin(admin.ModelAdmin):
+  list_display = ('title', 'professional', 'category', 'resource_type', 'created_at')
   search_fields = ('title', 'professional__username', 'category__name', 'subcategory')
-  list_filter = ('reference_type',)
+  list_filter = ('resource_type',)
 
 
 @admin.register(TrackingTemplate)

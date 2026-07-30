@@ -184,11 +184,57 @@ p {
   font-size: 0.85rem;
 }
 
+.suggestion-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.suggestion-search {
+  width: 100%;
+  max-width: 20rem;
+  min-height: 2.1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  padding: 0 0.7rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+
+.category-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.category-chip {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.category-chip-active {
+  border-color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 12%, var(--app-surface));
+  color: var(--app-primary-strong);
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.chip-row .empty-note {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 0.85rem;
 }
 
 .field-chip {

@@ -436,13 +436,13 @@ export const routes: Routes = [
     title: 'Schedule'
   },
   {
-    path: 'professional/references',
+    path: 'professional/resource',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
       import('./pages/studio/professional/professional-references/professional-references.component').then(
         (module) => module.ProfessionalReferencesComponent
       ),
-    title: 'References Library'
+    title: 'Resource Library'
   },
   {
     path: 'public/forms/:publicSlug',

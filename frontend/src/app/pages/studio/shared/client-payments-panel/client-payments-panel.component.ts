@@ -19,6 +19,7 @@ export class ClientPaymentsPanelComponent implements OnInit {
   requests: ClientPaymentRequestRecord[] = [];
   isLoading = true;
   loadError = '';
+  private unreadRequestIds = new Set<string>();
 
   ngOnInit(): void {
     this.paymentsApi.getMyPaymentRequests().subscribe({
@@ -31,7 +32,20 @@ export class ClientPaymentsPanelComponent implements OnInit {
         this.isLoading = false;
       }
     });
-    this.paymentsApi.markClientPaymentNotificationsRead().subscribe({ next: () => undefined, error: () => undefined });
+    // Only used to highlight which specific request needs attention - opening
+    // a request's own detail page is what actually marks it read (backend-driven).
+    this.paymentsApi.getClientPaymentUnread().subscribe({
+      next: (summary) => {
+        this.unreadRequestIds = new Set(
+          summary.items.map((item) => item.payload.request_id).filter((id): id is string => !!id)
+        );
+      },
+      error: () => (this.unreadRequestIds = new Set())
+    });
+  }
+
+  isUnread(request: ClientPaymentRequestRecord): boolean {
+    return this.unreadRequestIds.has(request.request_id);
   }
 
   statusLabel(statusValue: PaymentRequestStatus): string {

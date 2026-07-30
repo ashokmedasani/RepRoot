@@ -18,7 +18,7 @@ import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmat
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
 import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
 
-type GroupTab = 'overview' | 'approved-users' | 'registration-form' | 'settings';
+type GroupTab = 'overview' | 'pending-users' | 'approved-users' | 'registration-form' | 'settings';
 
 @Component({
   selector: 'app-professional-group-users',
@@ -49,10 +49,12 @@ export class ProfessionalGroupUsersComponent implements OnInit {
   isSettingsOpen = true;
   readonly tabs: { id: GroupTab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'pending-users', label: 'Pending Users' },
     { id: 'approved-users', label: 'Approved Users' },
     { id: 'registration-form', label: 'Client Registration Form' },
     { id: 'settings', label: 'Settings' }
   ];
+  decliningSubmissionId: number | null = null;
 
   // ----- bulk import wizard -----
   isImportOpen = false;
@@ -234,6 +236,49 @@ export class ProfessionalGroupUsersComponent implements OnInit {
 
   initials(client: ClientAccessRecord): string {
     return initialsFor(client.first_name, client.last_name);
+  }
+
+  /** Fields the registration form requires but this submission left blank --
+   *  surfaced as a missing-field indicator on the Pending Users tab. */
+  missingRequiredFields(submission: GroupRegistrationSubmission): string[] {
+    const answers = submission.answers || {};
+    return this.registrationFields
+      .filter((field) => field.required && !String(answers[field.key || ''] ?? '').trim())
+      .map((field) => field.label);
+  }
+
+  async declineSubmission(submission: GroupRegistrationSubmission): Promise<void> {
+    if (!this.group) {
+      return;
+    }
+
+    const confirmed = await this.confirmation.confirm({
+      kind: 'delete',
+      title: 'Decline registration request',
+      target: submission.applicant_name,
+      impact: 'This request will be removed from Pending Users. No client account will be created.',
+      confirmLabel: 'Decline Request'
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.decliningSubmissionId = submission.id;
+
+    this.formsGroupsApi.declineRegistrationSubmission(this.group.id, submission.id).subscribe({
+      next: (response) => {
+        this.registrationSubmissions = this.registrationSubmissions.filter((item) => item.id !== submission.id);
+        this.messageType = 'success';
+        this.message = response.message;
+        this.decliningSubmissionId = null;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Registration request could not be declined.');
+        this.decliningSubmissionId = null;
+      }
+    });
   }
 
   // ----- bulk import wizard -----
