@@ -36,6 +36,7 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
   proofMessage = '';
   proofMessageType: 'success' | 'error' = 'success';
   proofSubmitted = false;
+  showProofForm = true;
 
   ngOnInit(): void {
     const requestId = this.route.snapshot.paramMap.get('requestId') || '';
@@ -46,6 +47,7 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
         this.proofForm.reported_amount = response.request.requested_amount;
         this.proofForm.reported_currency = response.request.requested_currency;
         this.proofForm.payment_method = this.selectedMethod?.id ?? null;
+        this.showProofForm = !response.request.proofs.length || response.request.proofs[0]?.status === 'rejected';
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -68,7 +70,7 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
 
   get canSubmitProof(): boolean {
     if (!this.request) return false;
-    return ['sent', 'viewed', 'overdue', 'under_review', 'partially_paid'].includes(this.request.status);
+    return ['sent', 'viewed', 'proof_submitted', 'overdue', 'under_review', 'partially_paid'].includes(this.request.status);
   }
 
   /** Most recent submission the client made, so a rejection is visible instead of
@@ -108,9 +110,8 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
         this.proofSubmitted = true;
         this.proofMessageType = 'success';
         this.proofMessage = response.message;
-        if (this.request) {
-          this.request = { ...this.request, status: 'proof_submitted' };
-        }
+        this.request = response.request;
+        this.showProofForm = false;
       },
       error: (error: unknown) => {
         this.isSubmittingProof = false;
@@ -118,6 +119,18 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
         this.proofMessage = formatApiError(error, 'Your proof could not be submitted.');
       }
     });
+  }
+
+  addAnotherTransaction(): void {
+    if (!this.request || !this.canSubmitProof) return;
+    this.proofForm = this.blankProofForm();
+    this.proofForm.reported_amount = this.request.remaining_amount;
+    this.proofForm.reported_currency = this.request.requested_currency;
+    this.proofForm.payment_method = this.selectedMethod?.id ?? null;
+    this.proofFile = null;
+    this.proofMessage = '';
+    this.proofSubmitted = false;
+    this.showProofForm = true;
   }
 
   private blankProofForm() {

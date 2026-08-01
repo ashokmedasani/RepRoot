@@ -1,253 +1,104 @@
 <main class="legal-page">
   <header class="legal-topbar">
-    <a routerLink="/" class="brand">RepRoot</a>
-    <nav class="legal-nav">
-      <a routerLink="/terms" [class.active]="doc === 'terms'">Terms</a>
-      <a routerLink="/privacy" [class.active]="doc === 'privacy'">Privacy</a>
+    <a [routerLink]="audience === 'platform' ? '/' : '/portal'" class="brand">
+      @if (audience !== 'platform') {
+        <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
+      }
+      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span>@if (audience !== 'platform') { <span> Studio</span> }</span>
+    </a>
+    <nav class="legal-nav" aria-label="Legal documents">
+      <a [routerLink]="termsLink" [class.active]="doc === 'terms'">{{ documentAudience }} Terms &amp; Conditions</a>
+      <a [routerLink]="privacyLink" [class.active]="doc === 'privacy'">{{ documentAudience }} Privacy Notice</a>
+      <a routerLink="/cookies">Cookie Notice</a>
     </nav>
   </header>
 
   <article class="legal-body">
-    <p class="disclaimer" role="note">
-      This is a general template provided for convenience. It is not legal advice. Have it reviewed by a qualified
-      lawyer for your jurisdictions before you launch, and replace every [bracketed] placeholder.
-    </p>
-
     @if (doc === 'terms') {
-      <h1>Terms &amp; Conditions</h1>
-      <p class="updated">Last updated: {{ lastUpdated }}</p>
+      <h1>{{ documentAudience }} Terms &amp; Conditions</h1>
+      <p class="updated">Effective and last updated: {{ lastUpdated }}. Version {{ legalVersion }}.</p>
 
-      <section>
-        <h2>1. Who we are &amp; acceptance</h2>
-        <p>
-          RepRoot ("RepRoot", "we", "us", "our") is developed and operated by an independent individual developer.
-          RepRoot is not operated by a company, corporation, or LLC. These Terms govern your access to and use of the
-          RepRoot web application and mobile applications (together, the "Service"). By creating an account, signing
-          in, or otherwise using the Service you agree to these Terms and to our
-          <a routerLink="/privacy">Privacy Policy</a>. If you do not agree, do not use the Service.
-        </p>
-      </section>
-
-      <section>
-        <h2>2. Eligibility</h2>
-        <p>
-          You must be at least 18 years old (or the age of majority in your jurisdiction) to create a professional account.
-          Clients must be at least 16, and where required by local law a parent or guardian must consent. You confirm
-          the information you provide is accurate and that you are legally able to enter into this agreement.
-        </p>
-      </section>
-
-      <section>
-        <h2>3. Accounts &amp; security</h2>
-        <p>
-          You are responsible for safeguarding your credentials and for all activity under your account. Notify us
-          promptly of any unauthorized use. Professionals who create client login access are responsible for the accounts
-          they issue and for informing those clients how their data is handled.
-        </p>
-      </section>
-
-      <section>
-        <h2>4. The professional–client relationship</h2>
-        <p>
-          RepRoot is a tool that helps independent professionals manage clients, forms, tracking templates, and
-          communication. We are not a party to the coaching relationship between a professional and a client, do not employ
-          professionals, and do not supervise or endorse any training program, plan, or advice delivered through the Service.
-          Professionals are solely responsible for the lawfulness, accuracy, and appropriateness of the content and guidance
-          they provide.
-        </p>
-      </section>
-
-      <section>
-        <h2>5. Health &amp; medical disclaimer</h2>
-        <p>
-          The Service is for general fitness and wellness organization only. It does <strong>not</strong> provide medical
-          advice, diagnosis, or treatment, and is not a substitute for professional healthcare. Always consult a
-          qualified healthcare provider before starting any exercise or nutrition program. You use fitness guidance and
-          tracking features at your own risk.
-        </p>
-      </section>
-
-      <section>
-        <h2>6. Acceptable use</h2>
-        <p>You agree not to: use the Service unlawfully or for others' data without a lawful basis; upload malicious code;
-          attempt to breach security or access accounts that are not yours; scrape, resell, or reverse-engineer the
-          Service; or upload content that is illegal, infringing, harassing, or harmful. We may suspend accounts that
-          violate these Terms.</p>
-      </section>
-
-      <section>
-        <h2>7. User content &amp; intellectual property</h2>
-        <p>
-          You retain ownership of the content you upload (forms, templates, notes, resources, entries). You grant us a
-          limited license to host and process that content solely to operate the Service. All RepRoot software,
-          branding, and design remain our property or that of our licensors.
-        </p>
-      </section>
-
-      <section>
-        <h2>8. Third-party services</h2>
-        <p>
-          The Service may link to or embed third-party content (for example, YouTube videos or documents a professional
-          shares). We are not responsible for third-party content or services and their own terms apply.
-        </p>
-      </section>
-
-      <section>
-        <h2>9. Disclaimers &amp; limitation of liability</h2>
-        <p>
-          The Service is provided "as is" and "as available" without warranties of any kind to the extent permitted by
-          law. To the maximum extent permitted by applicable law, RepRoot will not be liable for indirect, incidental,
-          special, or consequential damages, or for loss of data, profits, or goodwill. Nothing in these Terms limits
-          liability that cannot be limited by law (including, where applicable, statutory consumer rights in the EEA, UK,
-          India, USA, and Japan).
-        </p>
-      </section>
-
-      <section>
-        <h2>10. Termination</h2>
-        <p>
-          You may stop using the Service and delete your account at any time. We may suspend or terminate access if you
-          breach these Terms, where required by law, or where an account (professional or client) has shown no sign of
-          use for an extended period — in that case we will email you advance notice before any access change takes
-          effect. On deletion, we handle your data as described in the <a routerLink="/privacy">Privacy Policy</a>.
-        </p>
-      </section>
-
-      <section>
-        <h2>11. Governing law &amp; changes</h2>
-        <p>
-          RepRoot is currently offered primarily to users in India and the United States. These Terms are governed by
-          the laws of India. If you are a resident of the United States, nothing in these Terms limits any consumer
-          protection rights available to you under applicable U.S. federal or state law. If you access the Service
-          from elsewhere, your local mandatory consumer protections still apply to the extent required by law. We may
-          update these Terms; material changes will be notified in-app or by email, and continued use after the
-          effective date means you accept the updated Terms.
-        </p>
-      </section>
-
-      <section>
-        <h2>12. Contact</h2>
-        <p>Questions about these Terms: {{ supportEmail }}.</p>
-      </section>
+      @if (audience === 'professional') {
+        <section><h2>1. Agreement and service operator</h2><p>These Terms &amp; Conditions form an agreement between you and RepRoot for your use of RepRoot Studio, a service within the RepRoot family. RepRoot Studio includes its professional portal, client portal, websites, applications, APIs, storage, communications, scheduling, payment-recording, and support features. By creating or using a professional account, you accept these Terms and the <a [routerLink]="privacyLink">Professional Privacy Notice</a>.</p></section>
+        <section><h2>2. Eligibility and professional account</h2><p>You must be at least 18 years old, legally capable of entering this agreement, and authorized to provide the services represented in your profile. Account information must be accurate and kept current. An account is personal to its registered professional and may not be sold, transferred, shared, or used to impersonate another person.</p></section>
+        <section><h2>3. RepRoot Studio's role</h2><p>RepRoot Studio provides software for organizing professional-client activity. RepRoot does not employ, supervise, certify, endorse, or act as the professional; select the information a professional requests from clients; prescribe programs or advice; or become a party to the professional-client relationship. Features do not replace professional judgment or obligations imposed by law.</p></section>
+        <section><h2>4. Professional responsibility for client information</h2><p>You determine which client forms, questions, records, templates, notes, schedules, files, and instructions are created or requested and why they are needed. You are responsible for having a lawful and appropriate purpose, providing required notices, obtaining required permission or authorization, limiting collection to what is necessary, keeping information accurate, responding to client requests, and using the information only for the disclosed professional purpose.</p></section>
+        <section><h2>5. Sensitive and health-related information</h2><p>Fitness, wellness, nutrition, injury, measurements, progress, and similar information may be sensitive. You must not collect medical, government-identifier, financial-account, child, or other highly sensitive information unless it is necessary, permitted by applicable law, and supported by all required notices and authorizations. RepRoot Studio is not a medical device, emergency service, healthcare provider, or substitute for qualified medical advice.</p></section>
+        <section><h2>6. Client access and confidentiality</h2><p>You may provide portal access only to the intended client. You must protect client confidentiality, use appropriate access settings, remove access when no longer appropriate, and avoid sharing client information with unauthorized persons. Private professional notes are for your internal professional use and must still be lawful, relevant, accurate, and respectful.</p></section>
+        <section><h2>7. Account security</h2><p>You must protect credentials and devices, use secure authentication practices, and promptly report suspected unauthorized access to {{ supportEmail }}. RepRoot may expire sessions, require re-authentication, restrict access, preserve security records, or suspend affected functionality to protect accounts, clients, and the service.</p></section>
+        <section><h2>8. Forms, groups, templates, files, and communications</h2><p>You are responsible for all content you create, upload, request, or send. Content must not be unlawful, deceptive, abusive, infringing, discriminatory, malicious, or unrelated to a legitimate professional purpose. You must have the rights and permissions required for every file, image, message, and person whose information you submit.</p></section>
+        <section><h2>9. Meetings and third-party integrations</h2><p>Scheduling and meeting tools help professionals and clients coordinate availability and requests. A meeting is not guaranteed until confirmed through the applicable workflow. Optional Google, calendar, email, storage, payment, and other integrations are also governed by their providers' terms and availability.</p></section>
+        <section><h2>10. Payment records</h2><p>RepRoot Studio may help you request payments, share external payment instructions, record manual payments, receive proof, acknowledge transactions, and generate records. Unless a supported integrated checkout expressly processes a transaction, payment occurs outside RepRoot Studio. You are responsible for amounts, currencies, instructions, acknowledgements, taxes, refunds, disputes, and legally required receipts. RepRoot does not guarantee an external payment or verify the underlying transfer.</p></section>
+        <section><h2>11. Plans, limits, and subscriptions</h2><p>Features and limits depend on the selected plan and billing period. Limits may apply to forms, groups, templates, resources, storage, retention, or other functions. Paid access, renewal, cancellation, downgrade, and expiry information will be displayed in the billing workflow. Content above a lower plan's limits may be restricted or locked until capacity is reduced or the plan changes.</p></section>
+        <section><h2>12. Ownership and processing permission</h2><p>You retain rights you lawfully hold in your content. You grant RepRoot the limited permission necessary to host, copy, organize, transmit, secure, back up, retrieve, and otherwise process that content to operate and support RepRoot Studio, enforce these Terms, prevent misuse, and comply with law. This permission ends when the content is deleted, subject to retention, backup, dispute, security, and legal requirements.</p></section>
+        <section><h2>13. Deletion, retention, and restoration</h2><p>Deletion and restoration depend on the record type and displayed workflow. Some content may enter a recycle, grace, locked, or backup state before permanent removal. Other records—including payment, acceptance, security, audit, fraud, support, and dispute records—may be retained longer where reasonably necessary or legally required. Once a permanent-deletion process completes and applicable backups rotate, content may not be recoverable.</p></section>
+        <section><h2>14. Acceptable use and suspension</h2><p>You must not access another account or tenant; bypass permissions or plan controls; test vulnerabilities without written authorization; upload malware; scrape or resell the service; send spam; interfere with operation; or use RepRoot Studio for unlawful, harmful, fraudulent, or deceptive activity. RepRoot may restrict or suspend access for security risk, non-payment, unlawful activity, misuse, or material breach.</p></section>
+        <section><h2>15. Availability, disclaimers, and liability</h2><p>The service may experience maintenance, interruptions, provider failures, or changes. To the extent permitted by applicable law, RepRoot Studio is provided on an “as available” basis. RepRoot is not responsible for professional advice, professional-client disputes, inaccurate user content, external payments, or losses caused by unlawful or unauthorized use. Nothing in these Terms excludes rights or liability that applicable law does not allow to be excluded.</p></section>
+        <section><h2>16. Third-party services</h2><p>RepRoot Studio may link to or interoperate with services operated by other providers. You decide whether to enable those services and authorize the information shared with them. RepRoot does not control their availability, security, pricing, processing, or terms. Disabling an integration may prevent related Studio features from working but does not automatically delete information already provided to that third party.</p></section>
+        <section><h2>17. Termination and account closure</h2><p>You may request account closure through the available workflow, subject to identity verification, active subscription obligations, plan downgrade requirements, unresolved disputes, and records that must be retained. RepRoot may terminate or restrict an account for material breach, unlawful use, security risk, fraud, non-payment, or prolonged inactivity after any notice required by law. Closure does not cancel obligations or liabilities that arose before closure.</p></section>
+        <section><h2>18. Indemnity for professional-controlled activity</h2><p>To the extent permitted by applicable law, you are responsible for claims, losses, and reasonable costs arising from your professional services, your instructions or content, your collection or use of client information, your external payment arrangements, your violation of another person's rights, or your breach of these Terms. This provision does not apply to the extent a claim results from RepRoot's own unlawful conduct or cannot legally be allocated to you.</p></section>
+        <section><h2>19. Notices and electronic records</h2><p>You agree that service, security, billing, and legal notices may be delivered through the application or to the verified email address associated with your account. You must keep that address current. Electronic acceptance records, timestamps, version identifiers, notices, acknowledgements, and transaction records may be retained as evidence of account activity.</p></section>
+        <section><h2>20. Entire agreement and enforceability</h2><p>These Terms, the Professional Privacy Notice, applicable plan details, and any feature-specific terms presented in the service form the agreement for your professional use of RepRoot Studio. If one provision is unenforceable, the remaining provisions continue to apply. A failure to enforce a provision once is not a waiver. You may not assign this agreement without RepRoot's consent; RepRoot may assign it as part of a lawful reorganization, financing, or transfer of the service.</p></section>
+        <section><h2>21. Governing terms, changes, and contact</h2><p>These Terms are governed by the laws of India, while preserving mandatory rights that may apply to eligible users in the United States under applicable federal or state law. Material changes receive a new published version and may require renewed acceptance. Contact {{ supportEmail }} with questions, account concerns, notices, or disputes.</p></section>
+      } @else if (audience === 'client') {
+        <section><h2>1. Agreement and service</h2><p>These Terms &amp; Conditions govern your use of the RepRoot Studio client portal, a service within the RepRoot family. By accessing the portal, you accept these Terms and the <a [routerLink]="privacyLink">Client Privacy Notice</a>. Your portal is connected to a professional who manages the professional-client relationship.</p></section>
+        <section><h2>2. Eligibility and account access</h2><p>You must provide accurate information, keep credentials secure, and use only the account assigned to you. A minor may use the service only where the professional has obtained any parent or guardian authorization required by applicable law. Notify your professional or {{ supportEmail }} if access appears unauthorized.</p></section>
+        <section><h2>3. Your professional's role</h2><p>Your professional chooses the forms, questions, templates, schedules, activities, records, and supporting information requested from you. RepRoot does not independently select those requests, prescribe your program, or supervise the professional. Ask your professional why information is needed and how it will be used before submitting it.</p></section>
+        <section><h2>4. RepRoot Studio's role</h2><p>RepRoot Studio provides the software that authenticates users and stores, organizes, secures, and transmits information between authorized accounts. RepRoot is not your trainer, healthcare provider, employer, financial adviser, or contracting professional and does not verify professional advice, qualifications, programs, or instructions.</p></section>
+        <section><h2>5. Information you submit</h2><p>Submit information knowingly, accurately, and only when relevant to your relationship with the professional. Do not submit another person's information without authority. Avoid unnecessary highly sensitive information. You remain responsible for messages, answers, files, payment references, and other content you choose to provide.</p></section>
+        <section><h2>6. Health and safety</h2><p>RepRoot Studio is not a medical device or emergency service and does not diagnose, monitor, or treat health conditions. Seek qualified medical assistance for health concerns and use emergency services when appropriate. Do not rely on the portal for urgent or emergency communication.</p></section>
+        <section><h2>7. Meetings and communications</h2><p>Meeting requests remain pending until accepted through the applicable workflow. Messages and notifications support communication but do not guarantee that a professional has reviewed urgent information. Use an appropriate direct or emergency channel when timing is critical.</p></section>
+        <section><h2>8. Payments</h2><p>A professional may send payment requests or external payment instructions. Unless an integrated checkout expressly states otherwise, the transfer occurs outside RepRoot Studio. Submitting a transaction reference or proof does not itself confirm payment. A transaction is acknowledged only through the professional's payment workflow. Address fees, refunds, services, and disputes with the professional, subject to applicable law.</p></section>
+        <section><h2>9. Acceptable use</h2><p>You must not access another person's account or information, bypass security, submit unlawful or malicious content, impersonate another person, harass users, interfere with the service, or use the portal for fraud or unauthorized activity.</p></section>
+        <section><h2>10. Access, correction, and deletion</h2><p>You may use available controls or contact your professional regarding professional-managed records. You may contact {{ supportEmail }} regarding RepRoot-controlled account, security, or privacy matters. Deletion and restoration depend on the record type, retention requirements, professional relationship, backups, and applicable law.</p></section>
+        <section><h2>11. Availability and responsibility</h2><p>The service may experience interruptions or changes. RepRoot is not responsible for professional advice, conduct, services, user-submitted inaccuracies, or external payment disputes. Nothing in these Terms limits rights or liability that applicable law does not allow to be limited.</p></section>
+        <section><h2>12. Third-party services</h2><p>Calendar, meeting, email, payment, and other external services may have their own terms and privacy practices. RepRoot does not control transactions or activity completed through those services. Review the applicable provider's information before using an external link or payment method.</p></section>
+        <section><h2>13. Suspension and ending access</h2><p>Your professional may end or restrict access connected to the professional relationship. RepRoot may also restrict access to protect an account or the service, comply with law, address misuse, or enforce these Terms. Ending portal access does not necessarily erase records that the professional or RepRoot must retain for security, disputes, payments, legal acceptance, or other lawful purposes.</p></section>
+        <section><h2>14. Intellectual property</h2><p>RepRoot and its licensors own the service, branding, software, and platform materials. Your professional or other identified owner retains rights in their materials. You receive only a limited, personal, non-transferable right to use the client portal for its intended purpose and may not copy, resell, reverse engineer, or commercially exploit the service except where applicable law expressly permits it.</p></section>
+        <section><h2>15. Electronic notices and acceptance</h2><p>Service, security, and legal notices may be delivered through the portal or to the email associated with your account. Your acceptance, document version, timestamp, and related account evidence may be recorded electronically. Keep your contact information current and review notices presented when you sign in.</p></section>
+        <section><h2>16. Governing terms, changes, and contact</h2><p>These Terms are governed by the laws of India, while preserving mandatory consumer and privacy rights that may apply to eligible users in the United States. Material changes receive a new published client version and may require renewed acceptance at your next login. If one provision is unenforceable, the remaining provisions continue to apply. Contact your professional about their requests and services, and contact {{ supportEmail }} about RepRoot Studio access, security, privacy, notices, or disputes.</p></section>
+      } @else {
+        <section><h2>1. Agreement</h2><p>These Terms govern use of the public RepRoot website and services. RepRoot Studio professionals and clients must also accept the role-specific documents presented during account access.</p></section>
+        <section><h2>2. Acceptable use</h2><p>Do not misuse the website, interfere with its operation, attempt unauthorized access, submit unlawful content, or misrepresent your identity or relationship with RepRoot.</p></section>
+        <section><h2>3. Availability and contact</h2><p>Public features may change or be interrupted. Contact {{ supportEmail }} for platform questions.</p></section>
+      }
     } @else {
-      <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: {{ lastUpdated }}</p>
+      <h1>{{ documentAudience }} Privacy Notice</h1>
+      <p class="updated">Effective and last updated: {{ lastUpdated }}. Version {{ legalVersion }}.</p>
 
-      <section>
-        <h2>1. Controller &amp; scope</h2>
-        <p>
-          RepRoot is developed and operated by an independent individual developer, not a company or LLC. That
-          individual ("RepRoot", "we") is the controller of personal data processed through the Service, except that
-          when a professional records information about their clients, the professional is the controller and RepRoot
-          acts as a processor on their behalf. This Policy explains what we collect, why, and the rights you have.
-          RepRoot is currently offered primarily to users in India and the United States, so this Policy is written
-          with reference to India's Digital Personal Data Protection Act 2023 (DPDP Act) and the California Consumer
-          Privacy Act (CCPA/CPRA). If you access the Service from another region, we will still honor equivalent
-          rights described in Section 7 on request.
-        </p>
-      </section>
-
-      <section>
-        <h2>2. Data we collect</h2>
-        <ul>
-          <li><strong>Account data</strong> — name, email, username, professional code, password (hashed), profile details.</li>
-          <li><strong>Client data</strong> — registration answers, contact details, and any information a professional adds
-            about a client (notes, additional information, documents).</li>
-          <li><strong>Health &amp; fitness data</strong> — tracking entries such as weight, nutrition, activity, and
-            wellbeing ratings. This may be considered <em>sensitive/special-category data</em> and is handled with
-            additional care and on the basis of your explicit consent where required.</li>
-          <li><strong>Usage &amp; device data</strong> — log data, IP address, and app diagnostics needed to run and
-            secure the Service.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>3. Why we process it (legal bases)</h2>
-        <p>
-          To provide and secure the Service (performance of a contract); to comply with law (legal obligation); with your
-          consent (for sensitive fitness data and optional communications); and for our legitimate interests in operating,
-          improving, and protecting the Service, balanced against your rights. You may withdraw consent at any time.
-        </p>
-      </section>
-
-      <section>
-        <h2>4. Sharing</h2>
-        <p>
-          We do not sell your personal data. We share it only with: your professional (for client data), service providers who
-          host and support the Service under contract, and authorities where legally required. Professionals only see the
-          client data relevant to their own clients.
-        </p>
-      </section>
-
-      <section>
-        <h2>5. International transfers</h2>
-        <p>
-          We may process data in countries other than yours. Where we transfer personal data out of the EEA, UK, or other
-          regulated regions, we use appropriate safeguards such as Standard Contractual Clauses (and the UK Addendum), or
-          equivalent legally recognized mechanisms.
-        </p>
-      </section>
-
-      <section>
-        <h2>6. Retention &amp; security</h2>
-        <p>
-          We keep personal data only as long as needed to provide the Service or as required by law, then delete or
-          anonymize it. Deleted professional accounts are moved to a recycle space before permanent removal. We
-          reserve the right to deactivate accounts (professional or client) that show no sign of use for an extended
-          period, in order to keep stored data secure and current; we will always email advance notice before doing
-          so, and a deactivated account can be restored by logging back in within the notice window. We use
-          encryption in transit, hashed passwords, access controls, and other measures appropriate to the risk.
-        </p>
-      </section>
-
-      <section>
-        <h2>7. Your rights</h2>
-        <p>
-          Depending on where you live, you may have the right to access, correct, delete, restrict, or object to
-          processing, to data portability, and to withdraw consent. In the Service, clients can request changes to their
-          details for professional approval, and can request deletion. To exercise rights, contact us using the details below;
-          we respond within the timeframe required by applicable law.
-        </p>
-      </section>
-
-      <section class="regional">
-        <h2>8. Regional information</h2>
-        <h3>India (DPDP Act 2023)</h3>
-        <p>You may access and correct your data, nominate another person to exercise rights, and raise grievances by
-          contacting us at {{ supportEmail }}. We process personal data based on your consent or legitimate
-          uses permitted by the Act.</p>
-
-        <h3>United States (California — CCPA/CPRA)</h3>
-        <p>California residents may request to know, delete, and correct personal information, and to opt out of "sale" or
-          "sharing." <strong>We do not sell or share personal information</strong> as those terms are defined. We do not
-          discriminate against you for exercising your rights.</p>
-
-        <h3>Other regions</h3>
-        <p>RepRoot is developed by a single independent developer and does not currently maintain a local
-          representative or grievance office outside India and the United States. If you access the Service from
-          another region (including the EEA, UK, or Japan), we will still honor data subject rights equivalent to
-          those in Section 7 on request, using the contact details below, to the extent required by your local law.</p>
-      </section>
-
-      <section>
-        <h2>9. Children</h2>
-        <p>The Service is not directed to children under 16. Where a client under the age of consent uses the Service, a
-          parent or guardian must provide consent as required by local law.</p>
-      </section>
-
-      <section>
-        <h2>10. Cookies</h2>
-        <p>We use only the storage strictly necessary to keep you signed in and run the app. We do not use advertising or
-          cross-site tracking cookies.</p>
-      </section>
-
-      <section>
-        <h2>11. Contact</h2>
-        <p>
-          Privacy questions or requests: {{ supportEmail }}. RepRoot is developed and operated by an independent
-          individual developer; no registered business address applies.
-        </p>
-      </section>
+      @if (audience === 'professional') {
+        <section><h2>1. Scope and roles</h2><p>This Notice explains how RepRoot handles professional information in RepRoot Studio. RepRoot determines how account, authentication, billing, security, support, legal-acceptance, and service-operation information is processed. For client content, the professional generally decides what information is requested and why, while RepRoot processes that content to provide, secure, and support the service.</p></section>
+        <section><h2>2. Information collected</h2><ul><li><strong>Account:</strong> name, username, email, password hash, identifiers, authentication status, and Google identity reference when used.</li><li><strong>Profile:</strong> phone, country, state, gender, birth month/year, biography, services, experience, specializations, training style, languages, certifications, photos, files, websites, and profile links.</li><li><strong>Workspace:</strong> forms, groups, templates, resources, schedules, messages, professional notes, client relationships, settings, and files.</li><li><strong>Billing and payments:</strong> plan, currency, billing status, transaction references, payment requests, acknowledgements, receipts, and expiry information. Full card or bank credentials are handled by the applicable provider rather than stored by RepRoot Studio.</li><li><strong>Technical and support:</strong> IP address, timestamps, browser/device information, authentication events, diagnostics, notifications, error reports, security events, support requests, and acceptance records.</li><li><strong>Integrations:</strong> identity, calendar, meeting, email, or payment information received when an optional integration is enabled.</li></ul></section>
+        <section><h2>3. Required and optional information</h2><p>Email, username or linked identity, authentication information, and acceptance records are required to establish and protect an account. Profile-setup fields identified as mandatory are required to use the professional workspace. Other profile, media, integration, and business information is optional unless a feature clearly states otherwise.</p></section>
+        <section><h2>4. Purposes</h2><p>Information is used to create and authenticate accounts; provide profiles and workspace features; store and deliver authorized content; support clients and professionals; schedule meetings; record payment activity; administer plans; send service communications; secure and troubleshoot the platform; prevent misuse and fraud; enforce limits and terms; maintain audit evidence; and comply with applicable law.</p></section>
+        <section><h2>5. Client information and professional responsibility</h2><p>RepRoot does not independently decide which coaching, fitness, wellness, or health questions you ask clients. You are responsible for the purpose, necessity, permission, and professional use of those requests. RepRoot stores and processes submitted client content on your behalf to operate RepRoot Studio and separately controls processing needed for account security, service integrity, support, billing, diagnostics, and legal compliance.</p></section>
+        <section><h2>6. Sharing and providers</h2><p>Information is disclosed only as needed to authorized clients; infrastructure, database, storage, delivery, email, identity, calendar, meeting, support, and payment providers; professional advisers; transaction counterparties where directed; and authorities or other parties when legally required or necessary to protect rights, users, and the service. RepRoot does not sell professional or client personal information or use health and wellness content for behavioral advertising.</p></section>
+        <section><h2>7. Administrative access</h2><p>Client and workspace content is not routinely reviewed by RepRoot. Limited authorized access may occur when reasonably necessary for support requested by a user, security investigation, abuse prevention, system integrity, account recovery, legal compliance, or protection of users and the service. Administrative access should be limited to the necessary purpose and subject to access controls and audit records.</p></section>
+        <section><h2>8. Retention and deletion</h2><p>Active information is retained while needed to provide the account and features. Operational information may be subject to plan visibility periods and configured maximum retention. Some deleted or locked content may remain temporarily in recycle, grace, cold-storage, or encrypted backup systems. Payment, acceptance, security, fraud, support, audit, dispute, and legal records may be retained longer where necessary or required.</p></section>
+        <section><h2>9. Security</h2><p>RepRoot uses measures such as encrypted transport, password hashing, expiring sessions, tenant-scoped authorization, restricted file access, throttling, logging, backups, and controlled administrative access. No system is completely risk-free. Report suspected compromise to {{ supportEmail }}.</p></section>
+        <section><h2>10. India and United States rights</h2><p>Subject to applicable law and verification, you may request access, correction, completion, deletion, a copy, restriction, withdrawal of consent, or information about processing. India users may submit a grievance and exercise rights available under applicable digital personal-data law. United States residents may exercise applicable federal or state privacy rights without unlawful discrimination. Rights vary according to residence, legal thresholds, and exemptions.</p></section>
+        <section><h2>11. International processing</h2><p>Providers may process information in India, the United States, and other locations where they operate. Applicable safeguards and contractual restrictions are used where required. Service availability, features, and rights may vary by location.</p></section>
+        <section><h2>12. Cookies and browser storage</h2><p>RepRoot Studio uses essential browser storage for authentication, active sessions, security, consent choices, and requested application functions. Optional preference storage, such as a remembered display theme, is used only when permitted. The application does not currently use third-party advertising or analytics cookies. Review the <a routerLink="/cookies">Cookie Notice</a> or use the website's Cookie settings control.</p></section>
+        <section><h2>13. Changes and contact</h2><p>Material changes receive a new version and may require renewed acceptance. Send professional privacy, access, security, or grievance requests to {{ supportEmail }}.</p></section>
+      } @else if (audience === 'client') {
+        <section><h2>1. Scope and responsibility</h2><p>This Notice explains how client information is handled in RepRoot Studio. Your professional generally decides which professional-client information is requested and why. RepRoot provides the platform and processes that content to store, secure, organize, display, and transmit it between authorized accounts. RepRoot separately determines processing necessary for authentication, security, support, diagnostics, legal acceptance, and service integrity.</p></section>
+        <section><h2>2. Information handled</h2><ul><li><strong>Identity and access:</strong> name, email, username, reference, password hash, profile photo, status, and authentication events.</li><li><strong>Professional-requested content:</strong> registration and form answers, additional information, templates, progress entries, wellness or fitness information, files, and communications.</li><li><strong>Relationship records:</strong> assigned professional and group, portal permissions, schedules, meeting requests, reminders, and professional-created records.</li><li><strong>Payments:</strong> requests, amounts, currencies, transaction references, payment dates, selected methods, proof files, acknowledgements, and receipts. RepRoot Studio does not store full card or bank credentials.</li><li><strong>Technical and support:</strong> IP address, timestamps, browser/device information, diagnostics, notifications, security events, support requests, and acceptance records.</li></ul></section>
+        <section><h2>3. Sources and purposes</h2><p>Information comes from you, your professional, account and application operation, and optional service providers. It is used to provide portal access; present and save requested records; support messaging, meetings, and payments; notify users; protect accounts; troubleshoot; prevent abuse; maintain audit evidence; respond to requests; and comply with law.</p></section>
+        <section><h2>4. Your professional's processing</h2><p>Your professional selects the questions, records, and activities requested in the professional-client relationship. Ask the professional about the purpose, necessity, accuracy, use, disclosure, or deletion of that content. RepRoot does not independently request coaching, fitness, wellness, or health information for its own advertising or unrelated profiling.</p></section>
+        <section><h2>5. RepRoot processing and limited access</h2><p>RepRoot stores and processes client information on its systems and service providers to operate RepRoot Studio. Content is not routinely reviewed. Limited authorized access may occur for requested support, security investigation, abuse prevention, system integrity, account recovery, legal compliance, or protection of users and the service.</p></section>
+        <section><h2>6. Sharing</h2><p>Information may be shared with your authorized professional; infrastructure, storage, delivery, email, identity, calendar, meeting, support, and payment providers; advisers; and authorities or other parties when legally required or necessary to protect users and the service. RepRoot does not sell client personal information or use client health and wellness content for behavioral advertising.</p></section>
+        <section><h2>7. Private professional notes</h2><p>A professional may maintain notes designated as private. Those notes are not displayed through the client portal. They remain subject to the professional's legal obligations and RepRoot's security, support, retention, and compliance processing.</p></section>
+        <section><h2>8. Retention and deletion</h2><p>Information is retained while needed for the portal, professional relationship, and configured service purposes. Some operational content may expire after configured periods. Deleted information may remain temporarily in recycle or encrypted backup systems. Payment, acceptance, security, fraud, support, dispute, audit, and legal records may be retained longer where necessary or required.</p></section>
+        <section><h2>9. Security</h2><p>RepRoot uses encrypted transport, password hashing, expiring sessions, tenant-scoped authorization, restricted file access, throttling, logging, backups, and controlled administrative access. No system is completely risk-free. Report suspected unauthorized access to your professional or {{ supportEmail }}.</p></section>
+        <section><h2>10. Your choices and rights</h2><p>Subject to applicable law and identity verification, you may request access, correction, completion, deletion, a copy, restriction, withdrawal of consent, or information about processing. Contact the professional regarding information they requested or created. Contact RepRoot regarding account security, platform processing, support, and applicable privacy rights. India users may submit a grievance under applicable digital personal-data law. United States rights vary by state and applicable legal thresholds.</p></section>
+        <section><h2>11. Children</h2><p>RepRoot Studio is not directed to children for independent use. A professional must not provide access to a minor without any parent or guardian authorization and other protection required by applicable law. Contact {{ supportEmail }} to report potentially unauthorized information involving a minor.</p></section>
+        <section><h2>12. Cookies and browser storage</h2><p>RepRoot Studio uses essential browser storage for authentication, active sessions, security, consent choices, and requested portal functions. Optional preference storage is used only when permitted. The application does not currently use third-party advertising or analytics cookies. Review the <a routerLink="/cookies">Cookie Notice</a> or use the website's Cookie settings control.</p></section>
+        <section><h2>13. Changes and contact</h2><p>Material changes receive a new client-document version and may require renewed acceptance. Contact your professional regarding their requests. Contact {{ supportEmail }} regarding RepRoot Studio privacy, access, security, or grievances.</p></section>
+      } @else {
+        <section><h2>1. Public website data</h2><p>RepRoot may process information submitted through public forms and ordinary technical information needed to deliver and protect the website.</p></section>
+        <section><h2>2. Cookies and browser storage</h2><p>Essential storage supports security, consent choices, and requested website functions. Optional preference storage is used only when permitted. RepRoot does not currently use third-party advertising or analytics cookies. See the <a routerLink="/cookies">Cookie Notice</a>.</p></section>
+        <section><h2>3. Purposes and contact</h2><p>Information is used to respond to requests, secure and improve reliability, and comply with law. Contact {{ supportEmail }} with platform privacy requests.</p></section>
+      }
     }
 
     <p class="back-row"><a routerLink="/">&larr; Back to home</a></p>

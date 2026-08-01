@@ -1,5 +1,6 @@
 from django.core.files.uploadedfile import UploadedFile
 from django.core.cache import cache
+from django.conf import settings
 from rest_framework import permissions
 
 from .data_usage import calculate_professional_data_usage
@@ -49,6 +50,14 @@ class ProfessionalAccessPermission(permissions.IsAuthenticated):
       return False
     if profile.lifecycle_status in (ProfessionalProfile.LIFECYCLE_FROZEN, ProfessionalProfile.LIFECYCLE_RECYCLED):
       self.message = 'This professional account is frozen. Contact support to restore access.'
+      return False
+    legal_current = (
+      profile.terms_accepted
+      and profile.privacy_policy_accepted
+      and profile.legal_document_version == settings.REPROOT_PROFESSIONAL_LEGAL_VERSION
+    )
+    if not legal_current and not getattr(view, 'allow_outdated_legal', False):
+      self.message = 'Updated Professional Terms & Conditions and Privacy Notice must be accepted before continuing.'
       return False
     if request_has_upload(request) and not upload_fits_storage(request.user, request):
       self.message = 'New uploads are paused at the 120% temporary storage ceiling. Delete files or upgrade storage.'

@@ -1,7 +1,7 @@
 <app-professional-page-shell
-  title="Forms & Groups"
+  title="Forms and Groups"
   eyebrow="Professional workspace"
-  subtitle="Manage enquiries, registration forms, groups, and client onboarding."
+  subtitle="Build lead forms, review enquiries, and organize active clients into groups."
   activeSection="forms-groups"
   titleId="forms-title"
 >
@@ -16,7 +16,7 @@
 
     @if (isLoading) {
       <section class="panel">
-        <p>Loading Forms & Groups...</p>
+        <p>Loading Forms and Groups...</p>
       </section>
     } @else if (overview) {
       <nav class="workspace-tabs" aria-label="Forms and groups sections">
@@ -27,8 +27,8 @@
           [attr.aria-selected]="activeWorkspaceTab === 'forms'"
           (click)="setWorkspaceTab('forms')"
         >
-          <span>Forms</span>
-          <small>Lead form and requests</small>
+          <span>Lead Forms</span>
+          <small>{{ overview.lead_forms.length }} of {{ overview.max_lead_forms }} used</small>
         </button>
         <button
           type="button"
@@ -37,7 +37,7 @@
           [attr.aria-selected]="activeWorkspaceTab === 'groups'"
           (click)="setWorkspaceTab('groups')"
         >
-          <span>Groups</span>
+          <span>Client Groups</span>
           <small>{{ overview.groups.length }} managed group{{ overview.groups.length === 1 ? '' : 's' }}</small>
         </button>
       </nav>
@@ -65,7 +65,7 @@
       @if (!overview.has_lead_form) {
         <section class="empty-state" aria-labelledby="empty-form-title">
           <h2 id="empty-form-title">You haven't created a form yet.</h2>
-          <p>Please create your professional lead form to view Forms & Groups.</p>
+          <p>Please create your professional lead form to view Forms and Groups.</p>
           <div class="setup-note">
             <p>Next, you'll set up:</p>
             <ol>
@@ -98,19 +98,8 @@
 
           @if (selectedLeadForm?.is_active) {
             <div class="lead-main">
-              <div class="panel-title">
-                <h2>Public Lead Form</h2>
-                <span class="status-pill">Active</span>
-              </div>
-
-              <div class="form-name-block">
-                <span>Form Name</span>
-                <h3>{{ selectedLeadForm?.title }}</h3>
-                <p>For unknown potential clients and initial enquiries. Approved leads move into client creation.</p>
-              </div>
-
               <div class="form-link-box">
-                <span>Form Link</span>
+                <span>Public Form Link</span>
                 <div>
                   <a [href]="selectedLeadForm?.public_link" target="_blank" rel="noreferrer">{{ selectedLeadForm?.public_link }}</a>
                   <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>

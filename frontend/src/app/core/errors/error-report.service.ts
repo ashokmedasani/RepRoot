@@ -56,7 +56,7 @@ export class ErrorReportService {
     // Whichever role is signed in on this tab — a professional token in
     // localStorage, or a client token in sessionStorage. Neither present
     // just means an anonymous report (e.g. a crash on the login screen).
-    const professionalToken = window.localStorage.getItem('professional-auth-token');
+    const professionalToken = window.sessionStorage.getItem('professional-auth-token');
     if (professionalToken) {
       return new HttpHeaders({ Authorization: `Token ${professionalToken}` });
     }
@@ -72,6 +72,9 @@ export class ErrorReportService {
     if (configuredBaseUrl) {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

@@ -29,7 +29,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
-from .models import ProfessionalProfile
+from .models import LegalAcceptanceRecord, ProfessionalProfile
 
 User = get_user_model()
 
@@ -105,7 +105,7 @@ def _generate_unique_username(email: str) -> str:
   return f'{base[:16]}{int(timezone.now().timestamp())}'
 
 
-def get_or_create_professional_for_google(claims: dict) -> tuple:
+def get_or_create_professional_for_google(claims: dict, allow_create: bool = False) -> tuple:
   """Resolve Google claims to a professional User, creating one if needed.
 
   Returns (user, created). Raises GoogleAuthError for account-linking
@@ -136,6 +136,11 @@ def get_or_create_professional_for_google(claims: dict) -> tuple:
       profile.save(update_fields=['google_sub', 'google_linked_at', 'updated_at'])
     return existing_user, False
 
+  if not allow_create:
+    raise GoogleAuthError(
+      'No professional account exists for this Google address. Use the sign-up page and accept the legal terms first.'
+    )
+
   with transaction.atomic():
     username = _generate_unique_username(email)
     given_name = (claims.get('given_name') or '').strip()
@@ -151,10 +156,23 @@ def get_or_create_professional_for_google(claims: dict) -> tuple:
     user.set_unusable_password()
     user.save(update_fields=['password'])
 
-    ProfessionalProfile.objects.create(
+    accepted_at = timezone.now()
+    profile = ProfessionalProfile.objects.create(
       user=user,
       google_sub=google_sub,
       google_linked_at=timezone.now(),
+      terms_accepted=True,
+      privacy_policy_accepted=True,
+      terms_accepted_at=accepted_at,
+      privacy_policy_accepted_at=accepted_at,
+      legal_document_version=settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+    )
+    LegalAcceptanceRecord.objects.create(
+      actor_type=LegalAcceptanceRecord.ACTOR_PROFESSIONAL,
+      professional_profile=profile,
+      actor_reference=profile.professional_id or str(user.id),
+      legal_document_version=settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+      accepted_at=accepted_at,
     )
 
   return user, True

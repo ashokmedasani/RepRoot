@@ -127,7 +127,6 @@
           <div><h2>Security</h2><p>Change your password. You will be signed out after it is updated.</p></div>
         </div>
         <form class="settings-form" (ngSubmit)="changePassword()">
-          <label><span>Current password</span><app-password-input name="clientCurrentPassword" autocomplete="current-password" [(ngModel)]="passwordForm.currentPassword" /></label>
           <label><span>New password</span><app-password-input name="clientNewPassword" autocomplete="new-password" [(ngModel)]="passwordForm.password" /></label>
           <label><span>Confirm new password</span><app-password-input name="clientConfirmPassword" autocomplete="new-password" [(ngModel)]="passwordForm.confirmPassword" /></label>
           <button type="submit" class="primary-action" [disabled]="isChangingPassword">{{ isChangingPassword ? 'Changing...' : 'Change Password' }}</button>
@@ -139,9 +138,29 @@
       <section class="portal-card settings-section">
         <div class="card-header"><div><h2>Privacy & Legal</h2><p>Review the policies that govern your account and coaching information.</p></div></div>
         <div class="legal-links">
-          <a routerLink="/terms" target="_blank" rel="noopener"><strong>Terms & Conditions</strong><span>Account responsibilities and acceptable use</span></a>
-          <a routerLink="/privacy" target="_blank" rel="noopener"><strong>Privacy Policy</strong><span>How profile, health-context, and activity data are handled</span></a>
+          <a routerLink="/terms/client" target="_blank" rel="noopener"><strong>Client Terms</strong><span>Client responsibilities and the professional relationship</span></a>
+          <a routerLink="/privacy/client" target="_blank" rel="noopener"><strong>Client Privacy Notice</strong><span>How profile, health-context, and activity data are handled</span></a>
         </div>
+        @if (client.legal_acceptance_history.length) {
+          <div class="acceptance-history">
+            <h3>Your acceptance history</h3>
+            <p>Dates and times are displayed in your current local time.</p>
+            @for (record of client.legal_acceptance_history; track record.accepted_at) {
+              <div class="acceptance-row">
+                <span>Terms and Privacy version {{ record.legal_document_version }}</span>
+                <strong>{{ record.accepted_at | date: 'medium' }}</strong>
+              </div>
+            }
+          </div>
+        } @else if (client.terms_accepted_at) {
+          <div class="acceptance-history">
+            <h3>Current acceptance</h3>
+            <div class="acceptance-row">
+              <span>Terms and Privacy version {{ client.legal_document_version }}</span>
+              <strong>{{ client.terms_accepted_at | date: 'medium' }}</strong>
+            </div>
+          </div>
+        }
       </section>
       }
 
@@ -174,6 +193,12 @@
         @for (tab of professionalTabs; track tab.id) {
           <button type="button" [class.active]="professionalTab === tab.id" (click)="setProfessionalTab(tab.id)">
             <span>{{ tab.label }}</span>
+            @if (tab.id === 'chat' && unreadChat > 0) {
+              <span class="tab-count">{{ unreadChat > 99 ? '99+' : unreadChat }}</span>
+            }
+            @if (tab.id === 'payments' && unreadPayments > 0) {
+              <span class="tab-count">{{ unreadPayments > 99 ? '99+' : unreadPayments }}</span>
+            }
           </button>
         }
         @if (sharedAdditionalInfo.length) {

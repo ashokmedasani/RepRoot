@@ -40,7 +40,11 @@ export class ProfessionalSignupComponent implements OnDestroy {
   verifiedUsername = '';
   isEmailAlreadyRegistered = false;
   resendCountdown = 0;
-  agreedToTerms = false;
+  showLegalReview = false;
+  acceptedLegalDocuments = false;
+  pendingGoogleCredential = '';
+  legalVersion = '';
+  legalEffectiveDate = '';
   isGoogleAvailable = true;
   isGoogleSubmitting = false;
 
@@ -51,6 +55,15 @@ export class ProfessionalSignupComponent implements OnDestroy {
     confirmPassword: '',
     username: ''
   };
+
+  constructor() {
+    this.professionalAuthApi.getLegalConfiguration().subscribe({
+      next: ({ professional, effective_date }) => {
+        this.legalVersion = professional.version;
+        this.legalEffectiveDate = effective_date;
+      }
+    });
+  }
 
   fieldErrors = {
     username: '',
@@ -119,7 +132,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
       !this.isVerifyingOtp &&
       this.emailOtpStatus !== 'verified' &&
       this.emailOtpStatus !== 'idle' &&
-      this.emailOtpStatus !== 'sending'
+      this.emailOtpStatus !== 'sending' &&
+      /^\d{6}$/.test(this.signupForm.emailOtp.trim())
     );
   }
 
@@ -233,6 +247,10 @@ export class ProfessionalSignupComponent implements OnDestroy {
   verifyEmailOtp(): void {
     const email = this.signupForm.email.trim().toLowerCase();
     const otp = this.signupForm.emailOtp.trim();
+    if (!/^\d{6}$/.test(otp)) {
+      this.fieldErrors.otp = 'Enter the complete 6-digit verification code.';
+      return;
+    }
 
     if (!email || !otp) {
       this.fieldErrors.otp = 'OTP is required.';
@@ -309,23 +327,33 @@ export class ProfessionalSignupComponent implements OnDestroy {
   }
 
   handleGoogleCredential(credential: string): void {
+    this.pendingGoogleCredential = credential;
+    this.openLegalReview('google');
+  }
+
+  confirmGoogleSignup(): void {
+    if (!this.hasAcceptedLegalDocuments || !this.pendingGoogleCredential) {
+      return;
+    }
     this.isGoogleSubmitting = true;
     this.fieldErrors.general = '';
     this.signupMessage = 'Verifying with Google...';
 
-    this.professionalAuthApi.googleAuth(credential).subscribe({
+    this.professionalAuthApi.googleAuth(this.pendingGoogleCredential, true).subscribe({
       next: (response) => {
-        window.localStorage.setItem('professional-auth-token', response.token);
-        window.localStorage.setItem('professional-account-id', String(response.professional.id));
-        window.localStorage.setItem('professional-account-username', response.professional.username);
+        if (!response.is_new_account) {
+          window.sessionStorage.removeItem('professional-auth-token');
+          this.isGoogleSubmitting = false;
+          this.closeLegalReview();
+          this.fieldErrors.general = 'An account already exists for this Google email. Please sign in.';
+          return;
+        }
+        window.sessionStorage.setItem('professional-auth-token', response.token);
+        window.sessionStorage.setItem('professional-account-id', String(response.professional.id));
+        window.sessionStorage.setItem('professional-account-username', response.professional.username);
         this.isGoogleSubmitting = false;
-        // New Google signups always need Profile Setup; existing Google
-        // logins from this page follow the same profile-completion check as
-        // the regular login flow. Either way we never send the user back to
-        // the login screen.
-        void this.router.navigate([
-          response.professional.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup'
-        ]);
+        this.closeLegalReview();
+        void this.router.navigate([response.professional.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup']);
       },
       error: (error: unknown) => {
         this.signupMessage = '';
@@ -345,12 +373,6 @@ export class ProfessionalSignupComponent implements OnDestroy {
       return;
     }
 
-    if (!this.agreedToTerms) {
-      this.fieldErrors.general = 'Please accept the Terms & Conditions and Privacy Policy to continue.';
-      this.signupMessage = '';
-      return;
-    }
-
     if (!this.emailVerificationToken || this.emailOtpStatus !== 'verified') {
       this.fieldErrors.otp = 'Please verify your email with OTP before creating the account.';
       this.signupMessage = '';
@@ -363,12 +385,24 @@ export class ProfessionalSignupComponent implements OnDestroy {
       return;
     }
 
+    this.openLegalReview('password');
+  }
+
+  confirmProfessionalAccountCreation(): void {
+    if (!this.hasAcceptedLegalDocuments) {
+      return;
+    }
+
+    const form = this.signupForm;
+    const username = form.username.trim().toLowerCase();
     const payload: ProfessionalSignupPayload = {
       email: form.email.trim().toLowerCase(),
       username,
       password: form.password,
       confirm_password: form.confirmPassword,
-      email_verification_token: this.emailVerificationToken
+      email_verification_token: this.emailVerificationToken,
+      accept_terms: true,
+      accept_privacy: true
     };
 
     this.isSubmitting = true;
@@ -376,10 +410,11 @@ export class ProfessionalSignupComponent implements OnDestroy {
 
     this.professionalAuthApi.signup(payload).subscribe({
       next: (response) => {
-        window.localStorage.removeItem('professional-auth-token');
+        window.sessionStorage.removeItem('professional-auth-token');
         window.sessionStorage.setItem('professional-login-notice', `${response.message} Please login now.`);
         this.clearSignupState();
         this.isSubmitting = false;
+        this.closeLegalReview();
         void this.router.navigate(['/professional/login']);
       },
       error: (error: unknown) => {
@@ -387,6 +422,29 @@ export class ProfessionalSignupComponent implements OnDestroy {
         this.isSubmitting = false;
       }
     });
+  }
+
+  get hasAcceptedLegalDocuments(): boolean {
+    return this.acceptedLegalDocuments;
+  }
+
+  closeLegalReview(): void {
+    if (this.isSubmitting || this.isGoogleSubmitting) {
+      return;
+    }
+    this.showLegalReview = false;
+    this.acceptedLegalDocuments = false;
+    this.pendingGoogleCredential = '';
+  }
+
+  private openLegalReview(source: 'password' | 'google'): void {
+    this.fieldErrors.general = '';
+    this.signupMessage = '';
+    this.acceptedLegalDocuments = false;
+    if (source === 'password') {
+      this.pendingGoogleCredential = '';
+    }
+    this.showLegalReview = true;
   }
 
   private formatApiError(error: unknown, fallbackMessage: string): string {
@@ -470,6 +528,8 @@ export class ProfessionalSignupComponent implements OnDestroy {
     this.usernameSuggestions = [];
     this.verifiedUsername = '';
     this.isEmailAlreadyRegistered = false;
+    this.acceptedLegalDocuments = false;
+    this.pendingGoogleCredential = '';
     this.resendCountdown = 0;
     this.clearResendTimer();
   }

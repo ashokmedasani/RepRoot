@@ -195,6 +195,26 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   }
 
+  get pendingMeetingRequests(): ScheduledMeetingRecord[] {
+    return this.meetings
+      .filter((meeting) => meeting.status === 'pending_approval' && meeting.requested_by === 'client')
+      .sort((left, right) => new Date(left.start_at).getTime() - new Date(right.start_at).getTime());
+  }
+
+  reviewMeetingRequest(meeting: ScheduledMeetingRecord, action: 'accept' | 'decline'): void {
+    this.schedulingApi.reviewClientMeetingRequest(meeting.id, action).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.loadMeetings();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not update this meeting request.');
+      }
+    });
+  }
+
   loadMeetings(): void {
     this.schedulingApi.getMeetings(this.clientId).subscribe({
       next: (response) => (this.meetings = response.meetings),
@@ -382,6 +402,13 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
 
   get client(): ClientAccessRecord | null {
     return this.profile?.client || null;
+  }
+
+  get clientPageTitle(): string {
+    if (!this.client) return 'Client Profile';
+    return `${this.client.first_name || ''} ${this.client.last_name || ''}`.trim()
+      || this.client.username
+      || 'Client Profile';
   }
 
   get availableTemplates(): TrackingTemplateRecord[] {

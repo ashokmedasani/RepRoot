@@ -39,6 +39,35 @@ export const routes: Routes = [
     title: 'Privacy Policy'
   },
   {
+    path: 'cookies',
+    loadComponent: () => import('./pages/legal/cookie-notice.component').then((module) => module.CookieNoticeComponent),
+    title: 'Cookie Notice | RepRoot'
+  },
+  {
+    path: 'terms/professional',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'terms', audience: 'professional' },
+    title: 'Professional Terms'
+  },
+  {
+    path: 'privacy/professional',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'privacy', audience: 'professional' },
+    title: 'Professional Privacy Notice'
+  },
+  {
+    path: 'terms/client',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'terms', audience: 'client' },
+    title: 'Client Terms'
+  },
+  {
+    path: 'privacy/client',
+    loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
+    data: { doc: 'privacy', audience: 'client' },
+    title: 'Client Privacy Notice'
+  },
+  {
     path: 'portal',
     loadComponent: () =>
       import('./pages/studio/portal/access-entry-placeholder.component').then(
@@ -116,6 +145,24 @@ export const routes: Routes = [
         (module) => module.ClientChangePasswordComponent
       ),
     title: 'Change Password'
+  },
+  {
+    path: 'client/legal-consent',
+    canActivate: [clientAuthGuard],
+    loadComponent: () =>
+      import('./pages/studio/client/client-legal-consent/client-legal-consent.component').then(
+        (module) => module.ClientLegalConsentComponent
+      ),
+    title: 'Client Legal Review'
+  },
+  {
+    path: 'professional/legal-consent',
+    canActivate: [professionalAuthGuard],
+    loadComponent: () =>
+      import('./pages/studio/professional/professional-legal-consent/professional-legal-consent.component').then(
+        (module) => module.ProfessionalLegalConsentComponent
+      ),
+    title: 'Professional Legal Review'
   },
   {
     path: 'professional-access',

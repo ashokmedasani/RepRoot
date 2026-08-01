@@ -8,7 +8,7 @@ action behind it).
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from accounts import payment_notifications
+from accounts import payment_notifications, web_routes
 from accounts.models import PaymentRequest
 
 
@@ -48,9 +48,12 @@ class Command(BaseCommand):
           f'The payment request "{payment_request.title}" for '
           f'{client.first_name or client.username} was due '
           f'{payment_request.due_date:%b %d, %Y} and has not been completed. '
-          f'Review it here: {payment_notifications.request_link_for_professional(payment_request.request_id)}'
+          f'Review it here: {payment_notifications.request_link_for_professional(payment_request.request_id, payment_request.client_id)}'
         ),
-        payload={'request_id': payment_request.request_id},
+        payload={
+          'request_id': payment_request.request_id,
+          'action_url': web_routes.professional_payment_request(payment_request.client_id, payment_request.request_id),
+        },
       )
       if payment_request.client_visibility == 'visible':
         payment_notifications.notify_client(
@@ -64,7 +67,10 @@ class Command(BaseCommand):
             f'{professional.first_name or professional.username}: '
             f'{payment_notifications.request_link_for_client(payment_request.request_id)}'
           ),
-          payload={'request_id': payment_request.request_id},
+          payload={
+            'request_id': payment_request.request_id,
+            'action_url': web_routes.client_payment_request(payment_request.request_id),
+          },
         )
 
     self.stdout.write(self.style.SUCCESS(f'Marked {count} payment request(s) overdue.'))

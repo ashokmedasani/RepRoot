@@ -66,7 +66,7 @@ export interface SlotEntry {
 
 export type SlotsByDate = Record<string, SlotEntry[]>;
 
-export type MeetingStatus = 'scheduled' | 'cancelled' | 'completed';
+export type MeetingStatus = 'pending_approval' | 'scheduled' | 'cancelled' | 'completed' | 'declined';
 export type MeetingResponseStatus = 'pending' | 'accepted' | 'declined';
 
 export interface ScheduledMeetingGuestRecord {
@@ -92,6 +92,8 @@ export interface ScheduledMeetingRecord {
   guests: ScheduledMeetingGuestRecord[];
   is_group_meeting: boolean;
   my_response_status: MeetingResponseStatus | null;
+  requested_by: 'professional' | 'client';
+  professional_responded_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -269,10 +271,33 @@ export class SchedulingApiService {
     );
   }
 
+  reviewClientMeetingRequest(meetingId: number, action: 'accept' | 'decline', reason = ''): Observable<{ meeting: ScheduledMeetingRecord; message: string }> {
+    return this.http.post<{ meeting: ScheduledMeetingRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/scheduling/meetings/${meetingId}/request-action/`,
+      { action, reason },
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
   getClientMeetings(): Observable<{ meetings: ScheduledMeetingRecord[] }> {
     return this.http.get<{ meetings: ScheduledMeetingRecord[] }>(`${this.apiBaseUrl}/client/scheduling/meetings/`, {
       headers: this.getClientAuthHeaders()
     });
+  }
+
+  getClientSlots(start: string, end: string, durationMinutes: 15 | 30): Observable<{ slots: SlotsByDate; timezone: string; availability_configured: boolean }> {
+    return this.http.get<{ slots: SlotsByDate; timezone: string; availability_configured: boolean }>(`${this.apiBaseUrl}/client/scheduling/slots/`, {
+      headers: this.getClientAuthHeaders(),
+      params: { start, end, duration_minutes: String(durationMinutes) }
+    });
+  }
+
+  requestClientMeeting(payload: { start: string; duration_minutes: 15 | 30; title: string; notes: string }): Observable<{ meeting: ScheduledMeetingRecord; message: string }> {
+    return this.http.post<{ meeting: ScheduledMeetingRecord; message: string }>(
+      `${this.apiBaseUrl}/client/scheduling/meeting-requests/`,
+      payload,
+      { headers: this.getClientAuthHeaders() }
+    );
   }
 
   respondToMeeting(meetingId: number, responseStatus: 'accepted' | 'declined'): Observable<{ meeting: ScheduledMeetingRecord; message: string }> {
@@ -284,7 +309,7 @@ export class SchedulingApiService {
   }
 
   private getProfessionalAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('professional-auth-token') || '';
+    const token = window.sessionStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 
@@ -300,6 +325,9 @@ export class SchedulingApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

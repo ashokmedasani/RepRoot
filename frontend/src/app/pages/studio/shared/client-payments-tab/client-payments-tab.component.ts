@@ -1,15 +1,12 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-
-import { ChartSpec } from '@studio-shared/analytics/analytics.types';
-import { ChartRendererComponent } from '@studio-shared/analytics/chart-renderer.component';
-import { chartTheme } from '@studio-shared/analytics/charts/chart-theme';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import {
   CreatePaymentRequestPayload,
   ManualPaymentMethodRecord,
+  PaymentActivityItem,
   PaymentProofRecord,
   PaymentReconciliationSummary,
   PaymentRecordRow,
@@ -30,24 +27,28 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentRequestStatus, string> = {
   acknowledged: 'Acknowledged',
   completed: 'Completed',
   partially_paid: 'Partially Paid',
+  overpaid: 'Overpaid',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
   overdue: 'Overdue',
   refunded: 'Refunded'
 };
 
-type PaymentsSubTab = 'summary' | 'requests' | 'history' | 'methods' | 'activity';
+type PaymentsSubTab = 'summary' | 'requests' | 'transactions' | 'methods' | 'activity';
+type TransactionView = 'manual' | 'integrated';
+type RequestListMode = 'active' | 'completed';
 
 @Component({
   selector: 'app-client-payments-tab',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ChartRendererComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink],
   templateUrl: './client-payments-tab.component.html',
   styleUrl: './client-payments-tab.component.scss'
 })
 export class ClientPaymentsTabComponent implements OnInit {
   private readonly paymentsApi = inject(PaymentsApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly route = inject(ActivatedRoute);
 
   @Input({ required: true }) clientId = 0;
   @Input() clientName = '';
@@ -57,6 +58,7 @@ export class ClientPaymentsTabComponent implements OnInit {
   requestsMessage = '';
   requestsMessageType: 'success' | 'error' = 'success';
   showRequestForm = false;
+  editingRequestId = '';
   isSavingRequest = false;
   requestFormMessage = '';
 
@@ -75,6 +77,7 @@ export class ClientPaymentsTabComponent implements OnInit {
   verifyingRecords: PaymentRecordRow[] = [];
   verifyMode: 'review' | 'acknowledge' | 'reject' | 'info' = 'review';
   acknowledgementNote = '';
+  settlementStatus: 'partial' | 'full' | 'overpaid' = 'partial';
   rejectReason = '';
   infoNote = '';
   isVerifyLoading = false;
@@ -92,16 +95,21 @@ export class ClientPaymentsTabComponent implements OnInit {
 
   // Acknowledged-vs-logged reconciliation
   reconciliation: PaymentReconciliationSummary | null = null;
+  activityItems: PaymentActivityItem[] = [];
+  activityLoadError = '';
 
   readonly subTabs: { id: PaymentsSubTab; label: string }[] = [
     { id: 'summary', label: 'Summary' },
-    { id: 'requests', label: 'Payment Requests' },
-    { id: 'history', label: 'Payment History' },
     { id: 'methods', label: 'Available Payment Methods' },
+    { id: 'requests', label: 'Payment Requests' },
+    { id: 'transactions', label: 'Transactions' },
     { id: 'activity', label: 'Payment Activity' }
   ];
 
   activeSubTab: PaymentsSubTab = 'summary';
+  transactionView: TransactionView = 'manual';
+  requestListMode: RequestListMode = 'active';
+  targetedRequestId = '';
 
   methods: (ManualPaymentMethodRecord & { shared: boolean })[] = [];
   methodsMessage = '';
@@ -110,10 +118,21 @@ export class ClientPaymentsTabComponent implements OnInit {
   private originalSharedIds: number[] = [];
 
   ngOnInit(): void {
+    const requestedValue = this.route.snapshot.queryParamMap.get('paymentTab');
+    if (requestedValue === 'history' || requestedValue === 'integrated') {
+      this.activeSubTab = 'transactions';
+      this.transactionView = requestedValue === 'integrated' ? 'integrated' : 'manual';
+    }
+    const requestedSubTab = requestedValue as PaymentsSubTab | null;
+    if (requestedSubTab && this.subTabs.some((tab) => tab.id === requestedSubTab)) {
+      this.activeSubTab = requestedSubTab;
+    }
+    this.targetedRequestId = this.route.snapshot.queryParamMap.get('request') || '';
     this.loadMethods();
     this.loadRequests();
     this.loadRecords();
     this.loadReconciliation();
+    this.loadActivity();
     this.paymentsApi.getPaymentSettings().subscribe({
       next: (response) => {
         this.currencyOptions = response.currency_options;
@@ -187,27 +206,58 @@ export class ClientPaymentsTabComponent implements OnInit {
 
   /** Everything actually logged as received — completed and partial payments together. */
   get totalReceived(): number {
-    return this.records
+    return this.manualRecords
       .filter((r) => r.reporting_currency === this.reportingCurrency)
       .reduce((sum, r) => sum + Number(r.reporting_amount), 0);
   }
 
-  /** Same overdue/pending/completed color language as the professional dashboard. */
-  get requestsChart(): ChartSpec {
-    const theme = chartTheme();
-    const overdueCount = this.requests.filter((r) => r.status === 'overdue').length;
-    const pendingCount = this.requests.filter((r) => this.isOpenStatus(r.status) && r.status !== 'overdue').length;
-    const completedCount = this.requests.filter((r) => r.status === 'completed').length;
-    return {
-      kind: 'bar',
-      title: 'Requests by status',
-      data: [
-        { label: 'Overdue', value: overdueCount, color: theme.danger },
-        { label: 'Pending', value: pendingCount, color: theme.warning },
-        { label: 'Completed', value: completedCount, color: theme.success }
-      ],
-      meta: { subtitle: `${this.requests.length} total requests` }
-    };
+  loadActivity(): void {
+    this.paymentsApi.getProfessionalPaymentActivity(this.clientId).subscribe({
+      next: (response) => (this.activityItems = response.items),
+      error: (error: unknown) => (this.activityLoadError = formatApiError(error, 'Payment activity could not be loaded.'))
+    });
+  }
+
+  get manualRecords(): PaymentRecordRow[] {
+    return this.records.filter((record) => record.record_type === 'manual_log');
+  }
+
+  showReportingAmount(record: PaymentRecordRow): boolean {
+    return record.original_currency !== record.reporting_currency || Number(record.original_amount) !== Number(record.reporting_amount);
+  }
+
+  get manualLoggedTotal(): number {
+    return this.manualRecords
+      .filter((record) => record.reporting_currency === this.reportingCurrency)
+      .reduce((sum, record) => sum + Number(record.reporting_amount), 0);
+  }
+
+  get integratedTotal(): number { return 0; }
+
+  get totalLoggedAmount(): number { return this.manualLoggedTotal + this.integratedTotal; }
+
+  get activeRequests(): PaymentRequestRecord[] {
+    return this.requests.filter((request) => this.isOpenStatus(request.status));
+  }
+
+  get completedRequests(): PaymentRequestRecord[] {
+    return this.requests.filter((request) => !this.isOpenStatus(request.status));
+  }
+
+  get displayedRequests(): PaymentRequestRecord[] {
+    return this.requestListMode === 'active' ? this.activeRequests : this.completedRequests;
+  }
+
+  get reviewRequestCount(): number {
+    return this.requests.filter((request) => this.needsReview(request.status)).length;
+  }
+
+  get overdueRequestCount(): number {
+    return this.requests.filter((request) => request.status === 'overdue').length;
+  }
+
+  get overpaidRequests(): PaymentRequestRecord[] {
+    return this.requests.filter((request) => Number(request.overpaid_amount) > 0);
   }
 
   openRecordForm(request?: Pick<PaymentRequestRecord, 'request_id' | 'title' | 'requested_amount' | 'requested_currency'>): void {
@@ -258,9 +308,9 @@ export class ClientPaymentsTabComponent implements OnInit {
       transaction_reference: this.recordForm.transaction_reference,
       received_date: this.recordForm.received_date,
       status: this.recordForm.status,
-      client_visibility: 'visible',
+      client_visibility: 'private',
       internal_note: this.recordForm.internal_note,
-      client_note: this.recordForm.client_note
+      client_note: ''
     };
 
     this.isSavingRecord = true;
@@ -295,8 +345,7 @@ export class ClientPaymentsTabComponent implements OnInit {
       received_date: today,
       status: 'completed' as 'completed' | 'partially_paid',
       transaction_reference: '',
-      internal_note: '',
-      client_note: ''
+      internal_note: ''
     };
   }
 
@@ -328,6 +377,7 @@ export class ClientPaymentsTabComponent implements OnInit {
       next: (response) => {
         this.requests = response.requests;
         this.isLoadingRequests = false;
+        this.focusTargetedRequest();
       },
       error: (error: unknown) => {
         this.requestsMessageType = 'error';
@@ -337,14 +387,51 @@ export class ClientPaymentsTabComponent implements OnInit {
     });
   }
 
+  private focusTargetedRequest(): void {
+    if (!this.targetedRequestId) return;
+    this.activeSubTab = 'requests';
+    setTimeout(() => {
+      document.getElementById(`payment-request-${this.targetedRequestId}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    });
+  }
+
   openRequestForm(): void {
-    this.requestForm = this.blankRequestForm();
+    // Use the professional's locked reporting currency as the convenient
+    // default. The form's currency selector remains editable for requests
+    // that intentionally use another currency.
+    this.requestForm = this.blankRequestForm(this.reportingCurrency);
     this.allowedMethodSelection = {};
     for (const method of this.sharedMethods) {
       this.allowedMethodSelection[method.id] = true;
     }
     this.requestFormMessage = '';
+    this.editingRequestId = '';
     this.showRequestForm = true;
+  }
+
+  openEditRequest(request: PaymentRequestRecord): void {
+    this.editingRequestId = request.request_id;
+    this.requestForm = {
+      title: request.title,
+      description: request.description,
+      requested_amount: request.requested_amount,
+      requested_currency: request.requested_currency,
+      due_date: request.due_date || '',
+      notes: request.notes
+    };
+    this.allowedMethodSelection = {};
+    for (const method of this.sharedMethods) {
+      this.allowedMethodSelection[method.id] = request.allowed_method_labels.includes(method.display_label);
+    }
+    this.requestFormMessage = '';
+    this.showRequestForm = true;
+  }
+
+  canEditRequest(request: PaymentRequestRecord): boolean {
+    return !request.is_locked && !['cancelled', 'refunded', 'rejected'].includes(request.status);
   }
 
   async submitRequest(): Promise<void> {
@@ -372,10 +459,14 @@ export class ClientPaymentsTabComponent implements OnInit {
     this.isSavingRequest = true;
     this.requestFormMessage = '';
 
-    this.paymentsApi.createPaymentRequest(this.clientId, payload).subscribe({
+    const saveRequest$ = this.editingRequestId
+      ? this.paymentsApi.updatePaymentRequest(this.editingRequestId, payload)
+      : this.paymentsApi.createPaymentRequest(this.clientId, payload);
+    saveRequest$.subscribe({
       next: (response) => {
         this.isSavingRequest = false;
         this.showRequestForm = false;
+        this.editingRequestId = '';
         this.requestsMessageType = 'success';
         this.requestsMessage = response.message;
         this.loadRequests();
@@ -427,6 +518,7 @@ export class ClientPaymentsTabComponent implements OnInit {
     this.verifyMode = 'review';
     this.verifyMessage = '';
     this.acknowledgementNote = '';
+    this.settlementStatus = 'partial';
     this.rejectReason = '';
     this.infoNote = '';
     this.isVerifyLoading = true;
@@ -440,6 +532,7 @@ export class ClientPaymentsTabComponent implements OnInit {
           response.proofs.find((p) => p.status === 'submitted' || p.status === 'under_review') ||
           response.proofs[0] ||
           null;
+        this.settlementStatus = this.recommendedSettlementStatus;
       },
       error: (error: unknown) => {
         this.isVerifyLoading = false;
@@ -469,7 +562,10 @@ export class ClientPaymentsTabComponent implements OnInit {
     this.verifyMessage = '';
 
     this.paymentsApi
-      .acknowledgePaymentProof(this.verifyingProof.id, { acknowledgement_note: this.acknowledgementNote })
+      .acknowledgePaymentProof(this.verifyingProof.id, {
+        acknowledgement_note: this.acknowledgementNote,
+        settlement_status: this.settlementStatus
+      })
       .subscribe({
         next: (response) => {
           this.isVerifySaving = false;
@@ -484,6 +580,33 @@ export class ClientPaymentsTabComponent implements OnInit {
           this.verifyMessage = formatApiError(error, 'Acknowledgement could not be saved.');
         }
       });
+  }
+
+  get acceptedAfterCurrentProof(): number {
+    if (!this.verifyingRequest || !this.verifyingProof) return 0;
+    return Number(this.verifyingRequest.accepted_amount) +
+      (this.verifyingProof.reported_currency === this.verifyingRequest.requested_currency
+        ? Number(this.verifyingProof.reported_amount)
+        : 0);
+  }
+
+  get recommendedSettlementStatus(): 'partial' | 'full' | 'overpaid' {
+    if (!this.verifyingRequest) return 'partial';
+    const total = this.acceptedAfterCurrentProof;
+    const requested = Number(this.verifyingRequest.requested_amount);
+    if (total > requested) return 'overpaid';
+    if (total === requested) return 'full';
+    return 'partial';
+  }
+
+  get remainingAfterCurrentProof(): number {
+    if (!this.verifyingRequest) return 0;
+    return Math.max(0, Number(this.verifyingRequest.requested_amount) - this.acceptedAfterCurrentProof);
+  }
+
+  get overpaidAfterCurrentProof(): number {
+    if (!this.verifyingRequest) return 0;
+    return Math.max(0, this.acceptedAfterCurrentProof - Number(this.verifyingRequest.requested_amount));
   }
 
   async submitReject(): Promise<void> {
@@ -536,12 +659,12 @@ export class ClientPaymentsTabComponent implements OnInit {
     });
   }
 
-  private blankRequestForm() {
+  private blankRequestForm(requestedCurrency = 'USD') {
     return {
       title: '',
       description: '',
       requested_amount: '',
-      requested_currency: 'USD',
+      requested_currency: requestedCurrency,
       due_date: '',
       notes: ''
     };

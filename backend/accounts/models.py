@@ -231,6 +231,9 @@ class ProfessionalProfile(models.Model):
   profile_visibility = models.JSONField(default=dict, blank=True)
   terms_accepted = models.BooleanField(default=False)
   privacy_policy_accepted = models.BooleanField(default=False)
+  terms_accepted_at = models.DateTimeField(null=True, blank=True)
+  privacy_policy_accepted_at = models.DateTimeField(null=True, blank=True)
+  legal_document_version = models.CharField(max_length=32, blank=True)
   google_sub = models.CharField(
     max_length=64, unique=True, null=True, blank=True, db_index=True,
     help_text='Stable Google account identifier ("sub" claim) linked for Google sign-in, if any.',
@@ -244,6 +247,21 @@ class ProfessionalProfile(models.Model):
 
   def __str__(self) -> str:
     return f'{self.user.get_full_name()} ({self.user.username})'
+
+
+class BillingWebhookEvent(models.Model):
+  """Idempotency record for signed billing-provider callbacks."""
+
+  provider = models.CharField(max_length=32)
+  event_id = models.CharField(max_length=160)
+  event_type = models.CharField(max_length=80, blank=True)
+  processed_at = models.DateTimeField(auto_now_add=True)
+
+  class Meta:
+    db_table = 'billing_webhook_events'
+    constraints = [
+      models.UniqueConstraint(fields=['provider', 'event_id'], name='unique_billing_provider_event'),
+    ]
 
 
 class ProfessionalLeadForm(models.Model):
@@ -461,6 +479,11 @@ class ClientAccess(models.Model):
   professional_notes = models.TextField(blank=True)
   professional_notes_updated_at = models.DateTimeField(null=True, blank=True)
   must_change_password = models.BooleanField(default=True)
+  terms_accepted = models.BooleanField(default=False)
+  privacy_policy_accepted = models.BooleanField(default=False)
+  terms_accepted_at = models.DateTimeField(null=True, blank=True)
+  privacy_policy_accepted_at = models.DateTimeField(null=True, blank=True)
+  legal_document_version = models.CharField(max_length=32, blank=True)
   is_active = models.BooleanField(default=True, db_index=True)
   # Distinguishes an automatic suspension (this client's group got locked by
   # the plan-limit lock system) from a professional's own manual suspension.
@@ -478,6 +501,57 @@ class ClientAccess(models.Model):
 
   def __str__(self) -> str:
     return f'{self.username or "(no portal access)"} for {self.professional.username}'
+
+
+class LegalAcceptanceRecord(models.Model):
+  """Immutable evidence of one account accepting one published legal version."""
+
+  ACTOR_PROFESSIONAL = 'professional'
+  ACTOR_CLIENT = 'client'
+  ACTOR_CHOICES = [
+    (ACTOR_PROFESSIONAL, 'Professional'),
+    (ACTOR_CLIENT, 'Client'),
+  ]
+
+  actor_type = models.CharField(max_length=16, choices=ACTOR_CHOICES, db_index=True)
+  professional_profile = models.ForeignKey(
+    ProfessionalProfile,
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='legal_acceptance_records',
+  )
+  client_access = models.ForeignKey(
+    ClientAccess,
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='legal_acceptance_records',
+  )
+  actor_reference = models.CharField(max_length=150, db_index=True)
+  legal_document_version = models.CharField(max_length=32, db_index=True)
+  terms_accepted = models.BooleanField(default=True)
+  privacy_policy_accepted = models.BooleanField(default=True)
+  accepted_at = models.DateTimeField(default=timezone.now, db_index=True)
+  client_timezone = models.CharField(max_length=80, blank=True)
+
+  class Meta:
+    db_table = 'legal_acceptance_records'
+    ordering = ['-accepted_at', '-id']
+
+  def __str__(self):
+    return f'{self.actor_type}:{self.actor_reference}:{self.legal_document_version}'
+
+
+class LegalDocumentRelease(models.Model):
+  """The legal version for which active login tokens were last invalidated."""
+
+  singleton_key = models.PositiveSmallIntegerField(default=1, unique=True)
+  legal_document_version = models.CharField(max_length=32)
+  activated_at = models.DateTimeField(default=timezone.now)
+
+  class Meta:
+    db_table = 'legal_document_release'
 
 
 class ClientResetAudit(models.Model):
@@ -784,14 +858,25 @@ class ScheduledMeeting(models.Model):
   follow-up note) — both show up together on a client's Schedule tab, but
   only this one has a join link and a calendar invite."""
 
+  STATUS_PENDING_APPROVAL = 'pending_approval'
   STATUS_SCHEDULED = 'scheduled'
   STATUS_CANCELLED = 'cancelled'
   STATUS_COMPLETED = 'completed'
+  STATUS_DECLINED = 'declined'
 
   STATUS_CHOICES = [
+    (STATUS_PENDING_APPROVAL, 'Pending professional approval'),
     (STATUS_SCHEDULED, 'Scheduled'),
     (STATUS_CANCELLED, 'Cancelled'),
     (STATUS_COMPLETED, 'Completed'),
+    (STATUS_DECLINED, 'Declined'),
+  ]
+
+  REQUESTED_BY_PROFESSIONAL = 'professional'
+  REQUESTED_BY_CLIENT = 'client'
+  REQUESTED_BY_CHOICES = [
+    (REQUESTED_BY_PROFESSIONAL, 'Professional'),
+    (REQUESTED_BY_CLIENT, 'Client'),
   ]
 
   RESPONSE_PENDING = 'pending'
@@ -819,10 +904,12 @@ class ScheduledMeeting(models.Model):
   external_calendar_event_id = models.CharField(max_length=255, blank=True, db_index=True)
   external_calendar_url = models.URLField(blank=True)
   external_calendar_sync_status = models.CharField(max_length=20, default='internal')
-  status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, db_index=True)
+  status = models.CharField(max_length=18, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, db_index=True)
   cancellation_reason = models.TextField(blank=True)
   client_response_status = models.CharField(max_length=10, choices=RESPONSE_CHOICES, default=RESPONSE_PENDING)
   client_responded_at = models.DateTimeField(null=True, blank=True)
+  requested_by = models.CharField(max_length=16, choices=REQUESTED_BY_CHOICES, default=REQUESTED_BY_PROFESSIONAL, db_index=True)
+  professional_responded_at = models.DateTimeField(null=True, blank=True)
   created_at = models.DateTimeField(auto_now_add=True)
   updated_at = models.DateTimeField(auto_now=True)
 
@@ -1280,6 +1367,7 @@ class PaymentRequest(models.Model):
   STATUS_ACKNOWLEDGED = 'acknowledged'
   STATUS_COMPLETED = 'completed'
   STATUS_PARTIALLY_PAID = 'partially_paid'
+  STATUS_OVERPAID = 'overpaid'
   STATUS_REJECTED = 'rejected'
   STATUS_CANCELLED = 'cancelled'
   STATUS_OVERDUE = 'overdue'
@@ -1293,6 +1381,7 @@ class PaymentRequest(models.Model):
     (STATUS_ACKNOWLEDGED, 'Acknowledged'),
     (STATUS_COMPLETED, 'Completed'),
     (STATUS_PARTIALLY_PAID, 'Partially Paid'),
+    (STATUS_OVERPAID, 'Overpaid'),
     (STATUS_REJECTED, 'Rejected'),
     (STATUS_CANCELLED, 'Cancelled'),
     (STATUS_OVERDUE, 'Overdue'),
@@ -1406,6 +1495,13 @@ class PaymentRecord(models.Model):
   professional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='payment_records')
   client = models.ForeignKey(ClientAccess, on_delete=models.CASCADE, related_name='payment_records')
   payment_request = models.ForeignKey(PaymentRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name='records')
+  source_proof = models.OneToOneField(
+    PaymentProof,
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='payment_record',
+  )
   payment_record_id = models.CharField(max_length=32, unique=True, default=generate_payment_record_id, editable=False, db_index=True)
   original_amount = models.DecimalField(max_digits=12, decimal_places=2)
   original_currency = models.CharField(max_length=3)
@@ -1452,6 +1548,7 @@ class PaymentAuditLog(models.Model):
     ('method_shared', 'Method shared'),
     ('method_unshared', 'Method unshared'),
     ('request_created', 'Request created'),
+    ('request_updated', 'Request updated'),
     ('request_cancelled', 'Request cancelled'),
     ('proof_submitted', 'Proof submitted'),
     ('proof_rejected', 'Proof rejected'),

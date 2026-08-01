@@ -269,6 +269,17 @@ export interface ClientAccessRecord {
   additional_info: AdditionalInfoItem[];
   additional_info_shared: boolean;
   must_change_password: boolean;
+  terms_accepted: boolean;
+  privacy_policy_accepted: boolean;
+  legal_document_version: string;
+  current_legal_document_version: string;
+  terms_accepted_at: string | null;
+  privacy_policy_accepted_at: string | null;
+  legal_acceptance_history: {
+    legal_document_version: string;
+    accepted_at: string;
+    client_timezone: string;
+  }[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -786,7 +797,7 @@ export class FormsGroupsApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('professional-auth-token') || '';
+    const token = window.sessionStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 
@@ -797,6 +808,9 @@ export class FormsGroupsApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

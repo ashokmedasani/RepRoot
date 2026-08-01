@@ -191,6 +191,9 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   private loadAll(): void {
     this.isLoading = true;
+    // Pending requests are independent of availability configuration and must
+    // remain actionable even if the settings request fails.
+    this.loadMeetings();
     this.schedulingApi.getSchedulingSettings().subscribe({
       next: (response) => {
         this.schedulingSettings = response.settings;
@@ -203,7 +206,6 @@ export class ProfessionalScheduleComponent implements OnInit {
         };
         this.autoDetectTimezone(response.settings.timezone);
         this.isLoading = false;
-        this.loadMeetings();
         this.loadClients();
         this.loadDateOffs();
         this.loadWeekdayOffs();
@@ -316,11 +318,32 @@ export class ProfessionalScheduleComponent implements OnInit {
       .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   }
 
+  get pendingClientRequests(): ScheduledMeetingRecord[] {
+    return this.meetings
+      .filter((meeting) => meeting.status === 'pending_approval' && meeting.requested_by === 'client')
+      .sort((left, right) => new Date(left.start_at).getTime() - new Date(right.start_at).getTime());
+  }
+
   get pastMeetings(): ScheduledMeetingRecord[] {
     const now = Date.now();
     return this.meetings
-      .filter((m) => m.status !== 'scheduled' || new Date(m.start_at).getTime() < now)
+      .filter((m) => m.status !== 'pending_approval' && (m.status !== 'scheduled' || new Date(m.start_at).getTime() < now))
       .sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime());
+  }
+
+  reviewClientRequest(meeting: ScheduledMeetingRecord, action: 'accept' | 'decline'): void {
+    this.message = '';
+    this.schedulingApi.reviewClientMeetingRequest(meeting.id, action).subscribe({
+      next: (response) => {
+        this.messageType = 'success';
+        this.message = response.message;
+        this.loadMeetings();
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Could not update this meeting request.');
+      }
+    });
   }
 
   /** Flags same-day meetings that overlap in time, so clashes are visible at a glance. */

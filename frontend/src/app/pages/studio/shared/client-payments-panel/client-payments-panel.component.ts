@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { ClientPaymentRequestRecord, PaymentRequestStatus, PaymentsApiService } from '@core/api/payments-api.service';
+import { ClientPaymentRequestRecord, PaymentActivityItem, PaymentRequestStatus, PaymentsApiService } from '@core/api/payments-api.service';
 import { PAYMENT_STATUS_LABELS } from '@studio-shared/client-payments-tab/client-payments-tab.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 
@@ -19,6 +19,8 @@ export class ClientPaymentsPanelComponent implements OnInit {
   requests: ClientPaymentRequestRecord[] = [];
   isLoading = true;
   loadError = '';
+  activityItems: PaymentActivityItem[] = [];
+  activeView: 'requests' | 'activity' = 'requests';
   private unreadRequestIds = new Set<string>();
 
   ngOnInit(): void {
@@ -41,6 +43,10 @@ export class ClientPaymentsPanelComponent implements OnInit {
         );
       },
       error: () => (this.unreadRequestIds = new Set())
+    });
+    this.paymentsApi.getClientPaymentActivity().subscribe({
+      next: (response) => (this.activityItems = response.items),
+      error: () => (this.activityItems = [])
     });
   }
 

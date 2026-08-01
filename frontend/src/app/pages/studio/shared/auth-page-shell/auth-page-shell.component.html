@@ -13,6 +13,22 @@
   <section class="auth-card" [class.auth-card--wide]="wide" [attr.aria-labelledby]="titleId">
     <p class="eyebrow">{{ eyebrow }}</p>
     <h1 [id]="titleId">{{ title }}</h1>
+    @if (subtitle) { <p class="auth-subtitle">{{ subtitle }}</p> }
     <ng-content></ng-content>
   </section>
+
+  <footer class="auth-footer">
+    <div class="footer-summary"><strong>RepRoot Studio</strong><span>Professional-client workspace by RepRoot.</span></div>
+    <nav aria-label="Website, help, and legal links">
+      <a href="https://rep-root.com" target="_blank" rel="noopener">RepRoot website</a>
+      <a routerLink="/studio">Studio overview</a>
+      <a href="mailto:studio.support@rep-root.com">Help &amp; Support</a>
+      <a routerLink="/terms/professional" target="_blank">Professional Terms</a>
+      <a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
+      <a routerLink="/terms/client" target="_blank">Client Terms</a>
+      <a routerLink="/privacy/client" target="_blank">Client Privacy</a>
+      <a routerLink="/cookies" target="_blank">Cookie Notice</a>
+    </nav>
+    <p>Use of RepRoot Studio is subject to the documents applicable to your account role. Never share passwords or one-time verification codes.</p>
+  </footer>
 </main>

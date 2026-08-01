@@ -21,7 +21,6 @@ export class ClientChangePasswordComponent {
   message = '';
 
   readonly passwordForm = {
-    currentPassword: '',
     password: '',
     confirmPassword: ''
   };
@@ -40,8 +39,8 @@ export class ClientChangePasswordComponent {
 
   changePassword(): void {
     const wasForcedFirstChange = this.isForcedFirstChange;
-    if ((!this.isForcedFirstChange && !this.passwordForm.currentPassword) || !this.passwordForm.password || !this.passwordForm.confirmPassword) {
-      this.message = 'All password fields are required.';
+    if (!this.passwordForm.password || !this.passwordForm.confirmPassword) {
+      this.message = 'New password and confirmation are required.';
       return;
     }
 
@@ -52,7 +51,7 @@ export class ClientChangePasswordComponent {
 
     this.isSubmitting = true;
     this.clientApi
-      .changePassword(this.passwordForm.currentPassword, this.passwordForm.password, this.passwordForm.confirmPassword)
+      .changePassword(this.passwordForm.password, this.passwordForm.confirmPassword)
       .subscribe({
         next: (response) => {
           // The backend rotates the auth token when the password changes -
@@ -64,9 +63,11 @@ export class ClientChangePasswordComponent {
 
           window.sessionStorage.setItem('client-access', JSON.stringify(response.client));
           this.isSubmitting = false;
-          void this.router.navigate(wasForcedFirstChange ? ['/client/profile'] : ['/client/dashboard'], {
-            queryParams: wasForcedFirstChange ? { onboarding: '1' } : undefined
-          });
+          const needsLegalAcceptance = !response.client.terms_accepted || !response.client.privacy_policy_accepted;
+          void this.router.navigate(
+            needsLegalAcceptance ? ['/client/legal-consent'] : (wasForcedFirstChange ? ['/client/profile'] : ['/client/dashboard']),
+            { queryParams: !needsLegalAcceptance && wasForcedFirstChange ? { onboarding: '1' } : undefined }
+          );
         },
         error: (error: unknown) => {
           this.message = formatApiError(error, 'Password could not be changed.');

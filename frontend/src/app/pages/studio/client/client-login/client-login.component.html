@@ -4,6 +4,8 @@
   actionLink="/professional/login"
   eyebrow="Client Portal"
   title="Login with your professional-approved access"
+  subtitle="Use the professional code and private credentials supplied by your professional."
+  audience="client"
   titleId="client-login-title">
 
   <form class="auth-form" (ngSubmit)="verifyClientLogin()">
@@ -38,12 +40,11 @@
       <p class="form-message">{{ loginMessage }}</p>
     }
 
-    <p class="legal-note">
-      By continuing, you agree to our
-      <a routerLink="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a>
-      and
-      <a routerLink="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
-    </p>
+    <aside class="client-access-help">
+      <strong>Need access?</strong>
+      <span>Client accounts are created or approved by a professional. Ask your professional for your professional code, username, and temporary password.</span>
+    </aside>
+    <p class="legal-note">Review the <a routerLink="/terms/client" target="_blank" rel="noopener">Client Terms &amp; Conditions</a> and <a routerLink="/privacy/client" target="_blank" rel="noopener">Client Privacy Notice</a>. You will be asked to accept the current version when required.</p>
   </form>
 </app-auth-page-shell>
 
@@ -59,29 +60,37 @@
         <button type="button" class="modal-close" (click)="cancelDirectory()" aria-label="Close professional search">&times;</button>
       </header>
       <div class="modal-search-row">
-        <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Professional code or name" autocomplete="off" (keyup.enter)="searchDirectory()">
-        <button type="button" class="primary-action" (click)="searchDirectory()">Search</button>
+        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <input type="search" name="directorySearch" [(ngModel)]="directorySearch" placeholder="Name or professional code" autocomplete="off" (ngModelChange)="onDirectorySearchChange()" (keyup.enter)="searchDirectory()">
+        @if (directorySearch) {
+          <button type="button" class="search-clear" (click)="directorySearch = ''; onDirectorySearchChange()" aria-label="Clear search">&times;</button>
+        }
       </div>
       <div class="picker-list">
         @if (isLoadingDirectory) {
           <p class="picker-empty">Loading professionals...</p>
         } @else {
-          @for (professional of filteredProfessionals; track professional.professional_id) {
-            <article class="picker-item" [class.selected]="pendingProfessional?.professional_id === professional.professional_id">
+          @for (professional of directory; track professional.professional_id) {
+            <button type="button" class="picker-item" [class.selected]="pendingProfessional?.professional_id === professional.professional_id" (click)="selectProfessional(professional)">
+              <span class="professional-avatar">{{ professional.professional_name.charAt(0) }}</span>
               <div class="picker-identity">
                 <strong class="picker-name">{{ professional.professional_name }}</strong>
-                <span class="picker-code"><small>Code</small>{{ professional.professional_id }}</span>
+                <span class="picker-code">{{ professional.professional_id }}</span>
               </div>
-              <button type="button" class="ghost-action" (click)="selectProfessional(professional)">{{ pendingProfessional?.professional_id === professional.professional_id ? 'Selected' : 'Select' }}</button>
-            </article>
+              <span class="selection-indicator" aria-hidden="true">{{ pendingProfessional?.professional_id === professional.professional_id ? '✓' : '›' }}</span>
+            </button>
           } @empty {
+            @if (directorySearch.trim().length < 3) {
+              <p class="picker-empty">Type at least 3 characters to find your professional.</p>
+            } @else {
             <p class="picker-empty">No professionals match your search.</p>
+            }
           }
         }
       </div>
       <footer>
         <button type="button" class="ghost-action" (click)="cancelDirectory()">Cancel</button>
-        <button type="button" class="primary-action" [disabled]="!pendingProfessional" (click)="confirmProfessional()">Confirm Selection</button>
+        <button type="button" class="primary-action" [disabled]="!pendingProfessional" (click)="confirmProfessional()">Continue</button>
       </footer>
     </section>
   </div>

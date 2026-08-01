@@ -5,7 +5,7 @@
   activeSection="payments"
   titleId="client-payment-request-title">
 
-  <a page-actions routerLink="/client/payments" class="ghost-action">&larr; Back to Payments</a>
+  <a page-actions routerLink="/client/payments" class="secondary-action">&larr; Back to Payments</a>
 
   @if (isLoading) {
     <p class="state-note">Loading payment request...</p>
@@ -30,6 +30,13 @@
           <span class="due">Due {{ req.due_date | date: 'MMM d, y' }}</span>
         }
       </div>
+
+      @if (+req.accepted_amount > 0) {
+        <p class="request-meta">
+          Accepted {{ req.accepted_amount }} {{ req.requested_currency }}
+          &middot; Remaining {{ req.remaining_amount }} {{ req.requested_currency }}
+        </p>
+      }
 
       @if (req.description) {
         <p class="request-description">{{ req.description }}</p>
@@ -75,6 +82,42 @@
       </section>
     }
 
+    @if (req.proofs.length) {
+      <section class="transaction-section" aria-labelledby="transaction-history-title">
+        <div class="transaction-heading">
+          <div>
+            <h3 id="transaction-history-title">Transactions for {{ req.request_id }}</h3>
+            <p class="section-note">Every installment stays grouped under this payment request.</p>
+          </div>
+        </div>
+        <div class="transaction-list">
+          @for (proof of req.proofs; track proof.id; let index = $index) {
+            <article class="transaction-row">
+              <span class="transaction-number" [attr.aria-label]="'Transaction ' + (req.proofs.length - index)">
+                #{{ (req.proofs.length - index).toString().padStart(2, '0') }}
+              </span>
+              <div>
+                <strong>{{ proof.reported_amount }} {{ proof.reported_currency }}</strong>
+                <small>
+                  {{ proof.reported_payment_date | date: 'MMM d, y' }}
+                  @if (proof.transaction_reference) { &middot; {{ proof.transaction_reference }} }
+                </small>
+              </div>
+              <span class="proof-status" [attr.data-status]="proof.status">{{ proof.status === 'under_review' ? 'Under review' : proof.status }}</span>
+              @if (proof.status === 'accepted' && proof.payment_record_id) {
+                <a class="receipt-link" [routerLink]="['/client/payments/records', proof.payment_record_id, 'confirmation']">Open / Print Receipt</a>
+              }
+            </article>
+          }
+        </div>
+        @if (canSubmitProof && !showProofForm) {
+          <button type="button" class="secondary-action add-transaction" (click)="addAnotherTransaction()">
+            + Add another transaction
+          </button>
+        }
+      </section>
+    }
+
     <section class="proof-section" aria-labelledby="proof-title">
       <h3 id="proof-title">Submit Payment Proof</h3>
 
@@ -89,8 +132,8 @@
         <div class="proof-done">
           <p>
             <strong>Partial payment received.</strong>
-            {{ latestProof?.reported_amount }} {{ latestProof?.reported_currency }} confirmed so far toward
-            {{ req.requested_amount }} {{ req.requested_currency }}. The remaining balance is still open.
+            {{ req.accepted_amount }} {{ req.requested_currency }} accepted so far.
+            {{ req.remaining_amount }} {{ req.requested_currency }} remains open.
           </p>
         </div>
       }
@@ -107,7 +150,14 @@
         <div class="proof-done">
           <p><strong>This payment is complete.</strong> Thank you.</p>
         </div>
-      } @else if (canSubmitProof) {
+      } @else if (req.status === 'overpaid') {
+        <div class="proof-done overpaid-notice">
+          <p>
+            <strong>This request was overpaid by {{ req.overpaid_amount }} {{ req.requested_currency }}.</strong>
+            The acknowledged extra amount remains visible in this transaction for future adjustment.
+          </p>
+        </div>
+      } @else if (canSubmitProof && showProofForm) {
         <p class="section-note">
           Already paid? Enter your transaction reference (or attach a screenshot) so {{ req.professional_name }} can verify it.
         </p>

@@ -2,6 +2,7 @@ import { DOCUMENT, isPlatformBrowser } from '@angular/common';
 import { Inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 
 import { ThemeId, ThemeOption } from './theme.model';
+import { CookieConsentService } from '../privacy/cookie-consent.service';
 
 const THEME_STORAGE_KEY = 'professional-platform-theme';
 
@@ -39,7 +40,8 @@ export class ThemeService {
 
   constructor(
     @Inject(DOCUMENT) private readonly document: Document,
-    @Inject(PLATFORM_ID) private readonly platformId: object
+    @Inject(PLATFORM_ID) private readonly platformId: object,
+    private readonly cookieConsent: CookieConsentService,
   ) {}
 
   initializeTheme(): void {
@@ -48,16 +50,24 @@ export class ThemeService {
       return;
     }
 
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null;
+    const storedTheme = this.cookieConsent.preferencesAllowed
+      ? window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null
+      : null;
     const selectedTheme = this.isKnownTheme(storedTheme) ? storedTheme : 'main-light-blue';
-    this.setTheme(selectedTheme);
+    this.activeTheme.set(selectedTheme);
+    this.applyTheme(selectedTheme);
+
+    this.cookieConsent.choice$.subscribe((choice) => {
+      if (choice?.preferences) window.localStorage.setItem(THEME_STORAGE_KEY, this.activeTheme());
+      else window.localStorage.removeItem(THEME_STORAGE_KEY);
+    });
   }
 
   setTheme(themeId: ThemeId): void {
     this.activeTheme.set(themeId);
     this.applyTheme(themeId);
 
-    if (isPlatformBrowser(this.platformId)) {
+    if (isPlatformBrowser(this.platformId) && this.cookieConsent.preferencesAllowed) {
       window.localStorage.setItem(THEME_STORAGE_KEY, themeId);
     }
   }

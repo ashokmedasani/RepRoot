@@ -370,7 +370,7 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
    *  or a notification below) has its own link straight to the specific
    *  client/request, so nothing is lost by not splitting the number. */
   get paymentsBadgeCount(): number {
-    return this.paymentsActionCount + this.paymentsUnreadCount;
+    return this.paymentsActionCount;
   }
 
   /** A payment notification's payload carries a specific action_url (set by
@@ -384,7 +384,11 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
       error: () => this.loadPaymentUnread()
     });
 
-    const actionUrl = typeof item.payload?.['action_url'] === 'string' ? (item.payload['action_url'] as string) : '';
+    let actionUrl = typeof item.payload?.['action_url'] === 'string' ? (item.payload['action_url'] as string) : '';
+    const clientId = actionUrl.match(/\/professional\/clients\/(\d+)/)?.[1];
+    if (requestId && clientId) {
+      actionUrl = `/professional/clients/${clientId}?tab=payments&paymentTab=requests&request=${requestId}`;
+    }
     if (actionUrl) {
       void this.router.navigateByUrl(actionUrl);
     } else {

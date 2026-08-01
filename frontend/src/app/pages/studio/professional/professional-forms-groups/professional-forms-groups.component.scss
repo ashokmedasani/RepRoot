@@ -253,27 +253,31 @@ h3 {
 }
 
 .workspace-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  display: inline-flex;
+  width: 100%;
+  gap: 0.3rem;
   margin-bottom: 1.1rem;
   padding: 0.35rem;
   border: 1px solid var(--app-border);
-  border-radius: var(--app-panel-radius);
+  border-radius: var(--app-radius-pill);
   background: var(--app-surface-soft);
 }
 
 .workspace-tab {
-  display: grid;
-  gap: 0.2rem;
-  min-height: 4.5rem;
-  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
   border: 1px solid transparent;
-  border-radius: calc(var(--app-panel-radius) - 0.25rem);
+  border-radius: var(--app-radius-pill);
   background: transparent;
   color: var(--app-muted);
   text-align: left;
   cursor: pointer;
+  flex: 1;
+  justify-content: center;
+  text-align: center;
 }
 
 .workspace-tab span {
@@ -293,16 +297,18 @@ h3 {
 }
 
 .workspace-tab.active {
-  border-color: color-mix(in srgb, var(--app-primary) 45%, var(--app-border));
-  background: var(--app-surface);
-  color: var(--app-primary-strong);
-  box-shadow: var(--app-shadow);
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: #fff;
+  box-shadow: var(--app-shadow-sm);
 }
 
 @media (max-width: 640px) {
   .workspace-tabs {
-    grid-template-columns: 1fr;
+    display: flex;
+    width: 100%;
   }
+  .workspace-tab { flex: 1; align-items: flex-start; flex-direction: column; }
 }
 
 .switch-control input {

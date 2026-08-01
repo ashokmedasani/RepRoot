@@ -1,12 +1,17 @@
-@if (isLoading) {
+<nav class="payment-view-tabs" aria-label="Client payment views">
+  <button type="button" [class.active]="activeView === 'requests'" (click)="activeView = 'requests'">Payment Requests</button>
+  <button type="button" [class.active]="activeView === 'activity'" (click)="activeView = 'activity'">Activity</button>
+</nav>
+
+@if (activeView === 'requests' && isLoading) {
   <p class="state-note">Loading payment requests...</p>
-} @else if (loadError) {
+} @else if (activeView === 'requests' && loadError) {
   <p class="message error-message">{{ loadError }}</p>
-} @else if (!requests.length) {
+} @else if (activeView === 'requests' && !requests.length) {
   <div class="placeholder-block">
     <p>You don't have any payment requests yet.</p>
   </div>
-} @else {
+} @else if (activeView === 'requests') {
   @if (openRequests.length) {
     <section class="request-group" aria-labelledby="open-requests-title">
       <h2 id="open-requests-title">Needs your attention</h2>
@@ -16,7 +21,6 @@
             <div class="request-main">
               <strong>
                 {{ request.title }}
-                @if (isUnread(request)) { <span class="unread-dot" aria-label="Unread">•</span> }
               </strong>
               <small>
                 {{ request.requested_amount }} {{ request.requested_currency }}
@@ -24,7 +28,10 @@
                 &middot; {{ request.request_id }}
               </small>
             </div>
-            <span class="status-pill" [attr.data-status]="request.status">{{ statusLabel(request.status) }}</span>
+            <div class="request-side">
+              <span class="status-pill" [attr.data-status]="request.status">{{ statusLabel(request.status) }}</span>
+              @if (isUnread(request)) { <span class="unread-count" aria-label="1 unread payment notification">1</span> }
+            </div>
           </a>
         }
       </div>
@@ -33,7 +40,7 @@
 
   @if (closedRequests.length) {
     <section class="request-group" aria-labelledby="closed-requests-title">
-      <h2 id="closed-requests-title">Completed &amp; closed</h2>
+      <h2 id="closed-requests-title">Completed Payments</h2>
       <div class="request-list">
         @for (request of closedRequests; track request.request_id) {
           <a class="request-card muted" [routerLink]="['/client/payments/requests', request.request_id]">
@@ -47,4 +54,23 @@
       </div>
     </section>
   }
+
+}
+
+@if (activeView === 'activity') {
+  <section class="request-group payment-activity" aria-labelledby="client-payment-activity-title">
+    <h2 id="client-payment-activity-title">Payment Activity</h2>
+    @if (!activityItems.length) {
+      <div class="placeholder-block"><p>No payment activity yet.</p></div>
+    } @else {
+      <div class="activity-list">
+        @for (item of activityItems; track item.id) {
+          <article class="activity-row">
+            <span aria-hidden="true"></span>
+            <div><strong>{{ item.action_label }}</strong><small>@if (item.request_id) { {{ item.request_id }} &middot; }{{ item.created_at | date: 'MMM d, y, h:mm a' }}</small></div>
+          </article>
+        }
+      </div>
+    }
+  </section>
 }

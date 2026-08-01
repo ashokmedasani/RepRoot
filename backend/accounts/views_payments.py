@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Sum
 from django.http import FileResponse
 from django.utils import timezone
@@ -27,6 +28,7 @@ from .models import (
   ClientPaymentMethodAccess,
   ManualPaymentProfile,
   PaymentNotification,
+  PaymentAuditLog,
   PaymentProof,
   PaymentRecord,
   PaymentRequest,
@@ -56,6 +58,48 @@ def _currency_options():
   featured = list(FEATURED_CURRENCIES)
   rest = sorted(ISO_4217_CODES - set(featured))
   return featured + rest
+
+
+def _serialize_payment_activity(row):
+  return {
+    'id': row.id,
+    'action': row.action,
+    'action_label': row.get_action_display(),
+    'request_id': row.payment_request.request_id if row.payment_request else '',
+    'record_id': row.payment_record.payment_record_id if row.payment_record else '',
+    'changed_by': row.changed_by,
+    'reason': row.reason,
+    'created_at': row.created_at,
+  }
+
+
+class ProfessionalPaymentActivityView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+
+  def get(self, request):
+    rows = PaymentAuditLog.objects.filter(professional=request.user).select_related('payment_request', 'payment_record')
+    client_id = request.query_params.get('client_id')
+    if client_id:
+      rows = rows.filter(client_id=client_id)
+    return Response({'items': [_serialize_payment_activity(row) for row in rows[:100]]})
+
+
+class ClientPaymentActivityView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  CLIENT_VISIBLE_ACTIONS = (
+    'request_created', 'request_updated', 'request_cancelled', 'proof_submitted', 'proof_rejected',
+    'info_requested', 'payment_acknowledged', 'payment_verified',
+  )
+
+  def get(self, request):
+    rows = PaymentAuditLog.objects.filter(
+      client=request.auth,
+      action__in=self.CLIENT_VISIBLE_ACTIONS,
+      payment_request__client_visibility='visible',
+    ).select_related('payment_request', 'payment_record')
+    return Response({'items': [_serialize_payment_activity(row) for row in rows[:100]]})
 
 
 def _serialize_payment_notification(row):
@@ -447,6 +491,71 @@ class PaymentRequestDetailView(APIView):
       }
     )
 
+  def put(self, request, request_id):
+    payment_request = PaymentRequest.objects.filter(request_id=request_id, professional=request.user).first()
+    if payment_request is None:
+      return Response({'message': 'Payment request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    deadline = payment_request.completed_at + timedelta(days=14) if payment_request.completed_at else None
+    if deadline and timezone.now() > deadline:
+      return Response({'message': 'This request is closed because its 14-day correction window has ended.'}, status=status.HTTP_423_LOCKED)
+    if payment_request.status in (PaymentRequest.STATUS_CANCELLED, PaymentRequest.STATUS_REFUNDED, PaymentRequest.STATUS_REJECTED):
+      return Response({'message': f'A {payment_request.get_status_display()} request cannot be edited.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    changes = request.data.copy()
+    method_ids = changes.pop('allowed_method_ids', None)
+    allowed_profiles = None
+    if method_ids is not None:
+      allowed_profiles = list(ManualPaymentProfile.objects.filter(id__in=method_ids, professional=request.user))
+      if len(allowed_profiles) != len(set(method_ids)):
+        return Response({'message': 'One or more payment methods are invalid.'}, status=status.HTTP_400_BAD_REQUEST)
+    has_accepted_proof = payment_request.proofs.filter(status=PaymentProof.STATUS_ACCEPTED).exists()
+    if has_accepted_proof:
+      changes.pop('requested_amount', None)
+      changes.pop('requested_currency', None)
+
+    before = {
+      'title': payment_request.title,
+      'description': payment_request.description,
+      'requested_amount': str(payment_request.requested_amount),
+      'requested_currency': payment_request.requested_currency,
+      'due_date': payment_request.due_date.isoformat() if payment_request.due_date else None,
+      'notes': payment_request.notes,
+    }
+    serializer = PaymentRequestSerializer(payment_request, data=changes, partial=True)
+    serializer.is_valid(raise_exception=True)
+    payment_request = serializer.save()
+
+    if allowed_profiles is not None:
+      payment_request.allowed_methods.all().delete()
+      PaymentRequestAllowedMethod.objects.bulk_create([
+        PaymentRequestAllowedMethod(payment_request=payment_request, manual_payment_profile=profile)
+        for profile in allowed_profiles
+      ])
+
+    after = {
+      'title': payment_request.title,
+      'description': payment_request.description,
+      'requested_amount': str(payment_request.requested_amount),
+      'requested_currency': payment_request.requested_currency,
+      'due_date': payment_request.due_date.isoformat() if payment_request.due_date else None,
+      'notes': payment_request.notes,
+    }
+    record_payment_action(
+      action='request_updated', professional=request.user, client=payment_request.client,
+      payment_request=payment_request, changed_by=request.user.username,
+      previous_values=before, new_values=after,
+    )
+    payment_notifications.notify_client(
+      payment_request.client,
+      'request_updated',
+      f'Payment request updated - {payment_request.title}',
+      f'{request.user.first_name or request.user.username} updated payment request {payment_request.request_id}.',
+      payload={'request_id': payment_request.request_id, 'action_url': web_routes.client_payment_request(payment_request.request_id)},
+      email=False,
+    )
+    return Response({'request': PaymentRequestSerializer(payment_request).data, 'message': 'Payment request updated.'})
+
 
 class PaymentRequestCancelView(APIView):
   permission_classes = [ProfessionalAccessPermission]
@@ -519,11 +628,11 @@ class ClientPaymentRequestDetailView(APIView):
         f'{client.first_name or client.username} viewed payment request {payment_request.request_id}',
         (
           f'{client.first_name or client.username} opened the payment request "{payment_request.title}". '
-          f'Track it here: {payment_notifications.request_link_for_professional(payment_request.request_id)}'
+          f'Track it here: {payment_notifications.request_link_for_professional(payment_request.request_id, payment_request.client_id)}'
         ),
         payload={
           'request_id': payment_request.request_id,
-          'action_url': f'{web_routes.professional_client(payment_request.client_id)}?tab=payments',
+          'action_url': web_routes.professional_payment_request(payment_request.client_id, payment_request.request_id),
         },
         email=False,
       )
@@ -653,6 +762,7 @@ class PaymentProofSubmitView(APIView):
       PaymentRequest.STATUS_OVERDUE,
       PaymentRequest.STATUS_UNDER_REVIEW,
       PaymentRequest.STATUS_PARTIALLY_PAID,
+      PaymentRequest.STATUS_PROOF_SUBMITTED,
     )
     if payment_request.status not in submittable:
       return Response(
@@ -699,12 +809,12 @@ class PaymentProofSubmitView(APIView):
         f'Hi {payment_request.professional.first_name or payment_request.professional.username}, '
         f'{client.first_name or client.username} submitted payment proof for "{payment_request.title}" '
         f'({proof.reported_amount} {proof.reported_currency}). Review it here: '
-        f'{payment_notifications.request_link_for_professional(payment_request.request_id)}'
+        f'{payment_notifications.request_link_for_professional(payment_request.request_id, payment_request.client_id)}'
       ),
       payload={
         'request_id': payment_request.request_id,
         'proof_id': proof.id,
-        'action_url': f'{web_routes.professional_client(payment_request.client_id)}?tab=payments',
+        'action_url': web_routes.professional_payment_request(payment_request.client_id, payment_request.request_id),
       },
     )
 
@@ -719,12 +829,7 @@ class PaymentProofSubmitView(APIView):
 
 
 class PaymentProofAcknowledgeView(APIView):
-  """Confirms the client's payment was received - nothing more. Acknowledging
-  is deliberately separate from logging it to the revenue ledger
-  (PaymentRecordListView): a trainer might acknowledge a payment the moment
-  it lands but only log it later (or never - logging stays optional), so
-  this view never asks for amount/currency/date and never creates a
-  PaymentRecord itself."""
+  """Accept one installment and advance the parent request as a single flow."""
 
   permission_classes = [ProfessionalAccessPermission]
 
@@ -738,14 +843,105 @@ class PaymentProofAcknowledgeView(APIView):
       return Response({'message': 'This proof was already acknowledged.'}, status=status.HTTP_400_BAD_REQUEST)
 
     payment_request = proof.payment_request
+    settlement_status = str(request.data.get('settlement_status') or '').strip().lower()
+    if settlement_status and settlement_status not in {'partial', 'full', 'overpaid'}:
+      return Response(
+        {'message': 'Choose whether this leaves the request partially paid, fully paid, or overpaid.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
 
-    proof.status = PaymentProof.STATUS_ACCEPTED
-    proof.reviewed_at = timezone.now()
-    proof.review_note = str(request.data.get('acknowledgement_note') or '')
-    proof.save(update_fields=['status', 'reviewed_at', 'review_note'])
+    with transaction.atomic():
+      proof.status = PaymentProof.STATUS_ACCEPTED
+      proof.reviewed_at = timezone.now()
+      proof.review_note = str(request.data.get('acknowledgement_note') or '')
+      proof.save(update_fields=['status', 'reviewed_at', 'review_note'])
 
-    payment_request.status = PaymentRequest.STATUS_ACKNOWLEDGED
-    payment_request.save(update_fields=['status', 'updated_at'])
+      accepted_total = sum(
+        (
+          row.reported_amount
+          for row in payment_request.proofs.filter(
+            status=PaymentProof.STATUS_ACCEPTED,
+            reported_currency=payment_request.requested_currency,
+          )
+        ),
+        Decimal('0.00'),
+      )
+      remaining = max(Decimal('0.00'), payment_request.requested_amount - accepted_total)
+      overpaid = max(Decimal('0.00'), accepted_total - payment_request.requested_amount)
+      # Backward compatibility for older website/mobile clients. The current
+      # website always sends the trainer's explicit decision.
+      if not settlement_status:
+        settlement_status = 'overpaid' if overpaid > 0 else ('full' if remaining == 0 else 'partial')
+      if settlement_status == 'partial' and remaining <= 0:
+        transaction.set_rollback(True)
+        return Response(
+          {'message': 'The accepted total covers the request. Choose Fully paid or Overpaid.'},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+      if settlement_status == 'full' and accepted_total < payment_request.requested_amount:
+        transaction.set_rollback(True)
+        return Response(
+          {'message': 'The accepted total is below the requested amount. Choose Partially paid.'},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+      if settlement_status == 'overpaid' and overpaid <= 0:
+        transaction.set_rollback(True)
+        return Response(
+          {'message': 'Overpaid can only be selected when the accepted total exceeds the requested amount.'},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+
+      has_pending_proofs = payment_request.proofs.filter(
+        status__in=(PaymentProof.STATUS_SUBMITTED, PaymentProof.STATUS_UNDER_REVIEW)
+      ).exists()
+
+      if has_pending_proofs:
+        # Keep the ticket in the trainer's review queue until every submitted
+        # installment has been decided. Accepted totals remain visible.
+        payment_request.status = PaymentRequest.STATUS_PROOF_SUBMITTED
+        payment_request.completed_at = None
+      elif settlement_status == 'partial':
+        payment_request.status = PaymentRequest.STATUS_PARTIALLY_PAID
+        payment_request.completed_at = None
+      elif settlement_status == 'overpaid':
+        payment_request.status = PaymentRequest.STATUS_OVERPAID
+        payment_request.completed_at = timezone.now()
+      else:
+        payment_request.status = PaymentRequest.STATUS_COMPLETED
+        payment_request.completed_at = timezone.now()
+      payment_request.save(update_fields=['status', 'completed_at', 'updated_at'])
+
+      # Accepted client proofs get a durable confirmation record for receipt
+      # viewing. Trainer-entered bookkeeping records remain a separate,
+      # private workflow.
+      record_status = (
+        PaymentRecord.STATUS_COMPLETED
+        if settlement_status in {'full', 'overpaid'}
+        else PaymentRecord.STATUS_PARTIALLY_PAID
+      )
+      payment_record, created = PaymentRecord.objects.get_or_create(
+        source_proof=proof,
+        defaults={
+          'professional': request.user,
+          'client': payment_request.client,
+          'payment_request': payment_request,
+          'original_amount': proof.reported_amount,
+          'original_currency': proof.reported_currency,
+          'reporting_amount': proof.reported_amount,
+          'reporting_currency': proof.reported_currency,
+          'payment_method': proof.payment_method,
+          'transaction_reference': proof.transaction_reference,
+          'received_date': proof.reported_payment_date,
+          'status': record_status,
+          'client_visibility': 'visible',
+          'internal_note': proof.review_note,
+          'client_note': proof.note,
+          'verified_by': request.user,
+          'verified_at': timezone.now(),
+        },
+      )
+      if created:
+        _write_finance_ledger_entry(payment_record)
 
     record_payment_action(
       action='payment_acknowledged',
@@ -757,6 +953,10 @@ class PaymentProofAcknowledgeView(APIView):
       new_values={
         'reported_amount': str(proof.reported_amount),
         'reported_currency': proof.reported_currency,
+        'accepted_total': str(accepted_total),
+        'remaining_amount': str(remaining),
+        'overpaid_amount': str(overpaid),
+        'settlement_status': settlement_status,
       },
       reason=proof.review_note,
     )
@@ -780,9 +980,16 @@ class PaymentProofAcknowledgeView(APIView):
         'request': PaymentRequestSerializer(payment_request).data,
         'message': (
           f'Payment of {proof.reported_amount} {proof.reported_currency} acknowledged. '
-          'Log it in your Payment History to track your revenue.'
+          + (
+            'Another submitted transaction is still waiting for review.'
+            if has_pending_proofs
+            else ('The request is complete.' if remaining == 0 else f'{remaining} {payment_request.requested_currency} remains due.')
+          )
+          + ' A confirmation is ready to view or download.'
         ),
-        'needs_logging': True,
+        'needs_logging': False,
+        'accepted_total': str(accepted_total),
+        'remaining_amount': str(remaining),
       },
       status=status.HTTP_200_OK,
     )
@@ -1086,14 +1293,9 @@ class PaymentRecordListView(APIView):
     if client is None:
       return Response({'message': 'Client not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    # A manually logged payment is private trainer bookkeeping. Payment
+    # requests are settled only through client proof acknowledgement.
     payment_request = None
-    request_ref = request.data.get('payment_request_id') or request.data.get('payment_request')
-    if request_ref:
-      payment_request = PaymentRequest.objects.filter(
-        request_id=request_ref, professional=request.user, client=client
-      ).first()
-      if payment_request is None:
-        return Response({'message': 'Linked payment request not found.'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = PaymentRecordSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
@@ -1107,6 +1309,8 @@ class PaymentRecordListView(APIView):
       client=client,
       payment_request=payment_request,
       status=outcome,
+      client_visibility=ProfessionalPaymentSettings.VISIBILITY_PRIVATE,
+      client_note='',
       verified_by=request.user,
       verified_at=timezone.now(),
     )
@@ -1158,6 +1362,11 @@ class PaymentRecordDetailView(APIView):
     record = self._record(request, record_id)
     if record is None:
       return Response({'message': 'Payment record not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if timezone.now() > ((record.verified_at or record.created_at) + timedelta(days=14)):
+      return Response(
+        {'message': 'This transaction is locked because its 14-day correction window has ended.'},
+        status=status.HTTP_423_LOCKED,
+      )
 
     reason = str(request.data.get('reason') or '').strip()
     if not reason:
@@ -1211,6 +1420,11 @@ class PaymentRecordDetailView(APIView):
     record = self._record(request, record_id)
     if record is None:
       return Response({'message': 'Payment record not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if timezone.now() > ((record.verified_at or record.created_at) + timedelta(days=14)):
+      return Response(
+        {'message': 'This transaction is locked because its 14-day correction window has ended.'},
+        status=status.HTTP_423_LOCKED,
+      )
 
     reason = str(request.data.get('reason') or '').strip()
     record_payment_action(
@@ -1342,6 +1556,7 @@ class ProfessionalRevenueSummaryView(APIView):
       professional=request.user,
       reporting_currency=currency,
       status__in=[PaymentRecord.STATUS_COMPLETED, PaymentRecord.STATUS_PARTIALLY_PAID],
+      source_proof__isnull=True,
     )
 
     today = timezone.localdate()
@@ -1400,6 +1615,9 @@ class ProfessionalRevenueSummaryView(APIView):
         'period_start': period_start.isoformat(),
         'period_end': period_end.isoformat(),
         'total_revenue': str(total_revenue or Decimal('0')),
+        'manual_logged_total': str(total_revenue or Decimal('0')),
+        'integrated_total': '0.00',
+        'total_logged': str(total_revenue or Decimal('0')),
         'chart_kind': chart_kind,
         'series': series,
         'recent_transactions': recent_transactions,
@@ -1416,12 +1634,15 @@ class ClientPaymentRecordListView(APIView):
 
   def get(self, request):
     records = PaymentRecord.objects.filter(
-      client=request.auth, client_visibility='visible'
+      client=request.auth,
+      client_visibility='visible',
+      source_proof__isnull=False,
+      payment_request__isnull=False,
     ).select_related('payment_request')
     return Response({'records': ClientPaymentRecordSerializer(records, many=True).data})
 
 
-def _confirmation_payload(record):
+def _confirmation_payload(record, *, client_view=False):
   professional = record.professional
   client = record.client
   return {
@@ -1438,7 +1659,7 @@ def _confirmation_payload(record):
     'received_date': record.received_date,
     'verified_at': record.verified_at or record.created_at,
     'status': record.status,
-    'client_note': record.client_note,
+    'client_note': record.client_note if client_view else record.internal_note,
   }
 
 
@@ -1463,8 +1684,12 @@ class ClientPaymentConfirmationView(APIView):
 
   def get(self, request, record_id):
     record = PaymentRecord.objects.filter(
-      payment_record_id=record_id, client=request.auth, client_visibility='visible'
+      payment_record_id=record_id,
+      client=request.auth,
+      client_visibility='visible',
+      source_proof__isnull=False,
+      payment_request__isnull=False,
     ).select_related('professional', 'client', 'payment_method', 'payment_request').first()
     if record is None:
       return Response({'message': 'Payment record not found.'}, status=status.HTTP_404_NOT_FOUND)
-    return Response({'confirmation': PaymentConfirmationSerializer(_confirmation_payload(record)).data})
+    return Response({'confirmation': PaymentConfirmationSerializer(_confirmation_payload(record, client_view=True)).data})

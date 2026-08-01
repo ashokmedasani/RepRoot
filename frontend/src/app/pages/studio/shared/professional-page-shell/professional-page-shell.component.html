@@ -107,13 +107,20 @@
               @if (unreadNotifications > 0) { <span>{{ badgeLabel(unreadNotifications) }}</span> }
             </button>
             @if (notificationsOpen) {
-              <section class="notification-panel" aria-label="Recent notifications">
-                <header><strong>Notifications</strong><button type="button" (click)="markAllNotificationsRead()">Mark all read</button></header>
+              <section class="notification-panel" [class.empty]="notifications.length === 0" aria-label="Recent notifications">
+                <header><strong>Notifications</strong></header>
+                <div class="notification-list">
                 @for (item of notifications; track item.id) {
                   <button type="button" class="notification-row" [class.unread]="!item.is_read" (click)="openNotification(item)">
-                    <strong>{{ item.title }}</strong><span>{{ item.body }}</span><small>{{ item.category }}</small>
+                    <span class="notification-meta"><i [attr.data-category]="item.category"></i><b>{{ item.category }}</b><time>{{ item.created_at | date: 'MMM d, h:mm a' }}</time></span>
+                    <strong>{{ item.title }}</strong><span>{{ item.body }}</span><small>Open details →</small>
                   </button>
                 } @empty { <p>No notifications yet.</p> }
+                </div>
+                <footer class="notification-actions">
+                  <button type="button" (click)="clearNotifications()" [disabled]="notifications.length === 0">Clear All</button>
+                  <button type="button" (click)="markAllNotificationsRead()" [disabled]="unreadNotifications === 0">Mark as Read</button>
+                </footer>
               </section>
             }
           </div>

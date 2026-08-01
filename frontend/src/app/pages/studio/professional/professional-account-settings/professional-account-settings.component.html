@@ -132,7 +132,11 @@
                 <div class="billing-preview-heading">
                   <div>
                     <h3>Choose Your Plan</h3>
-                    <p>Temporary testing only. No payment will be collected.</p>
+                    @if (billing.test_mode) {
+                      <p>Temporary testing only. No payment will be collected.</p>
+                    } @else {
+                      <p>Checkout is billed through Razorpay.</p>
+                    }
                   </div>
                   <div class="preview-selectors">
                     <select [(ngModel)]="selectedBillingCycle" name="billingCycle" aria-label="Billing period">
@@ -143,6 +147,12 @@
                     <span class="detected-region">{{ billing.billing_region }} · {{ billing.billing_currency }}</span>
                   </div>
                 </div>
+
+                @if (selectedBillingCycle !== 'monthly') {
+                  <div class="cycle-savings-banner">
+                    💰 {{ selectedBillingCycle === 'six_months' ? '6-month' : 'Yearly' }} billing saves up to {{ cycleSavingsPercent(billing, 'premium_unlimited') }}% versus paying monthly.
+                  </div>
+                }
 
                 @if (billing.has_billing_account) {
                   <button type="button" class="secondary-action compact" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
@@ -164,6 +174,9 @@
                       <div class="preview-plan-price">
                         <strong>{{ planPrice(billing, plan.code) }}</strong>
                         <span>/{{ selectedBillingCycle === 'monthly' ? 'month' : selectedBillingCycle === 'six_months' ? '6 months' : 'year' }}</span>
+                        @if (cycleSavingsPercent(billing, plan.code) > 0) {
+                          <span class="savings-badge">Save {{ cycleSavingsPercent(billing, plan.code) }}%</span>
+                        }
                       </div>
                       <ul>
                         <li>{{ plan.lead_forms }} lead form{{ plan.lead_forms === 1 ? '' : 's' }}</li>
@@ -549,12 +562,27 @@
               </li>
               <li>
                 <span>Privacy Policy</span>
-                <a routerLink="/privacy" target="_blank" rel="noopener">View</a>
+                <a routerLink="/privacy/professional" target="_blank" rel="noopener">View</a>
               </li>
               <li>
                 <span>Terms &amp; Conditions</span>
-                <a routerLink="/terms" target="_blank" rel="noopener">View</a>
+                <a routerLink="/terms/professional" target="_blank" rel="noopener">View</a>
               </li>
+              @if (legalProfile?.legal_acceptance_history?.length) {
+                <li>
+                  <span>Last legal acceptance</span>
+                  <strong>{{ legalProfile?.legal_acceptance_history?.[0]?.accepted_at | date: 'medium' }}</strong>
+                </li>
+                <li>
+                  <span>Accepted document version</span>
+                  <strong>{{ legalProfile?.legal_acceptance_history?.[0]?.legal_document_version }}</strong>
+                </li>
+              } @else if (legalProfile?.terms_accepted_at) {
+                <li>
+                  <span>Last legal acceptance</span>
+                  <strong>{{ legalProfile?.terms_accepted_at | date: 'medium' }}</strong>
+                </li>
+              }
             </ul>
           </section>
         </div>

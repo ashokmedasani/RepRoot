@@ -69,5 +69,5 @@ def request_link_for_client(request_id):
   return _frontend_link(web_routes.client_payment_request(request_id))
 
 
-def request_link_for_professional(request_id):
-  return _frontend_link(web_routes.PROFESSIONAL_CLIENTS)
+def request_link_for_professional(request_id, client_id):
+  return _frontend_link(web_routes.professional_payment_request(client_id, request_id))

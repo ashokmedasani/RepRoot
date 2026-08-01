@@ -1,9 +1,11 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ClientApiService, ClientMeResponse } from '@core/api/client-api.service';
+import { ChatApiService } from '@core/api/chat-api.service';
+import { PaymentsApiService } from '@core/api/payments-api.service';
 import {
   AdditionalInfoItem,
   ClientAccessRecord,
@@ -53,11 +55,13 @@ interface EntryReviewRow {
   templateUrl: './client-profile.component.html',
   styleUrl: './client-profile.component.scss'
 })
-export class ClientProfileComponent implements OnInit {
+export class ClientProfileComponent implements OnInit, OnDestroy {
   private readonly clientApi = inject(ClientApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly chatApi = inject(ChatApiService);
+  private readonly paymentsApi = inject(PaymentsApiService);
 
   client: ClientAccessRecord | null = null;
   me: ClientMeResponse | null = null;
@@ -86,7 +90,10 @@ export class ClientProfileComponent implements OnInit {
   deletionNote = '';
   isRequestingDeletion = false;
   isChangingPassword = false;
-  readonly passwordForm = { currentPassword: '', password: '', confirmPassword: '' };
+  unreadChat = 0;
+  unreadPayments = 0;
+  private unreadPoll: ReturnType<typeof setInterval> | null = null;
+  readonly passwordForm = { password: '', confirmPassword: '' };
 
   readonly tabs: { id: PortalTab; label: string }[] = [
     { id: 'details', label: 'Settings' },
@@ -139,6 +146,12 @@ export class ClientProfileComponent implements OnInit {
         this.setProfessionalTab(professionalTab);
       }
     });
+    this.loadProfessionalUnreadCounts();
+    this.unreadPoll = setInterval(() => this.loadProfessionalUnreadCounts(), 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.unreadPoll) clearInterval(this.unreadPoll);
   }
 
   signOut(): void {
@@ -162,6 +175,18 @@ export class ClientProfileComponent implements OnInit {
 
   setProfessionalTab(tab: ProfessionalTab): void {
     this.professionalTab = tab;
+    setTimeout(() => this.loadProfessionalUnreadCounts(), 400);
+  }
+
+  private loadProfessionalUnreadCounts(): void {
+    this.chatApi.getClientUnreadCount().subscribe({
+      next: (summary) => (this.unreadChat = summary.unread_count),
+      error: () => (this.unreadChat = 0)
+    });
+    this.paymentsApi.getClientPaymentUnread().subscribe({
+      next: (summary) => (this.unreadPayments = summary.unread_count),
+      error: () => (this.unreadPayments = 0)
+    });
   }
 
   setSettingsTab(tab: SettingsTab): void {
@@ -497,10 +522,10 @@ export class ClientProfileComponent implements OnInit {
   }
 
   changePassword(): void {
-    const { currentPassword, password, confirmPassword } = this.passwordForm;
-    if (!currentPassword || !password || !confirmPassword) {
+    const { password, confirmPassword } = this.passwordForm;
+    if (!password || !confirmPassword) {
       this.messageType = 'error';
-      this.message = 'Current password, new password, and confirmation are required.';
+      this.message = 'New password and confirmation are required.';
       return;
     }
     if (password !== confirmPassword) {
@@ -509,7 +534,7 @@ export class ClientProfileComponent implements OnInit {
       return;
     }
     this.isChangingPassword = true;
-    this.clientApi.changePassword(currentPassword, password, confirmPassword).subscribe({
+    this.clientApi.changePassword(password, confirmPassword).subscribe({
       next: (response) => {
         window.sessionStorage.removeItem('client-access');
         window.sessionStorage.removeItem('client-auth-token');

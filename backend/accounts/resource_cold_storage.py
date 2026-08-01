@@ -37,7 +37,7 @@ def _relocate(resource, old_prefix, new_prefix) -> bool:
 
   storage = file_field.storage
   old_name = file_field.name
-  new_name = new_prefix + old_name[len(old_prefix):]
+  requested_name = new_prefix + old_name[len(old_prefix):]
 
   if not storage.exists(old_name):
     return False
@@ -45,7 +45,19 @@ def _relocate(resource, old_prefix, new_prefix) -> bool:
   try:
     with storage.open(old_name, 'rb') as fh:
       content = ContentFile(fh.read())
-    storage.save(new_name, content)
+    # storage.save() can return a different name than requested if something
+    # already occupies that key (most backends append a random suffix rather
+    # than overwrite) -- always use what it actually returns, never the
+    # requested name, or the model can end up pointing at the wrong object
+    # while an orphaned copy sits under the name we asked for.
+    saved_name = storage.save(requested_name, content)
+    # Confirm the new object really exists under the name we're about to
+    # commit before touching the source -- if the storage backend lied or
+    # partially failed, leave the original file alone rather than risk
+    # deleting the only good copy.
+    if not storage.exists(saved_name):
+      storage.delete(saved_name)
+      return False
     storage.delete(old_name)
   # A storage hiccup here must never block the actual lock/unlock action it's
   # riding along with -- worst case the file just stays in its current tier
@@ -53,7 +65,7 @@ def _relocate(resource, old_prefix, new_prefix) -> bool:
   except Exception:
     return False
 
-  resource.file.name = new_name
+  resource.file.name = saved_name
   resource.save(update_fields=['file'])
   return True
 

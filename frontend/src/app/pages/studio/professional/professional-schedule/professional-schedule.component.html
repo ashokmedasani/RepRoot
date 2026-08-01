@@ -186,6 +186,32 @@
       }
     </section>
 
+    <section class="meetings-section client-request-section">
+      <h2>Client Meeting Requests</h2>
+      <p class="section-note source-note">Meeting times requested by clients stay here until you accept or decline them.</p>
+      @if (pendingClientRequests.length) {
+        <div class="meeting-list">
+          @for (meeting of pendingClientRequests; track meeting.id) {
+            <article class="meeting-card client-request-card" [attr.id]="'meeting-' + meeting.id">
+              <div class="meeting-main">
+                <span class="source-pill">Needs approval</span>
+                <strong>{{ meeting.client_name }}</strong>
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} – {{ meeting.end_at | date: 'h:mm a' }}</small>
+                @if (meeting.notes) { <small>{{ meeting.notes }}</small> }
+              </div>
+              <div class="meeting-actions">
+                <button type="button" class="primary-action" (click)="reviewClientRequest(meeting, 'accept')">Accept &amp; Confirm</button>
+                <button type="button" class="ghost-action danger" (click)="reviewClientRequest(meeting, 'decline')">Decline</button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No client meeting requests are waiting for approval.</p>
+      }
+    </section>
+
     <section class="meetings-section">
       <h2>Upcoming internal client meetings</h2>
       <p class="section-note source-note">Scheduled directly by the trainer from a client profile or the Schedule workspace.</p>

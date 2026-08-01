@@ -28,6 +28,7 @@ export class ClientLoginComponent {
   isLoadingDirectory = false;
   selectedProfessional: ProfessionalDirectoryEntry | null = null;
   pendingProfessional: ProfessionalDirectoryEntry | null = null;
+  private directorySearchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly loginForm = {
     professionalCode: '',
@@ -38,20 +39,9 @@ export class ClientLoginComponent {
   toggleDirectory(): void {
     this.showDirectory = true;
     this.pendingProfessional = this.selectedProfessional;
-    this.loadDirectory();
-  }
-
-  get filteredProfessionals(): ProfessionalDirectoryEntry[] {
-    const term = this.directorySearch.trim().toLowerCase();
-
-    if (!term) {
-      return this.directory;
-    }
-
-    return this.directory.filter(
-      (professional) =>
-        professional.professional_name.toLowerCase().includes(term) || professional.professional_id.toLowerCase().includes(term)
-    );
+    this.directory = [];
+    this.directorySearch = '';
+    this.isLoadingDirectory = false;
   }
 
   selectProfessional(professional: ProfessionalDirectoryEntry): void {
@@ -74,10 +64,18 @@ export class ClientLoginComponent {
   }
 
   loadDirectory(): void {
+    const search = this.directorySearch.trim();
+    if (search.length < 3) {
+      this.directory = [];
+      this.isLoadingDirectory = false;
+      return;
+    }
     this.isLoadingDirectory = true;
-    this.clientApi.getProfessionalDirectory(this.directorySearch).subscribe({
+    this.clientApi.getProfessionalDirectory(search).subscribe({
       next: (response) => {
-        this.directory = response.professionals;
+        if (this.directorySearch.trim() === search) {
+          this.directory = response.professionals.slice(0, 5);
+        }
         this.isLoadingDirectory = false;
       },
       error: () => {
@@ -88,7 +86,22 @@ export class ClientLoginComponent {
   }
 
   searchDirectory(): void {
+    if (this.directorySearchTimer) {
+      clearTimeout(this.directorySearchTimer);
+    }
     this.loadDirectory();
+  }
+
+  onDirectorySearchChange(): void {
+    if (this.directorySearchTimer) {
+      clearTimeout(this.directorySearchTimer);
+    }
+    if (this.directorySearch.trim().length < 3) {
+      this.directory = [];
+      this.isLoadingDirectory = false;
+      return;
+    }
+    this.directorySearchTimer = setTimeout(() => this.loadDirectory(), 250);
   }
 
   verifyClientLogin(): void {
@@ -115,6 +128,8 @@ export class ClientLoginComponent {
 
         if (client.must_change_password) {
           void this.router.navigate(['/client/change-password']);
+        } else if (!client.terms_accepted || !client.privacy_policy_accepted) {
+          void this.router.navigate(['/client/legal-consent']);
         } else {
           void this.router.navigate(['/client/dashboard']);
         }

@@ -1018,8 +1018,43 @@ p {
   min-width: 0;
 }
 
+.payment-unlock-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border-color: color-mix(in srgb, var(--app-primary) 32%, var(--app-border));
+  background: linear-gradient(135deg, var(--app-primary-soft), var(--app-surface));
+}
+
+.payment-unlock-card h2 {
+  margin-top: 0.25rem;
+  color: var(--app-text);
+}
+
+.payment-unlock-card ol {
+  margin: 0.8rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--app-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.setup-kicker {
+  color: var(--app-primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 620px) {
   .dash-tabs {
+    flex-direction: column;
+  }
+
+  .payment-unlock-card {
+    align-items: stretch;
     flex-direction: column;
   }
 }

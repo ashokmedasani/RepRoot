@@ -47,9 +47,9 @@ export class ProfessionalLoginComponent {
 
     this.professionalAuthApi.login(identifier, this.loginForm.password).subscribe({
       next: (response) => {
-        window.localStorage.setItem('professional-auth-token', response.token);
-        window.localStorage.setItem('professional-account-id', String(response.professional.id));
-        window.localStorage.setItem('professional-account-username', response.professional.username);
+        window.sessionStorage.setItem('professional-auth-token', response.token);
+        window.sessionStorage.setItem('professional-account-id', String(response.professional.id));
+        window.sessionStorage.setItem('professional-account-username', response.professional.username);
         this.loginMessage = 'Checking profile status...';
         this.routeAfterLogin();
       },
@@ -74,13 +74,11 @@ export class ProfessionalLoginComponent {
 
     this.professionalAuthApi.googleAuth(credential).subscribe({
       next: (response) => {
-        window.localStorage.setItem('professional-auth-token', response.token);
-        window.localStorage.setItem('professional-account-id', String(response.professional.id));
-        window.localStorage.setItem('professional-account-username', response.professional.username);
-        this.isSubmitting = false;
-        void this.router.navigate([
-          response.professional.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup'
-        ]);
+        window.sessionStorage.setItem('professional-auth-token', response.token);
+        window.sessionStorage.setItem('professional-account-id', String(response.professional.id));
+        window.sessionStorage.setItem('professional-account-username', response.professional.username);
+        this.loginMessage = 'Checking profile status...';
+        this.routeAfterLogin();
       },
       error: (error: unknown) => {
         this.loginMessage = this.formatApiError(error, 'Google sign-in failed. Please try again.');
@@ -93,7 +91,13 @@ export class ProfessionalLoginComponent {
     this.professionalAuthApi.getProfileStatus().subscribe({
       next: (response) => {
         this.isSubmitting = false;
-        void this.router.navigate([response.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup']);
+        void this.router.navigate([
+          response.legal_acceptance_required
+            ? '/professional/legal-consent'
+            : response.profile_setup_completed
+              ? '/professional/dashboard'
+              : '/professional/profile-setup'
+        ]);
       },
       error: (error: unknown) => {
         this.loginMessage = this.formatApiError(error, 'Login succeeded, but profile status could not be checked.');

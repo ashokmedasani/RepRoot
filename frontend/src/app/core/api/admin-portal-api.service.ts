@@ -227,7 +227,15 @@ export class AdminPortalApiService {
   private rangeParams(range:string,startDate:string,endDate:string):HttpParams { let params=new HttpParams().set('range',range); if(range==='custom'){if(startDate)params=params.set('start_date',startDate);if(endDate)params=params.set('end_date',endDate);} return params; }
 
   private getApiBaseUrl(): string {
-    const configured = window.APP_CONFIG?.apiBaseUrl?.trim() || `http://${window.location.hostname}:8000/api/accounts`;
+    const configuredBaseUrl = window.APP_CONFIG?.apiBaseUrl?.trim();
+    const configured = configuredBaseUrl || (
+      ['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)
+        ? `http://${window.location.hostname}:8000/api/accounts`
+        : ''
+    );
+    if (!configured) {
+      throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
+    }
     return configured.replace(/\/+$/, '').replace(/\/accounts$/, '/admin');
   }
 }

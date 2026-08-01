@@ -1,6 +1,7 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { LegalConfigurationResponse } from './professional-auth-api.service';
 
 import {
   AdditionalInfoItem,
@@ -158,15 +159,30 @@ export class ClientApiService {
   }
 
   changePassword(
-    currentPassword: string,
     password: string,
     confirmPassword: string
   ): Observable<{ token: string; client: ClientAccessRecord; message: string }> {
     return this.http.post<{ token: string; client: ClientAccessRecord; message: string }>(
       `${this.apiBaseUrl}/client/change-password/`,
-      { current_password: currentPassword, password, confirm_password: confirmPassword },
+      { password, confirm_password: confirmPassword },
       { headers: this.getAuthHeaders() }
     );
+  }
+
+  acceptLegalDocuments(): Observable<{ client: ClientAccessRecord; message: string }> {
+    return this.http.post<{ client: ClientAccessRecord; message: string }>(
+      `${this.apiBaseUrl}/client/legal-acceptance/`,
+      {
+        accept_terms: true,
+        accept_privacy: true,
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+      },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  getLegalConfiguration(): Observable<LegalConfigurationResponse> {
+    return this.http.get<LegalConfigurationResponse>(`${this.apiBaseUrl}/legal/configuration/`);
   }
 
   getMe(): Observable<ClientMeResponse> {
@@ -322,6 +338,10 @@ export class ClientApiService {
     return this.http.patch<{ unread_count: number }>(`${this.apiBaseUrl}/client/notifications/`, notificationId ? { notification_id: notificationId } : { mark_all_read: true }, { headers: this.getAuthHeaders() });
   }
 
+  clearNotifications(): Observable<{ deleted_count: number; unread_count: number }> {
+    return this.http.delete<{ deleted_count: number; unread_count: number }>(`${this.apiBaseUrl}/client/notifications/`, { headers: this.getAuthHeaders() });
+  }
+
   private getAuthHeaders(): HttpHeaders {
     const token = window.sessionStorage.getItem('client-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `ClientToken ${token}` } : {});
@@ -334,6 +354,9 @@ export class ClientApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

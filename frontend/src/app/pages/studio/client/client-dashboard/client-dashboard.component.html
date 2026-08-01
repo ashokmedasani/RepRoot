@@ -12,16 +12,40 @@
   } @else if (dashboard) {
     <section class="kpi-grid" aria-label="Client dashboard metrics">
       <article class="streak"><span>Current Check-in Streak</span><strong>{{ summary.current_streak }} days</strong><small>Consecutive active days</small></article>
-      <article><span>30-Day Consistency</span><strong>{{ summary.consistency_percent }}%</strong><small>{{ summary.active_days_last_30 }} of the last 30 days</small></article>
-      <article><span>Recent Check-ins</span><strong>{{ summary.entries_last_30_days }}</strong><small>{{ summary.entries_this_week }} submitted this week</small></article>
-      <article><span>Active Templates</span><strong>{{ summary.active_templates }}</strong><small>{{ summary.total_entries }} lifetime entries</small></article>
-      <article><span>Schedules Completed</span><strong>{{ summary.completed_schedules_last_30 }}</strong><small>During the last 30 days</small></article>
+      <article class="consistency"><span>30-Day Consistency</span><strong>{{ summary.consistency_percent }}%</strong><small>{{ summary.active_days_last_30 }} of the last 30 days</small></article>
+      <article class="checkins"><span>Recent Check-ins</span><strong>{{ summary.entries_last_30_days }}</strong><small>{{ summary.entries_this_week }} submitted this week</small></article>
+      <article class="templates"><span>Active Templates</span><strong>{{ summary.active_templates }}</strong><small>{{ summary.total_entries }} lifetime entries</small></article>
+      <article class="completed"><span>Schedules Completed</span><strong>{{ summary.completed_schedules_last_30 }}</strong><small>During the last 30 days</small></article>
     </section>
 
     <section class="dashboard-panel focus-strip" [class.attention]="summary.overdue || summary.due_24_hours">
       <div><span>Next focus</span><strong>{{ summary.overdue ? summary.overdue + ' overdue' : summary.due_24_hours ? summary.due_24_hours + ' due within 24 hours' : 'You are up to date' }}</strong></div>
       <div><span>Last check-in</span><strong>{{ summary.last_entry_date ? (summary.last_entry_date | date: 'mediumDate') : 'No entries yet' }}</strong></div>
       <a routerLink="/client/profile" [queryParams]="{ tab: 'templates' }" class="primary-action">Record a Check-in</a>
+    </section>
+
+    <section class="dashboard-panel meetings-panel">
+      <header>
+        <div><h2>Meetings</h2><p>Your pending requests and confirmed upcoming meetings.</p></div>
+        <a routerLink="/client/meetings" class="ghost-action">Open Meetings</a>
+      </header>
+      <div class="dashboard-meeting-list">
+        @for (meeting of pendingMeetingRequests; track meeting.id) {
+          <a class="dashboard-meeting pending" routerLink="/client/meetings">
+            <div><strong>{{ meeting.title }}</strong><span>{{ meeting.start_at | date: 'EEE, MMM d, y, h:mm a' }}</span></div>
+            <span class="meeting-state pending">Waiting for professional approval</span>
+          </a>
+        }
+        @for (meeting of upcomingMeetings; track meeting.id) {
+          <a class="dashboard-meeting" routerLink="/client/meetings">
+            <div><strong>{{ meeting.title }}</strong><span>{{ meeting.start_at | date: 'EEE, MMM d, y, h:mm a' }}</span></div>
+            <span class="meeting-state">Confirmed</span>
+          </a>
+        }
+        @if (!pendingMeetingRequests.length && !upcomingMeetings.length) {
+          <p class="empty-state">No pending or upcoming meetings.</p>
+        }
+      </div>
     </section>
 
     <section class="dashboard-panel schedules-panel">

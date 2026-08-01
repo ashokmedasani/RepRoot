@@ -63,11 +63,76 @@
 }
 
 .pay-section,
-.proof-section {
+.proof-section,
+.transaction-section {
   display: grid;
   gap: 0.85rem;
   margin-bottom: 1.5rem;
 }
+
+.transaction-section {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.1rem;
+  background: var(--app-surface);
+}
+
+.transaction-heading,
+.transaction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.transaction-heading .section-note { margin-top: 0.2rem; }
+
+.transaction-number {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 25%, var(--app-border));
+  border-radius: 0.65rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.transaction-list { display: grid; gap: 0.55rem; }
+
+.transaction-row {
+  justify-content: flex-start;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  padding: 0.8rem;
+  background: var(--app-surface-soft);
+}
+
+.transaction-row > div { display: grid; gap: 0.15rem; min-width: 0; flex: 1; }
+.transaction-row strong { color: var(--app-text); }
+.transaction-row small { color: var(--app-muted); overflow-wrap: anywhere; }
+
+.proof-status {
+  border-radius: var(--app-radius-pill);
+  padding: 0.25rem 0.55rem;
+  background: #fff5dc;
+  color: #8a5c00;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.proof-status[data-status='accepted'] { background: #e7f6ed; color: #18794e; }
+.proof-status[data-status='rejected'] { background: #fff0ef; color: #b42318; }
+.receipt-link { color: var(--app-primary-strong); font-size: 0.78rem; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.receipt-link:hover { text-decoration: underline; }
+
+.add-transaction { justify-self: end; }
 
 h3 {
   margin: 0;

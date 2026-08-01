@@ -66,11 +66,24 @@
   background: color-mix(in srgb, var(--app-primary) 6%, var(--app-surface));
 }
 
-.unread-dot {
-  color: var(--app-primary-strong);
-  font-size: 1.1rem;
-  line-height: 1;
-  margin-left: 0.35rem;
+.request-side {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.unread-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  border-radius: var(--app-radius-pill);
+  padding-inline: 0.25rem;
+  background: #e31b4b;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .request-main {
@@ -133,9 +146,22 @@
   color: #b42318;
 }
 
+.payment-view-tabs { display: inline-flex; gap: 0.3rem; margin-bottom: 1.25rem; border: 1px solid var(--app-border); border-radius: var(--app-radius-pill); padding: 0.25rem; background: var(--app-surface-soft); }
+.payment-view-tabs button { border: 0; border-radius: var(--app-radius-pill); padding: 0.5rem 0.9rem; background: transparent; color: var(--app-muted); font-weight: 750; cursor: pointer; }
+.payment-view-tabs button.active { background: var(--app-primary); color: #fff; }
+
+.payment-activity { margin-top: 1.5rem; }
+.activity-list { display: grid; border: 1px solid var(--app-border); border-radius: var(--app-radius-lg); overflow: hidden; }
+.activity-row { display: grid; grid-template-columns: auto 1fr; gap: 0.7rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--app-border); background: var(--app-surface); }
+.activity-row:last-child { border-bottom: 0; }
+.activity-row > span { width: 0.6rem; height: 0.6rem; margin-top: 0.3rem; border-radius: 50%; background: var(--app-primary); }
+.activity-row > div { display: grid; gap: 0.15rem; }
+.activity-row small { color: var(--app-muted); }
+
 @media (max-width: 620px) {
   .request-card {
     flex-direction: column;
     align-items: flex-start;
   }
+
 }

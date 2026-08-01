@@ -1,5 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.conf import settings
 
 from accounts.models import (
   ActivityNotification, ChatMessage, ClientAccess, ClientReminder, LeadSubmission,
@@ -50,3 +51,23 @@ def record_operation_event(sender, instance, created, **kwargs):
     values['success'] = False
     values['platform'] = instance.platform
   OperationEvent.objects.create(module=module, event_type=event_type, **values)
+
+
+@receiver(post_save, sender=ErrorLog, dispatch_uid='admin_portal_error_alert_email')
+def alert_new_error(sender, instance, created, **kwargs):
+  if not created or not settings.ERROR_ALERT_EMAIL:
+    return
+  from accounts.email_utils import send_mail_background
+  send_mail_background(
+    subject=f'[RepRoot] {instance.level.upper()} {instance.error_id}',
+    message=(
+      f'A new {instance.source} error was recorded.\n\n'
+      f'Reference: {instance.error_id}\n'
+      f'Platform: {instance.platform}\n'
+      f'Path: {instance.request_path or "(not supplied)"}\n'
+      f'Message: {instance.message}\n\n'
+      'Open the private RepRoot admin error console for details.'
+    ),
+    from_email=settings.DEFAULT_FROM_EMAIL,
+    recipient_list=[settings.ERROR_ALERT_EMAIL],
+  )

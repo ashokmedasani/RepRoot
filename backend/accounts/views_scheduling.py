@@ -52,6 +52,8 @@ from .scheduling_engine import (
   generate_meeting_uid,
   get_or_create_scheduling_settings,
 )
+from .notifications import notify_client, notify_professional
+from . import web_routes
 from .serializers import (
   LeadMeetingRequestSerializer,
   ProfessionalAvailabilityWindowSerializer,
@@ -802,6 +804,17 @@ class ScheduledMeetingRescheduleView(APIView):
 
     if meeting.external_calendar_sync_status == 'failed':
       invite_note += ' Google Calendar could not be updated; the RepRoot appointment was updated.'
+    for attendee in [meeting.client, *guest_clients]:
+      notify_client(
+        attendee,
+        category='meetings',
+        event_type='meeting.rescheduled',
+        title='Meeting rescheduled',
+        body=f'{meeting.title} has a new date or time.',
+        action_url=web_routes.client_meeting(meeting.id),
+        payload={'meeting_id': meeting.id},
+        priority='high',
+      )
     return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': f'Meeting rescheduled.{invite_note}'})
 
 
@@ -846,8 +859,221 @@ class ScheduledMeetingCancelView(APIView):
         )
       except Exception:
         pass  # Best-effort; the cancellation itself is already saved.
+    else:
+      guest_clients = [guest.client for guest in meeting.guests.all()]
+
+    for attendee in [meeting.client, *guest_clients]:
+      notify_client(
+        attendee,
+        category='meetings',
+        event_type='meeting.cancelled',
+        title='Meeting cancelled',
+        body=f'{meeting.title} was cancelled.' + (f' Reason: {reason}' if reason else ''),
+        action_url=web_routes.client_meeting(meeting.id),
+        payload={'meeting_id': meeting.id},
+        priority='high',
+      )
 
     return Response({'meeting': ScheduledMeetingSerializer(meeting).data, 'message': 'Meeting cancelled.'})
+
+
+class ProfessionalMeetingRequestActionView(APIView):
+  """Approve or decline a meeting time requested by an authenticated client."""
+
+  permission_classes = [ProfessionalAccessPermission]
+
+  def post(self, request, meeting_id):
+    meeting = ScheduledMeeting.objects.filter(
+      id=meeting_id,
+      professional=request.user,
+      requested_by=ScheduledMeeting.REQUESTED_BY_CLIENT,
+      status=ScheduledMeeting.STATUS_PENDING_APPROVAL,
+    ).select_related('client').first()
+    if meeting is None:
+      return Response({'message': 'Pending meeting request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    action = str(request.data.get('action', '')).strip().lower()
+    if action not in ('accept', 'decline'):
+      return Response({'message': 'action must be "accept" or "decline".'}, status=status.HTTP_400_BAD_REQUEST)
+
+    meeting.professional_responded_at = timezone.now()
+    if action == 'decline':
+      meeting.status = ScheduledMeeting.STATUS_DECLINED
+      meeting.cancellation_reason = str(request.data.get('reason', '')).strip()
+      meeting.save(update_fields=['status', 'cancellation_reason', 'professional_responded_at', 'updated_at'])
+      notify_client(
+        meeting.client,
+        category='meetings',
+        event_type='meeting.request_declined',
+        event_key=f'meeting:{meeting.pk}:request-declined',
+        title='Meeting request declined',
+        body=meeting.cancellation_reason or f'Your request for {meeting.title} was declined.',
+        action_url=web_routes.client_meeting(meeting.pk),
+        payload={'meeting_id': meeting.pk},
+        priority='high',
+      )
+      return Response({
+        'meeting': ScheduledMeetingSerializer(meeting).data,
+        'message': 'Meeting request declined.',
+      })
+
+    if meeting.start_at <= timezone.now():
+      return Response(
+        {'message': 'This requested time has passed. Decline it and ask the client to choose another time.'},
+        status=status.HTTP_409_CONFLICT,
+      )
+    if ScheduledMeeting.objects.filter(
+      professional=request.user,
+      status=ScheduledMeeting.STATUS_SCHEDULED,
+      start_at__lt=meeting.end_at,
+      end_at__gt=meeting.start_at,
+    ).exclude(pk=meeting.pk).exists():
+      return Response(
+        {'message': 'This time now conflicts with another confirmed meeting.'},
+        status=status.HTTP_409_CONFLICT,
+      )
+
+    uid = generate_meeting_uid()
+    external = _provision_video_meeting(
+      uid=uid,
+      title=meeting.title,
+      notes=meeting.notes,
+      start_at=meeting.start_at,
+      end_at=meeting.end_at,
+      attendee_emails=[meeting.client.email],
+    )
+    meeting.status = ScheduledMeeting.STATUS_SCHEDULED
+    meeting.meeting_url = external['meeting_url']
+    meeting.cal_booking_uid = uid
+    meeting.external_calendar_provider = external['provider']
+    meeting.external_calendar_event_id = external['event_id']
+    meeting.external_calendar_url = external['calendar_url']
+    meeting.external_calendar_sync_status = external['sync_status']
+    meeting.client_response_status = ScheduledMeeting.RESPONSE_ACCEPTED
+    meeting.client_responded_at = meeting.created_at
+    meeting.save(update_fields=[
+      'status', 'meeting_url', 'cal_booking_uid', 'external_calendar_provider',
+      'external_calendar_event_id', 'external_calendar_url', 'external_calendar_sync_status',
+      'client_response_status', 'client_responded_at', 'professional_responded_at', 'updated_at',
+    ])
+
+    invite_note = ''
+    if external['sync_status'] != 'synced':
+      try:
+        send_meeting_invite_email(
+          uid=uid,
+          sequence=0,
+          start_at=meeting.start_at,
+          end_at=meeting.end_at,
+          summary=meeting.title,
+          organizer_email=request.user.email,
+          organizer_name=request.user.get_full_name() or request.user.username,
+          attendees=_meeting_attendees(meeting.client),
+          meeting_url=meeting.meeting_url,
+        )
+      except Exception:
+        invite_note = ' Calendar invite email could not be sent; share the join link directly.'
+
+    notify_client(
+      meeting.client,
+      category='meetings',
+      event_type='meeting.request_accepted',
+      event_key=f'meeting:{meeting.pk}:request-accepted',
+      title='Meeting request confirmed',
+      body=f'{meeting.title} is confirmed.',
+      action_url=web_routes.client_meeting(meeting.pk),
+      payload={'meeting_id': meeting.pk},
+      requires_action=True,
+      priority='high',
+    )
+    return Response({
+      'meeting': ScheduledMeetingSerializer(meeting).data,
+      'message': f'Meeting request accepted and confirmed.{invite_note}',
+    })
+
+
+class ClientSchedulingSlotsView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def get(self, request):
+    client = request.auth
+    start_param = request.query_params.get('start')
+    end_param = request.query_params.get('end')
+    try:
+      start_date = date.fromisoformat(start_param) if start_param else timezone.localdate()
+      end_date = date.fromisoformat(end_param) if end_param else start_date + timedelta(days=6)
+      duration_minutes = int(request.query_params.get('duration_minutes', 30))
+    except (TypeError, ValueError):
+      return Response({'message': 'Use valid dates and a whole-number duration.'}, status=status.HTTP_400_BAD_REQUEST)
+    if duration_minutes not in (15, 30):
+      return Response({'message': 'Video meetings must be 15 or 30 minutes.'}, status=status.HTTP_400_BAD_REQUEST)
+    if end_date < start_date or (end_date - start_date).days > 31:
+      return Response({'message': 'Choose a date range of 31 days or less.'}, status=status.HTTP_400_BAD_REQUEST)
+    scheduling_settings = get_or_create_scheduling_settings(client.professional)
+    availability_configured = ProfessionalAvailabilityWindow.objects.filter(
+      professional=client.professional,
+      is_active=True,
+    ).exists()
+    return Response({
+      'slots': compute_available_slots(client.professional, start_date, end_date, duration_minutes),
+      'timezone': scheduling_settings.timezone,
+      'availability_configured': availability_configured,
+    })
+
+
+class ClientMeetingRequestView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+
+  def post(self, request):
+    client = request.auth
+    start_at = parse_datetime(str(request.data.get('start', '')))
+    if start_at is None:
+      return Response({'message': 'A valid start time is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    if timezone.is_naive(start_at):
+      start_at = timezone.make_aware(start_at, timezone.get_default_timezone())
+    try:
+      duration_minutes = int(request.data.get('duration_minutes', 30))
+    except (TypeError, ValueError):
+      return Response({'message': 'duration_minutes must be a whole number.'}, status=status.HTTP_400_BAD_REQUEST)
+    if duration_minutes not in (15, 30):
+      return Response({'message': 'Video meetings must be 15 or 30 minutes.'}, status=status.HTTP_400_BAD_REQUEST)
+    if start_at <= timezone.now():
+      return Response({'message': 'Choose a future meeting time.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not client.email:
+      return Response({'message': 'Add an email address before requesting a meeting.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    available = compute_available_slots(
+      client.professional,
+      timezone.localtime(start_at).date(),
+      timezone.localtime(start_at).date(),
+      duration_minutes,
+    )
+    available_starts = {
+      parse_datetime(slot['start'])
+      for slots_for_day in available.values()
+      for slot in slots_for_day
+    }
+    if start_at not in available_starts:
+      return Response({'message': 'That time is no longer available.'}, status=status.HTTP_409_CONFLICT)
+
+    meeting = ScheduledMeeting.objects.create(
+      professional=client.professional,
+      client=client,
+      title=str(request.data.get('title') or 'Client-requested meeting')[:180],
+      notes=str(request.data.get('notes') or '')[:2000],
+      start_at=start_at,
+      end_at=start_at + timedelta(minutes=duration_minutes),
+      status=ScheduledMeeting.STATUS_PENDING_APPROVAL,
+      requested_by=ScheduledMeeting.REQUESTED_BY_CLIENT,
+      client_response_status=ScheduledMeeting.RESPONSE_ACCEPTED,
+      client_responded_at=timezone.now(),
+    )
+    return Response({
+      'meeting': ScheduledMeetingSerializer(meeting, context={'client': client}).data,
+      'message': 'Meeting request sent. It will stay pending until your professional accepts it.',
+    }, status=status.HTTP_201_CREATED)
 
 
 class ClientMeetingCalendarInviteView(APIView):
@@ -937,6 +1163,17 @@ class ClientMeetingRespondView(APIView):
       guest.save(update_fields=['response_status', 'responded_at'])
 
     meeting.refresh_from_db()
+    notify_professional(
+      meeting.professional,
+      category='meetings',
+      event_type=f'meeting.client_{response_status}',
+      event_key=f'meeting:{meeting.pk}:client:{client.pk}:{response_status}',
+      title=f'Client {response_status} meeting',
+      body=f'{client.first_name or client.username} {response_status} {meeting.title}.',
+      action_url=web_routes.professional_meeting(meeting.pk),
+      payload={'meeting_id': meeting.pk, 'client_id': client.pk},
+      priority='high' if response_status == ScheduledMeeting.RESPONSE_DECLINED else 'normal',
+    )
     return Response({
       'meeting': ScheduledMeetingSerializer(meeting, context={'client': client}).data,
       'message': f'You have {response_status} this meeting.',

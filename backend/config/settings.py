@@ -180,6 +180,7 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
 SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '').strip()
+ERROR_ALERT_EMAIL = os.environ.get('ERROR_ALERT_EMAIL', SUPPORT_EMAIL).strip()
 MEETING_FROM_EMAIL = os.environ.get('MEETING_FROM_EMAIL', DEFAULT_FROM_EMAIL).strip()
 
 if not DEBUG and EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
@@ -284,7 +285,7 @@ REST_FRAMEWORK = {
     'rest_framework.permissions.IsAuthenticated',
   ],
   'DEFAULT_AUTHENTICATION_CLASSES': [
-    'rest_framework.authentication.TokenAuthentication',
+    'accounts.authentication.ExpiringTokenAuthentication',
   ],
   'DEFAULT_THROTTLE_RATES': {
     'auth': os.environ.get('THROTTLE_AUTH_RATE', '20/min'),
@@ -297,6 +298,19 @@ REST_FRAMEWORK = {
   },
 }
 
+REPROOT_AUTH_TOKEN_TTL_HOURS = int(os.environ.get('REPROOT_AUTH_TOKEN_TTL_HOURS', '12'))
+REPROOT_PROFESSIONAL_LEGAL_VERSION = os.environ.get('REPROOT_PROFESSIONAL_LEGAL_VERSION', '2026-07-30').strip()
+REPROOT_CLIENT_LEGAL_VERSION = os.environ.get('REPROOT_CLIENT_LEGAL_VERSION', '2026-07-30').strip()
+REPROOT_LEGAL_EFFECTIVE_DATE = os.environ.get('REPROOT_LEGAL_EFFECTIVE_DATE', '2026-07-30').strip()
+# Compatibility alias for older internal code. New role-specific code must use
+# the professional/client settings above so one audience is not forced to
+# re-accept documents changed only for the other audience.
+REPROOT_LEGAL_DOCUMENT_VERSION = REPROOT_PROFESSIONAL_LEGAL_VERSION
+REPROOT_SUPPORTED_COUNTRIES = {
+  value.strip().upper()
+  for value in os.environ.get('REPROOT_SUPPORTED_COUNTRIES', 'IN,INDIA,US,USA,UNITED STATES,UNITED STATES OF AMERICA').split(',')
+  if value.strip()
+}
 # Limits are tier-aware so premium capacity can change without rewriting API
 # views or Angular pages. Existing professionals remain on Starter unless an admin
 # explicitly changes their ProfessionalProfile.plan_tier.
@@ -398,6 +412,7 @@ REPROOT_DATA_DELETION_DAYS = int(os.environ.get('REPROOT_DATA_DELETION_DAYS', '3
 # entry, reminder, reference, template) stays restorable before permanent purge.
 REPROOT_RECYCLE_BIN_DAYS = int(os.environ.get('REPROOT_RECYCLE_BIN_DAYS', '14'))
 REPROOT_OPERATIONAL_DATA_MAX_DAYS = int(os.environ.get('REPROOT_OPERATIONAL_DATA_MAX_DAYS', '180'))
+REPROOT_ERROR_LOG_RETENTION_DAYS = int(os.environ.get('REPROOT_ERROR_LOG_RETENTION_DAYS', '90'))
 
 # Storage usage is intentionally a calm operational indicator, not a live
 # counter that changes while the professional navigates between pages.

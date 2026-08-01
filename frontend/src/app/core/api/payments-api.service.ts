@@ -37,6 +37,9 @@ export interface RevenueSummaryResponse {
   period_start: string;
   period_end: string;
   total_revenue: string;
+  manual_logged_total: string;
+  integrated_total: string;
+  total_logged: string;
   // Backend picks the chart shape to match the span: <=30 days is a bar
   // chart, longer spans switch to a line chart (weekly/monthly buckets).
   chart_kind: 'bar' | 'line';
@@ -125,6 +128,7 @@ export type PaymentRequestStatus =
   | 'acknowledged'
   | 'completed'
   | 'partially_paid'
+  | 'overpaid'
   | 'rejected'
   | 'cancelled'
   | 'overdue'
@@ -140,6 +144,9 @@ export interface PaymentRequestRecord {
   description: string;
   requested_amount: string;
   requested_currency: string;
+  accepted_amount: string;
+  remaining_amount: string;
+  overpaid_amount: string;
   due_date: string | null;
   payment_type: 'manual' | 'integrated' | 'both';
   status: PaymentRequestStatus;
@@ -150,6 +157,8 @@ export interface PaymentRequestRecord {
   sent_at: string | null;
   viewed_at: string | null;
   completed_at: string | null;
+  correction_deadline: string | null;
+  is_locked: boolean;
   updated_at: string;
 }
 
@@ -172,6 +181,9 @@ export interface ClientPaymentRequestRecord {
   description: string;
   requested_amount: string;
   requested_currency: string;
+  accepted_amount: string;
+  remaining_amount: string;
+  overpaid_amount: string;
   due_date: string | null;
   payment_type: 'manual' | 'integrated' | 'both';
   status: PaymentRequestStatus;
@@ -179,6 +191,8 @@ export interface ClientPaymentRequestRecord {
   proofs: PaymentProofRecord[];
   created_at: string;
   sent_at: string | null;
+  correction_deadline: string | null;
+  is_locked: boolean;
 }
 
 export interface PaymentProofRecord {
@@ -190,6 +204,7 @@ export interface PaymentProofRecord {
   payment_method: number | null;
   payment_method_label: string;
   has_file: boolean;
+  payment_record_id: string;
   note: string;
   status: 'submitted' | 'under_review' | 'accepted' | 'rejected';
   review_note: string;
@@ -215,6 +230,9 @@ export interface PaymentRecordRow {
   internal_note: string;
   client_note: string;
   verified_at: string | null;
+  editable_until: string;
+  is_locked: boolean;
+  record_type: 'manual_log' | 'acknowledged_payment';
 }
 
 export interface PaymentRequestDetailResponse {
@@ -302,6 +320,18 @@ export interface RecordReceivedPayload {
 
 export interface AcknowledgeProofPayload {
   acknowledgement_note?: string;
+  settlement_status: 'partial' | 'full' | 'overpaid';
+}
+
+export interface PaymentActivityItem {
+  id: number;
+  action: string;
+  action_label: string;
+  request_id: string;
+  record_id: string;
+  changed_by: string;
+  reason: string;
+  created_at: string;
 }
 
 export interface PaymentReconciliationSummary {
@@ -479,8 +509,8 @@ export class PaymentsApiService {
     );
   }
 
-  submitPaymentProof(requestId: string, payload: FormData): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(
+  submitPaymentProof(requestId: string, payload: FormData): Observable<{ message: string; proof: PaymentProofRecord; request: ClientPaymentRequestRecord }> {
+    return this.http.post<{ message: string; proof: PaymentProofRecord; request: ClientPaymentRequestRecord }>(
       `${this.apiBaseUrl}/client/payments/requests/${requestId}/proof/`,
       payload,
       { headers: this.getClientAuthHeaders() }
@@ -533,6 +563,27 @@ export class PaymentsApiService {
     });
   }
 
+  updatePaymentRequest(requestId: string, payload: CreatePaymentRequestPayload): Observable<{ request: PaymentRequestRecord; message: string }> {
+    return this.http.put<{ request: PaymentRequestRecord; message: string }>(
+      `${this.apiBaseUrl}/professional/payments/requests/${requestId}/`,
+      payload,
+      { headers: this.getProfessionalAuthHeaders() }
+    );
+  }
+
+  getProfessionalPaymentActivity(clientId?: number): Observable<{ items: PaymentActivityItem[] }> {
+    return this.http.get<{ items: PaymentActivityItem[] }>(`${this.apiBaseUrl}/professional/payments/activity/`, {
+      headers: this.getProfessionalAuthHeaders(),
+      params: clientId ? { client_id: String(clientId) } : {}
+    });
+  }
+
+  getClientPaymentActivity(): Observable<{ items: PaymentActivityItem[] }> {
+    return this.http.get<{ items: PaymentActivityItem[] }>(`${this.apiBaseUrl}/client/payments/activity/`, {
+      headers: this.getClientAuthHeaders()
+    });
+  }
+
   getProfessionalPaymentUnread(): Observable<PaymentNotificationsResponse> {
     return this.http.get<PaymentNotificationsResponse>(`${this.apiBaseUrl}/professional/payments/notifications/`, {
       headers: this.getProfessionalAuthHeaders()
@@ -581,7 +632,7 @@ export class PaymentsApiService {
   }
 
   private getProfessionalAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('professional-auth-token') || '';
+    const token = window.sessionStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 
@@ -597,6 +648,9 @@ export class PaymentsApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

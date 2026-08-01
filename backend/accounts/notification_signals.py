@@ -82,7 +82,21 @@ def reminder_created(sender, instance, created, **kwargs):
 @receiver(post_save, sender=ScheduledMeeting)
 def meeting_created(sender, instance, created, **kwargs):
   if created:
-    notify_client(instance.client, category='meetings', event_type='meeting.scheduled', event_key=f'meeting:{instance.pk}:scheduled', title='Meeting invitation', body=instance.title, action_url=web_routes.CLIENT_MEETINGS, payload={'meeting_id': instance.pk}, requires_action=True, priority='high')
+    if instance.requested_by == ScheduledMeeting.REQUESTED_BY_CLIENT:
+      notify_professional(
+        instance.professional,
+        category='meetings',
+        event_type='meeting.approval_requested',
+        event_key=f'meeting:{instance.pk}:approval-requested',
+        title='Client requested a meeting',
+        body=f'{instance.client.first_name or instance.client.username} requested {instance.title}.',
+        action_url=web_routes.professional_meeting(instance.pk),
+        payload={'meeting_id': instance.pk, 'client_id': instance.client_id},
+        requires_action=True,
+        priority='high',
+      )
+    else:
+      notify_client(instance.client, category='meetings', event_type='meeting.scheduled', event_key=f'meeting:{instance.pk}:scheduled', title='Meeting invitation', body=instance.title, action_url=web_routes.client_meeting(instance.pk), payload={'meeting_id': instance.pk}, requires_action=True, priority='high')
 
 
 @receiver(post_save, sender=ChatMessage)

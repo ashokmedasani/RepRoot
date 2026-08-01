@@ -14,6 +14,28 @@ from rest_framework.authtoken.models import Token
 from . import account_lifecycle
 from . import data_retention
 
+
+def current_professional_legal_acceptance():
+  accepted_at = timezone.now()
+  return {
+    'terms_accepted': True,
+    'privacy_policy_accepted': True,
+    'terms_accepted_at': accepted_at,
+    'privacy_policy_accepted_at': accepted_at,
+    'legal_document_version': settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+  }
+
+
+def current_client_legal_acceptance():
+  accepted_at = timezone.now()
+  return {
+    'terms_accepted': True,
+    'privacy_policy_accepted': True,
+    'terms_accepted_at': accepted_at,
+    'privacy_policy_accepted_at': accepted_at,
+    'legal_document_version': settings.REPROOT_CLIENT_LEGAL_VERSION,
+  }
+
 from .models import (
   ChatMessage,
   ClientAccess,
@@ -49,12 +71,14 @@ class ProfessionalLifecycleTests(APITestCase):
     User = get_user_model()
     self.user = User.objects.create_user('lifecycle', 'lifecycle@example.test', 'Strong!Pass7')
     self.profile = ProfessionalProfile.objects.create(
-      user=self.user, professional_id='lifecycle-pro', profile_setup_completed=True
+      user=self.user, professional_id='lifecycle-pro', profile_setup_completed=True,
+      **current_professional_legal_acceptance(),
     )
     self.group = ProfessionalGroup.objects.create(professional=self.user, name='Lifecycle Clients')
     self.client_record = ClientAccess.objects.create(
       professional=self.user, group=self.group, first_name='Test', last_name='Client',
       email='client@example.test', username='lifeclient', temporary_password='Strong!Pass7',
+      **current_client_legal_acceptance(),
     )
     self.professional_token = Token.objects.create(user=self.user)
     self.client_token = ClientAuthToken.objects.create(client=self.client_record, key='a' * 40)
@@ -151,6 +175,7 @@ class WorkflowRefinementTests(APITestCase):
       user=self.user,
       professional_id='coach-taylor',
       profile_setup_completed=True,
+      **current_professional_legal_acceptance(),
     )
     self.group = ProfessionalGroup.objects.create(professional=self.user, name='Strength Group')
     self.registration_form = ClientRegistrationForm.objects.create(
@@ -430,6 +455,7 @@ class WorkflowRefinementTests(APITestCase):
     self.assertNotIn('due_5_days', summary)
     self.assertNotIn('due_10_days', summary)
 
+    ClientAccess.objects.filter(pk=client_access.pk).update(**current_client_legal_acceptance())
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
@@ -494,6 +520,7 @@ class WorkflowRefinementTests(APITestCase):
       format='json',
     )
     client_access = ClientAccess.objects.get(pk=created.data['client_access']['id'])
+    ClientAccess.objects.filter(pk=client_access.pk).update(**current_client_legal_acceptance())
 
     self.client.force_authenticate(user=None)
     login = self.client.post(
@@ -625,6 +652,7 @@ class WorkflowRefinementTests(APITestCase):
       {'text': 'I reviewed it and left feedback.'},
       format='json',
     )
+    ClientAccess.objects.filter(pk=client_access.pk).update(**current_client_legal_acceptance())
     self.client.force_authenticate(user=None)
     login = self.client.post(
       '/api/accounts/client/login/',
@@ -703,7 +731,9 @@ class ProfessionalAvailabilityWindowTests(APITestCase):
     self.user = get_user_model().objects.create_user(
       username='schedule-pro', email='schedule-pro@example.com', password='Professional!123',
     )
-    ProfessionalProfile.objects.create(user=self.user, professional_id='schedule-pro')
+    ProfessionalProfile.objects.create(
+      user=self.user, professional_id='schedule-pro', **current_professional_legal_acceptance()
+    )
     self.client.force_authenticate(self.user)
 
   def test_overlapping_block_on_same_weekday_is_rejected(self):
@@ -766,7 +796,10 @@ class ClientPaymentsWorkflowTests(APITestCase):
       first_name='Maya',
       last_name='Santos',
     )
-    ProfessionalProfile.objects.create(user=self.user, professional_id='coach-maya-pay', profile_setup_completed=True)
+    ProfessionalProfile.objects.create(
+      user=self.user, professional_id='coach-maya-pay', profile_setup_completed=True,
+      **current_professional_legal_acceptance(),
+    )
     self.group = ProfessionalGroup.objects.create(professional=self.user, name='Pay Group')
     ClientRegistrationForm.objects.create(group=self.group, fields=[field.copy() for field in UNIVERSAL_CORE_FIELDS])
     self.client.force_authenticate(self.user)
@@ -785,6 +818,9 @@ class ClientPaymentsWorkflowTests(APITestCase):
     )
     self.assertEqual(created.status_code, 201, created.data)
     self.client_access_id = created.data['client_access']['id']
+    ClientAccess.objects.filter(pk=self.client_access_id).update(
+      **current_client_legal_acceptance(),
+    )
 
     login = self.client.post(
       '/api/accounts/client/login/',
@@ -811,6 +847,57 @@ class ClientPaymentsWorkflowTests(APITestCase):
     self.assertEqual(response.status_code, 201, response.data)
     return response.data['method']['id']
 
+  def test_client_can_save_first_login_legal_acceptance(self):
+    self.client.force_authenticate(user=None)
+    response = self.client.post(
+      '/api/accounts/client/legal-acceptance/',
+      {'accept_terms': True, 'accept_privacy': True, 'client_timezone': 'America/New_York'},
+      format='json',
+      HTTP_AUTHORIZATION=self.client_auth_header,
+    )
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertTrue(response.data['client']['terms_accepted'])
+    self.assertTrue(response.data['client']['privacy_policy_accepted'])
+    self.assertEqual(len(response.data['client']['legal_acceptance_history']), 1)
+    self.assertEqual(
+      response.data['client']['legal_acceptance_history'][0]['client_timezone'],
+      'America/New_York',
+    )
+
+  def test_professional_directory_does_not_match_hidden_username(self):
+    hidden_match = get_user_model().objects.create_user(
+      username='arjun-demo-hidden',
+      email='arjun@example.com',
+      password='Professional!123',
+      first_name='Arjun',
+      last_name='M',
+    )
+    ProfessionalProfile.objects.create(
+      user=hidden_match,
+      professional_id='arjunfit',
+      profile_setup_completed=True,
+    )
+    visible_match = get_user_model().objects.create_user(
+      username='premium-account',
+      email='premium@example.com',
+      password='Professional!123',
+      first_name='Premium',
+      last_name='Demo',
+    )
+    ProfessionalProfile.objects.create(
+      user=visible_match,
+      professional_id='premium-usage-demo',
+      profile_setup_completed=True,
+    )
+
+    self.client.force_authenticate(user=None)
+    response = self.client.get('/api/accounts/client/professional-directory/?search=dem')
+    self.assertEqual(response.status_code, 200, response.data)
+    self.assertEqual(
+      [row['professional_id'] for row in response.data['professionals']],
+      ['premium-usage-demo'],
+    )
+
   def share_method(self, method_id):
     response = self.client.put(
       '/api/accounts/professional/payments/clients/' + str(self.client_access_id) + '/methods/',
@@ -833,6 +920,73 @@ class ClientPaymentsWorkflowTests(APITestCase):
     )
     self.assertEqual(response.status_code, 201, response.data)
     return response.data['request']['request_id']
+
+  def test_professional_can_edit_active_request_and_client_activity_tracks_it(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    updated = self.client.put(
+      '/api/accounts/professional/payments/requests/' + request_id + '/',
+      {
+        'title': 'Corrected Coaching Fee',
+        'description': 'Corrected before settlement',
+        'requested_amount': '225.00',
+        'requested_currency': 'USD',
+        'payment_type': 'manual',
+        'client_visibility': 'visible',
+        'notes': '',
+        'allowed_method_ids': [method_id],
+      },
+      format='json',
+    )
+    self.assertEqual(updated.status_code, 200, updated.data)
+    self.assertEqual(updated.data['request']['title'], 'Corrected Coaching Fee')
+
+    self.client.force_authenticate(user=None)
+    activity = self.client.get(
+      '/api/accounts/client/payments/activity/', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(activity.status_code, 200, activity.data)
+    self.assertIn('request_updated', [item['action'] for item in activity.data['items']])
+
+  def test_client_activity_excludes_private_manual_payment_logs(self):
+    self.client.post(
+      '/api/accounts/professional/payments/records/',
+      {
+        'client': self.client_access_id,
+        'original_amount': '75.00',
+        'original_currency': 'USD',
+        'reporting_amount': '75.00',
+        'reporting_currency': 'USD',
+        'received_date': timezone.now().date().isoformat(),
+        'status': 'completed',
+        'internal_note': 'private trainer bookkeeping',
+      },
+      format='json',
+    )
+    self.client.force_authenticate(user=None)
+    activity = self.client.get(
+      '/api/accounts/client/payments/activity/', HTTP_AUTHORIZATION=self.client_auth_header
+    )
+    self.assertEqual(activity.status_code, 200, activity.data)
+    self.assertNotIn('payment_recorded', [item['action'] for item in activity.data['items']])
+
+  def test_completed_request_edit_locks_after_fourteen_days(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+    payment_request = PaymentRequest.objects.get(request_id=request_id)
+    payment_request.status = PaymentRequest.STATUS_COMPLETED
+    payment_request.completed_at = timezone.now() - timedelta(days=15)
+    payment_request.save(update_fields=['status', 'completed_at', 'updated_at'])
+
+    response = self.client.put(
+      '/api/accounts/professional/payments/requests/' + request_id + '/',
+      {'title': 'Too late to change'},
+      format='json',
+    )
+    self.assertEqual(response.status_code, 423, response.data)
 
   # --- Manual payment methods -------------------------------------------
 
@@ -948,17 +1102,62 @@ class ClientPaymentsWorkflowTests(APITestCase):
       format='json',
     )
     self.assertEqual(acknowledged.status_code, 200, acknowledged.data)
-    self.assertTrue(acknowledged.data['needs_logging'])
+    self.assertFalse(acknowledged.data['needs_logging'])
 
     payment_request = PaymentRequest.objects.get(request_id=request_id)
-    self.assertEqual(payment_request.status, PaymentRequest.STATUS_ACKNOWLEDGED)
-    self.assertFalse(PaymentRecord.objects.filter(payment_request=payment_request).exists())
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
+    self.assertTrue(
+      PaymentRecord.objects.filter(payment_request=payment_request, source_proof_id=proof_id).exists()
+    )
+
+  def test_partial_proofs_accumulate_and_only_close_after_full_amount(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+
+    for index, amount in enumerate(('75.00', '125.00'), start=1):
+      self.client.force_authenticate(user=None)
+      submitted = self.client.post(
+        '/api/accounts/client/payments/requests/' + request_id + '/proof/',
+        {
+          'transaction_reference': f'INSTALLMENT-{index}',
+          'reported_amount': amount,
+          'reported_currency': 'USD',
+          'reported_payment_date': timezone.now().date().isoformat(),
+          'payment_method': method_id,
+          'confirmed_accurate': True,
+        },
+        format='json',
+        HTTP_AUTHORIZATION=self.client_auth_header,
+      )
+      self.assertEqual(submitted.status_code, 201, submitted.data)
+
+      self.client.force_authenticate(self.user)
+      acknowledged = self.client.post(
+        '/api/accounts/professional/payments/proofs/'
+        + str(submitted.data['proof']['id'])
+        + '/acknowledge/',
+        {'acknowledgement_note': f'Accepted installment {index}'},
+        format='json',
+      )
+      self.assertEqual(acknowledged.status_code, 200, acknowledged.data)
+
+      payment_request = PaymentRequest.objects.get(request_id=request_id)
+      if index == 1:
+        self.assertEqual(payment_request.status, PaymentRequest.STATUS_PARTIALLY_PAID)
+        self.assertEqual(str(acknowledged.data['request']['accepted_amount']), '75.00')
+        self.assertEqual(str(acknowledged.data['request']['remaining_amount']), '125.00')
+      else:
+        self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
+        self.assertEqual(str(acknowledged.data['request']['accepted_amount']), '200.00')
+        self.assertEqual(str(acknowledged.data['request']['remaining_amount']), '0.00')
     self.assertTrue(PaymentAuditLog.objects.filter(action='payment_acknowledged', payment_request=payment_request).exists())
 
     reconciliation = self.client.get('/api/accounts/professional/payments/reconciliation/')
     self.assertEqual(reconciliation.status_code, 200, reconciliation.data)
     self.assertEqual(reconciliation.data['acknowledged_count'], 1)
-    self.assertEqual(reconciliation.data['unlogged_count'], 1)
+    self.assertEqual(reconciliation.data['unlogged_count'], 0)
+    self.assertEqual(reconciliation.data['logged_count'], 1)
 
     logged = self.client.post(
       '/api/accounts/professional/payments/records/',
@@ -978,7 +1177,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
 
     payment_request.refresh_from_db()
     self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
-    record = PaymentRecord.objects.get(payment_request=payment_request)
+    record = PaymentRecord.objects.filter(professional=self.user, source_proof__isnull=True).latest('created_at')
     self.assertEqual(record.status, PaymentRecord.STATUS_COMPLETED)
     self.assertEqual(str(record.reporting_amount), '16750.00')
     self.assertTrue(PaymentAuditLog.objects.filter(action='payment_recorded', payment_record=record).exists())
@@ -986,6 +1185,47 @@ class ClientPaymentsWorkflowTests(APITestCase):
     reconciliation_after = self.client.get('/api/accounts/professional/payments/reconciliation/')
     self.assertEqual(reconciliation_after.data['unlogged_count'], 0)
     self.assertEqual(reconciliation_after.data['logged_count'], 1)
+
+  def test_client_can_submit_multiple_transactions_before_trainer_review(self):
+    method_id = self.create_method()
+    self.share_method(method_id)
+    request_id = self.create_request(method_id)
+    proof_ids = []
+
+    self.client.force_authenticate(user=None)
+    for index, amount in enumerate(('75.00', '125.00'), start=1):
+      submitted = self.client.post(
+        '/api/accounts/client/payments/requests/' + request_id + '/proof/',
+        {
+          'transaction_reference': f'BATCH-{index}',
+          'reported_amount': amount,
+          'reported_currency': 'USD',
+          'reported_payment_date': timezone.now().date().isoformat(),
+          'payment_method': method_id,
+          'confirmed_accurate': True,
+        },
+        format='json',
+        HTTP_AUTHORIZATION=self.client_auth_header,
+      )
+      self.assertEqual(submitted.status_code, 201, submitted.data)
+      proof_ids.append(submitted.data['proof']['id'])
+
+    self.client.force_authenticate(self.user)
+    first = self.client.post(
+      f'/api/accounts/professional/payments/proofs/{proof_ids[0]}/acknowledge/',
+      {'settlement_status': 'partial'},
+      format='json',
+    )
+    self.assertEqual(first.status_code, 200, first.data)
+    self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_PROOF_SUBMITTED)
+
+    second = self.client.post(
+      f'/api/accounts/professional/payments/proofs/{proof_ids[1]}/acknowledge/',
+      {'settlement_status': 'full'},
+      format='json',
+    )
+    self.assertEqual(second.status_code, 200, second.data)
+    self.assertEqual(PaymentRequest.objects.get(request_id=request_id).status, PaymentRequest.STATUS_COMPLETED)
 
   def test_reject_proof_requires_reason_and_client_can_resubmit(self):
     method_id = self.create_method()
@@ -1043,7 +1283,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
       self.assertEqual(response.status_code, 201, response.data)
 
     payment_request.refresh_from_db()
-    self.assertEqual(payment_request.status, PaymentRequest.STATUS_COMPLETED)
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_SENT)
 
   def test_mixed_currency_installments_do_not_auto_complete(self):
     method_id = self.create_method()
@@ -1081,7 +1321,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
     )
 
     payment_request.refresh_from_db()
-    self.assertEqual(payment_request.status, PaymentRequest.STATUS_PARTIALLY_PAID)
+    self.assertEqual(payment_request.status, PaymentRequest.STATUS_SENT)
 
   def test_reporting_currency_change_does_not_rewrite_historical_records(self):
     method_id = self.create_method()
@@ -1102,7 +1342,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
       },
       format='json',
     )
-    record = PaymentRecord.objects.get(payment_request__request_id=request_id)
+    record = PaymentRecord.objects.filter(professional=self.user, source_proof__isnull=True).latest('created_at')
 
     settings_response = self.client.put(
       '/api/accounts/professional/payments/settings/', {'reporting_currency': 'USD'}, format='json'
@@ -1158,7 +1398,7 @@ class ClientPaymentsWorkflowTests(APITestCase):
         'reporting_currency': 'USD',
         'received_date': timezone.now().date().isoformat(),
         'status': 'completed',
-        'client_note': 'Thanks!',
+        'internal_note': 'Thanks!',
       },
       format='json',
     )
@@ -1337,7 +1577,11 @@ class ProfessionalGoogleAuthTests(APITestCase):
   def test_new_google_user_creates_professional_account(self, mock_get):
     mock_get.return_value = _fake_google_tokeninfo('new.trainer@example.test', 'google-sub-1')
 
-    response = self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+    response = self.client.post(self.url, {
+      'credential': 'fake-token',
+      'accept_terms': True,
+      'accept_privacy': True,
+    }, format='json')
 
     self.assertEqual(response.status_code, 201, response.data)
     self.assertTrue(response.data['is_new_account'])
@@ -1349,11 +1593,18 @@ class ProfessionalGoogleAuthTests(APITestCase):
     user = User.objects.get(email='new.trainer@example.test')
     self.assertFalse(user.has_usable_password())
     self.assertEqual(user.professional_profile.google_sub, 'google-sub-1')
+    self.assertTrue(user.professional_profile.terms_accepted)
+    self.assertIsNotNone(user.professional_profile.terms_accepted_at)
+    self.assertEqual(user.professional_profile.legal_document_version, settings.REPROOT_PROFESSIONAL_LEGAL_VERSION)
 
   @patch('accounts.google_oauth.requests.get')
   def test_returning_google_user_logs_in_without_duplicate_account(self, mock_get):
     mock_get.return_value = _fake_google_tokeninfo('returning@example.test', 'google-sub-2')
-    self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+    self.client.post(self.url, {
+      'credential': 'fake-token',
+      'accept_terms': True,
+      'accept_privacy': True,
+    }, format='json')
 
     User = get_user_model()
     self.assertEqual(User.objects.filter(email='returning@example.test').count(), 1)
@@ -1363,6 +1614,16 @@ class ProfessionalGoogleAuthTests(APITestCase):
     self.assertEqual(response.status_code, 200, response.data)
     self.assertFalse(response.data['is_new_account'])
     self.assertEqual(User.objects.filter(email='returning@example.test').count(), 1)
+
+  @patch('accounts.google_oauth.requests.get')
+  def test_new_google_user_requires_legal_acceptance(self, mock_get):
+    mock_get.return_value = _fake_google_tokeninfo('no-consent@example.test', 'google-sub-no-consent')
+
+    response = self.client.post(self.url, {'credential': 'fake-token'}, format='json')
+
+    self.assertEqual(response.status_code, 400, response.data)
+    User = get_user_model()
+    self.assertFalse(User.objects.filter(email='no-consent@example.test').exists())
 
   @patch('accounts.google_oauth.requests.get')
   def test_existing_password_account_is_linked_not_duplicated(self, mock_get):

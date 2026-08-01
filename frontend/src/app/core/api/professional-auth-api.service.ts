@@ -58,6 +58,16 @@ export interface ProfessionalAccount {
   birth_month: number | null;
   birth_year: number | null;
   profile_setup_completed: boolean;
+  terms_accepted: boolean;
+  privacy_policy_accepted: boolean;
+  terms_accepted_at: string | null;
+  privacy_policy_accepted_at: string | null;
+  legal_document_version: string;
+  legal_acceptance_history: {
+    legal_document_version: string;
+    accepted_at: string;
+    client_timezone: string;
+  }[];
 }
 
 export interface ProfessionalAuthResponse {
@@ -76,10 +86,20 @@ export interface ProfessionalSignupPayload {
   password: string;
   confirm_password: string;
   email_verification_token: string;
+  accept_terms: boolean;
+  accept_privacy: boolean;
 }
 
 export interface ProfessionalProfileStatusResponse {
   profile_setup_completed: boolean;
+  legal_acceptance_required: boolean;
+  current_legal_document_version: string;
+}
+
+export interface LegalConfigurationResponse {
+  effective_date: string;
+  professional: { version: string };
+  client: { version: string };
 }
 
 export type ProfessionalPlanCode = 'starter_free' | 'pro' | 'premium_unlimited' | 'starter' | 'premium';
@@ -263,6 +283,16 @@ export interface ProfessionalProfile {
   professional_id: string | null;
   professional_code: string | null;
   profile_setup_completed: boolean;
+  terms_accepted: boolean;
+  privacy_policy_accepted: boolean;
+  terms_accepted_at: string | null;
+  privacy_policy_accepted_at: string | null;
+  legal_document_version: string;
+  legal_acceptance_history: {
+    legal_document_version: string;
+    accepted_at: string;
+    client_timezone: string;
+  }[];
   profile_photo_url: string;
   phone: string;
   gender: string;
@@ -390,8 +420,12 @@ export class ProfessionalAuthApiService {
   /** Used for both "Continue with Google" signup and "Log in with Google" -- the
    *  backend decides whether to create, link, or just log in based on the
    *  verified Google account. */
-  googleAuth(credential: string): Observable<ProfessionalGoogleAuthResponse> {
-    return this.http.post<ProfessionalGoogleAuthResponse>(`${this.apiBaseUrl}/professional/auth/google/`, { credential });
+  googleAuth(credential: string, acceptLegalTerms = false): Observable<ProfessionalGoogleAuthResponse> {
+    return this.http.post<ProfessionalGoogleAuthResponse>(`${this.apiBaseUrl}/professional/auth/google/`, {
+      credential,
+      accept_terms: acceptLegalTerms,
+      accept_privacy: acceptLegalTerms
+    });
   }
 
   logout(): Observable<MessageResponse> {
@@ -429,6 +463,22 @@ export class ProfessionalAuthApiService {
     });
   }
 
+  getLegalConfiguration(): Observable<LegalConfigurationResponse> {
+    return this.http.get<LegalConfigurationResponse>(`${this.apiBaseUrl}/legal/configuration/`);
+  }
+
+  acceptLegalDocuments(): Observable<{ profile: ProfessionalProfile; message: string }> {
+    return this.http.post<{ profile: ProfessionalProfile; message: string }>(
+      `${this.apiBaseUrl}/professional/legal-acceptance/`,
+      {
+        accept_terms: true,
+        accept_privacy: true,
+        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+      },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
   getDataUsage(): Observable<ProfessionalDataUsageResponse> {
     if (!this.dataUsageRequest$) {
       this.dataUsageRequest$ = this.http.get<ProfessionalDataUsageResponse>(`${this.apiBaseUrl}/professional/data-usage/`, {
@@ -454,6 +504,10 @@ export class ProfessionalAuthApiService {
   markNotificationRead(notificationId?: number): Observable<{ unread_count: number }> {
     const body = notificationId ? { notification_id: notificationId } : { mark_all_read: true };
     return this.http.patch<{ unread_count: number }>(`${this.apiBaseUrl}/professional/notifications/`, body, { headers: this.getAuthHeaders() });
+  }
+
+  clearNotifications(): Observable<{ deleted_count: number; unread_count: number }> {
+    return this.http.delete<{ deleted_count: number; unread_count: number }>(`${this.apiBaseUrl}/professional/notifications/`, { headers: this.getAuthHeaders() });
   }
 
   /** Drops the cached data-usage response so the next getDataUsage() call re-fetches — call after restore/plan changes. */
@@ -614,7 +668,7 @@ export class ProfessionalAuthApiService {
   }
 
   private getAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('professional-auth-token') || '';
+    const token = window.sessionStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 
@@ -625,6 +679,9 @@ export class ProfessionalAuthApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

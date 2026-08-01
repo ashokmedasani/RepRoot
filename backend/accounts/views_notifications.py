@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from .access_permissions import ProfessionalAccessPermission
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
-from .models import ActivityNotification, NotificationPreference
+from .models import ActivityNotification, NotificationPreference, PaymentNotification
 from .notifications import CATEGORIES, MANDATORY_IN_APP, preferences_for
 
 
@@ -32,7 +32,10 @@ class NotificationMixin:
     disabled = NotificationPreference.objects.filter(
       recipient_type=self.recipient_type, in_app_enabled=False, **{key: target}
     ).exclude(category__in=MANDATORY_IN_APP).values_list('category', flat=True)
-    return ActivityNotification.objects.filter(recipient_type=self.recipient_type, **{key: target}).exclude(category__in=disabled)
+    return ActivityNotification.objects.filter(
+      recipient_type=self.recipient_type,
+      **{key: target},
+    ).exclude(category__in=disabled).order_by('-created_at', '-id')
 
   def get(self, request):
     qs = self.queryset(request)
@@ -47,13 +50,39 @@ class NotificationMixin:
   def patch(self, request):
     qs = self.queryset(request)
     notification_id = request.data.get('notification_id')
+    selected = []
     if notification_id:
       qs = qs.filter(id=notification_id)
+      selected = list(qs.values('category', 'payload'))
     elif not request.data.get('mark_all_read'):
       return Response({'message': 'Provide notification_id or mark_all_read.'}, status=400)
     now = timezone.now()
     qs.filter(is_read=False).update(is_read=True, read_at=now, updated_at=now)
+
+    payment_filter = (
+      {'recipient_professional': request.user}
+      if self.recipient_type == 'professional'
+      else {'recipient_client': request.auth}
+    )
+    if request.data.get('mark_all_read'):
+      PaymentNotification.objects.filter(is_read=False, **payment_filter).update(is_read=True)
+    else:
+      request_ids = {
+        str(row['payload'].get('request_id'))
+        for row in selected
+        if row['category'] == 'payments' and row['payload'].get('request_id')
+      }
+      if request_ids:
+        PaymentNotification.objects.filter(
+          is_read=False,
+          payload__request_id__in=request_ids,
+          **payment_filter,
+        ).update(is_read=True)
     return Response({'unread_count': self.queryset(request).filter(is_read=False).count()})
+
+  def delete(self, request):
+    deleted_count, _ = self.queryset(request).delete()
+    return Response({'deleted_count': deleted_count, 'unread_count': 0})
 
 
 class ProfessionalNotificationsView(NotificationMixin, APIView):

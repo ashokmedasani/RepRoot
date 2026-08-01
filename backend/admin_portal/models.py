@@ -1,4 +1,5 @@
 import uuid
+import re
 from datetime import timedelta
 
 from django.conf import settings
@@ -358,7 +359,36 @@ def record_error(
   elif professional is not None:
     reporter_role = ErrorLog.ROLE_PROFESSIONAL
 
-  message = (message or '').strip()[:500] or 'Unknown error'
+  def scrub(value):
+    text = str(value or '')
+    patterns = (
+      (r'(?i)(authorization|token|password|secret|api[_-]?key|otp)(\s*[:=]\s*)([^\s,;&]+)', r'\1\2[REDACTED]'),
+      (r'(?i)(bearer|token|clienttoken)\s+[A-Za-z0-9._~+/=-]+', r'\1 [REDACTED]'),
+      (r'(?i)(id_token|access_token|refresh_token)=([^&\s]+)', r'\1=[REDACTED]'),
+    )
+    for pattern, replacement in patterns:
+      text = re.sub(pattern, replacement, text)
+    return text
+
+  def scrub_context(value, depth=0):
+    if depth > 4:
+      return '[TRUNCATED]'
+    if isinstance(value, dict):
+      return {
+        str(key)[:100]: (
+          '[REDACTED]' if re.search(r'(?i)password|secret|token|authorization|otp|api[_-]?key', str(key))
+          else scrub_context(item, depth + 1)
+        )
+        for key, item in list(value.items())[:50]
+      }
+    if isinstance(value, list):
+      return [scrub_context(item, depth + 1) for item in value[:50]]
+    return scrub(value)[:1000]
+
+  message = scrub(message).strip()[:500] or 'Unknown error'
+  stack_trace = scrub(stack_trace)[:20000]
+  request_path = scrub(request_path).split('?', 1)[0][:300]
+  context = scrub_context(context or {})
   professional_username = professional.username if professional else ''
   client_username = client.username if client else ''
 
@@ -386,10 +416,10 @@ def record_error(
     client_username=client_username,
     client_reference=client.reference_id if client else '',
     message=message,
-    stack_trace=(stack_trace or '')[:20000],
-    context=context or {},
+    stack_trace=stack_trace,
+    context=context,
     app_version=app_version,
     device_info=device_info,
-    request_path=request_path[:300],
+    request_path=request_path,
   )
   return log, False

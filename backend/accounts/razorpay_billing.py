@@ -1,8 +1,8 @@
 """Backend-only Razorpay payment-link integration."""
 
+import calendar
 import hashlib
 import hmac
-from datetime import timedelta
 from decimal import Decimal
 
 import requests
@@ -108,6 +108,22 @@ def verify_webhook(raw_body, signature):
 
 
 def renewal_date(months):
-  # Razorpay payment links are prepaid terms. Thirty-day units keep expiry
-  # deterministic without requiring database/provider plan IDs.
-  return timezone.now() + timedelta(days=int(months) * 30)
+  """Return the same local day after a calendar-month prepaid term."""
+  current = timezone.now()
+  month_index = current.month - 1 + int(months)
+  year = current.year + month_index // 12
+  month = month_index % 12 + 1
+  day = min(current.day, calendar.monthrange(year, month)[1])
+  return current.replace(year=year, month=month, day=day)
+
+
+def expected_payment(target_tier, billing_cycle, currency):
+  price = PLAN_PRICES.get(target_tier, {}).get(billing_cycle)
+  currency = str(currency or '').upper()
+  if not price or currency not in ('INR', 'USD'):
+    return None
+  return {
+    'amount_subunits': int(price[currency] * 100),
+    'months': int(price['months']),
+    'currency': currency,
+  }

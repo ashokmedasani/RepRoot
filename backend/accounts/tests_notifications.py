@@ -27,7 +27,7 @@ class SharedNotificationTests(TestCase):
     self.assertEqual(ActivityNotification.objects.filter(event_key='test:chat:1').count(), 1)
 
   def test_backend_notification_destinations_match_web_routes(self):
-    self.assertEqual(web_routes.professional_client(42), '/professional/clients/42')
+    self.assertEqual(web_routes.professional_client(42), '/professional/clients/42?section=overview')
     self.assertEqual(web_routes.professional_form_request(7), '/professional/forms-groups/requests/7')
     self.assertEqual(web_routes.CLIENT_PROGRAMS, '/client/profile?tab=templates')
     self.assertEqual(web_routes.CLIENT_PROGRESS, '/client/dashboard')

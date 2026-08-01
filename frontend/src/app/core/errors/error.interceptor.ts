@@ -14,6 +14,15 @@ export const appErrorInterceptor: HttpInterceptorFn = (request, next) => {
 
   return next(request).pipe(
     catchError((error: unknown) => {
+      if (error instanceof HttpErrorResponse && error.status === 403) {
+        const detail = String(error.error?.detail || error.error?.message || '');
+        if (detail.includes('Terms & Conditions and Privacy Notice must be accepted')) {
+          const clientRequest = request.url.includes('/api/accounts/client/');
+          void router.navigate([clientRequest ? '/client/legal-consent' : '/professional/legal-consent']);
+          return throwError(() => error);
+        }
+      }
+
       // A 401 on a client-portal endpoint means the stored client token is
       // dead (for example rotated by a password change). Clear the stale
       // session and return to the client login instead of failing forever.
@@ -27,6 +36,21 @@ export const appErrorInterceptor: HttpInterceptorFn = (request, next) => {
         window.sessionStorage.removeItem('client-access');
         window.sessionStorage.setItem('client-login-notice', 'Your session expired. Please log in again.');
         void router.navigate(['/client/login']);
+        return throwError(() => error);
+      }
+
+      if (
+        error instanceof HttpErrorResponse &&
+        error.status === 401 &&
+        request.url.includes('/api/accounts/professional/') &&
+        !request.url.includes('/professional/login/') &&
+        !request.url.includes('/professional/auth/google/')
+      ) {
+        window.sessionStorage.removeItem('professional-auth-token');
+        window.sessionStorage.removeItem('professional-account-id');
+        window.sessionStorage.removeItem('professional-account-username');
+        window.sessionStorage.setItem('professional-login-notice', 'Your session expired. Please log in again.');
+        void router.navigate(['/professional/login']);
         return throwError(() => error);
       }
 

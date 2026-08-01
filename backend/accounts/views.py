@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import permissions, status
-from rest_framework.authentication import TokenAuthentication
+from .authentication import ExpiringTokenAuthentication as TokenAuthentication, issue_professional_token
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
@@ -47,6 +47,7 @@ from .models import (
   ClientResetAudit,
   GroupRegistrationSubmission,
   LeadSubmission,
+  LegalAcceptanceRecord,
   ProgressEntry,
   RecycledProfessionalAccount,
   RecycleBinItem,
@@ -62,6 +63,7 @@ from .models import (
   ProfessionalAvailabilityWindow,
   ProfessionalSchedulingSettings,
   ProfessionalResource,
+  BillingWebhookEvent,
 )
 from .serializers import (
   ChatMessageSerializer,
@@ -111,6 +113,7 @@ from .serializers import (
   ProfessionalSignupSerializer,
   UsernameAvailabilitySerializer,
 )
+from .notifications import notify_client
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
 from .access_permissions import ProfessionalAccessPermission
 from .data_retention import visible_client_data_cutoff
@@ -504,7 +507,7 @@ class ProfessionalSignupView(APIView):
     serializer = ProfessionalSignupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.save()
-    token, _created = Token.objects.get_or_create(user=user)
+    token = issue_professional_token(user)
 
     return Response(
       {
@@ -525,7 +528,7 @@ class ProfessionalLoginView(APIView):
     serializer = ProfessionalLoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
-    token, _created = Token.objects.get_or_create(user=user)
+    token = issue_professional_token(user)
 
     return Response(
       {
@@ -554,7 +557,7 @@ class ProfessionalGoogleAuthView(APIView):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     created = serializer.validated_data['created']
-    token, _created = Token.objects.get_or_create(user=user)
+    token = issue_professional_token(user)
 
     return Response(
       {
@@ -661,10 +664,63 @@ class PasswordResetConfirmView(APIView):
 
 class ProfessionalProfileStatusView(APIView):
   permission_classes = [ProfessionalAccessPermission]
+  allow_outdated_legal = True
 
   def get(self, request):
     profile = request.user.professional_profile
     return Response(ProfessionalProfileStatusSerializer(profile).data)
+
+
+class ProfessionalLegalAcceptanceView(APIView):
+  permission_classes = [ProfessionalAccessPermission]
+  allow_outdated_legal = True
+
+  def post(self, request):
+    if request.data.get('accept_terms') is not True or request.data.get('accept_privacy') is not True:
+      return Response(
+        {'message': 'You must review and accept both Professional Terms and the Professional Privacy Notice.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    profile = request.user.professional_profile
+    accepted_at = timezone.now()
+    profile.terms_accepted = True
+    profile.privacy_policy_accepted = True
+    profile.terms_accepted_at = accepted_at
+    profile.privacy_policy_accepted_at = accepted_at
+    profile.legal_document_version = settings.REPROOT_PROFESSIONAL_LEGAL_VERSION
+    profile.save(update_fields=[
+      'terms_accepted', 'privacy_policy_accepted', 'terms_accepted_at',
+      'privacy_policy_accepted_at', 'legal_document_version', 'updated_at',
+    ])
+    LegalAcceptanceRecord.objects.create(
+      actor_type=LegalAcceptanceRecord.ACTOR_PROFESSIONAL,
+      professional_profile=profile,
+      actor_reference=profile.professional_id or str(request.user.id),
+      legal_document_version=settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+      accepted_at=accepted_at,
+      client_timezone=str(request.data.get('client_timezone') or '')[:80],
+    )
+    return Response({
+      'profile': ProfessionalProfileSerializer(profile).data,
+      'message': 'Professional legal documents accepted.',
+    })
+
+
+class LegalConfigurationView(APIView):
+  """Public, non-secret metadata used by legal pages and consent screens."""
+
+  permission_classes = [permissions.AllowAny]
+
+  def get(self, request):
+    return Response({
+      'effective_date': settings.REPROOT_LEGAL_EFFECTIVE_DATE,
+      'professional': {
+        'version': settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+      },
+      'client': {
+        'version': settings.REPROOT_CLIENT_LEGAL_VERSION,
+      },
+    })
 
 
 class ProfessionalDataUsageView(APIView):
@@ -835,14 +891,22 @@ class ProfessionalBillingStatusView(APIView):
         'cancellation_effective_at': profile.cancellation_effective_at,
         'downgrade_assessment': subscription_cancellation.downgrade_assessment(request.user),
         'has_billing_account': bool(profile.razorpay_payment_link_id or profile.stripe_customer_id),
-        'billing_configured': settings.REPROOT_BILLING_TEST_MODE,
+        # billing_configured reflects whether Razorpay itself is actually set
+        # up (real key/secret/webhook secret present) -- not whether the
+        # no-charge test-mode shortcut happens to be on. Those are separate
+        # things: test mode can be off in production with Razorpay fully
+        # configured, or (in a dev sandbox) on with no real keys at all.
+        'billing_configured': razorpay_billing.is_configured() or settings.REPROOT_BILLING_TEST_MODE,
         'test_mode': settings.REPROOT_BILLING_TEST_MODE,
         'billing_currency': 'INR' if is_india else 'USD',
         'billing_region': 'India' if is_india else 'International',
         'support_email': settings.SUPPORT_EMAIL,
-        # A tier is offered once it either has a real Stripe price configured,
-        # or test mode is on (which applies the tier directly with no charge).
-        'available_upgrades': {tier: settings.REPROOT_BILLING_TEST_MODE for tier in razorpay_billing.PLAN_PRICES},
+        # A tier is offered once Razorpay is genuinely configured for it, or
+        # test mode is on (which applies the tier directly with no charge).
+        'available_upgrades': {
+          tier: (razorpay_billing.is_configured() or settings.REPROOT_BILLING_TEST_MODE)
+          for tier in razorpay_billing.PLAN_PRICES
+        },
         'catalog': razorpay_billing.public_catalog(),
         'plans': [
           {'code': code, **settings.REPROOT_PLAN_TIERS[code]}
@@ -854,6 +918,8 @@ class ProfessionalBillingStatusView(APIView):
 
 class ProfessionalBillingCheckoutView(APIView):
   permission_classes = [ProfessionalAccessPermission]
+  throttle_classes = [ScopedRateThrottle]
+  throttle_scope = 'payments'
 
   def post(self, request):
     target_tier = str(request.data.get('target_tier', '')).strip().lower()
@@ -909,31 +975,6 @@ class ProfessionalBillingCheckoutView(APIView):
       'provider': 'razorpay',
       'payment_link_id': payment_link.get('id', ''),
     })
-
-    has_real_price = bool(billing.price_id_for_tier(target_tier))
-
-    if not has_real_price:
-      if not settings.REPROOT_BILLING_TEST_MODE:
-        return Response({'message': f'The {target_tier} plan is not open for upgrades yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-      # No real Stripe price for this tier yet — apply it directly so the
-      # rest of the lifecycle (limits, storage quota, unlocking) can be
-      # exercised without a payment provider. No FinanceLedgerEntry is
-      # written since no money moved.
-      profile.plan_tier = target_tier
-      profile.save(update_fields=['plan_tier'])
-      account_lifecycle.reactivate_on_upgrade(profile)
-      return Response({'checkout_url': f'{settings.REPROOT_BILLING_SUCCESS_URL}&test_mode=1', 'test_mode': True})
-
-    if not settings.STRIPE_SECRET_KEY:
-      return Response({'message': 'Billing is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    try:
-      checkout_url = billing.create_checkout_session(profile, target_tier)
-    except stripe.StripeError as exc:
-      return Response({'message': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response({'checkout_url': checkout_url})
 
 
 def _allowed_downgrade_targets(plan_tier):
@@ -1059,7 +1100,10 @@ def razorpay_webhook(request):
   if not razorpay_billing.verify_webhook(request.body, signature):
     return HttpResponse(status=400)
 
-  payload = json.loads(request.body.decode('utf-8'))
+  try:
+    payload = json.loads(request.body.decode('utf-8'))
+  except (UnicodeDecodeError, json.JSONDecodeError):
+    return HttpResponse(status=400)
   if payload.get('event') not in ('payment_link.paid', 'payment.captured'):
     return HttpResponse(status=200)
   event_payload = payload.get('payload') or {}
@@ -1070,43 +1114,65 @@ def razorpay_webhook(request):
   target_tier = notes.get('target_tier')
   profile = ProfessionalProfile.objects.filter(user_id=user_id).first() if user_id else None
   if profile is None or target_tier not in razorpay_billing.PLAN_PRICES:
-    return HttpResponse(status=200)
+    return HttpResponse(status=400)
 
   payment_id = payment.get('id', '')
-  if payment_id and FinanceLedgerEntry.objects.filter(
-    provider='razorpay', external_reference=payment_id
-  ).exists():
+  payment_link_id = payment_link.get('id', '')
+  event_id = request.META.get('HTTP_X_RAZORPAY_EVENT_ID', '').strip() or payment_id or payment_link_id
+  billing_cycle = notes.get('billing_cycle', '')
+  currency = (payment.get('currency') or payment_link.get('currency') or '').upper()
+  try:
+    amount_subunits = int(payment.get('amount') or payment_link.get('amount') or 0)
+  except (TypeError, ValueError):
+    return HttpResponse(status=400)
+  expected = razorpay_billing.expected_payment(target_tier, billing_cycle, currency)
+  if not event_id or not payment_id or not expected:
+    return HttpResponse(status=400)
+  if amount_subunits != expected['amount_subunits']:
+    return HttpResponse(status=400)
+  if payment.get('status') not in ('captured', 'paid') and payment_link.get('status') != 'paid':
+    return HttpResponse(status=400)
+  if profile.razorpay_payment_link_id and payment_link_id != profile.razorpay_payment_link_id:
+    return HttpResponse(status=400)
+
+  try:
+    with transaction.atomic():
+      BillingWebhookEvent.objects.create(
+        provider='razorpay',
+        event_id=event_id,
+        event_type=payload.get('event', ''),
+      )
+      profile = ProfessionalProfile.objects.select_for_update().get(pk=profile.pk)
+      profile.plan_tier = target_tier
+      profile.razorpay_payment_link_id = payment_link_id
+      profile.razorpay_payment_id = payment_id
+      profile.plan_renews_at = razorpay_billing.renewal_date(expected['months'])
+      profile.save(update_fields=[
+        'plan_tier', 'razorpay_payment_link_id', 'razorpay_payment_id', 'plan_renews_at',
+      ])
+      account_lifecycle.reactivate_on_upgrade(profile)
+
+      amount = amount_subunits / 100
+      FinanceLedgerEntry.objects.create(
+        entry_type=FinanceLedgerEntry.TYPE_SUBSCRIPTION,
+        status=FinanceLedgerEntry.STATUS_COMPLETED,
+        amount=amount,
+        currency=currency,
+        professional=profile.user,
+        description=f'{profile.get_plan_tier_display()} prepaid membership started',
+        external_reference=payment_id,
+        source='platform_subscription',
+        professional_reference=profile.internal_reference_code,
+        original_amount=amount,
+        original_currency=currency,
+        reporting_amount=amount,
+        reporting_currency=currency,
+        provider='razorpay',
+        metadata={'target_tier': target_tier, 'billing_cycle': billing_cycle, 'event_id': event_id},
+        occurred_at=timezone.now(),
+      )
+  except IntegrityError:
     return HttpResponse(status=200)
-
-  profile.plan_tier = target_tier
-  profile.razorpay_payment_link_id = payment_link.get('id', profile.razorpay_payment_link_id)
-  profile.razorpay_payment_id = payment_id
-  profile.plan_renews_at = razorpay_billing.renewal_date(notes.get('months', 1))
-  profile.save(update_fields=[
-    'plan_tier', 'razorpay_payment_link_id', 'razorpay_payment_id', 'plan_renews_at',
-  ])
-  account_lifecycle.reactivate_on_upgrade(profile)
-
-  amount = (payment.get('amount') or payment_link.get('amount') or 0) / 100
-  currency = (payment.get('currency') or payment_link.get('currency') or 'INR').upper()
-  FinanceLedgerEntry.objects.create(
-    entry_type=FinanceLedgerEntry.TYPE_SUBSCRIPTION,
-    status=FinanceLedgerEntry.STATUS_COMPLETED,
-    amount=amount,
-    currency=currency,
-    professional=profile.user,
-    description=f'{profile.get_plan_tier_display()} subscription started',
-    external_reference=payment_id or payment_link.get('id', ''),
-    source='platform_subscription',
-    professional_reference=profile.internal_reference_code,
-    original_amount=amount,
-    original_currency=currency,
-    reporting_amount=amount,
-    reporting_currency=currency,
-    provider='razorpay',
-    metadata={'target_tier': target_tier, 'billing_cycle': notes.get('billing_cycle', '')},
-    occurred_at=timezone.now(),
-  )
   return HttpResponse(status=200)
 
 
@@ -1314,6 +1380,7 @@ class ProfessionalProfileVisibilityView(APIView):
 
 class ProfessionalLogoutView(APIView):
   permission_classes = [ProfessionalAccessPermission]
+  allow_outdated_legal = True
 
   def post(self, request):
     Token.objects.filter(user=request.user).delete()
@@ -1361,6 +1428,7 @@ class ProfessionalAccountView(APIView):
 
 class ProfessionalPasswordChangeView(APIView):
   permission_classes = [ProfessionalAccessPermission]
+  allow_outdated_legal = True
 
   def post(self, request):
     serializer = ProfessionalPasswordChangeSerializer(data=request.data, context={'user': request.user})
@@ -2241,6 +2309,17 @@ class ClientAdditionalInfoView(APIView):
 
     client_access.save(update_fields=['additional_info', 'additional_info_shared', 'updated_at'])
 
+    if client_access.additional_info_shared:
+      notify_client(
+        client_access,
+        category='clients',
+        event_type='client.additional_info_updated',
+        title='Your information was updated',
+        body='Your trainer updated information shared with you.',
+        action_url='/client/profile?tab=professional&professionalTab=additional',
+        payload={'client_id': client_access.id},
+      )
+
     return Response({'client': ClientAccessSerializer(client_access).data, 'message': 'Additional information saved.'})
 
 
@@ -2528,20 +2607,23 @@ class ProfessionalDirectoryView(APIView):
 
   def get(self, request):
     search = str(request.query_params.get('search', '')).strip()
+    if len(search) < 3:
+      return Response({'professionals': []})
+
     profiles = (
       ProfessionalProfile.objects.select_related('user')
+      .filter(user__is_active=True, is_locked=False)
       .exclude(professional_id__isnull=True)
       .exclude(professional_id__exact='')
     )
 
-    if search:
-      profiles = profiles.filter(
-        Q(professional_id__icontains=search)
-        | Q(user__first_name__icontains=search)
-        | Q(user__last_name__icontains=search)
-      )
+    profiles = profiles.filter(
+      Q(professional_id__icontains=search)
+      | Q(user__first_name__icontains=search)
+      | Q(user__last_name__icontains=search)
+    )
 
-    profiles = profiles.order_by('user__first_name', 'user__last_name')[:100]
+    profiles = profiles.order_by('user__first_name', 'user__last_name', 'professional_id')[:5]
 
     professionals = [
       {
@@ -3557,6 +3639,7 @@ class ProfessionalChatUnreadView(APIView):
 class ClientPasswordChangeView(APIView):
   authentication_classes = [ClientTokenAuthentication]
   permission_classes = [IsAuthenticatedClient]
+  allow_outdated_legal = True
 
   def post(self, request):
     serializer = ClientPasswordChangeSerializer(data=request.data, context={'client_access': request.auth})
@@ -3575,6 +3658,45 @@ class ClientPasswordChangeView(APIView):
         'message': 'Password changed successfully.',
       }
     )
+
+
+class ClientLegalAcceptanceView(APIView):
+  authentication_classes = [ClientTokenAuthentication]
+  permission_classes = [IsAuthenticatedClient]
+  allow_outdated_legal = True
+
+  def post(self, request):
+    if request.data.get('accept_terms') is not True or request.data.get('accept_privacy') is not True:
+      return Response(
+        {'message': 'You must review and accept both the Client Terms and Client Privacy Notice.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+    client_access = request.auth
+    accepted_at = timezone.now()
+    client_access.terms_accepted = True
+    client_access.privacy_policy_accepted = True
+    client_access.terms_accepted_at = accepted_at
+    client_access.privacy_policy_accepted_at = accepted_at
+    client_access.legal_document_version = settings.REPROOT_CLIENT_LEGAL_VERSION
+    client_access.save(update_fields=[
+      'terms_accepted', 'privacy_policy_accepted',
+      'terms_accepted_at', 'privacy_policy_accepted_at',
+      'legal_document_version', 'updated_at',
+    ])
+    LegalAcceptanceRecord.objects.create(
+      actor_type=LegalAcceptanceRecord.ACTOR_CLIENT,
+      client_access=client_access,
+      actor_reference=client_access.reference_id,
+      legal_document_version=settings.REPROOT_CLIENT_LEGAL_VERSION,
+      terms_accepted=True,
+      privacy_policy_accepted=True,
+      accepted_at=accepted_at,
+      client_timezone=str(request.data.get('client_timezone') or '')[:80],
+    )
+    return Response({
+      'client': ClientAccessSerializer(client_access).data,
+      'message': 'Client legal documents accepted.',
+    })
 
 
 class ClientDashboardView(APIView):
@@ -3645,6 +3767,7 @@ class ClientDashboardView(APIView):
 class ClientLogoutView(APIView):
   authentication_classes = [ClientTokenAuthentication]
   permission_classes = [IsAuthenticatedClient]
+  allow_outdated_legal = True
 
   def post(self, request):
     ClientAuthToken.objects.filter(client=request.auth).delete()

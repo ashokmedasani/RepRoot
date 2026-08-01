@@ -233,16 +233,21 @@
             </div>
           }
 
-          <div class="attention-kpi-row revenue-kpi-row" aria-label="Revenue totals">
+          <div class="attention-kpi-row revenue-kpi-row" aria-label="Logged payment totals">
             <article class="attention-kpi clear">
-              <span>This month</span>
-              <strong>{{ rev.this_month_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
-              <small>Resets on the 1st</small>
+              <span>Total Logged</span>
+              <strong>{{ rev.total_logged | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
+              <small>Private payment records</small>
             </article>
             <article class="attention-kpi clear">
-              <span>Total Revenue</span>
-              <strong>{{ rev.total_revenue | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
+              <span>Manual Logs</span>
+              <strong>{{ rev.manual_logged_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
               <small>{{ rev.period_start | date: 'MMM d' }} &ndash; {{ rev.period_end | date: 'MMM d, y' }}</small>
+            </article>
+            <article class="attention-kpi clear">
+              <span>Integrated Payments</span>
+              <strong>{{ rev.integrated_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
+              <small>Available after provider setup</small>
             </article>
           </div>
 
@@ -291,16 +296,23 @@
           </app-fixed-height-list>
         </section>
       } @else if (!revenueUnlocked) {
-        <section class="activity-card">
-          <div class="panel-heading">
-            <div>
-              <h2>Revenue</h2>
-              <p>Unlock your payments dashboard and pick a reporting currency in Settings &rarr; Payments to see earnings totals here.</p>
-            </div>
+        <section class="activity-card payment-unlock-card">
+          <div>
+            <span class="setup-kicker">One-time setup</span>
+            <h2>Choose your reporting currency</h2>
+            <ol>
+              <li>Open <strong>Settings &rarr; Payments</strong>.</li>
+              <li>Select the currency you use for payment reports.</li>
+              <li>Save it to unlock revenue totals and payment activity.</li>
+            </ol>
           </div>
+          <a class="primary-action" routerLink="/professional/settings" [queryParams]="{ section: 'payments' }">
+            Open Payment Settings
+          </a>
         </section>
       }
 
+      @if (revenueUnlocked) {
       <section class="activity-card">
         <div class="attention-kpi-row" aria-label="Payments needing action">
           <article class="attention-kpi review" [class.clear]="paymentReviewCount === 0">
@@ -368,7 +380,7 @@
                       <td data-label="Due">{{ item.due_date ? (item.due_date | date: 'dd MMM yyyy') : 'No due date' }}</td>
                       <td data-label="Status"><span class="status-chip" [attr.data-status]="item.status">{{ paymentStatusLabel(item.status) }}</span></td>
                       <td data-label="Actions" class="actions-col">
-                        <a class="primary-action compact" [routerLink]="['/professional/clients', item.client_id]" [queryParams]="{ tab: 'payments' }">Review</a>
+                        <a class="primary-action compact" [routerLink]="['/professional/clients', item.client_id]" [queryParams]="{ tab: 'payments', paymentTab: 'requests', request: item.request_id }">Review</a>
                       </td>
                     </tr>
                   }
@@ -380,6 +392,7 @@
           </div>
         </app-fixed-height-list>
       </section>
+      }
     }
 
     @if (activeTab === 'schedules') {

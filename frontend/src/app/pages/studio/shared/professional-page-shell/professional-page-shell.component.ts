@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
@@ -10,7 +10,7 @@ type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates
 @Component({
   selector: 'app-professional-page-shell',
   standalone: true,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, RouterLink],
   templateUrl: './professional-page-shell.component.html',
   styleUrl: './professional-page-shell.component.scss'
 })
@@ -70,15 +70,31 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   openNotification(item: ActivityNotification): void {
     this.professionalAuthApi.markNotificationRead(item.id).subscribe({ next: () => this.loadNotifications() });
     this.notificationsOpen = false;
-    if (item.action_url) void this.router.navigateByUrl(item.action_url);
+    let destination = item.action_url;
+    if (item.category === 'payments') {
+      const requestId = String(item.payload?.['request_id'] || '');
+      const clientId = destination.match(/\/professional\/clients\/(\d+)/)?.[1];
+      if (requestId && clientId) {
+        destination = `/professional/clients/${clientId}?tab=payments&paymentTab=requests&request=${requestId}`;
+      }
+    }
+    if (destination) void this.router.navigateByUrl(destination);
   }
 
   markAllNotificationsRead(): void {
-    this.professionalAuthApi.markNotificationRead().subscribe({ next: () => this.loadNotifications() });
+    this.notifications = this.notifications.map((item) => ({ ...item, is_read: true }));
+    this.unreadNotifications = 0;
+    this.professionalAuthApi.markNotificationRead().subscribe({ next: () => this.loadNotifications(), error: () => this.loadNotifications() });
+  }
+
+  clearNotifications(): void {
+    this.notifications = [];
+    this.unreadNotifications = 0;
+    this.professionalAuthApi.clearNotifications().subscribe({ next: () => this.loadNotifications(), error: () => this.loadNotifications() });
   }
 
   private loadNotifications(): void {
-    this.professionalAuthApi.getNotifications().subscribe({
+    this.professionalAuthApi.getNotifications(20).subscribe({
       next: (result) => { this.notifications = result.notifications; this.unreadNotifications = result.unread_count; },
       error: () => { this.notifications = []; this.unreadNotifications = 0; }
     });
@@ -93,9 +109,9 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   }
 
   private clearAndRedirect(): void {
-    window.localStorage.removeItem('professional-auth-token');
-    window.localStorage.removeItem('professional-account-id');
-    window.localStorage.removeItem('professional-account-username');
+    window.sessionStorage.removeItem('professional-auth-token');
+    window.sessionStorage.removeItem('professional-account-id');
+    window.sessionStorage.removeItem('professional-account-username');
     void this.router.navigate(['/portal']);
   }
 }

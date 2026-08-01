@@ -93,7 +93,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
   }
 
   get canVerifyOtp(): boolean {
-    return !this.isVerifyingOtp && this.resetOtpStatus !== 'verified' && this.resetOtpStatus !== 'idle';
+    return !this.isVerifyingOtp && this.resetOtpStatus !== 'verified' && this.resetOtpStatus !== 'idle' && /^\d{6}$/.test(this.resetForm.otp.trim());
   }
 
   ngOnDestroy(): void {
@@ -175,8 +175,8 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
     const email = this.resetForm.email.trim().toLowerCase();
     const otp = this.resetForm.otp.trim();
 
-    if (!email || !otp) {
-      this.resetFieldErrors.otp = 'OTP is required.';
+    if (!email || !/^\d{6}$/.test(otp)) {
+      this.resetFieldErrors.otp = 'Enter the complete 6-digit verification code.';
       return;
     }
 

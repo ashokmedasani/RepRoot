@@ -11,6 +11,7 @@ import {
   ProfessionalDataUsageResponse,
   ProfessionalDataUsageSection,
   ProfessionalPlanCode,
+  ProfessionalProfile,
   ProfessionalUpgradeTier,
   ProfessionalUsageLabel,
   RecycleBinItem,
@@ -165,6 +166,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
 
   notificationPreferences: NotificationPreference[] = [];
   notificationMessage = '';
+  legalProfile: ProfessionalProfile | null = null;
   readonly notificationLabels: Record<string, string> = {
     chat: 'Client messages', forms: 'Form submissions', meetings: 'Meetings', clients: 'Client requests',
     templates: 'Templates', progress: 'Progress and tracking', reminders: 'Reminders', resources: 'Resources',
@@ -176,6 +178,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     this.loadNotificationPrefs();
     this.professionalAuthApi.getProfile().subscribe({
       next: (profile) => {
+        this.legalProfile = profile;
         this.professionalCode = profile.professional_id || '';
         this.codeDraft = this.professionalCode;
       }
@@ -396,11 +399,19 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private static readonly CURRENCY_LOCALES: Record<'INR' | 'USD', string> = { INR: 'en-IN', USD: 'en-US' };
 
   formatPlanPrice(amount: number, currency: 'INR' | 'USD'): string {
+    // Prices are deliberately .99-style (e.g. $5.99, $14.99) -- rounding to
+    // whole currency here would silently turn $5.99 into $6 and $14.99 into
+    // $15, which is exactly the wrong impression for psychological pricing.
+    // Round trip through cents first so floating-point noise (e.g.
+    // 29.949999999999996 from Decimal-to-number conversion) can't produce a
+    // stray extra digit.
+    const cents = Math.round(amount * 100) / 100;
     return new Intl.NumberFormat(ProfessionalAccountSettingsComponent.CURRENCY_LOCALES[currency], {
       style: 'currency',
       currency,
-      maximumFractionDigits: 0
-    }).format(amount);
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(cents);
   }
 
   planPrice(billing: ProfessionalBillingStatus, code: ProfessionalPlanCode): string {
@@ -409,6 +420,24 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     const value = billing.catalog?.trainer?.[tier as ProfessionalUpgradeTier]?.[this.selectedBillingCycle]?.[this.selectedCurrency];
     if (!value) return '—';
     return this.formatPlanPrice(Number(value), this.selectedCurrency);
+  }
+
+  // How much cheaper the selected cycle is than paying the monthly rate that
+  // many times over -- six_months/yearly are already discounted server-side
+  // (Pro: 5x monthly for 6 months, 10x for 12; same ratio for Premium) but
+  // nothing surfaced that saving to the professional before now.
+  cycleSavingsPercent(billing: ProfessionalBillingStatus, code: ProfessionalPlanCode): number {
+    if (this.selectedBillingCycle === 'monthly') return 0;
+    if (code === 'starter_free' || code === 'starter') return 0;
+    const tier = code === 'premium' ? 'premium_unlimited' : code;
+    const prices = billing.catalog?.trainer?.[tier as ProfessionalUpgradeTier];
+    const monthly = Number(prices?.['monthly']?.[this.selectedCurrency]);
+    const cyclePrice = prices?.[this.selectedBillingCycle];
+    const selected = Number(cyclePrice?.[this.selectedCurrency]);
+    const months = Number(cyclePrice?.['months']);
+    if (!monthly || !selected || !months) return 0;
+    const fullPriceForPeriod = monthly * months;
+    return Math.round((1 - selected / fullPriceForPeriod) * 100);
   }
 
   storageLabel(bytes: number): string {
@@ -591,9 +620,9 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   }
 
   private clearProfessionalSession(): void {
-    window.localStorage.removeItem('professional-auth-token');
-    window.localStorage.removeItem('professional-account-id');
-    window.localStorage.removeItem('professional-account-username');
+    window.sessionStorage.removeItem('professional-auth-token');
+    window.sessionStorage.removeItem('professional-account-id');
+    window.sessionStorage.removeItem('professional-account-username');
   }
 
   private formatApiError(error: unknown, fallbackMessage: string): string {

@@ -4,11 +4,12 @@ import { RouterOutlet } from '@angular/router';
 import { SubdomainRedirectService } from './core/routing/subdomain-redirect.service';
 import { ThemeService } from './core/theme/theme.service';
 import { ConfirmationDialogComponent } from './shared/confirmation-dialog/confirmation-dialog.component';
+import { CookieConsentComponent } from './shared/cookie-consent/cookie-consent.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, ConfirmationDialogComponent],
+  imports: [RouterOutlet, ConfirmationDialogComponent, CookieConsentComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

@@ -91,7 +91,7 @@ export class ChatApiService {
   }
 
   private getProfessionalAuthHeaders(): HttpHeaders {
-    const token = window.localStorage.getItem('professional-auth-token') || '';
+    const token = window.sessionStorage.getItem('professional-auth-token') || '';
     return new HttpHeaders(token ? { Authorization: `Token ${token}` } : {});
   }
 
@@ -107,6 +107,9 @@ export class ChatApiService {
       return `${configuredBaseUrl.replace(/\/$/, '')}/api/accounts`;
     }
 
-    return `http://${window.location.hostname}:8000/api/accounts`;
+    if (['localhost', '127.0.0.1', '10.0.2.2'].includes(window.location.hostname)) {
+      return `http://${window.location.hostname}:8000/api/accounts`;
+    }
+    throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
   }
 }

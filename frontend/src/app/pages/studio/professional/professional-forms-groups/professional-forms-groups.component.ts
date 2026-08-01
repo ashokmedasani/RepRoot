@@ -230,7 +230,7 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.messageType = 'error';
-        this.message = this.formatApiError(error, 'Could not load Forms & Groups.');
+        this.message = this.formatApiError(error, 'Could not load Forms and Groups.');
         this.isLoading = false;
       }
     });

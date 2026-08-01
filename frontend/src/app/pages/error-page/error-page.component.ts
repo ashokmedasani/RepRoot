@@ -57,7 +57,7 @@ export class ErrorPageComponent implements OnInit {
   }
 
   private safeStartUrl(): string {
-    if (window.localStorage.getItem('professional-auth-token')) {
+    if (window.sessionStorage.getItem('professional-auth-token')) {
       return '/professional/dashboard';
     }
 

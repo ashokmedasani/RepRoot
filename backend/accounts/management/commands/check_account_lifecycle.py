@@ -6,6 +6,10 @@ from accounts.account_lifecycle import (
 )
 from accounts.data_retention import purge_expired_client_data
 from accounts.recycle_bin import purge_expired as purge_expired_recycle_bin
+from admin_portal.models import ErrorLog
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 
 
 class Command(BaseCommand):
@@ -54,6 +58,15 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Recycle Bin purge failed: {e}'))
             failures.append(f'item recycle purge: {e}')
+
+        try:
+            self.stdout.write('Removing diagnostic error logs past the configured retention window...')
+            cutoff = timezone.now() - timedelta(days=settings.REPROOT_ERROR_LOG_RETENTION_DAYS)
+            ErrorLog.objects.filter(last_seen_at__lt=cutoff).delete()
+            self.stdout.write(self.style.SUCCESS('[OK] Error log retention purge complete'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'[FAILED] Error log retention purge failed: {e}'))
+            failures.append(f'error log retention: {e}')
 
         if failures:
             raise CommandError('Lifecycle processing failed: ' + '; '.join(failures))

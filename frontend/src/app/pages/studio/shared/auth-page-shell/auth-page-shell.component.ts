@@ -21,6 +21,8 @@ export class AuthPageShellComponent {
   @Input() actionLink = '';
   @Input() eyebrow = '';
   @Input() title = '';
+  @Input() subtitle = '';
+  @Input() audience: 'professional' | 'client' = 'professional';
   @Input() titleId = 'auth-title';
   /** Wider card for forms with more fields (e.g. signup's two-column layout). */
   @Input() wide = false;

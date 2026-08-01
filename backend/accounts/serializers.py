@@ -2,11 +2,15 @@ import hashlib
 import json
 import re
 import secrets
+from datetime import timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from .email_verification import consume_verified_email_token
@@ -25,6 +29,7 @@ from .models import (
   GroupRegistrationSubmission,
   LeadSubmission,
   LeadMeetingRequest,
+  LegalAcceptanceRecord,
   ProgressEntry,
   ResourceCategory,
   SupportIncident,
@@ -382,6 +387,8 @@ class ProfessionalSignupSerializer(serializers.Serializer):
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
   email_verification_token = serializers.CharField(write_only=True)
+  accept_terms = serializers.BooleanField(write_only=True)
+  accept_privacy = serializers.BooleanField(write_only=True)
 
   def validate_username(self, value: str) -> str:
     username = value.strip().lower()
@@ -397,11 +404,15 @@ class ProfessionalSignupSerializer(serializers.Serializer):
     email = value.strip().lower()
 
     if User.objects.filter(email__iexact=email).exists():
-      raise serializers.ValidationError('Email is already registered.')
+      raise serializers.ValidationError('An account already exists for this email. Please sign in.')
 
     return email
 
   def validate(self, attrs):
+    if not attrs.get('accept_terms'):
+      raise serializers.ValidationError({'accept_terms': 'You must accept the Terms & Conditions.'})
+    if not attrs.get('accept_privacy'):
+      raise serializers.ValidationError({'accept_privacy': 'You must acknowledge the Privacy Policy.'})
     try:
       validate_strong_password(attrs['password'])
     except serializers.ValidationError as error:
@@ -418,6 +429,8 @@ class ProfessionalSignupSerializer(serializers.Serializer):
   def create(self, validated_data):
     validated_data.pop('confirm_password')
     validated_data.pop('email_verification_token')
+    validated_data.pop('accept_terms')
+    validated_data.pop('accept_privacy')
     password = validated_data.pop('password')
 
     with transaction.atomic():
@@ -428,7 +441,23 @@ class ProfessionalSignupSerializer(serializers.Serializer):
         first_name='',
         last_name='',
       )
-      ProfessionalProfile.objects.create(user=user)
+      accepted_at = timezone.now()
+      ProfessionalProfile.objects.create(
+        user=user,
+        terms_accepted=True,
+        privacy_policy_accepted=True,
+        terms_accepted_at=accepted_at,
+        privacy_policy_accepted_at=accepted_at,
+        legal_document_version=settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+      )
+      profile = user.professional_profile
+      LegalAcceptanceRecord.objects.create(
+        actor_type=LegalAcceptanceRecord.ACTOR_PROFESSIONAL,
+        professional_profile=profile,
+        actor_reference=profile.professional_id or str(user.id),
+        legal_document_version=settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
+        accepted_at=accepted_at,
+      )
 
     return user
 
@@ -490,13 +519,18 @@ class ProfessionalGoogleAuthSerializer(serializers.Serializer):
   """
 
   credential = serializers.CharField(write_only=True)
+  accept_terms = serializers.BooleanField(write_only=True, required=False, default=False)
+  accept_privacy = serializers.BooleanField(write_only=True, required=False, default=False)
 
   def validate(self, attrs):
     from . import google_oauth
 
     try:
       claims = google_oauth.verify_google_id_token(attrs['credential'])
-      user, created = google_oauth.get_or_create_professional_for_google(claims)
+      user, created = google_oauth.get_or_create_professional_for_google(
+        claims,
+        allow_create=bool(attrs.get('accept_terms') and attrs.get('accept_privacy')),
+      )
     except google_oauth.GoogleAuthError as error:
       raise serializers.ValidationError({'credential': str(error)})
 
@@ -600,9 +634,22 @@ class ProfessionalAccountSerializer(serializers.ModelSerializer):
 
 
 class ProfessionalProfileStatusSerializer(serializers.ModelSerializer):
+  legal_acceptance_required = serializers.SerializerMethodField()
+  current_legal_document_version = serializers.SerializerMethodField()
+
   class Meta:
     model = ProfessionalProfile
-    fields = ['profile_setup_completed']
+    fields = ['profile_setup_completed', 'legal_acceptance_required', 'current_legal_document_version']
+
+  def get_legal_acceptance_required(self, obj):
+    return not (
+      obj.terms_accepted
+      and obj.privacy_policy_accepted
+      and obj.legal_document_version == settings.REPROOT_PROFESSIONAL_LEGAL_VERSION
+    )
+
+  def get_current_legal_document_version(self, _obj):
+    return settings.REPROOT_PROFESSIONAL_LEGAL_VERSION
 
 
 class ProfessionalProfileSerializer(serializers.ModelSerializer):
@@ -616,6 +663,7 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
   certification_file_url = serializers.SerializerMethodField()
   transformation_photo_url = serializers.SerializerMethodField()
   training_photo_url = serializers.SerializerMethodField()
+  legal_acceptance_history = serializers.SerializerMethodField()
 
   class Meta:
     model = ProfessionalProfile
@@ -627,6 +675,12 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       'middle_name',
       'last_name',
       'profile_setup_completed',
+      'terms_accepted',
+      'privacy_policy_accepted',
+      'terms_accepted_at',
+      'privacy_policy_accepted_at',
+      'legal_document_version',
+      'legal_acceptance_history',
       'profile_photo',
       'profile_photo_url',
       'phone',
@@ -658,6 +712,16 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       'profile_images',
       'profile_links',
       'profile_visibility',
+    ]
+
+  def get_legal_acceptance_history(self, obj):
+    return [
+      {
+        'legal_document_version': row.legal_document_version,
+        'accepted_at': row.accepted_at,
+        'client_timezone': row.client_timezone,
+      }
+      for row in obj.legal_acceptance_records.all()[:20]
     ]
     read_only_fields = [
       'profile_setup_completed',
@@ -719,6 +783,14 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('Professional ID is already taken.')
 
     return professional_id
+
+  def validate_country(self, value):
+    country = str(value or '').strip()
+    if country.upper() not in settings.REPROOT_SUPPORTED_COUNTRIES:
+      raise serializers.ValidationError(
+        'RepRoot is currently available for professionals in India and the United States only.'
+      )
+    return country
 
   def validate_profile_photo(self, value):
     return self.validate_image_upload(value)
@@ -1587,7 +1659,6 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 
 class ClientPasswordChangeSerializer(serializers.Serializer):
-  current_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
   password = serializers.CharField(min_length=8, write_only=True)
   confirm_password = serializers.CharField(min_length=8, write_only=True)
 
@@ -1599,11 +1670,6 @@ class ClientPasswordChangeSerializer(serializers.Serializer):
 
     if attrs['password'] != attrs['confirm_password']:
       raise serializers.ValidationError({'confirm_password': 'Passwords must match.'})
-
-    client_access = self.context['client_access']
-
-    if not client_access.must_change_password and not check_password(attrs.get('current_password', ''), client_access.temporary_password):
-      raise serializers.ValidationError({'current_password': 'Current password is incorrect.'})
 
     return attrs
 
@@ -1619,6 +1685,8 @@ class ClientAccessSerializer(serializers.ModelSerializer):
   group_name = serializers.CharField(source='group.name', read_only=True)
   professional_name = serializers.SerializerMethodField()
   additional_info = serializers.SerializerMethodField()
+  legal_acceptance_history = serializers.SerializerMethodField()
+  current_legal_document_version = serializers.SerializerMethodField()
 
   class Meta:
     model = ClientAccess
@@ -1641,6 +1709,13 @@ class ClientAccessSerializer(serializers.ModelSerializer):
       'additional_info',
       'additional_info_shared',
       'must_change_password',
+      'terms_accepted',
+      'privacy_policy_accepted',
+      'legal_document_version',
+      'terms_accepted_at',
+      'privacy_policy_accepted_at',
+      'legal_acceptance_history',
+      'current_legal_document_version',
       'is_active',
       'created_at',
       'updated_at',
@@ -1652,6 +1727,26 @@ class ClientAccessSerializer(serializers.ModelSerializer):
 
   def get_additional_info(self, obj):
     return normalize_additional_info(obj.additional_info)
+
+  def get_legal_acceptance_history(self, obj):
+    return [
+      {
+        'legal_document_version': row.legal_document_version,
+        'accepted_at': row.accepted_at,
+        'client_timezone': row.client_timezone,
+      }
+      for row in obj.legal_acceptance_records.all()[:20]
+    ]
+
+  def get_current_legal_document_version(self, _obj):
+    return settings.REPROOT_CLIENT_LEGAL_VERSION
+
+  def to_representation(self, instance):
+    data = super().to_representation(instance)
+    if instance.legal_document_version != settings.REPROOT_CLIENT_LEGAL_VERSION:
+      data['terms_accepted'] = False
+      data['privacy_policy_accepted'] = False
+    return data
 
 
 class ClientAdditionalInfoUpdateSerializer(serializers.Serializer):
@@ -1955,6 +2050,8 @@ class ScheduledMeetingSerializer(serializers.ModelSerializer):
       'external_calendar_url',
       'external_calendar_sync_status',
       'status',
+      'requested_by',
+      'professional_responded_at',
       'cancellation_reason',
       'client_response_status',
       'guests',
@@ -1965,7 +2062,8 @@ class ScheduledMeetingSerializer(serializers.ModelSerializer):
     ]
     read_only_fields = [
       'id', 'client_name', 'meeting_url', 'external_calendar_provider', 'external_calendar_url',
-      'external_calendar_sync_status', 'status', 'cancellation_reason', 'client_response_status',
+      'external_calendar_sync_status', 'status', 'requested_by', 'professional_responded_at',
+      'cancellation_reason', 'client_response_status',
       'guests', 'is_group_meeting', 'my_response_status', 'created_at', 'updated_at',
     ]
 
@@ -2133,6 +2231,11 @@ class ManualPaymentProfileClientSerializer(serializers.ModelSerializer):
 class PaymentRequestSerializer(serializers.ModelSerializer):
   client_name = serializers.SerializerMethodField()
   allowed_method_labels = serializers.SerializerMethodField()
+  accepted_amount = serializers.SerializerMethodField()
+  remaining_amount = serializers.SerializerMethodField()
+  overpaid_amount = serializers.SerializerMethodField()
+  correction_deadline = serializers.SerializerMethodField()
+  is_locked = serializers.SerializerMethodField()
 
   class Meta:
     model = PaymentRequest
@@ -2146,6 +2249,9 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
       'description',
       'requested_amount',
       'requested_currency',
+      'accepted_amount',
+      'remaining_amount',
+      'overpaid_amount',
       'due_date',
       'payment_type',
       'status',
@@ -2156,6 +2262,8 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
       'sent_at',
       'viewed_at',
       'completed_at',
+      'correction_deadline',
+      'is_locked',
       'updated_at',
     ]
     read_only_fields = [
@@ -2172,6 +2280,26 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
       for allowed in obj.allowed_methods.select_related('manual_payment_profile')
       if allowed.manual_payment_profile
     ]
+
+  def get_accepted_amount(self, obj):
+    return sum(
+      (proof.reported_amount for proof in obj.proofs.all()
+       if proof.status == PaymentProof.STATUS_ACCEPTED and proof.reported_currency == obj.requested_currency),
+      Decimal('0.00'),
+    )
+
+  def get_remaining_amount(self, obj):
+    return max(Decimal('0.00'), obj.requested_amount - self.get_accepted_amount(obj))
+
+  def get_overpaid_amount(self, obj):
+    return max(Decimal('0.00'), self.get_accepted_amount(obj) - obj.requested_amount)
+
+  def get_correction_deadline(self, obj):
+    return obj.completed_at + timedelta(days=14) if obj.completed_at else None
+
+  def get_is_locked(self, obj):
+    deadline = self.get_correction_deadline(obj)
+    return bool(deadline and timezone.now() > deadline)
 
   def validate_title(self, value):
     title = value.strip()
@@ -2198,6 +2326,11 @@ class ClientPaymentRequestSerializer(serializers.ModelSerializer):
   professional_name = serializers.SerializerMethodField()
   available_methods = serializers.SerializerMethodField()
   proofs = serializers.SerializerMethodField()
+  accepted_amount = serializers.SerializerMethodField()
+  remaining_amount = serializers.SerializerMethodField()
+  overpaid_amount = serializers.SerializerMethodField()
+  correction_deadline = serializers.SerializerMethodField()
+  is_locked = serializers.SerializerMethodField()
 
   class Meta:
     model = PaymentRequest
@@ -2208,6 +2341,9 @@ class ClientPaymentRequestSerializer(serializers.ModelSerializer):
       'description',
       'requested_amount',
       'requested_currency',
+      'accepted_amount',
+      'remaining_amount',
+      'overpaid_amount',
       'due_date',
       'payment_type',
       'status',
@@ -2215,6 +2351,8 @@ class ClientPaymentRequestSerializer(serializers.ModelSerializer):
       'proofs',
       'created_at',
       'sent_at',
+      'correction_deadline',
+      'is_locked',
     ]
     read_only_fields = fields
 
@@ -2235,6 +2373,26 @@ class ClientPaymentRequestSerializer(serializers.ModelSerializer):
     # rejection reason — without this, a rejected proof silently resets the
     # request to "viewed" with no visible trace of what happened.
     return PaymentProofSerializer(obj.proofs.order_by('-submitted_at'), many=True).data
+
+  def get_accepted_amount(self, obj):
+    return sum(
+      (proof.reported_amount for proof in obj.proofs.all()
+       if proof.status == PaymentProof.STATUS_ACCEPTED and proof.reported_currency == obj.requested_currency),
+      Decimal('0.00'),
+    )
+
+  def get_remaining_amount(self, obj):
+    return max(Decimal('0.00'), obj.requested_amount - self.get_accepted_amount(obj))
+
+  def get_overpaid_amount(self, obj):
+    return max(Decimal('0.00'), self.get_accepted_amount(obj) - obj.requested_amount)
+
+  def get_correction_deadline(self, obj):
+    return obj.completed_at + timedelta(days=14) if obj.completed_at else None
+
+  def get_is_locked(self, obj):
+    deadline = self.get_correction_deadline(obj)
+    return bool(deadline and timezone.now() > deadline)
 
 
 class PaymentProofSubmitSerializer(serializers.ModelSerializer):
@@ -2304,6 +2462,7 @@ class PaymentProofSerializer(serializers.ModelSerializer):
 
   payment_method_label = serializers.SerializerMethodField()
   has_file = serializers.SerializerMethodField()
+  payment_record_id = serializers.SerializerMethodField()
 
   class Meta:
     model = PaymentProof
@@ -2316,6 +2475,7 @@ class PaymentProofSerializer(serializers.ModelSerializer):
       'payment_method',
       'payment_method_label',
       'has_file',
+      'payment_record_id',
       'note',
       'status',
       'review_note',
@@ -2331,11 +2491,21 @@ class PaymentProofSerializer(serializers.ModelSerializer):
   def get_has_file(self, obj):
     return bool(obj.proof_file)
 
+  def get_payment_record_id(self, obj):
+    try:
+      record = obj.payment_record
+    except PaymentRecord.DoesNotExist:
+      return ''
+    return record.payment_record_id if record.client_visibility == 'visible' else ''
+
 
 class PaymentRecordSerializer(serializers.ModelSerializer):
   client_name = serializers.SerializerMethodField()
   payment_method_label = serializers.SerializerMethodField()
   request_reference = serializers.SerializerMethodField()
+  editable_until = serializers.SerializerMethodField()
+  is_locked = serializers.SerializerMethodField()
+  record_type = serializers.SerializerMethodField()
 
   class Meta:
     model = PaymentRecord
@@ -2362,6 +2532,9 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
       'verified_at',
       'created_at',
       'updated_at',
+      'editable_until',
+      'is_locked',
+      'record_type',
     ]
     read_only_fields = [
       'id', 'payment_record_id', 'client', 'client_name', 'request_reference',
@@ -2385,6 +2558,15 @@ class PaymentRecordSerializer(serializers.ModelSerializer):
 
   def get_request_reference(self, obj):
     return obj.payment_request.request_id if obj.payment_request else ''
+
+  def get_editable_until(self, obj):
+    return (obj.verified_at or obj.created_at) + timedelta(days=14)
+
+  def get_is_locked(self, obj):
+    return timezone.now() > self.get_editable_until(obj)
+
+  def get_record_type(self, obj):
+    return 'acknowledged_payment' if obj.source_proof_id else 'manual_log'
 
   def validate_original_amount(self, value):
     if value <= 0:

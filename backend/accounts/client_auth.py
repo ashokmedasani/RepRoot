@@ -8,7 +8,10 @@ The authenticated ClientAccess record is exposed as `request.auth`.
 
 import binascii
 import os
+from datetime import timedelta
 
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import authentication, exceptions, permissions
 
 from .models import ClientAccess, ClientAuthToken
@@ -28,6 +31,12 @@ def issue_client_token(client_access: ClientAccess) -> ClientAuthToken:
   if not created and not token.key:
     token.key = generate_client_token_key()
     token.save(update_fields=['key'])
+  elif not created and token.created_at < timezone.now() - timedelta(
+    hours=max(1, int(settings.REPROOT_AUTH_TOKEN_TTL_HOURS))
+  ):
+    token.key = generate_client_token_key()
+    token.created_at = timezone.now()
+    token.save(update_fields=['key', 'created_at'])
 
   return token
 
@@ -55,6 +64,7 @@ class ClientTokenAuthentication(authentication.BaseAuthentication):
 
     if (
       token is None
+      or token.created_at < timezone.now() - timedelta(hours=max(1, int(settings.REPROOT_AUTH_TOKEN_TTL_HOURS)))
       or not token.client.is_active
       or not token.client.professional.is_active
       or token.client.professional.professional_profile.lifecycle_status != 'active'
@@ -80,6 +90,14 @@ class IsAuthenticatedClient(permissions.BasePermission):
     profile = professional.professional_profile
     if not professional.is_active or profile.lifecycle_status != profile.LIFECYCLE_ACTIVE:
       self.message = 'This client portal is unavailable while the professional account is frozen.'
+      return False
+    legal_current = (
+      request.auth.terms_accepted
+      and request.auth.privacy_policy_accepted
+      and request.auth.legal_document_version == settings.REPROOT_CLIENT_LEGAL_VERSION
+    )
+    if not legal_current and not getattr(view, 'allow_outdated_legal', False):
+      self.message = 'Updated Client Terms & Conditions and Privacy Notice must be accepted before continuing.'
       return False
     if request_has_upload(request) and not upload_fits_storage(professional, request):
       self.message = 'New uploads are paused because this professional workspace reached its temporary storage ceiling.'

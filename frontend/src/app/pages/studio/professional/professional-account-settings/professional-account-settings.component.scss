@@ -667,6 +667,26 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.savings-badge {
+  margin-left: auto;
+  border-radius: var(--app-radius-pill);
+  padding: 0.15rem 0.55rem;
+  background: color-mix(in srgb, var(--app-success) 15%, var(--app-surface));
+  color: var(--app-success);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.cycle-savings-banner {
+  border: 1px solid color-mix(in srgb, var(--app-success) 35%, var(--app-border));
+  border-radius: var(--app-radius-md);
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  background: color-mix(in srgb, var(--app-success) 10%, var(--app-surface));
+  color: var(--app-text);
+  font-weight: 700;
+}
+
 .preview-plan-card ul {
   display: grid;
   align-content: start;

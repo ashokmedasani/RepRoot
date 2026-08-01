@@ -121,6 +121,57 @@ h2 {
   color: #d92d20;
 }
 
+.pending-section {
+  border-radius: var(--app-radius-lg);
+  padding: 1rem;
+  background: color-mix(in srgb, #f59e0b 8%, var(--app-surface));
+}
+
+.pending-card { border-color: color-mix(in srgb, #f59e0b 45%, var(--app-border)); }
+.response-pill[data-response='pending'] { background: color-mix(in srgb, #f59e0b 15%, var(--app-surface)); color: #9a5b00; }
+
+.request-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 0.55);
+}
+
+.request-panel {
+  display: grid;
+  width: min(38rem, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  gap: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  padding: 1.25rem;
+  background: var(--app-surface);
+  box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 0.28);
+}
+
+.request-panel header,
+.request-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.request-panel h2, .request-panel p { margin: 0; }
+.request-panel .eyebrow { color: var(--app-primary-strong); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
+.close-action { border: 0; background: transparent; color: var(--app-muted); font-size: 1.75rem; cursor: pointer; }
+.request-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.request-panel label { display: grid; gap: 0.35rem; color: var(--app-text); font-weight: 700; }
+.request-panel input, .request-panel select, .request-panel textarea { width: 100%; border: 1px solid var(--app-border); border-radius: 0.65rem; padding: 0.7rem; background: var(--app-surface-soft); color: var(--app-text); font: inherit; }
+.slot-block { display: grid; gap: 0.65rem; }
+.slot-block small, .slot-block p { color: var(--app-muted); font-weight: 500; }
+.slot-block .availability-help { border-radius: 0.65rem; padding: 0.75rem; background: color-mix(in srgb, #f59e0b 10%, var(--app-surface)); color: #8a5c00; font-weight: 650; }
+.slot-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.slot-list button { border: 1px solid var(--app-border); border-radius: 999px; padding: 0.5rem 0.8rem; background: var(--app-surface); color: var(--app-text); cursor: pointer; }
+.slot-list button.selected { border-color: var(--app-primary); background: var(--app-primary-soft); color: var(--app-primary-strong); }
+
+@media (max-width: 520px) {
+  .request-grid { grid-template-columns: 1fr; }
+}
+
 .status-pill[data-status='cancelled'] {
   background: rgba(217, 45, 32, 0.1);
   color: #d92d20;

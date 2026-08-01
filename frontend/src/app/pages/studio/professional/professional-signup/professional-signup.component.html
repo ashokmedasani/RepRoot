@@ -4,8 +4,16 @@
   actionLink="/professional/login"
   eyebrow="Professional registration"
   title="Create your account"
+  subtitle="Verify your username and email, secure your account, then review the Studio documents."
+  audience="professional"
   titleId="professional-signup-title"
   [wide]="true">
+
+  <ol class="registration-steps" aria-label="Account creation progress">
+    <li class="active"><span>1</span><div><strong>Account details</strong><small>Username and email</small></div></li>
+    <li [class.active]="emailOtpStatus !== 'idle'" [class.complete]="emailOtpStatus === 'verified'"><span>{{ emailOtpStatus === 'verified' ? '✓' : '2' }}</span><div><strong>Email verification</strong><small>Six-digit OTP</small></div></li>
+    <li [class.active]="emailOtpStatus === 'verified'"><span>3</span><div><strong>Secure and review</strong><small>Password and legal review</small></div></li>
+  </ol>
 
   <form class="auth-form" (ngSubmit)="createProfessionalAccount()">
     <label class="wide-field">
@@ -40,7 +48,7 @@
       </span>
       @if (isEmailAlreadyRegistered) {
         <span class="field-help error-text">
-          Email exists already. Try <a routerLink="/professional/login">Login</a> or <a routerLink="/professional/forgot-password">Forgot Password</a>.
+          An account already exists for this email. Please <a routerLink="/professional/login">sign in</a>. If needed, use <a routerLink="/professional/forgot-password">Forgot Password</a>.
         </span>
       } @else if (emailOtpHelpText) {
         <span class="field-help" [class.success-text]="emailOtpStatus === 'verified'" [class.error-text]="emailOtpStatus === 'failed'">
@@ -71,7 +79,7 @@
     <label class="wide-field">
       <span class="field-label">OTP <span class="required">*</span></span>
       <span class="input-with-button">
-        <input name="emailOtp" type="text" inputmode="numeric" maxlength="6" [(ngModel)]="signupForm.emailOtp" (ngModelChange)="handleOtpChange()" required>
+        <input class="otp-code" name="emailOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit code" [(ngModel)]="signupForm.emailOtp" (ngModelChange)="handleOtpChange()" required>
         <button type="button" [disabled]="!canVerifyOtp" [class.success-button]="emailOtpStatus === 'verified'" [class.error-button]="emailOtpStatus === 'failed'" (click)="verifyEmailOtp()">{{ verifyOtpButtonText }}</button>
       </span>
       @if (fieldErrors.otp) {
@@ -97,17 +105,7 @@
       }
     </label>
 
-    <label class="agree-field wide-field">
-      <input type="checkbox" name="agreeTerms" [(ngModel)]="agreedToTerms">
-      <span>
-        I agree to the
-        <a routerLink="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a>
-        and
-        <a routerLink="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
-      </span>
-    </label>
-
-    <button type="submit" class="primary-action wide-field" [disabled]="isSubmitting || !agreedToTerms || !isPasswordRequirementsMet || signupForm.password !== signupForm.confirmPassword">Create Account</button>
+    <button type="submit" class="primary-action wide-field" [disabled]="isSubmitting || !isPasswordRequirementsMet || signupForm.password !== signupForm.confirmPassword">Review and Create Account</button>
 
     @if (signupMessage) {
       <p class="form-message wide-field">{{ signupMessage }}</p>
@@ -128,3 +126,46 @@
       (loadError)="handleGoogleLoadError($event)" />
   }
 </app-auth-page-shell>
+
+@if (showLegalReview) {
+  <div class="legal-overlay" role="presentation" (click)="closeLegalReview()">
+    <section class="legal-dialog" role="dialog" aria-modal="true" aria-labelledby="professional-legal-review-title" (click)="$event.stopPropagation()">
+      <button type="button" class="dialog-close" aria-label="Close legal review" (click)="closeLegalReview()">×</button>
+      <p class="dialog-eyebrow">Account creation · Step 2 of 2</p>
+      <h2 id="professional-legal-review-title">Review how RepRoot Studio works</h2>
+      <p class="dialog-intro">Before we create your professional account, review and accept the documents that explain your responsibilities and how your data is handled.</p>
+      @if (legalVersion) {
+        <p class="legal-release">Effective {{ legalEffectiveDate }} · Version {{ legalVersion }}</p>
+      }
+
+      <div class="legal-links">
+        <a routerLink="/terms/professional" target="_blank" rel="noopener">
+          <strong>Professional Terms</strong>
+          <span>Account, client-data, payment, and platform responsibilities.</span>
+        </a>
+        <a routerLink="/privacy/professional" target="_blank" rel="noopener">
+          <strong>Professional Privacy Notice</strong>
+          <span>What RepRoot Studio processes, why it is used, and your choices.</span>
+        </a>
+      </div>
+
+      <label class="legal-check">
+        <input type="checkbox" [(ngModel)]="acceptedLegalDocuments">
+        <span>I have reviewed and accept the Professional Terms &amp; Conditions and Professional Privacy Notice.</span>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" class="secondary-action" (click)="closeLegalReview()" [disabled]="isSubmitting || isGoogleSubmitting">Back</button>
+        @if (pendingGoogleCredential) {
+          <button type="button" class="primary-action" (click)="confirmGoogleSignup()" [disabled]="!hasAcceptedLegalDocuments || isGoogleSubmitting">
+            {{ isGoogleSubmitting ? 'Creating account...' : 'Accept and Create Account' }}
+          </button>
+        } @else {
+          <button type="button" class="primary-action" (click)="confirmProfessionalAccountCreation()" [disabled]="!hasAcceptedLegalDocuments || isSubmitting">
+            {{ isSubmitting ? 'Creating account...' : 'Accept and Create Account' }}
+          </button>
+        }
+      </div>
+    </section>
+  </div>
+}
