@@ -19,6 +19,6 @@ button { min-height: 2.5rem; border-radius: var(--app-radius-md); padding: 0 .95
 .always { flex: 0 0 auto; border-radius: 2rem; padding: .25rem .55rem; background: var(--app-primary-soft); color: var(--app-primary-strong) !important; font-weight: 750; }
 .disabled { opacity: .75; }
 .detail { margin: 1rem 0 !important; }
-.cookie-launcher { position: fixed; left: .75rem; bottom: .75rem; min-height: 2rem; border: 1px solid var(--app-border); background: var(--app-surface); color: var(--app-muted); box-shadow: var(--app-shadow-sm); }
+.cookie-launcher { position: fixed; right: .75rem; bottom: .75rem; min-height: 2rem; border: 1px solid var(--app-border); background: var(--app-surface); color: var(--app-muted); box-shadow: var(--app-shadow-sm); }
 @media (max-width: 760px) { .cookie-banner { grid-template-columns: 1fr; } .cookie-actions { display: grid; grid-template-columns: 1fr 1fr; } .cookie-actions .primary { grid-column: span 2; } .category { align-items: flex-start; } }
 @media (max-width: 430px) { .cookie-actions, .cookie-settings footer { display: grid; grid-template-columns: 1fr; } .cookie-actions .primary { grid-column: auto; } .cookie-actions button, .cookie-settings footer button { width: 100%; } }
