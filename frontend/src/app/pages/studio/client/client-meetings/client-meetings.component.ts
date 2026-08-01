@@ -1,7 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 
+import { ClientApiService } from '@core/api/client-api.service';
+import { ClientReminder } from '@core/api/forms-groups-api.service';
 import { ScheduledMeetingRecord, SchedulingApiService } from '@core/api/scheduling-api.service';
 import { ClientPageShellComponent } from '@studio-shared/client-page-shell/client-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
@@ -16,11 +19,13 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 })
 export class ClientMeetingsComponent implements OnInit {
   private readonly schedulingApi = inject(SchedulingApiService);
+  private readonly clientApi = inject(ClientApiService);
   private readonly confirmation = inject(ConfirmationDialogService);
 
   isLoading = true;
   loadError = '';
   meetings: ScheduledMeetingRecord[] = [];
+  reminders: ClientReminder[] = [];
   message = '';
   messageType: 'success' | 'error' = 'success';
   respondingMeetingId: number | null = null;
@@ -43,9 +48,15 @@ export class ClientMeetingsComponent implements OnInit {
 
   private loadMeetings(): void {
     this.isLoading = true;
-    this.schedulingApi.getClientMeetings().subscribe({
+    forkJoin({
+      meetings: this.schedulingApi.getClientMeetings(),
+      dashboard: this.clientApi.getDashboard()
+    }).subscribe({
       next: (response) => {
-        this.meetings = response.meetings;
+        this.meetings = response.meetings.meetings;
+        this.reminders = [...response.dashboard.schedules].sort((left, right) =>
+          `${left.date}T${left.time || '23:59'}`.localeCompare(`${right.date}T${right.time || '23:59'}`)
+        );
         this.isLoading = false;
       },
       error: (error: unknown) => {
@@ -60,6 +71,10 @@ export class ClientMeetingsComponent implements OnInit {
     return this.meetings
       .filter((m) => m.status === 'scheduled' && new Date(m.start_at).getTime() >= now)
       .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+  }
+
+  isReminderOverdue(reminder: ClientReminder): boolean {
+    return new Date(`${reminder.date}T${reminder.time || '23:59'}`).getTime() < Date.now();
   }
 
   get pendingRequests(): ScheduledMeetingRecord[] {

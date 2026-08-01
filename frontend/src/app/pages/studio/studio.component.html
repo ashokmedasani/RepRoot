@@ -1,99 +1,24 @@
-<main class="landing-shell">
-  <nav class="landing-nav" aria-label="Studio page navigation">
-    <a class="brand" routerLink="/" aria-label="Back to RepRoot home">
-      <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
-      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span> <em>Studio</em></span>
-    </a>
-
-    <app-theme-switcher />
-  </nav>
-
-  <section class="hero" aria-labelledby="landing-title">
-    <div class="hero__content">
-      <p class="eyebrow">Part of the RepRoot family &middot; Professional and client management</p>
-      <h1 id="landing-title">A professional workspace for professionals, clients, goals, and measurable progress.</h1>
-      <p class="hero__summary">
-        {{ appName }} helps professionals manage leads, groups, clients, targets, and progress tracking from one
-        premium SaaS workspace. Clients can log in to view their profile, goals, daily targets, weekly targets,
-        monthly targets, and submit progress updates.
-      </p>
-
-      <div class="hero__actions">
-        <a class="primary-action" [routerLink]="launchRoute" aria-label="Go to professional and client login page">
-          Launch Studio
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
-    </div>
-
-    <div class="hero-panel" aria-label="Platform overview preview">
-      <div class="hero-panel__header">
-        <span>Today</span>
-        <strong>Training Operations</strong>
-      </div>
-
-      <div class="metric-grid">
-        <article class="metric-card">
-          <span>Leads</span>
-          <strong>24</strong>
-          <small>6 ready for follow-up</small>
-        </article>
-        <article class="metric-card">
-          <span>Clients</span>
-          <strong>118</strong>
-          <small>82 active this month</small>
-        </article>
-        <article class="metric-card">
-          <span>Targets</span>
-          <strong>91%</strong>
-          <small>weekly completion</small>
-        </article>
-        <article class="metric-card">
-          <span>Progress</span>
-          <strong>43</strong>
-          <small>updates submitted</small>
-        </article>
-      </div>
-    </div>
+<main class="studio-site">
+  <app-public-site-header brand="studio" />
+  <section id="overview" class="hero section" aria-labelledby="studio-title">
+    <div><a class="parent-link" [href]="publicSite.parentUrl">A product by RepRoot <span aria-hidden="true">↗</span></a><p class="eyebrow">Professional-client workflow management</p><h1 id="studio-title">Build a clearer workflow between professionals and clients.</h1><p class="lead">RepRoot Studio gives professionals a flexible place to collect client information, organize relationships, create recurring workflows, share resources, and track progress based on the way they work.</p><div class="actions"><a class="button primary" routerLink="/portal">Launch Studio</a><a class="button secondary" href="#workflow">See how it works</a></div><a class="signin-link" routerLink="/portal">Already have an account? Sign in</a></div>
+    <div class="relationship-map" aria-label="RepRoot Studio workflow preview"><strong>Professional space</strong><div><span>Enquiries</span><span>Clients</span><span>Templates</span></div><i aria-hidden="true">Connected workflow</i><div><span>Updates</span><span>Resources</span><span>Meetings</span></div><strong>Client portal</strong></div>
   </section>
 
-  <section class="feature-section" aria-label="Platform capabilities">
-    <article class="feature-column">
-      <div class="section-heading">
-        <span class="section-heading__icon" aria-hidden="true">P</span>
-        <div>
-          <p class="eyebrow">For professionals</p>
-          <h2>Run the business side of coaching with clarity.</h2>
-        </div>
-      </div>
+  <section class="section audience" aria-labelledby="audience-title"><div><p class="eyebrow">Who Studio is for</p><h2 id="audience-title">For professionals who manage continuing client relationships.</h2><p>Studio provides building blocks that can adapt across professional categories. It is not limited to fitness, coaching, or one fixed service format.</p></div><ul>@for (audience of audiences; track audience) { <li>{{ audience }}</li> }</ul></section>
 
-      <div class="feature-list">
-        @for (feature of professionalFeatures; track feature.title) {
-          <div class="feature-card">
-            <strong>{{ feature.title }}</strong>
-            <p>{{ feature.description }}</p>
-          </div>
-        }
-      </div>
-    </article>
+  <section id="workflow" class="section workflow" aria-labelledby="workflow-title"><p class="eyebrow">How it works</p><h2 id="workflow-title">From first enquiry to an organized ongoing relationship.</h2><div class="workflow-list">@for (step of workflow; track step.title; let index = $index) { <article><span>{{ index + 1 }}</span><div><h3>{{ step.title }}</h3><p>{{ step.description }}</p></div></article> }</div></section>
 
-    <article class="feature-column">
-      <div class="section-heading">
-        <span class="section-heading__icon" aria-hidden="true">C</span>
-        <div>
-          <p class="eyebrow">For clients</p>
-          <h2>Give every client a focused place to follow the plan.</h2>
-        </div>
-      </div>
+  <section id="features" class="section features" aria-labelledby="features-title"><p class="eyebrow">Verified product capabilities</p><h2 id="features-title">One relationship-centered workspace.</h2><p class="intro">These capabilities reflect working areas already present in RepRoot Studio. Availability and capacity can depend on account role and plan.</p><div class="feature-grid">@for (feature of features; track feature.title) { <article><h3>{{ feature.title }}</h3><p>{{ feature.description }}</p></article> }</div></section>
 
-      <div class="feature-list">
-        @for (feature of clientFeatures; track feature.title) {
-          <div class="feature-card">
-            <strong>{{ feature.title }}</strong>
-            <p>{{ feature.description }}</p>
-          </div>
-        }
-      </div>
-    </article>
-  </section>
+  <section id="professionals" class="section split-section" aria-labelledby="professional-title"><div><p class="eyebrow">For professionals</p><h2 id="professional-title">Your profession. Your structure. Your workflow.</h2></div><div><p>Professionals decide what information to request, how clients are organized, which recurring records are useful, and what resources are shared. Studio supports that process without forcing every profession into one template.</p><ul><li>Review enquiries before creating access.</li><li>Keep each client’s forms, work, conversations, meetings, and payment records in context.</li><li>Use private professional notes where supported.</li><li>Retain responsibility for professional judgment and appropriate data collection.</li></ul></div></section>
+
+  <section id="clients" class="section split-section client-section" aria-labelledby="client-title"><div><p class="eyebrow">For clients</p><h2 id="client-title">A focused place for the work shared with you.</h2></div><div><p>Clients can view assigned expectations, complete recurring updates, review shared information, message their professional, request available meetings, and respond to payment requests.</p><p>The professional designs the workflow. RepRoot Studio provides the platform and access controls; it does not replace professional advice or judgment.</p></div></section>
+
+  <section class="section trust" aria-labelledby="trust-title"><p class="eyebrow">Trust and data responsibility</p><h2 id="trust-title">Clear roles support responsible use.</h2><div class="trust-grid"><article><strong>RepRoot Studio</strong><p>Provides software, account controls, security measures, and structured professional-client workflows.</p></article><article><strong>Professionals</strong><p>Determine what client information they request and remain responsible for using the platform appropriately within their field.</p></article><article><strong>Clients</strong><p>Review requests and submit information knowingly within the relationship established with their professional.</p></article></div></section>
+
+  <section id="faq" class="section faq" aria-labelledby="faq-title"><p class="eyebrow">Frequently asked questions</p><h2 id="faq-title">A few useful distinctions.</h2><details><summary>Is a lead already a client?</summary><p>No. A lead is an applicant or enquiry. The professional reviews the submission and decides whether to create client access.</p></details><details><summary>Why does Studio use groups?</summary><p>A group organizes clients around a shared program, service, cohort, goal, location, or onboarding process.</p></details><details><summary>Is a requested meeting confirmed immediately?</summary><p>No. A client request remains pending until the professional accepts it.</p></details><details><summary>Does Studio process manual payments?</summary><p>No. For manual methods, clients pay using the professional’s external instructions and submit information for review. Integrated processing must be separately enabled before it can be described as active.</p></details></section>
+
+  <section class="section final-cta"><p class="eyebrow">Start with Studio</p><h2>Ready to organize your professional-client workflow?</h2><div class="actions"><a class="button primary" routerLink="/portal">Launch Studio</a><a class="button secondary" [href]="publicSite.parentUrl">Explore RepRoot</a></div></section>
+  <app-public-site-footer brand="studio" />
 </main>

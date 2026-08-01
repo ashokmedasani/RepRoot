@@ -28,8 +28,14 @@ export class LegalPageComponent implements OnInit {
     this.authApi.getLegalConfiguration().subscribe({
       next: (configuration) => {
         const role = this.audience === 'client' ? configuration.client : configuration.professional;
-        this.legalVersion = role.version;
-        this.lastUpdated = this.formatEffectiveDate(configuration.effective_date);
+        this.legalVersion = role.version?.trim() || 'Current published version';
+        this.lastUpdated = configuration.effective_date?.trim()
+          ? this.formatEffectiveDate(configuration.effective_date)
+          : 'Effective date temporarily unavailable';
+      },
+      error: () => {
+        this.legalVersion = 'Current published version';
+        this.lastUpdated = 'Effective date temporarily unavailable';
       }
     });
   }

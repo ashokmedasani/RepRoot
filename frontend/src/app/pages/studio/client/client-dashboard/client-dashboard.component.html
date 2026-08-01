@@ -26,8 +26,8 @@
 
     <section class="dashboard-panel meetings-panel">
       <header>
-        <div><h2>Meetings</h2><p>Your pending requests and confirmed upcoming meetings.</p></div>
-        <a routerLink="/client/meetings" class="ghost-action">Open Meetings</a>
+        <div><h2>Meetings &amp; Reminders</h2><p>Meeting requests, confirmed sessions, and professional reminders in one place.</p></div>
+        <a routerLink="/client/meetings" class="ghost-action">Open All</a>
       </header>
       <div class="dashboard-meeting-list">
         @for (meeting of pendingMeetingRequests; track meeting.id) {
@@ -48,9 +48,9 @@
       </div>
     </section>
 
-    <section class="dashboard-panel schedules-panel">
+    <section class="dashboard-panel schedules-panel" aria-label="Reminder preview">
       <header>
-        <div><h2>Schedules</h2><p>Overdue items are separated from the nearest upcoming activities.</p></div>
+        <div><h3>Reminder preview</h3><p>Overdue reminders are separated from upcoming activities.</p></div>
         <div class="schedule-summary">
           @if (summary.overdue) { <span class="overdue-count">{{ summary.overdue }} overdue</span> }
           <span>{{ schedules.length }} pending</span>
@@ -70,7 +70,7 @@
               <time>{{ schedule.date | date: 'mediumDate' }}</time>
               <span>{{ schedule.time || 'Time not set' }}</span>
               <span class="status-pill" [class.overdue]="isOverdue(schedule)">{{ isOverdue(schedule) ? 'Overdue' : schedule.status }}</span>
-              <a routerLink="/client/profile" [queryParams]="{ tab: 'professional' }" class="ghost-action">Open Details</a>
+              <a routerLink="/client/meetings" class="ghost-action">Open Details</a>
             </article>
           } @empty { <p class="empty-state">No upcoming schedules.</p> }
         </div>

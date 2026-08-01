@@ -230,14 +230,6 @@ h3 {
   background: var(--app-surface);
 }
 
-.dash-chart-row {
-  display: grid;
-}
-
-.dash-chart-row app-chart-renderer {
-  min-width: 0;
-}
-
 .summary-tile span {
   color: var(--app-muted);
   font-size: 0.72rem;
@@ -306,16 +298,6 @@ h3 {
   .record-reference,
   .record-row time { grid-column: 1; }
   .record-side { grid-column: 2; grid-row: 1 / span 3; }
-}
-
-.visibility-tag {
-  border-radius: var(--app-radius-pill);
-  padding: 0.2rem 0.5rem;
-  background: var(--app-surface-soft);
-  color: var(--app-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
 }
 
 .status-pill[data-status='completed'] {
@@ -396,21 +378,18 @@ h3 {
   gap: 0.4rem;
 }
 
-.method-check,
-.visibility-check {
+.method-check {
   display: flex !important;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
 }
 
-.method-check input,
-.visibility-check input {
+.method-check input {
   width: auto;
 }
 
-.method-check span,
-.visibility-check span {
+.method-check span {
   color: var(--app-text);
   font-size: 0.88rem;
 }
@@ -495,11 +474,6 @@ h3 {
   white-space: nowrap;
 }
 
-.status-pill[data-status='completed'] {
-  background: #e7f6ed;
-  color: #18794e;
-}
-
 .status-pill[data-status='sent'],
 .status-pill[data-status='viewed'],
 .status-pill[data-status='proof_submitted'],
@@ -519,47 +493,6 @@ h3 {
 .status-pill[data-status='overdue'] {
   background: #fff0ef;
   color: #b42318;
-}
-
-.status-pill[data-status='refunded'] {
-  background: var(--app-surface-soft);
-  color: var(--app-muted);
-}
-
-.reconciliation-banner {
-  display: grid;
-  gap: 0.6rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ffd28a;
-  border-radius: var(--app-radius-lg);
-  padding: 0.85rem 1rem;
-  background: #fff9ef;
-}
-
-.reconciliation-banner.all-logged {
-  border-color: var(--app-border);
-  background: var(--app-surface-soft);
-}
-
-.reconciliation-banner p {
-  margin: 0;
-  color: var(--app-text);
-  font-size: 0.88rem;
-}
-
-.unlogged-list {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.unlogged-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  padding-top: 0.4rem;
-  font-size: 0.85rem;
 }
 
 .primary-action.compact {
@@ -747,15 +680,10 @@ h3 {
   font-weight: 800;
 }
 
-.form-hint,
-.outcome-hint {
+.form-hint {
   margin: 0;
   color: var(--app-muted);
   font-size: 0.85rem;
-}
-
-.outcome-hint strong {
-  color: var(--app-primary-strong);
 }
 
 .danger-action {

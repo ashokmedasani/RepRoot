@@ -1,9 +1,7 @@
 <main class="legal-page">
   <header class="legal-topbar">
     <a [routerLink]="audience === 'platform' ? '/' : '/portal'" class="brand">
-      @if (audience !== 'platform') {
-        <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
-      }
+      <span class="brand__mark"><img [src]="audience === 'platform' ? '/brand/reproot/mark.png' : '/brand/studio/mark.png'" alt=""></span>
       <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span>@if (audience !== 'platform') { <span> Studio</span> }</span>
     </a>
     <nav class="legal-nav" aria-label="Legal documents">

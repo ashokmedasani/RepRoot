@@ -1,66 +1,35 @@
-import { Component, ElementRef, HostListener } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, ElementRef, HostListener, OnInit, inject } from '@angular/core';
 
-import { ThemeSwitcherComponent } from '@shared/theme-switcher/theme-switcher.component';
+import { PUBLIC_SITE, publicSupportEmail } from '@core/config/public-site.config';
+import { PublicPageSeoService } from '@core/seo/public-page-seo.service';
+import { PublicSiteFooterComponent } from '@shared/public-site-footer/public-site-footer.component';
+import { PublicSiteHeaderComponent } from '@shared/public-site-header/public-site-header.component';
 
-interface StudioFeature {
-  label: string;
-}
-
-interface BrandValue {
-  label: string;
-}
-
-@Component({
-  selector: 'app-home',
-  standalone: true,
-  imports: [RouterLink, ThemeSwitcherComponent],
-  templateUrl: './home.component.html',
-  styleUrl: './home.component.scss'
-})
-export class HomeComponent {
-  readonly supportEmail = window.APP_CONFIG?.supportEmail || '';
-
-  readonly studioFeatures: StudioFeature[] = [
-    { label: 'Client Management' },
-    { label: 'Custom Forms' },
-    { label: 'Progress Tracking' },
-    { label: 'Communication' },
-    { label: 'Notes' },
-    { label: 'Groups' },
-    { label: 'Payments' },
-    { label: 'Dashboard' },
-    { label: 'Reports' }
-  ];
-
-  readonly values: BrandValue[] = [
-    { label: 'Simplicity' },
-    { label: 'Trust' },
-    { label: 'Transparency' },
-    { label: 'Progress' },
-    { label: 'Consistency' },
-    { label: 'Relationships' },
-    { label: 'Privacy' },
-    { label: 'Innovation' }
+@Component({ selector: 'app-home', standalone: true, imports: [PublicSiteFooterComponent, PublicSiteHeaderComponent], templateUrl: './home.component.html', styleUrl: './home.component.scss' })
+export class HomeComponent implements OnInit {
+  private readonly seo = inject(PublicPageSeoService);
+  readonly publicSite = PUBLIC_SITE;
+  readonly supportEmail = publicSupportEmail('reproot');
+  readonly pillars = [
+    { title: 'Simplify', description: 'Reduce repetitive administrative, recording, and tracking work.' },
+    { title: 'Organize', description: 'Bring recurring information and workflows into clear, structured systems.' },
+    { title: 'Connect', description: 'Support clearer, more consistent relationships between people who work together.' },
+    { title: 'Build', description: 'Create practical products and services around real workflow problems.' }
   ];
 
   constructor(private readonly hostRef: ElementRef<HTMLElement>) {}
 
-  // Same-page "#section" links: intercept and scroll instantly. The global
-  // `scroll-behavior: smooth` in styles.scss is silently dropped in some
-  // environments (headless/automated browsers, reduced-motion setups), so
-  // relying on native anchor scrolling alone leaves the click doing nothing.
+  ngOnInit(): void {
+    this.seo.apply({ title: 'RepRoot | Practical Technology for Better Workflows', description: 'RepRoot creates digital products and services that reduce repetitive work, organize essential information, and support meaningful professional progress.', canonical: this.publicSite.parentUrl });
+  }
+
   @HostListener('click', ['$event'])
   onHostClick(event: MouseEvent): void {
     const anchor = (event.target as HTMLElement)?.closest('a[href^="#"]');
     if (!anchor) return;
-
-    const id = anchor.getAttribute('href')!.slice(1);
-    const target = this.hostRef.nativeElement.querySelector(`#${id}`) || document.getElementById(id);
+    const target = this.hostRef.nativeElement.querySelector(anchor.getAttribute('href') || '');
     if (!target) return;
-
     event.preventDefault();
-    target.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
-    history.replaceState(null, '', `#${id}`);
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }

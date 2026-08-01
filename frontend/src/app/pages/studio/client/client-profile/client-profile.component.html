@@ -37,12 +37,14 @@
             <h2>Client Information</h2>
             <p>Your account identity and group registration details.</p>
           </div>
+          <div class="profile-header-actions">
           <label class="dp-avatar compact-avatar" title="Upload your photo">
             @if (client.photo) { <img [src]="client.photo" alt="Your profile photo"> }
             @else { <span>{{ (client.first_name || '?').charAt(0) }}{{ (client.last_name || '').charAt(0) }}</span> }
             <span class="dp-edit">Photo</span>
             <input type="file" accept="image/*" (change)="onPhotoSelected($event)" class="visually-hidden">
           </label>
+          </div>
         </div>
 
         <div class="detail-grid identity-grid">
@@ -57,12 +59,10 @@
           <article><span>Reference ID</span><strong>{{ client.reference_id }}</strong></article>
         </div>
 
-        <div class="details-heading">
-          <h2>Registration Details</h2>
-          @if (!isEditingDetails && !hasPendingChangeRequest && editableFields().length) {
-            <button type="button" class="secondary-action" (click)="startDetailEdit()">Request an edit</button>
-          }
-        </div>
+        @if (!isEditingDetails && !hasPendingChangeRequest) {
+          <div class="profile-edit-row"><button type="button" class="secondary-action" (click)="beginProfileEdit()">Edit Profile</button></div>
+        }
+        <div class="details-heading"><h2>Registration Details</h2></div>
 
         @if (hasPendingChangeRequest) {
           <p class="status-banner pending">Your edit request is awaiting your professional's approval. You can't submit another until it's reviewed.</p>
@@ -136,31 +136,13 @@
 
       @if (settingsTab === 'legal') {
       <section class="portal-card settings-section">
-        <div class="card-header"><div><h2>Privacy & Legal</h2><p>Review the policies that govern your account and coaching information.</p></div></div>
-        <div class="legal-links">
-          <a routerLink="/terms/client" target="_blank" rel="noopener"><strong>Client Terms</strong><span>Client responsibilities and the professional relationship</span></a>
-          <a routerLink="/privacy/client" target="_blank" rel="noopener"><strong>Client Privacy Notice</strong><span>How profile, health-context, and activity data are handled</span></a>
+        <div class="card-header"><div><h2>Privacy &amp; Legal</h2><p>Review your legal documents and latest acceptance.</p></div></div>
+        <div class="legal-summary">
+          <div class="legal-summary-row"><span>Privacy Policy</span><a routerLink="/privacy/client" target="_blank" rel="noopener">View</a></div>
+          <div class="legal-summary-row"><span>Terms &amp; Conditions</span><a routerLink="/terms/client" target="_blank" rel="noopener">View</a></div>
+          <div class="legal-summary-row"><span>Last legal acceptance</span><strong>{{ latestLegalAcceptanceDate ? (latestLegalAcceptanceDate | date: 'medium') : 'Not recorded' }}</strong></div>
+          <div class="legal-summary-row"><span>Accepted document version</span><strong>{{ latestLegalDocumentVersion || 'Not recorded' }}</strong></div>
         </div>
-        @if (client.legal_acceptance_history.length) {
-          <div class="acceptance-history">
-            <h3>Your acceptance history</h3>
-            <p>Dates and times are displayed in your current local time.</p>
-            @for (record of client.legal_acceptance_history; track record.accepted_at) {
-              <div class="acceptance-row">
-                <span>Terms and Privacy version {{ record.legal_document_version }}</span>
-                <strong>{{ record.accepted_at | date: 'medium' }}</strong>
-              </div>
-            }
-          </div>
-        } @else if (client.terms_accepted_at) {
-          <div class="acceptance-history">
-            <h3>Current acceptance</h3>
-            <div class="acceptance-row">
-              <span>Terms and Privacy version {{ client.legal_document_version }}</span>
-              <strong>{{ client.terms_accepted_at | date: 'medium' }}</strong>
-            </div>
-          </div>
-        }
       </section>
       }
 

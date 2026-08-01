@@ -180,6 +180,7 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
 SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '').strip()
+STUDIO_SUPPORT_EMAIL = os.environ.get('STUDIO_SUPPORT_EMAIL', 'studio.support@rep-root.com').strip()
 ERROR_ALERT_EMAIL = os.environ.get('ERROR_ALERT_EMAIL', SUPPORT_EMAIL).strip()
 MEETING_FROM_EMAIL = os.environ.get('MEETING_FROM_EMAIL', DEFAULT_FROM_EMAIL).strip()
 
@@ -452,7 +453,9 @@ RAZORPAY_BASE_URL = os.environ.get('RAZORPAY_BASE_URL', 'https://api.razorpay.co
 RAZORPAY_PERSONAL_LINK = os.environ.get('RAZORPAY_PERSONAL_LINK', '')
 REPROOT_BILLING_PROVIDER = os.environ.get('REPROOT_BILLING_PROVIDER', 'razorpay').strip().lower()
 REPROOT_ADS_ENABLED = False
-REPROOT_PAYMENTS_ENABLED = True
+# Payment mutations stay locked for the testing launch. Enable only after the
+# selected provider, webhook verification, and production credentials are ready.
+REPROOT_PAYMENTS_ENABLED = os.environ.get('REPROOT_PAYMENTS_ENABLED', 'False').lower() == 'true'
 
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')

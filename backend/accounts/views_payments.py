@@ -14,10 +14,11 @@ from django.db.models import Sum
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import permissions, status
+from rest_framework.exceptions import APIException
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
-from rest_framework.views import APIView
+from rest_framework.views import APIView as DRFAPIView
 
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient
 from .access_permissions import ProfessionalAccessPermission
@@ -52,6 +53,31 @@ from .serializers import (
   ProfessionalPaymentSettingsSerializer,
   detect_upload_content_type,
 )
+
+
+class PaymentsUnavailable(APIException):
+  status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+  default_detail = 'Payments are locked during the testing period.'
+  default_code = 'payments_locked'
+
+
+class APIView(DRFAPIView):
+  """Read access remains available while every payment-data mutation is locked.
+
+  Notification read/clear actions opt out below because they change only a
+  recipient's inbox state, not payment or financial records.
+  """
+
+  allow_locked_mutations = False
+
+  def initial(self, request, *args, **kwargs):
+    super().initial(request, *args, **kwargs)
+    if (
+      request.method not in permissions.SAFE_METHODS
+      and not settings.REPROOT_PAYMENTS_ENABLED
+      and not self.allow_locked_mutations
+    ):
+      raise PaymentsUnavailable()
 
 
 def _currency_options():
@@ -645,6 +671,7 @@ class ClientPaymentRequestDetailView(APIView):
 
 
 class ProfessionalPaymentNotificationsView(APIView):
+  allow_locked_mutations = True
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
@@ -667,6 +694,7 @@ class ProfessionalPaymentNotificationsView(APIView):
 
 
 class ClientPaymentNotificationsView(APIView):
+  allow_locked_mutations = True
   authentication_classes = [ClientTokenAuthentication]
   permission_classes = [IsAuthenticatedClient]
 

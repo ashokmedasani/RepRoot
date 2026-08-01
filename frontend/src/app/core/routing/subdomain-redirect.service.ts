@@ -24,7 +24,9 @@ export class SubdomainRedirectService {
 
       const host = window.location.hostname;
       if (host.startsWith('studio.')) {
-        void this.router.navigateByUrl('/studio', { replaceUrl: true });
+        // Render the Studio homepage while keeping its canonical public URL at
+        // the root of the Studio subdomain. `_studio-home` is internal only.
+        void this.router.navigateByUrl('/_studio-home', { skipLocationChange: true, replaceUrl: true });
       } else if (host.startsWith('operate.')) {
         void this.router.navigateByUrl('/admin-portal/login', { replaceUrl: true });
       }

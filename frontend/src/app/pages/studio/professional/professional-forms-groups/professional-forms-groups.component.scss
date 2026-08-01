@@ -1,5 +1,4 @@
 .section-heading,
-.panel-title,
 .fields-header,
 .group-row,
 .group-summary,
@@ -101,20 +100,10 @@ h3 {
   gap: 1.1rem;
 }
 
-.panel-title {
-  align-items: baseline;
-}
-
-.form-name-block span,
 .form-link-box span {
   color: var(--app-text);
   font-size: 0.82rem;
   font-weight: 700;
-}
-
-.form-name-block h3 {
-  margin-top: 0.35rem;
-  font-size: 1.45rem;
 }
 
 .form-link-box {
@@ -502,11 +491,6 @@ tr:last-child td {
   font-weight: 700;
 }
 
-.group-reorder {
-  display: flex;
-  gap: 0.4rem;
-}
-
 .drag-hint {
   color: var(--app-muted);
   font-weight: 600;
@@ -592,16 +576,9 @@ tr:last-child td {
   padding: 0 0.85rem;
   font-weight: 700;
   text-decoration: none;
-}
-
-.icon-action {
   border: 1px solid var(--app-border);
   background: var(--app-surface);
   color: var(--app-text);
-}
-
-.success-action {
-  color: var(--app-success);
 }
 
 .danger-action {
@@ -635,7 +612,6 @@ tr:last-child td {
 .meeting-rule-grid span { color: var(--app-muted); font-size: 0.76rem; font-weight: 700; text-transform: uppercase; }
 .meeting-rule-grid strong { color: var(--app-text); }
 .meeting-settings-action { width: fit-content; }
-.inactive-status { background: var(--app-surface-soft); color: var(--app-muted); }
 .lead-meeting-preview, .overdue-meetings { display: grid; gap: 0.65rem; border-top: 1px solid var(--app-border); padding-top: 1rem; }
 .preview-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
 .preview-heading h3 { margin: 0; color: var(--app-text); }
@@ -664,18 +640,6 @@ dd {
   font-weight: 700;
 }
 
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.dynamic-fields {
-  display: grid;
-  gap: 0.8rem;
-  margin: 1rem 0;
-}
-
 label {
   display: grid;
   gap: 0.4rem;
@@ -701,9 +665,8 @@ textarea {
 
 @media (max-width: 980px) {
   .lead-panel,
-  .stats-grid,
-  .meeting-rule-grid,
-  .form-grid {
+.stats-grid,
+.meeting-rule-grid {
     grid-template-columns: 1fr;
   }
 
@@ -732,12 +695,19 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+.lead-form-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .workspace-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.8rem;
-  margin-bottom: 1rem;
 }
 
 .workspace-actions span {
@@ -748,8 +718,8 @@ textarea {
 
 .lead-form-select {
   display: grid;
+  flex: 1 1 24rem;
   gap: 0.35rem;
-  margin-bottom: 1rem;
   max-width: 24rem;
 }
 
@@ -762,9 +732,25 @@ textarea {
 }
 
 .lead-form-select select {
+  width: 100%;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-md);
   padding: 0.6rem 0.75rem;
   background: var(--app-surface);
   font-size: 0.92rem;
+}
+
+@media (max-width: 720px) {
+  .lead-form-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lead-form-select {
+    max-width: none;
+  }
+
+  .workspace-actions {
+    justify-content: space-between;
+  }
 }

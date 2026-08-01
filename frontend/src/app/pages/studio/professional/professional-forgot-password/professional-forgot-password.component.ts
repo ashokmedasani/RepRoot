@@ -193,7 +193,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
         this.clearResendTimer();
         this.isVerifyingOtp = false;
       },
-      error: (error: unknown) => {
+      error: () => {
         this.resetToken = '';
         this.resetOtpStatus = 'failed';
         this.resetFieldErrors.otp = 'OTP is not verified. Please try again.';

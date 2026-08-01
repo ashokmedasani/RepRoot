@@ -711,6 +711,18 @@ class ScheduledMeetingListView(APIView):
     )
     for guest_client in guest_clients:
       ScheduledMeetingGuest.objects.create(meeting=meeting, client=guest_client)
+      notify_client(
+        guest_client,
+        category='meetings',
+        event_type='meeting.scheduled',
+        event_key=f'meeting:{meeting.pk}:guest:{guest_client.pk}:scheduled',
+        title='Meeting invitation',
+        body=meeting.title,
+        action_url=web_routes.client_meeting(meeting.pk),
+        payload={'meeting_id': meeting.pk, 'guest_client_id': guest_client.pk},
+        requires_action=True,
+        priority='high',
+      )
 
     invite_note = ''
     try:

@@ -60,12 +60,6 @@ input {
   border: 1px solid color-mix(in srgb, var(--app-primary) 15%, transparent);
 }
 
-.error-message {
-  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
-  color: #d92d20;
-  border-color: color-mix(in srgb, #d92d20 20%, transparent);
-}
-
 .top-message {
   margin-bottom: 1.25rem;
 }

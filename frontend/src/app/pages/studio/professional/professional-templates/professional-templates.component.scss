@@ -147,27 +147,6 @@ p {
   font-size: 0.86rem;
 }
 
-.template-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.template-stats span {
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-pill);
-  padding: 0.22rem 0.6rem;
-  background: var(--app-surface);
-  color: var(--app-muted);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.template-actions {
-  display: flex;
-  gap: 0.6rem;
-}
-
 .template-list {
   display: grid;
   gap: 0.6rem;
@@ -299,10 +278,6 @@ p {
   transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
 }
 
-.locked-grid {
-  margin-top: 1rem;
-}
-
 .template-card.locked {
   opacity: 0.85;
 }
@@ -330,10 +305,6 @@ p {
   color: var(--app-success);
   font-size: 0.78rem;
   font-weight: 700;
-}
-
-.empty-card {
-  border-left-color: var(--app-border);
 }
 
 /* Primary/secondary buttons come from the global premium button styles. */

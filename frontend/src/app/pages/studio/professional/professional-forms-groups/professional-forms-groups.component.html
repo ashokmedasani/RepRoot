@@ -43,24 +43,26 @@
       </nav>
 
       @if (activeWorkspaceTab === 'forms') {
-      <div class="workspace-actions">
-        <span>{{ overview.lead_forms.length }} / {{ overview.max_lead_forms }} forms used</span>
-        <a routerLink="/professional/forms/create" [queryParams]="{ new: 1 }" class="primary-action">Create Form</a>
-      </div>
-      @if (overview.lead_forms.length > 1) {
-        <label class="lead-form-select">
-          <span>Viewing form</span>
-          <select
-            aria-label="Select lead form"
-            [ngModel]="selectedLeadFormId"
-            (ngModelChange)="selectLeadForm($event)"
-            name="selectedLeadForm"
-          >
-            @for (form of overview.lead_forms; track form.id) {
-              <option [ngValue]="form.id">{{ form.title }} ({{ form.is_active ? 'Active' : 'Disabled' }})</option>
-            }
-          </select>
-        </label>
+      @if (overview.lead_forms.length) {
+        <div class="lead-form-toolbar">
+          <label class="lead-form-select">
+            <span>Viewing form</span>
+            <select
+              aria-label="Select lead form"
+              [ngModel]="selectedLeadFormId"
+              (ngModelChange)="selectLeadForm($event)"
+              name="selectedLeadForm"
+            >
+              @for (form of overview.lead_forms; track form.id) {
+                <option [ngValue]="form.id">{{ form.title }} ({{ form.is_active ? 'Active' : 'Disabled' }})</option>
+              }
+            </select>
+          </label>
+          <div class="workspace-actions">
+            <span>{{ overview.lead_forms.length }} / {{ overview.max_lead_forms }} forms used</span>
+            <a routerLink="/professional/forms/create" [queryParams]="{ new: 1 }" class="primary-action">Create Form</a>
+          </div>
+        </div>
       }
       @if (!overview.has_lead_form) {
         <section class="empty-state" aria-labelledby="empty-form-title">

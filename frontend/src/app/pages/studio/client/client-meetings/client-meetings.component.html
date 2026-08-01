@@ -1,14 +1,14 @@
 <app-client-page-shell
-  title="Meetings"
+  title="Meetings & Reminders"
   eyebrow="Client Portal"
-  subtitle="Review your scheduled sessions and let your professional know if you're coming."
+  subtitle="Review meeting invitations, requests, and reminders shared by your professional."
   activeSection="meetings"
   titleId="client-meetings-title">
 
   <button page-actions type="button" class="primary-action" (click)="openRequestForm()">Request a Meeting</button>
 
   @if (isLoading) {
-    <p class="state-note">Loading your meetings...</p>
+    <p class="state-note">Loading your meetings and reminders...</p>
   } @else if (loadError) {
     <p class="message error-message">{{ loadError }}</p>
   } @else {
@@ -73,6 +73,28 @@
         </div>
       } @else {
         <p class="empty-note">No upcoming meetings scheduled.</p>
+      }
+    </section>
+
+    <section class="meetings-section reminders-section">
+      <h2>Reminders</h2>
+      @if (reminders.length) {
+        <div class="meeting-list">
+          @for (reminder of reminders; track reminder.id) {
+            <article class="meeting-card reminder-card" [class.overdue]="isReminderOverdue(reminder)">
+              <div class="meeting-main">
+                <strong>{{ reminder.title }}</strong>
+                <small>{{ reminder.date | date: 'EEE, MMM d, y' }} @if (reminder.time) { &middot; {{ reminder.time }} }</small>
+                @if (reminder.notes) { <small class="notes">{{ reminder.notes }}</small> }
+              </div>
+              <span class="status-pill" [attr.data-status]="isReminderOverdue(reminder) ? 'overdue' : reminder.status">
+                {{ isReminderOverdue(reminder) ? 'Overdue' : reminder.status }}
+              </span>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No pending reminders.</p>
       }
     </section>
 

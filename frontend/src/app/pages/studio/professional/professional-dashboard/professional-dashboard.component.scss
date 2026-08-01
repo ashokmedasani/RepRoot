@@ -4,8 +4,6 @@ p {
 }
 
 .panel,
-.accordion-panel,
-.overview-panel,
 .activity-card {
   border: 1px solid var(--app-border);
   border-radius: var(--app-panel-radius);
@@ -16,7 +14,6 @@ p {
 }
 
 .panel h2,
-.overview-title h2,
 .panel-heading h2 {
   color: var(--app-text);
   font-size: 1.1rem;
@@ -25,20 +22,11 @@ p {
 }
 
 .panel p,
-.overview-title p,
 .panel-heading p {
   color: var(--app-muted);
   font-size: 0.88rem;
   font-weight: 500;
   margin-top: 0.25rem;
-}
-
-/* ---- KPI cards ---- */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.85rem;
-  margin-bottom: 1.5rem;
 }
 
 .action-required {
@@ -101,174 +89,6 @@ p {
   .action-required-links {
     justify-content: flex-start;
   }
-}
-
-.kpi-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
-  background: var(--app-card-bg-gradient);
-  box-shadow: var(--app-shadow-sm);
-  padding: 1rem;
-  transition: all var(--app-transition-normal);
-  animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--app-shadow-lg);
-  border-color: color-mix(in srgb, var(--app-primary) 25%, var(--app-border));
-}
-
-.kpi-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: var(--app-radius-lg);
-  transition: transform var(--app-transition-fast);
-}
-
-.kpi-card:hover .kpi-icon {
-  transform: scale(1.05);
-}
-
-.kpi-icon svg {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.kpi-icon.clients {
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-  box-shadow: 0 4px 10px rgba(11, 125, 227, 0.12);
-}
-
-.kpi-icon.groups {
-  background: color-mix(in srgb, #7a5af8 12%, var(--app-surface-soft));
-  color: #7a5af8;
-  box-shadow: 0 4px 10px rgba(122, 90, 248, 0.12);
-}
-
-.kpi-icon.templates {
-  background: color-mix(in srgb, var(--app-success) 12%, var(--app-surface-soft));
-  color: var(--app-success);
-  box-shadow: 0 4px 10px rgba(31, 157, 99, 0.12);
-}
-
-.kpi-icon.requests {
-  background: color-mix(in srgb, #f79009 12%, var(--app-surface-soft));
-  color: #b54708;
-  box-shadow: 0 4px 10px rgba(247, 144, 9, 0.12);
-}
-
-.kpi-icon.programs {
-  background: color-mix(in srgb, #0ea5e9 12%, var(--app-surface-soft));
-  color: #0369a1;
-  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.12);
-}
-
-.kpi-copy {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
-}
-
-.kpi-copy > span {
-  color: var(--app-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--app-tracking-wide);
-}
-
-.kpi-copy strong {
-  color: var(--app-text);
-  font-size: 1.6rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.kpi-copy small {
-  color: var(--app-muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.kpi-copy small.up {
-  color: var(--app-success);
-  font-weight: 700;
-}
-
-/* ---- Schedule Overview panel ---- */
-.overview-panel {
-  margin-bottom: 1.5rem;
-}
-
-.overview-head {
-  margin-bottom: 1.25rem;
-}
-
-.overview-title {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-}
-
-.overview-icon {
-  display: grid;
-  place-items: center;
-  width: 2.8rem;
-  height: 2.8rem;
-  border-radius: var(--app-radius-lg);
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-  box-shadow: var(--app-shadow-sm);
-}
-
-.overview-icon svg {
-  width: 1.4rem;
-  height: 1.4rem;
-}
-
-.tracking-visuals {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.8fr);
-  gap: 1rem;
-  align-items: stretch;
-  margin-bottom: 1rem;
-}
-
-.tracking-visuals app-chart-renderer {
-  min-width: 0;
-}
-
-.attention-row-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.65rem;
-}
-
-.attention-row-heading span {
-  color: var(--app-text);
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: var(--app-tracking-wide);
-  text-transform: uppercase;
-}
-
-.attention-row-heading strong {
-  border-radius: var(--app-radius-pill);
-  padding: 0.25rem 0.6rem;
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-  font-size: 0.72rem;
 }
 
 .current-plan-line {
@@ -423,57 +243,6 @@ p {
   color: var(--app-success);
 }
 
-.upcoming-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-md);
-  padding: 0.8rem 1.1rem;
-  background: var(--app-surface-soft);
-  color: var(--app-text);
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all var(--app-transition-fast);
-}
-
-.upcoming-trigger:hover {
-  background: color-mix(in srgb, var(--app-surface-soft) 85%, var(--app-text));
-}
-
-.activity-queue-tabs {
-  display: inline-flex;
-  gap: 0.35rem;
-  margin-top: 1rem;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-pill);
-  padding: 0.25rem;
-  background: var(--app-surface-soft);
-}
-
-.activity-queue-tabs button {
-  border: 0;
-  border-radius: var(--app-radius-pill);
-  padding: 0.5rem 0.85rem;
-  background: transparent;
-  color: var(--app-muted);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.activity-queue-tabs button.active {
-  background: var(--app-primary);
-  color: #fff;
-}
-
-.activity-queue-tabs span {
-  margin-left: 0.25rem;
-  font-variant-numeric: tabular-nums;
-}
-
 /* ---- Upcoming schedules table ---- */
 .sched-table-wrap {
   margin-top: 1rem;
@@ -614,13 +383,6 @@ p {
 }
 
 @media (max-width: 900px) {
-  .kpi-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .tracking-visuals {
-    grid-template-columns: 1fr 1fr;
-  }
 
   .attention-kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -628,13 +390,6 @@ p {
 }
 
 @media (max-width: 620px) {
-  .kpi-row {
-    grid-template-columns: 1fr;
-  }
-
-  .tracking-visuals {
-    grid-template-columns: 1fr;
-  }
 
   .attention-kpi-row {
     grid-template-columns: 1fr;
@@ -698,67 +453,6 @@ p {
     margin-top: 0.25rem;
     padding-top: 0.5rem;
   }
-}
-
-/* ---- Activity accordion ---- */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  align-items: start;
-}
-
-.dashboard-grid.two-col {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-/* Standalone Pending Requests panel shown above the tracking center. */
-.pending-panel {
-  margin-bottom: 1.5rem;
-}
-
-.accordion-panel {
-  padding: 0;
-  margin-bottom: 1.5rem;
-  overflow: hidden;
-}
-
-.accordion-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  border: 0;
-  padding: 1.1rem;
-  background: transparent;
-  color: var(--app-text);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--app-transition-fast);
-}
-
-.accordion-trigger:hover {
-  background: var(--app-surface-soft);
-}
-
-.accordion-trigger strong {
-  display: block;
-  color: var(--app-text);
-  font-size: 1.15rem;
-  font-weight: 800;
-}
-
-.accordion-trigger small {
-  color: var(--app-muted);
-  font-weight: 600;
-  display: block;
-  margin-top: 0.15rem;
-}
-
-.accordion-body {
-  border-top: 1px solid var(--app-border);
-  padding: 1.25rem;
 }
 
 .panel-heading {
@@ -841,25 +535,6 @@ p {
   box-shadow: var(--app-shadow-sm);
 }
 
-.template-avatar {
-  border-radius: var(--app-radius-md);
-}
-
-.template-avatar.green {
-  background: color-mix(in srgb, var(--app-success) 12%, var(--app-surface-soft));
-  color: var(--app-success);
-}
-
-.template-avatar.orange {
-  background: color-mix(in srgb, #f79009 12%, var(--app-surface-soft));
-  color: #b54708;
-}
-
-.template-avatar.purple {
-  background: color-mix(in srgb, #7a5af8 12%, var(--app-surface-soft));
-  color: #7a5af8;
-}
-
 .empty-note {
   color: var(--app-muted);
   font-weight: 500;
@@ -880,38 +555,6 @@ p {
 .error-message {
   border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
   background: color-mix(in srgb, #d92d20 7%, var(--app-surface));
-}
-
-/* ---- accordion caret + trigger layout ---- */
-.trigger-copy {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
-  text-align: left;
-}
-
-.trigger-side {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  white-space: nowrap;
-}
-
-.caret {
-  display: inline-block;
-  color: var(--app-primary-strong);
-  font-size: 1.15rem;
-  transition: transform 150ms ease;
-}
-
-.caret.open {
-  transform: rotate(180deg);
-}
-
-@media (max-width: 1100px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .dash-tabs {

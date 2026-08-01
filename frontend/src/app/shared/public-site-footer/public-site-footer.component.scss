@@ -1,0 +1,9 @@
+:host { display: block; }
+footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.25rem 2rem; width: min(1180px, calc(100% - 2rem)); margin: 4rem auto 0; border-top: 1px solid var(--app-border); padding: 2rem 0 2.5rem; }
+.footer-brand strong { color: var(--app-text); font-size: 1.05rem; }
+.footer-brand p, .copyright { margin: .35rem 0 0; color: var(--app-muted); font-size: .82rem; line-height: 1.5; }
+nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .8rem 1.2rem; }
+nav a { color: var(--app-muted); font-size: .82rem; font-weight: 700; text-decoration: none; }
+nav a:hover, nav a:focus-visible { color: var(--app-primary-strong); outline: none; }
+.copyright { grid-column: 1 / -1; }
+@media (max-width: 700px) { footer { grid-template-columns: 1fr; } nav { justify-content: flex-start; } }

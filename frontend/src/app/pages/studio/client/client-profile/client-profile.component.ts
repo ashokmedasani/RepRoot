@@ -471,6 +471,14 @@ export class ClientProfileComponent implements OnInit, OnDestroy {
     return String(this.client?.registration_answers?.['middle_name'] || 'Not added');
   }
 
+  get latestLegalAcceptanceDate(): string | null {
+    return this.client?.legal_acceptance_history?.[0]?.accepted_at || this.client?.terms_accepted_at || null;
+  }
+
+  get latestLegalDocumentVersion(): string {
+    return this.client?.legal_acceptance_history?.[0]?.legal_document_version || this.client?.legal_document_version || '';
+  }
+
   // Fields the client may propose edits to (core identity stays fixed).
   editableFields(): DynamicField[] {
     return (this.me?.registration_fields || []).filter((field) => !field.is_core);
@@ -478,6 +486,16 @@ export class ClientProfileComponent implements OnInit, OnDestroy {
 
   get hasPendingChangeRequest(): boolean {
     return this.changeRequest?.status === 'pending';
+  }
+
+  beginProfileEdit(): void {
+    if (!this.editableFields().length) {
+      this.messageType = 'error';
+      this.message = 'This generated account has no editable registration fields. You can still update your profile photo.';
+      return;
+    }
+
+    this.startDetailEdit();
   }
 
   startDetailEdit(): void {

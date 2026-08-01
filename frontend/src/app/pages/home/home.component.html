@@ -1,187 +1,41 @@
-<main class="home-shell">
-  <nav class="home-nav" aria-label="RepRoot navigation">
-    <a class="brand" routerLink="/" aria-label="RepRoot home">
-      <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
-      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span></span>
-    </a>
+<main class="public-page">
+  <app-public-site-header brand="reproot" />
 
-    <div class="nav-links">
-      <a href="#story">Story</a>
-      <a href="#vision">Vision</a>
-      <a href="#mission">Mission</a>
-      <a href="#product">Studio</a>
-      <a href="#contact">Contact</a>
-      <a class="launch-action" href="https://studio.rep-root.com/portal">Launch RepRoot Studio</a>
+  <section id="home" class="hero section" aria-labelledby="home-title">
+    <div class="hero-copy">
+      <p class="eyebrow">Practical technology. Clearer work.</p>
+      <h1 id="home-title">Technology that reduces repetitive work and strengthens meaningful progress.</h1>
+      <p class="lead">RepRoot creates practical digital products and services that simplify recurring workflows, organize essential information, and help people spend less time on repetitive logging and more time on work that requires their attention.</p>
+      <div class="actions"><a class="button primary" href="#products">Explore our products</a></div>
     </div>
-  </nav>
-
-  <section class="hero" aria-labelledby="home-title">
-    <p class="eyebrow">RepRoot</p>
-    <h1 id="home-title">Build Better Relationships.<br>Create Lasting Progress.</h1>
-    <p class="hero__summary">
-      Technology designed to strengthen the connection between professionals and the people they support.
-    </p>
-
-    <div class="hero__actions">
-      <a class="primary-action" href="#story">
-        Explore RepRoot
-        <span aria-hidden="true">→</span>
-      </a>
-      <a class="secondary-action" href="https://studio.rep-root.com/portal">
-        Launch RepRoot Studio
-      </a>
+    <div class="workflow-visual" aria-label="An organized workflow from repeated inputs to focused work">
+      <span>Recurring information</span><i aria-hidden="true">→</i><span>Structured workflow</span><i aria-hidden="true">→</i><strong>Time for meaningful work</strong>
     </div>
   </section>
 
-  <section class="belief-section" aria-labelledby="belief-title">
-    <p class="eyebrow">Progress starts with people</p>
-    <h2 id="belief-title">Every achievement begins with guidance, trust, and consistent action.</h2>
-    <p class="belief-summary">
-      RepRoot builds technology that empowers professionals to organize their work, strengthen relationships, and
-      help others reach meaningful goals.
-    </p>
+  <section id="about" class="section problem" aria-labelledby="problem-title">
+    <div><p class="eyebrow">The problem</p><h2 id="problem-title">Important work becomes harder when information is scattered.</h2></div>
+    <div class="problem-copy"><p>Professionals often rely on separate spreadsheets, messages, notes, forms, calendars, and repeated data entry to manage work that happens every day, week, or month.</p><ul><li>Repeated logging consumes time.</li><li>Information becomes fragmented across tools.</li><li>Follow-ups depend too heavily on memory.</li><li>Rigid systems do not reflect how every professional works.</li></ul></div>
   </section>
 
-  <section class="philosophy-section" aria-labelledby="philosophy-title">
-    <div class="philosophy-card">
-      <p class="eyebrow">Our philosophy</p>
-      <h2 id="philosophy-title">Small actions repeated consistently create extraordinary results.</h2>
-      <p class="philosophy-line">Technology should never replace human relationships.</p>
-      <p class="philosophy-line philosophy-line--strong">It should strengthen them.</p>
-      <p class="philosophy-summary">That belief is at the heart of every product we create.</p>
-    </div>
+  <section id="purpose" class="section" aria-labelledby="purpose-title">
+    <p class="eyebrow">What RepRoot does</p><h2 id="purpose-title">Build useful structure around work that repeats.</h2>
+    <div class="pillar-grid">@for (pillar of pillars; track pillar.title) { <article><span>{{ pillar.title.charAt(0) }}</span><h3>{{ pillar.title }}</h3><p>{{ pillar.description }}</p></article> }</div>
   </section>
 
-  <section id="story" class="story-section" aria-labelledby="story-title">
-    <p class="eyebrow">Our story</p>
-    <h2 id="story-title">RepRoot is where progress begins.</h2>
-    <p class="story-lede">
-      Every meaningful journey starts with a relationship. Whether it's between a coach and an athlete, a mentor
-      and a student, a creator and a team, or simply a person striving to become better&mdash;lasting progress
-      grows from consistent guidance, trust, and measurable actions. RepRoot exists to build the systems behind
-      those relationships.
-    </p>
-
-    <div class="meaning-grid">
-      <div class="meaning-card">
-        <span class="meaning-card__word">Rep</span>
-        <ul>
-          <li>Repetition</li>
-          <li>Consistency</li>
-          <li>Practice</li>
-          <li>Daily effort</li>
-        </ul>
-      </div>
-      <div class="meaning-card">
-        <span class="meaning-card__word">Root</span>
-        <ul>
-          <li>Foundation</li>
-          <li>Growth</li>
-          <li>Connection</li>
-          <li>Long-term success</li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="meaning__together">
-      Together, RepRoot means that lasting growth comes from consistent actions built on strong foundations.
-    </p>
+  <section class="section name-section" aria-labelledby="name-title">
+    <div><p class="eyebrow">Why RepRoot</p><h2 id="name-title">Progress grows from what we repeatedly build at the root.</h2></div>
+    <div class="name-grid"><article><strong>Rep</strong><p>Repetition, consistency, practice, and the actions performed over time.</p></article><article><strong>Root</strong><p>Foundation, connection, stability, and the conditions that support long-term growth.</p></article></div>
   </section>
 
-  <section id="vision" class="statement-section" aria-labelledby="vision-title">
-    <p class="eyebrow">Vision</p>
-    <h2 id="vision-title">To become the home for relationship-driven productivity.</h2>
-    <p class="statement-summary">Not just fitness. Any profession where one person helps another grow.</p>
+  <section id="products" class="section products" aria-labelledby="products-title">
+    <p class="eyebrow">Our products</p><h2 id="products-title">Products built under RepRoot</h2><p class="section-intro">Each RepRoot product begins with a practical workflow problem. The product structure is designed to grow as new applications are introduced.</p>
+    <article class="product-card"><div class="product-mark"><img src="/brand/studio/mark.png" alt=""></div><div><p class="product-label">First RepRoot product</p><h3>RepRoot Studio</h3><p>A flexible professional-client platform that helps professionals collect information, organize clients, create recurring workflows, share resources, and track ongoing progress from one structured environment.</p><div class="actions"><a class="button secondary" [href]="publicSite.studioUrl">Explore Studio</a><a class="button primary" [href]="publicSite.studioPortalUrl">Launch Studio</a></div></div></article>
   </section>
 
-  <section id="mission" class="statement-section statement-section--alt" aria-labelledby="mission-title">
-    <p class="eyebrow">Mission</p>
-    <h2 id="mission-title">
-      Create simple, beautiful tools that help professionals build stronger relationships with the people they
-      support.
-    </h2>
-  </section>
+  <section class="section future" aria-labelledby="future-title"><p class="eyebrow">Built for what comes next</p><h2 id="future-title">A growing ecosystem of practical products and services.</h2><p>RepRoot will continue exploring areas where thoughtful technology can simplify recurring work. We will introduce products when they solve a clear problem—not to fill a roadmap with unsupported promises.</p></section>
 
-  <section id="values" class="values-section" aria-labelledby="values-title">
-    <p class="eyebrow">Brand values</p>
-    <h2 id="values-title">What we build on.</h2>
+  <section id="contact" class="section contact" aria-labelledby="contact-title"><div><p class="eyebrow">Contact</p><h2 id="contact-title">Start a conversation with RepRoot.</h2></div><div><p>Questions about the organization, its products, or RepRoot Studio can be sent to our public support address.</p><a class="button primary" [href]="'mailto:' + supportEmail">{{ supportEmail }}</a></div></section>
 
-    <ul class="values-grid">
-      @for (value of values; track value.label) {
-        <li>{{ value.label }}</li>
-      }
-    </ul>
-  </section>
-
-  <section id="product" class="product-section" aria-labelledby="product-title">
-    <p class="eyebrow">Meet our first product</p>
-    <h2 id="product-title">RepRoot Studio</h2>
-    <p class="product-summary">
-      Built for coaches, trainers, and professionals who manage clients. Originally created for fitness coaches
-      and personal trainers, Studio provides a structured workspace to manage clients, monitor progress, organize
-      communication, and simplify everyday operations &mdash; so professionals focus on coaching, and clients focus
-      on improving.
-    </p>
-
-    <div class="product-card">
-      <div class="product-card__mark"><img src="/brand/studio/mark.png" alt=""></div>
-      <div class="product-card__body">
-        <ul class="feature-pills">
-          @for (feature of studioFeatures; track feature.label) {
-            <li>{{ feature.label }}</li>
-          }
-        </ul>
-        <a class="primary-action" href="https://studio.rep-root.com/portal">
-          Launch RepRoot Studio
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <section class="ecosystem-section" aria-labelledby="ecosystem-title">
-    <p class="eyebrow">More than one product</p>
-    <h2 id="ecosystem-title">RepRoot is an ecosystem.</h2>
-    <p class="ecosystem-summary">
-      RepRoot Studio is only the beginning. Every application we build shares the same purpose: helping people
-      grow together.
-    </p>
-  </section>
-
-  <section id="contact" class="contact-section" aria-labelledby="contact-title">
-    <p class="eyebrow">Contact</p>
-    <h2 id="contact-title">Let's talk.</h2>
-    <p class="contact-summary">
-      Questions about RepRoot, RepRoot Studio, or what's next for the family of products &mdash; reach out and
-      we'll get back to you.
-    </p>
-
-    @if (supportEmail) {
-      <a class="primary-action" [href]="'mailto:' + supportEmail">{{ supportEmail }}</a>
-    }
-  </section>
-
-  <footer class="home-footer">
-    <div class="footer-top">
-      <div class="footer-brand">
-        <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
-        <div>
-          <strong><span class="brand__rep">Rep</span><span class="brand__root">Root</span></strong>
-          <p>Building meaningful relationships through technology.</p>
-        </div>
-      </div>
-
-      <div class="footer-links">
-        <a routerLink="/privacy">Privacy</a>
-        <a routerLink="/terms">Terms</a>
-        <a routerLink="/cookies">Cookies</a>
-        <a href="#contact">Contact</a>
-      </div>
-    </div>
-
-    <div class="footer-theme">
-      <span class="footer-theme__label">Theme</span>
-      <app-theme-switcher />
-    </div>
-  </footer>
+  <app-public-site-footer brand="reproot" />
 </main>

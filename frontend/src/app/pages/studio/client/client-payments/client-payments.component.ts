@@ -7,7 +7,6 @@ import { ClientPaymentsPanelComponent } from '@studio-shared/client-payments-pan
   selector: 'app-client-payments',
   standalone: true,
   imports: [ClientPageShellComponent, ClientPaymentsPanelComponent],
-  templateUrl: './client-payments.component.html',
-  styleUrl: './client-payments.component.scss'
+  templateUrl: './client-payments.component.html'
 })
 export class ClientPaymentsComponent {}

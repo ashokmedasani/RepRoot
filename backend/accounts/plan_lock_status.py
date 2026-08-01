@@ -22,7 +22,6 @@ Design, agreed over a long planning discussion, in short:
   professional's plan_tier must call bust_lock_status_cache().
 """
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F

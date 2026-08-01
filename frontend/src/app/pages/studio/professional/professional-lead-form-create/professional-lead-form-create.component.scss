@@ -27,31 +27,13 @@ h2 {
   animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.core-card {
-  border-color: color-mix(in srgb, var(--app-primary) 38%, var(--app-border));
-  background: linear-gradient(135deg, var(--app-primary-soft), var(--app-surface));
-}
-
-.core-card p,
 .message {
-  color: var(--app-muted);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
   font-weight: 600;
   line-height: 1.55;
-}
-
-.core-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.core-grid span {
-  border: 1px solid var(--app-border);
-  border-radius: 0.7rem;
-  padding: 0.8rem;
-  background: var(--app-surface);
-  color: var(--app-text);
-  font-weight: 700;
 }
 
 label {
@@ -80,12 +62,6 @@ select {
 .approval-note { border-left: 3px solid var(--app-primary); padding: 0.75rem 1rem; background: var(--app-primary-soft); }
 .split-actions { justify-content: space-between; gap: 0.75rem; }
 
-.ghost-link {
-  color: var(--app-primary-strong);
-  font-weight: 700;
-  text-decoration: none;
-}
-
 .primary-action {
   min-height: 2.85rem;
   border: 0;
@@ -101,21 +77,11 @@ select {
   justify-content: flex-end;
 }
 
-.message {
-  border-radius: 0.75rem;
-  padding: 1rem;
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
-}
-
 .error-message {
   background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
   color: #d92d20;
 }
 
 @media (max-width: 720px) {
-  .core-grid {
-    grid-template-columns: 1fr;
-  }
   .meeting-grid { grid-template-columns: 1fr; }
 }

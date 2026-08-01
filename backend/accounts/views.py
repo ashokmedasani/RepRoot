@@ -49,7 +49,6 @@ from .models import (
   LeadSubmission,
   LegalAcceptanceRecord,
   ProgressEntry,
-  RecycledProfessionalAccount,
   RecycleBinItem,
   ResourceCategory,
   SupportIncident,
@@ -114,6 +113,7 @@ from .serializers import (
   UsernameAvailabilitySerializer,
 )
 from .notifications import notify_client
+from . import web_routes
 from .client_auth import ClientTokenAuthentication, IsAuthenticatedClient, issue_client_token
 from .access_permissions import ProfessionalAccessPermission
 from .data_retention import visible_client_data_cutoff
@@ -2366,9 +2366,22 @@ class ClientReminderDetailView(APIView):
     if reminder is None:
       return Response({'message': 'Reminder not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    previous_status = reminder.status
     serializer = ClientReminderSerializer(reminder, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
-    serializer.save()
+    reminder = serializer.save()
+
+    event_type = 'reminder.completed' if previous_status != reminder.status and reminder.status == ClientReminder.STATUS_DONE else 'reminder.updated'
+    notify_client(
+      reminder.client,
+      category='reminders',
+      event_type=event_type,
+      event_key=f'reminder:{reminder.pk}:{event_type}:{reminder.updated_at.isoformat()}',
+      title='Reminder completed' if event_type == 'reminder.completed' else 'Reminder updated',
+      body=f'{reminder.title} was marked complete.' if event_type == 'reminder.completed' else f'{reminder.title} has updated details.',
+      action_url=web_routes.CLIENT_MEETINGS,
+      payload={'reminder_id': reminder.pk, 'client_id': reminder.client_id},
+    )
 
     return Response({'reminder': ClientReminderSerializer(reminder).data, 'message': 'Reminder updated.'})
 
@@ -2378,7 +2391,20 @@ class ClientReminderDetailView(APIView):
     if reminder is None:
       return Response({'message': 'Reminder not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+    reminder_title = reminder.title
+    reminder_id = reminder.pk
+    reminder_client = reminder.client
     reminder.delete()
+    notify_client(
+      reminder_client,
+      category='reminders',
+      event_type='reminder.deleted',
+      event_key=f'reminder:{reminder_id}:deleted',
+      title='Reminder removed',
+      body=f'{reminder_title} was removed from your schedule.',
+      action_url=web_routes.CLIENT_MEETINGS,
+      payload={'reminder_id': reminder_id, 'client_id': reminder_client.pk},
+    )
     return Response({'message': 'Reminder deleted.'})
 
 

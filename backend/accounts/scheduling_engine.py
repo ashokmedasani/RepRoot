@@ -14,7 +14,6 @@ import uuid
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from django.db.models import Q
 from django.utils import timezone
 
 from .models import (

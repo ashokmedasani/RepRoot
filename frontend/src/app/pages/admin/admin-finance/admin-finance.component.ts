@@ -1,7 +1,7 @@
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AdminFinanceEntry, AdminFinanceSummary, AdminPortalApiService } from '@core/api/admin-portal-api.service';
+import { AdminFinanceSummary, AdminPortalApiService } from '@core/api/admin-portal-api.service';
 import { AdminPageShellComponent } from '@admin-shared/admin-page-shell/admin-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 

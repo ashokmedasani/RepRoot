@@ -14,7 +14,6 @@ Locked features:
 - Chat (disabled)
 """
 
-from django.conf import settings
 from accounts.data_usage import calculate_professional_data_usage
 
 

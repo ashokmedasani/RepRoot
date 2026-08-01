@@ -104,27 +104,6 @@ h3 {
   font-size: 0.9rem;
 }
 
-.provider-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: 0.85rem;
-}
-
-.provider-card {
-  display: grid;
-  justify-items: start;
-  gap: 0.6rem;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
-  padding: 1.1rem;
-  background: var(--app-surface);
-}
-
-.provider-card strong {
-  color: var(--app-text);
-  font-size: 0.95rem;
-}
-
 .status-pill {
   border-radius: var(--app-radius-pill);
   padding: 0.25rem 0.6rem;
@@ -165,24 +144,6 @@ h3 {
 .pref-row small {
   color: var(--app-muted);
   font-size: 0.8rem;
-}
-
-.visibility-choice {
-  display: grid;
-  gap: 0.75rem;
-  border: 1px solid var(--app-border);
-  margin: 0;
-}
-
-.visibility-choice legend {
-  padding: 0 0.35rem;
-}
-
-.visibility-choice label {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  cursor: pointer;
 }
 
 .disclosure-block {

@@ -8,13 +8,18 @@ export const routes: Routes = [
     path: '',
     loadComponent: () =>
       import('./pages/home/home.component').then((module) => module.HomeComponent),
-    title: 'RepRoot'
+    title: 'RepRoot | Practical Technology for Better Workflows'
   },
   {
     path: 'studio',
+    redirectTo: '',
+    pathMatch: 'full'
+  },
+  {
+    path: '_studio-home',
     loadComponent: () =>
       import('./pages/studio/studio.component').then((module) => module.StudioComponent),
-    title: 'RepRoot Studio'
+    title: 'RepRoot Studio | Professional and Client Workflow Platform'
   },
   {
     path: 'about',
@@ -73,7 +78,7 @@ export const routes: Routes = [
       import('./pages/studio/portal/access-entry-placeholder.component').then(
         (module) => module.AccessEntryPlaceholderComponent
       ),
-    title: 'Portal'
+    title: 'Launch RepRoot Studio | Professional and Client Access'
   },
   {
     path: 'professional-client-login',

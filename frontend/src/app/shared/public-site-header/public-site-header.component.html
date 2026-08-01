@@ -1,0 +1,14 @@
+<header class="site-header">
+  <a class="brand" routerLink="/" (click)="closeMenu()" [attr.aria-label]="brand === 'studio' ? 'RepRoot Studio home' : 'RepRoot home'">
+    <span class="brand-mark"><img [src]="brand === 'studio' ? '/brand/studio/mark.png' : '/brand/reproot/mark.png'" alt=""></span>
+    <span><b>Rep<span>Root</span></b>@if (brand === 'studio') { <em>Studio</em> }</span>
+  </a>
+  <button class="menu-toggle" type="button" (click)="menuOpen = !menuOpen" [attr.aria-expanded]="menuOpen" aria-controls="public-navigation"><span></span><span></span><span></span><span class="sr-only">Menu</span></button>
+  <nav id="public-navigation" [class.open]="menuOpen" [attr.aria-label]="brand === 'studio' ? 'RepRoot Studio navigation' : 'RepRoot navigation'">
+    @if (brand === 'studio') {
+      <a href="#overview" (click)="closeMenu()">Overview</a><a href="#workflow" (click)="closeMenu()">How it works</a><a href="#features" (click)="closeMenu()">Features</a><a href="#professionals" (click)="closeMenu()">For professionals</a><a href="#clients" (click)="closeMenu()">For clients</a><a href="#faq" (click)="closeMenu()">FAQ</a><a class="nav-cta" routerLink="/portal" (click)="closeMenu()">Sign in</a>
+    } @else {
+      <a href="#home" (click)="closeMenu()">Home</a><a href="#about" (click)="closeMenu()">About</a><a href="#purpose" (click)="closeMenu()">Why RepRoot</a><a href="#products" (click)="closeMenu()">Products</a><a href="#contact" (click)="closeMenu()">Contact</a>
+    }
+  </nav>
+</header>

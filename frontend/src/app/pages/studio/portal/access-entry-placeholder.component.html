@@ -1,28 +1,31 @@
-<main class="access-shell">
-  <a routerLink="/" class="back-link">Back to RepRoot</a>
-
-  <a routerLink="/portal" class="studio-brand" aria-label="RepRoot Studio portal">
-    <span class="studio-brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
-    <span><span class="studio-brand__rep">Rep</span><span class="studio-brand__root">Root</span> Studio</span>
-  </a>
-
-  <header class="access-header">
-    <p class="eyebrow">RepRoot Studio access</p>
-    <h1>Choose your workspace</h1>
-    <p>Choose the correct workspace to continue.</p>
-  </header>
-
-  <section class="entry-grid" aria-label="RepRoot Studio access options">
-    <a class="entry-card" routerLink="/professional/login" [class.entry-card--active]="selectedEntry === 'professional'" (click)="selectEntry('professional')">
-      <span class="entry-card__icon">P</span>
-      <strong>Professional</strong>
-      <small>Login or create a global professional account.</small>
-    </a>
-
-    <a class="entry-card" routerLink="/client/login" [class.entry-card--active]="selectedEntry === 'client'" (click)="selectEntry('client')">
-      <span class="entry-card__icon">C</span>
-      <strong>Client Portal</strong>
-      <small>Login with the username and password created by your professional.</small>
-    </a>
+<main class="portal-page">
+  <header class="portal-topbar"><div class="portal-header">
+    <a routerLink="/" class="studio-brand" aria-label="RepRoot Studio home"><span><img src="/brand/studio/mark.png" alt=""></span><strong>Rep<span>Root</span> Studio</strong></a>
+    <a routerLink="/" class="back-link">Return to Studio</a>
+  </div></header>
+  <section class="portal-intro" aria-labelledby="portal-title">
+    <p class="eyebrow">Studio portal</p><h1 id="portal-title">Choose your access</h1><p>Continue as a professional or client.</p>
   </section>
+  <section class="entry-grid" aria-label="RepRoot Studio access options">
+    <article class="entry-card">
+      <span class="entry-icon">P</span><p class="card-label">Professional</p><h2>Professional workspace</h2>
+      <p>Manage clients, workflows, records, meetings, and payments.</p>
+      <div class="card-actions"><a class="button primary" routerLink="/professional/login">Professional sign in</a><a class="button secondary" routerLink="/professional/signup">Create professional account</a></div>
+    </article>
+    <article class="entry-card">
+      <span class="entry-icon">C</span><p class="card-label">Client</p><h2>Client workspace</h2>
+      <p>View assigned work, messages, meetings, resources, and payments.</p>
+      <div class="access-note"><strong>Professional-approved access</strong><span>Use the code and credentials supplied by your professional.</span></div>
+      <div class="card-actions"><a class="button primary" routerLink="/client/login">Client sign in</a></div>
+    </article>
+  </section>
+  <footer class="portal-footer">
+    <div class="footer-summary"><strong>RepRoot Studio</strong><span>Professional-client workspace by RepRoot.</span></div>
+    <nav aria-label="Website, help, and legal links">
+      <a [href]="publicSite.parentUrl">RepRoot website</a><a routerLink="/">Studio overview</a><a [href]="'mailto:' + publicSite.studioSupportEmail">Help &amp; Support</a>
+      <a routerLink="/terms/professional" target="_blank">Professional Terms</a><a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
+      <a routerLink="/terms/client" target="_blank">Client Terms</a><a routerLink="/privacy/client" target="_blank">Client Privacy</a><a routerLink="/cookies" target="_blank">Cookie Notice</a>
+    </nav>
+    <p>Use the access route intended for your account role. Never share passwords or one-time verification codes.</p>
+  </footer>
 </main>
