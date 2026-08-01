@@ -2112,7 +2112,13 @@ class ProfessionalPaymentSettingsSerializer(serializers.ModelSerializer):
       'client_payment_history_enabled',
       'updated_at',
     ]
-    read_only_fields = ['reporting_currency_locked', 'reporting_currency_locked_at', 'updated_at']
+    read_only_fields = [
+      'payment_tracking_enabled',
+      'client_payment_history_enabled',
+      'reporting_currency_locked',
+      'reporting_currency_locked_at',
+      'updated_at',
+    ]
 
   def validate_reporting_currency(self, value):
     code = value.strip().upper()

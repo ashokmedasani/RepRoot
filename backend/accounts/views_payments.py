@@ -163,9 +163,11 @@ class ProfessionalPaymentSettingsView(APIView):
   def get(self, request):
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
     payload = ProfessionalPaymentSettingsSerializer(settings_row).data
-    if not settings.REPROOT_PAYMENTS_ENABLED:
-      payload['payment_tracking_enabled'] = False
-      payload['client_payment_history_enabled'] = False
+    # Manual payment tracking and the client's own payment history are core
+    # Studio features. The gateway flag only controls provider-backed payment
+    # mutations; it must not hide the existing payment workspace.
+    payload['payment_tracking_enabled'] = True
+    payload['client_payment_history_enabled'] = True
     return Response(
       {
         'settings': payload,

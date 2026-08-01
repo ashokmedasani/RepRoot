@@ -13,7 +13,7 @@ import {
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
 
-type PaymentSettingsSection = 'reporting' | 'transactions' | 'methods' | 'integrated' | 'preferences' | 'disclosures';
+type PaymentSettingsSection = 'reporting' | 'transactions' | 'methods' | 'integrated' | 'disclosures';
 
 interface ClientFieldDef {
   key: string;
@@ -88,7 +88,6 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     { id: 'transactions', label: 'Transactions' },
     { id: 'methods', label: 'Manual Payment Methods' },
     { id: 'integrated', label: 'Integrated Payments' },
-    { id: 'preferences', label: 'Payment Preferences' },
     { id: 'disclosures', label: 'Payment Disclosures' }
   ];
 
@@ -143,7 +142,7 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     });
   }
 
-  // --- Reporting currency + preferences -------------------------------------
+  // --- Reporting currency ---------------------------------------------------
 
   async saveReportingCurrency(): Promise<void> {
     if (!this.reportingCurrencyDraft) {
@@ -160,10 +159,6 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     if (confirmed) {
       this.saveSettings({ reporting_currency: this.reportingCurrencyDraft, confirm_reporting_currency: true });
     }
-  }
-
-  togglePreference(key: 'client_payment_history_enabled' | 'payment_tracking_enabled', value: boolean): void {
-    this.saveSettings({ [key]: value });
   }
 
   // --- Manual payment methods -----------------------------------------------

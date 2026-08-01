@@ -285,38 +285,6 @@
   </section>
 }
 
-@if (activeSection === 'preferences') {
-  <section class="payment-section" aria-labelledby="preferences-title">
-    <h3 id="preferences-title">Payment Preferences</h3>
-
-    @if (settings) {
-      <label class="pref-row">
-        <input
-          type="checkbox"
-          name="trackingEnabled"
-          [ngModel]="settings.payment_tracking_enabled"
-          (ngModelChange)="togglePreference('payment_tracking_enabled', $event)">
-        <span>
-          <strong>Track client payments</strong>
-          <small>Turn this off if you don't want to record or track payments from clients. When off, the Payments tab and payments dashboard are hidden — nothing is forced.</small>
-        </span>
-      </label>
-
-      <label class="pref-row">
-        <input
-          type="checkbox"
-          name="historyEnabled"
-          [ngModel]="settings.client_payment_history_enabled"
-          (ngModelChange)="togglePreference('client_payment_history_enabled', $event)">
-        <span>
-          <strong>Client payment history</strong>
-          <small>Let clients see their own completed payment history in the Client Portal.</small>
-        </span>
-      </label>
-    }
-  </section>
-}
-
 @if (activeSection === 'disclosures') {
   <section class="payment-section" aria-labelledby="disclosures-title">
     <h3 id="disclosures-title">Payment Disclosures</h3>
