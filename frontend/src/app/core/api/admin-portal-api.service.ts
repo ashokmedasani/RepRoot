@@ -236,6 +236,10 @@ export class AdminPortalApiService {
     if (!configured) {
       throw new Error('RepRoot API configuration is missing. Set APP_CONFIG.apiBaseUrl for this deployment.');
     }
-    return configured.replace(/\/+$/, '').replace(/\/accounts$/, '/admin');
+    const normalized = configured.replace(/\/+$/, '');
+    if (normalized.endsWith('/api/accounts')) {
+      return normalized.replace(/\/api\/accounts$/, '/api/admin');
+    }
+    return `${normalized}/api/admin`;
   }
 }
