@@ -8,7 +8,7 @@ import { PublicSiteHeaderComponent } from '@shared/public-site-header/public-sit
 
 interface Feature { title: string; description: string; }
 
-@Component({ selector: 'app-studio', standalone: true, imports: [RouterLink, PublicSiteFooterComponent, PublicSiteHeaderComponent], templateUrl: './studio.component.html', styleUrl: './studio.component.scss' })
+@Component({ selector: 'app-studio', standalone: true, imports: [RouterLink, PublicSiteFooterComponent, PublicSiteHeaderComponent], templateUrl: './studio.component.html', styleUrls: ['./studio.component.scss', './studio.mobile.scss'] })
 export class StudioComponent implements OnInit {
   private readonly seo = inject(PublicPageSeoService);
   readonly publicSite = PUBLIC_SITE;
