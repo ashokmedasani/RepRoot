@@ -10,5 +10,7 @@
 ///
 /// `dart.library.js_interop` is the web-only condition; anything else gets the
 /// stub, which is never displayed.
+library;
+
 export 'google_button_stub.dart'
     if (dart.library.js_interop) 'google_button_web.dart';

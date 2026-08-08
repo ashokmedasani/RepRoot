@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -623,6 +622,63 @@ class FormsGroupsApi {
       );
     });
   }
+
+  Future<ClientAccessDetailResponse> getClientProfile(int clientId) {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/',
+        options: _auth,
+      );
+      return ClientAccessDetailResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<({String notes, String? updatedAt})> saveProfessionalNotes(
+    int clientId,
+    String notes,
+  ) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/notes/',
+        data: {'notes': notes},
+        options: _auth,
+      );
+      return (
+        notes: res.data?['professional_notes'] as String? ?? '',
+        updatedAt: res.data?['professional_notes_updated_at'] as String?,
+      );
+    });
+  }
+
+  /// Partial update — only send the keys being changed, as in the TS.
+  Future<ClientAccessRecord> updateClientProfile(
+    int clientId, {
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? username,
+    bool? isActive,
+    Map<String, String>? registrationAnswers,
+  }) {
+    return runApi(() async {
+      final res = await _dio.put<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/',
+        data: {
+          'first_name': ?firstName,
+          'last_name': ?lastName,
+          'email': ?email,
+          'username': ?username,
+          'is_active': ?isActive,
+          'registration_answers': ?registrationAnswers,
+        },
+        options: _auth,
+      );
+      return ClientAccessRecord.fromJson(
+        res.data?['client'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
 }
 
 final formsGroupsApiProvider =
