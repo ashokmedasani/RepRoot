@@ -992,6 +992,12 @@ class ClientRegistrationFormSerializer(serializers.ModelSerializer):
 class LeadSubmissionSerializer(serializers.ModelSerializer):
   applicant_name = serializers.SerializerMethodField()
   client_access = serializers.SerializerMethodField()
+  # Additive only — the web frontend's LeadSubmission interface doesn't
+  # declare these fields and simply ignores them; added for mobile's
+  # per-form filtering on the requests list (which form a submission came
+  # from was already stored via the lead_form FK, just never serialized).
+  lead_form = serializers.PrimaryKeyRelatedField(read_only=True)
+  lead_form_title = serializers.CharField(source='lead_form.title', read_only=True)
 
   class Meta:
     model = LeadSubmission
@@ -1010,6 +1016,8 @@ class LeadSubmissionSerializer(serializers.ModelSerializer):
       'converted_at',
       'deleted_at',
       'client_access',
+      'lead_form',
+      'lead_form_title',
     ]
     read_only_fields = fields
 

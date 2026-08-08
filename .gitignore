@@ -27,3 +27,13 @@ backend/staticfiles/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Build/deploy outputs — regenerated, not source.
+# deployment-artifacts/ is a full duplicate copy of backend/ (137 files); once
+# committed, greps and edits would hit two copies of every module and git
+# would carry the weight forever. deploy_artifacts/ holds release zips.
+deploy_artifacts/
+deployment-artifacts/
+
+# JetBrains project config — local IDE state, not shared source.
+.idea/
