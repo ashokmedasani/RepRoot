@@ -11,6 +11,7 @@ class ChatMessageRecord {
     required this.sender,
     required this.text,
     required this.createdAt,
+    this.imageUrl = '',
   });
 
   final int id;
@@ -20,7 +21,15 @@ class ChatMessageRecord {
   final String text;
   final String createdAt;
 
+  /// Attached image, as returned by the backend's `image_url`.
+  ///
+  /// This field was missing from the mobile model entirely, so an image sent
+  /// from the website arrived here and was silently dropped — the message
+  /// rendered as an empty bubble. Messages can carry an image, text, or both.
+  final String imageUrl;
+
   bool get isProfessional => sender == 'professional';
+  bool get hasImage => imageUrl.isNotEmpty;
 
   factory ChatMessageRecord.fromJson(Map<String, dynamic> json) =>
       ChatMessageRecord(
@@ -28,6 +37,7 @@ class ChatMessageRecord {
         sender: json['sender'] as String? ?? '',
         text: json['text'] as String? ?? '',
         createdAt: json['created_at'] as String? ?? '',
+        imageUrl: json['image_url'] as String? ?? '',
       );
 }
 
@@ -92,11 +102,30 @@ class ChatApi {
     });
   }
 
-  Future<ChatMessageRecord> sendProfessionalMessage(int clientId, String text) {
+  /// Sends a message, optionally with an image attached.
+  ///
+  /// Mirrors the web's `buildMessageBody`: a plain JSON body when there's no
+  /// image, multipart when there is. Sending multipart unconditionally would
+  /// work too, but this keeps the common text-only case a small JSON post.
+  Future<ChatMessageRecord> sendProfessionalMessage(
+    int clientId,
+    String text, {
+    String? imagePath,
+    String? imageName,
+  }) {
     return runApi(() async {
+      final hasImage = imagePath != null && imagePath.isNotEmpty;
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/clients/$clientId/chat/',
-        data: {'text': text},
+        data: hasImage
+            ? FormData.fromMap({
+                'text': text,
+                'image': await MultipartFile.fromFile(
+                  imagePath,
+                  filename: imageName,
+                ),
+              })
+            : {'text': text},
         options: _auth,
       );
       final message = res.data?['chat_message'];

@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/models/payment_models.dart';
 import '../../core/api/payments_api.dart';
@@ -116,6 +121,9 @@ class _ClientPaymentRequestDetailPageState
   bool _loading = true;
   String _message = '';
 
+  /// Id of the proof whose attachment is currently downloading, or 0.
+  int _openingProofId = 0;
+
   @override
   void initState() {
     super.initState();
@@ -144,6 +152,35 @@ class _ClientPaymentRequestDetailPageState
     if (result == true) {
       _toast('Payment proof submitted.');
       _load();
+    }
+  }
+
+  /// Proof files are only served through an authenticated endpoint (there is no
+  /// public media URL for them), so the bytes are fetched, written to a temp
+  /// file and handed to the system share/open sheet.
+  Future<void> _openProofFile(PaymentProofRecord proof) async {
+    if (_openingProofId != 0) return;
+    setState(() => _openingProofId = proof.id);
+    try {
+      final bytes =
+          await ref.read(paymentsApiProvider).downloadPaymentProofFile(proof.id);
+      final type = _proofFileType(bytes);
+      final directory = await getTemporaryDirectory();
+      final file =
+          File('${directory.path}/payment-proof-${proof.id}${type.suffix}');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      setState(() => _openingProofId = 0);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: type.mimeType)],
+          subject: 'Payment proof',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _openingProofId = 0);
+      _toast('That attachment could not be opened.');
     }
   }
 
@@ -239,6 +276,23 @@ class _ClientPaymentRequestDetailPageState
                                       style: context.text.bodySmall?.copyWith(
                                           fontStyle: FontStyle.italic)),
                                 ],
+                                if (proof.hasFile) ...[
+                                  const SizedBox(height: AppSpacing.xs),
+                                  OutlinedButton.icon(
+                                    onPressed: _openingProofId == proof.id
+                                        ? null
+                                        : () => _openProofFile(proof),
+                                    icon: const Icon(Icons.attachment,
+                                        size: AppSize.iconRow),
+                                    label: Text(_openingProofId == proof.id
+                                        ? 'Opening…'
+                                        : 'View attachment'),
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize:
+                                          const Size(0, AppSize.buttonHeightSm),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -322,6 +376,12 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
   bool _confirmed = false;
   bool _submitting = false;
   String _error = '';
+  PlatformFile? _proofFile;
+
+  /// PAYMENT_PROOF_CONTENT_TYPES / PAYMENT_PROOF_MAX_BYTES in
+  /// backend/accounts/payment_constants.py — kept in sync by hand.
+  static const _proofExtensions = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+  static const _maxProofBytes = 5 * 1024 * 1024;
 
   @override
   void initState() {
@@ -337,12 +397,49 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
     super.dispose();
   }
 
-  String _isoDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Same accept list and 5MB ceiling the web input enforces; the backend
+  /// re-checks both (and sniffs the real file signature) on submit.
+  Future<void> _pickProofFile() async {
+    // file_picker 11 made pickFiles static; there is no .platform any more.
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: _proofExtensions,
+      withData: false,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+
+    final picked = result.files.first;
+    if (picked.path == null || picked.path!.isEmpty) {
+      setState(() => _error = 'Could not read that file. Try another one.');
+      return;
+    }
+    if (!_proofExtensions.contains((picked.extension ?? '').toLowerCase())) {
+      setState(() => _error = 'Attach a JPG, PNG, WEBP, or PDF file.');
+      return;
+    }
+    if (picked.size > _maxProofBytes) {
+      final megabytes = (picked.size / (1024 * 1024)).toStringAsFixed(1);
+      setState(() => _error =
+          'That file is ${megabytes}MB. Proof files must be under 5MB.');
+      return;
+    }
+
+    setState(() {
+      _proofFile = picked;
+      _error = '';
+    });
+  }
 
   Future<void> _submit() async {
-    if (_reference.text.trim().isEmpty || _amount.text.trim().isEmpty) {
-      setState(() => _error = 'Enter the transaction reference and amount.');
+    if (_amount.text.trim().isEmpty) {
+      setState(() => _error = 'Enter the amount you paid.');
+      return;
+    }
+    // The backend requires a transaction reference OR a file, not both.
+    if (_reference.text.trim().isEmpty && _proofFile == null) {
+      setState(() => _error =
+          'Enter a transaction reference or attach a proof file.');
       return;
     }
     if (!_confirmed) {
@@ -351,17 +448,18 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
     }
     setState(() { _submitting = true; _error = ''; });
     try {
-      // Multipart to match the web (a screenshot may be attached; here we send
-      // the text fields — file attachment can be added later without a contract
-      // change since the endpoint already accepts multipart).
-      final form = FormDataProof(
+      // Multipart, exactly as the web submits it — the optional attachment
+      // rides along under `proof_file`.
+      final form = await FormDataProof(
         transactionReference: _reference.text.trim(),
         reportedAmount: _amount.text.trim(),
         reportedCurrency: widget.request.requestedCurrency,
-        reportedPaymentDate: _isoDate(_date),
+        reportedPaymentDate: isoDate(_date),
         paymentMethod: _methodId,
         note: _note.text.trim(),
         confirmedAccurate: _confirmed,
+        proofFilePath: _proofFile?.path,
+        proofFileName: _proofFile?.name,
       ).build();
       await ref.read(paymentsApiProvider).submitPaymentProof(widget.request.requestId, form);
       if (mounted) Navigator.of(context).pop(true);
@@ -426,7 +524,45 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
                 if (picked != null) setState(() => _date = picked);
               },
               icon: const Icon(Icons.calendar_today_outlined, size: 18),
-              label: Text('Paid on ${_isoDate(_date)}'),
+              label: Text('Paid on ${isoDate(_date)}'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _submitting ? null : _pickProofFile,
+                  icon: const Icon(Icons.attach_file, size: AppSize.iconRow),
+                  label: Text(_proofFile == null ? 'Attach proof' : 'Replace file'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, AppSize.buttonHeightSm),
+                  ),
+                ),
+                if (_proofFile != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      _proofFile!.name,
+                      style: context.text.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => setState(() => _proofFile = null),
+                    icon: const Icon(Icons.close),
+                    iconSize: AppSize.iconRow,
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Remove file',
+                  ),
+                ],
+              ],
+            ),
+            Text(
+              'JPG, PNG, WEBP or PDF, up to 5MB. Enter a transaction reference '
+              'or attach a file — at least one is required.',
+              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -464,6 +600,8 @@ class FormDataProof {
     required this.paymentMethod,
     required this.note,
     required this.confirmedAccurate,
+    this.proofFilePath,
+    this.proofFileName,
   });
 
   final String transactionReference;
@@ -474,7 +612,13 @@ class FormDataProof {
   final String note;
   final bool confirmedAccurate;
 
-  FormData build() => FormData.fromMap({
+  /// Optional attachment. The serializer validates the multipart part's
+  /// content type, which dio derives from [proofFileName]'s extension — so the
+  /// name must keep its .jpg/.png/.webp/.pdf suffix.
+  final String? proofFilePath;
+  final String? proofFileName;
+
+  Future<FormData> build() async => FormData.fromMap({
         'transaction_reference': transactionReference,
         'reported_amount': reportedAmount,
         'reported_currency': reportedCurrency,
@@ -482,7 +626,39 @@ class FormDataProof {
         if (paymentMethod != null) 'payment_method': paymentMethod,
         'note': note,
         'confirmed_accurate': confirmedAccurate,
+        if (proofFilePath != null && proofFilePath!.isNotEmpty)
+          'proof_file': await MultipartFile.fromFile(
+            proofFilePath!,
+            filename: proofFileName,
+          ),
       });
+}
+
+/// Signature sniff for a downloaded proof, so the temp file gets a usable
+/// extension/mime type — the endpoint streams bytes, not a typed URL.
+({String suffix, String mimeType}) _proofFileType(List<int> bytes) {
+  bool matches(List<int> signature, [int offset = 0]) {
+    if (bytes.length < offset + signature.length) return false;
+    for (var i = 0; i < signature.length; i++) {
+      if (bytes[offset + i] != signature[i]) return false;
+    }
+    return true;
+  }
+
+  if (matches([0x25, 0x50, 0x44, 0x46])) {
+    return (suffix: '.pdf', mimeType: 'application/pdf');
+  }
+  if (matches([0x89, 0x50, 0x4E, 0x47])) {
+    return (suffix: '.png', mimeType: 'image/png');
+  }
+  if (matches([0xFF, 0xD8, 0xFF])) {
+    return (suffix: '.jpg', mimeType: 'image/jpeg');
+  }
+  if (matches([0x52, 0x49, 0x46, 0x46]) &&
+      matches([0x57, 0x45, 0x42, 0x50], 8)) {
+    return (suffix: '.webp', mimeType: 'image/webp');
+  }
+  return (suffix: '', mimeType: 'application/octet-stream');
 }
 
 class _StatusPill extends StatelessWidget {

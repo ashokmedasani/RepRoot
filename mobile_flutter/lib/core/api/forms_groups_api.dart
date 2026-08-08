@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,10 +28,14 @@ class FormsGroupsApi {
     });
   }
 
+  /// [formId] targets a specific lead form; omit it to create a new form
+  /// (or, when the professional only has one, to edit that one) — matches
+  /// the web's optional `form_id` on this same endpoint.
   Future<LeadForm> saveLeadForm(
     String title,
     List<DynamicField> customFields, {
     bool? isMandatory,
+    int? formId,
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
@@ -38,6 +44,7 @@ class FormsGroupsApi {
           'title': title,
           'custom_fields': customFields.map((f) => f.toJson()).toList(),
           'is_mandatory': ?isMandatory,
+          'form_id': ?formId,
         },
         options: _auth,
       );
@@ -45,20 +52,22 @@ class FormsGroupsApi {
     });
   }
 
-  /// Enable/disable the public lead form.
-  Future<LeadForm> updateLeadFormStatus(bool isActive) {
+  /// Enable/disable a public lead form. [formId] picks which one when the
+  /// professional has more than one; omitted, the backend falls back to
+  /// their first (oldest) form.
+  Future<LeadForm> updateLeadFormStatus(bool isActive, {int? formId}) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
         '/professional/forms-groups/lead-form/status/',
-        data: {'is_active': isActive},
+        data: {'is_active': isActive, 'form_id': ?formId},
         options: _auth,
       );
       return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
     });
   }
 
-  /// Update the introductory-meeting settings on the lead form (enable, title,
-  /// duration, notice/advance windows, approval).
+  /// Update the introductory-meeting settings on a lead form (enable, title,
+  /// duration, notice/advance windows, approval). [formId] as above.
   Future<LeadForm> saveLeadMeetingSettings({
     bool? introductoryMeetingEnabled,
     String? introductoryMeetingTitle,
@@ -67,6 +76,7 @@ class FormsGroupsApi {
     int? introductoryMeetingMaxAdvanceDays,
     int? introductoryMeetingBufferMinutes,
     bool? introductoryMeetingRequiresApproval,
+    int? formId,
   }) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
@@ -79,10 +89,52 @@ class FormsGroupsApi {
           'introductory_meeting_max_advance_days': ?introductoryMeetingMaxAdvanceDays,
           'introductory_meeting_buffer_minutes': ?introductoryMeetingBufferMinutes,
           'introductory_meeting_requires_approval': ?introductoryMeetingRequiresApproval,
+          'form_id': ?formId,
         },
         options: _auth,
       );
       return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+    });
+  }
+
+  // ----- lead-form introductory meeting requests -----
+
+  /// Every meeting request across all of the professional's lead forms —
+  /// the backend does not scope this by form, matching the web's
+  /// `getLeadMeetingRequests()`.
+  Future<List<LeadMeetingRequest>> getLeadMeetingRequests() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/lead-meeting-requests/',
+        options: _auth,
+      );
+      return (res.data?['requests'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(LeadMeetingRequest.fromJson)
+          .toList();
+    });
+  }
+
+  /// [action] is 'accept', 'decline', or 'send_followup'. [trainerNote] is
+  /// the review note for accept/decline, or the follow-up email body for
+  /// send_followup.
+  Future<({LeadMeetingRequest request, String message})> reviewLeadMeetingRequest(
+    int requestId,
+    String action, {
+    String trainerNote = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/lead-meeting-requests/$requestId/action/',
+        data: {'action': action, 'trainer_note': trainerNote},
+        options: _auth,
+      );
+      return (
+        request: LeadMeetingRequest.fromJson(
+          res.data?['request'] as Map<String, dynamic>? ?? {},
+        ),
+        message: res.data?['message'] as String? ?? '',
+      );
     });
   }
 
@@ -192,75 +244,26 @@ class FormsGroupsApi {
     });
   }
 
-  Future<ClientAccessDetailResponse> getClientProfile(int clientId) {
-    return runApi(() async {
-      final res = await _dio.get<Map<String, dynamic>>(
-        '/professional/forms-groups/clients/$clientId/',
-        options: _auth,
-      );
-      return ClientAccessDetailResponse.fromJson(res.data ?? {});
-    });
-  }
-
-  /// Partial update — only send the keys being changed, as in the TS.
-  Future<ClientAccessRecord> updateClientProfile(
-    int clientId, {
-    String? firstName,
-    String? lastName,
-    String? email,
-    String? username,
-    bool? isActive,
-    Map<String, String>? registrationAnswers,
-  }) {
-    return runApi(() async {
-      final res = await _dio.put<Map<String, dynamic>>(
-        '/professional/forms-groups/clients/$clientId/',
-        data: {
-          'first_name': ?firstName,
-          'last_name': ?lastName,
-          'email': ?email,
-          'username': ?username,
-          'is_active': ?isActive,
-          'registration_answers': ?registrationAnswers,
-        },
-        options: _auth,
-      );
-      return ClientAccessRecord.fromJson(
-        res.data?['client'] as Map<String, dynamic>? ?? {},
-      );
-    });
-  }
-
-  Future<({String notes, String? updatedAt})> saveProfessionalNotes(
-    int clientId,
-    String notes,
+  /// Rejects a pending group-registration submission, leaving no client behind.
+  ///
+  /// The counterpart to approving one; without it a submission the professional
+  /// doesn't want could only be cleared from the website.
+  Future<String> declineRegistrationSubmission(
+    int groupId,
+    int submissionId,
   ) {
     return runApi(() async {
-      final res = await _dio.put<Map<String, dynamic>>(
-        '/professional/forms-groups/clients/$clientId/notes/',
-        data: {'notes': notes},
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/forms-groups/groups/$groupId/'
+        'registration-submissions/$submissionId/decline/',
+        data: const {},
         options: _auth,
       );
-      return (
-        notes: res.data?['professional_notes'] as String? ?? '',
-        updatedAt: res.data?['professional_notes_updated_at'] as String?,
-      );
+      return res.data?['message'] as String? ?? '';
     });
   }
 
-  /// [photo] is a data URL / base64 string, matching the TS.
-  Future<ClientAccessRecord> updateClientPhoto(int clientId, String photo) {
-    return runApi(() async {
-      final res = await _dio.put<Map<String, dynamic>>(
-        '/professional/forms-groups/clients/$clientId/photo/',
-        data: {'photo': photo},
-        options: _auth,
-      );
-      return ClientAccessRecord.fromJson(
-        res.data?['client'] as Map<String, dynamic>? ?? {},
-      );
-    });
-  }
+  // ----- group CSV import -----
 
   Future<ClientAccessRecord> updateClientAdditionalInfo(
     int clientId,
@@ -388,6 +391,66 @@ class FormsGroupsApi {
         options: _auth,
       );
       return res.data?['temporary_password'] as String? ?? '';
+    });
+  }
+
+  // ----- portal access -----
+
+  /// Gives a manually-created client their own portal login. Until this runs a
+  /// client record exists but nobody can sign in as them, so on mobile this was
+  /// a dead end: you could add a client in the app but had to finish on the
+  /// website. 1:1 with the web's `grantPortalAccess`.
+  ///
+  /// The backend re-checks that the two passwords match and that the username
+  /// is free; [confirmPassword] is sent rather than validated away here so its
+  /// error message comes back from the same place the web's does.
+  Future<GrantPortalAccessResult> grantPortalAccess(
+    int clientId, {
+    required String username,
+    required String password,
+    required String confirmPassword,
+    bool sendCredentials = false,
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/grant-access/',
+        data: {
+          'username': username,
+          'password': password,
+          'confirm_password': confirmPassword,
+          'send_credentials': sendCredentials,
+        },
+        options: _auth,
+      );
+      final data = res.data ?? const <String, dynamic>{};
+      return GrantPortalAccessResult(
+        client: ClientAccessRecord.fromJson(
+          data['client_access'] as Map<String, dynamic>? ?? const {},
+        ),
+        temporaryPassword: data['temporary_password'] as String? ?? '',
+        credentialsSent: data['credentials_sent'] as bool? ?? false,
+        message: data['message'] as String? ?? '',
+      );
+    });
+  }
+
+  /// Removes the client's portal login while keeping their record and history.
+  Future<({ClientAccessRecord client, String message})> revokePortalAccess(
+    int clientId,
+  ) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/forms-groups/clients/$clientId/revoke-access/',
+        data: const {},
+        options: _auth,
+      );
+      final data = res.data ?? const <String, dynamic>{};
+      return (
+        client: ClientAccessRecord.fromJson(
+          data['client_access'] as Map<String, dynamic>? ?? const {},
+        ),
+        message: data['message'] as String? ?? '',
+      );
     });
   }
 

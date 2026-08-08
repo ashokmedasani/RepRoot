@@ -142,12 +142,15 @@ class SchedulingApi {
     });
   }
 
+  /// [guestClientIds] turns the booking into a group meeting: the backend
+  /// keeps [client] as the primary attendee and adds a guest row per id.
   Future<ScheduledMeetingRecord> createMeeting({
     required int client,
     required String start,
     int? durationMinutes,
     String title = '',
     String notes = '',
+    List<int>? guestClientIds,
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
@@ -158,6 +161,9 @@ class SchedulingApi {
           'duration_minutes': ?durationMinutes,
           'title': ?(title.isEmpty ? null : title),
           'notes': ?(notes.isEmpty ? null : notes),
+          'guest_client_ids': ?((guestClientIds == null || guestClientIds.isEmpty)
+              ? null
+              : guestClientIds),
         },
         options: _auth,
       );
@@ -214,6 +220,100 @@ class SchedulingApi {
         '/client/scheduling/meetings/$meetingId/respond/',
         data: {'response_status': responseStatus},
         options: _clientAuth,
+      );
+      return ScheduledMeetingRecord.fromJson(
+        res.data?['meeting'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  // ----- days off (specific dates + recurring weekdays) -----
+
+  Future<List<DateOffRecord>> listDateOffs() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/scheduling/date-offs/',
+        options: _auth,
+      );
+      return (res.data?['date_offs'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(DateOffRecord.fromJson)
+          .toList();
+    });
+  }
+
+  /// [date] is "yyyy-MM-dd". The backend rejects dates in the past and
+  /// duplicates of a date that is already off.
+  Future<DateOffRecord> addDateOff(String date) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/scheduling/date-offs/',
+        data: {'date': date},
+        options: _auth,
+      );
+      return DateOffRecord.fromJson(
+        res.data?['date_off'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  Future<void> deleteDateOff(int dateOffId) {
+    return runApi(() async {
+      await _dio.delete<Map<String, dynamic>>(
+        '/professional/scheduling/date-offs/$dateOffId/',
+        options: _auth,
+      );
+    });
+  }
+
+  Future<List<WeekdayOffRecord>> listWeekdayOffs() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/scheduling/weekday-offs/',
+        options: _auth,
+      );
+      return (res.data?['weekday_offs'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(WeekdayOffRecord.fromJson)
+          .toList();
+    });
+  }
+
+  /// [weekday] is 0=Monday .. 6=Sunday, matching the availability windows.
+  Future<WeekdayOffRecord> addWeekdayOff(int weekday) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/scheduling/weekday-offs/',
+        data: {'weekday': weekday},
+        options: _auth,
+      );
+      return WeekdayOffRecord.fromJson(
+        res.data?['weekday_off'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  Future<void> deleteWeekdayOff(int weekdayOffId) {
+    return runApi(() async {
+      await _dio.delete<Map<String, dynamic>>(
+        '/professional/scheduling/weekday-offs/$weekdayOffId/',
+        options: _auth,
+      );
+    });
+  }
+
+  /// Accept or decline a time a client proposed — [action] is 'accept' or
+  /// 'decline'. Accepting provisions the video link and sends the invites.
+  Future<ScheduledMeetingRecord> reviewClientMeetingRequest(
+    int meetingId,
+    String action, {
+    String reason = '',
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/scheduling/meetings/$meetingId/request-action/',
+        data: {'action': action, 'reason': reason},
+        options: _auth,
       );
       return ScheduledMeetingRecord.fromJson(
         res.data?['meeting'] as Map<String, dynamic>? ?? {},

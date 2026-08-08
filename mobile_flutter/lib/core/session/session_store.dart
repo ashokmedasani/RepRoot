@@ -69,26 +69,53 @@ class SessionStore extends ChangeNotifier {
   bool get hasProfessionalSession => has(SessionKeys.professionalToken);
   bool get hasClientSession => has(SessionKeys.clientToken);
 
+  /// 'professional' | 'client' | null. Set by the dio error interceptor when
+  /// a 403 says updated legal documents must be accepted (the backend bumps
+  /// REPROOT_*_LEGAL_VERSION mid-session). In-memory only — never persisted:
+  /// on a fresh launch the login/restore gates re-derive it from the API.
+  /// The router watches this via refreshListenable and redirects to the
+  /// matching consent page, mirroring the web error.interceptor.ts.
+  String? _pendingLegalConsent;
+  String? get pendingLegalConsent => _pendingLegalConsent;
+
+  void flagLegalConsentRequired(String role) {
+    if (_pendingLegalConsent == role) return;
+    _pendingLegalConsent = role;
+    notifyListeners();
+  }
+
+  void clearLegalConsentFlag() {
+    if (_pendingLegalConsent == null) return;
+    _pendingLegalConsent = null;
+    notifyListeners();
+  }
+
   Future<void> storeProfessionalToken(String token) =>
       write(SessionKeys.professionalToken, token);
 
   Future<void> storeClientToken(String token) =>
       write(SessionKeys.clientToken, token);
 
-  Future<void> clearProfessionalSession() =>
-      clear([SessionKeys.professionalToken]);
+  Future<void> clearProfessionalSession() {
+    if (_pendingLegalConsent == 'professional') _pendingLegalConsent = null;
+    return clear([SessionKeys.professionalToken]);
+  }
 
-  Future<void> clearClientSession() =>
-      clear([SessionKeys.clientToken, SessionKeys.clientAccess]);
+  Future<void> clearClientSession() {
+    if (_pendingLegalConsent == 'client') _pendingLegalConsent = null;
+    return clear([SessionKeys.clientToken, SessionKeys.clientAccess]);
+  }
 
   /// Immediately invalidates an unauthorized role in memory so interceptors
   /// stop attaching the rejected token. Secure-storage cleanup is best-effort
   /// in the background because a 401 response must not wait on the keystore.
   void invalidateProfessionalSession() {
+    if (_pendingLegalConsent == 'professional') _pendingLegalConsent = null;
     _invalidate([SessionKeys.professionalToken]);
   }
 
   void invalidateClientSession() {
+    if (_pendingLegalConsent == 'client') _pendingLegalConsent = null;
     _invalidate([SessionKeys.clientToken, SessionKeys.clientAccess]);
   }
 

@@ -12,6 +12,7 @@ import '../../core/api/client_api.dart';
 import '../../core/api/models/forms_groups_models.dart';
 import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../shared/legal/legal_documents.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/password_field.dart';
 import '../professional/professional_format.dart';
@@ -516,6 +517,32 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
             ),
           ),
 
+          // The "Privacy & Legal" tab of the web client settings page:
+          // both client documents plus the latest recorded acceptance.
+          const SectionHeader(title: 'Privacy & Legal'),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Review your legal documents and latest acceptance.',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.tokens.muted,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _legalLink('Privacy Policy', LegalAudience.client.privacyUrl),
+                _legalLink(
+                  'Terms & Conditions',
+                  LegalAudience.client.termsUrl,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _kv('Last legal acceptance', _lastLegalAcceptance),
+                _kv('Accepted document version', _acceptedLegalVersion),
+              ],
+            ),
+          ),
+
           const SectionHeader(title: 'Account'),
           AppCard(
             child: _deletionRequest != null
@@ -576,6 +603,43 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Newest acceptance record, with the same "Not recorded" fallback the web
+  /// template shows.
+  String get _lastLegalAcceptance {
+    final history = _me?.client.legalAcceptanceHistory ?? const [];
+    if (history.isNotEmpty && history.first.acceptedAt.isNotEmpty) {
+      return dateTimeLabel(history.first.acceptedAt);
+    }
+    final accepted = _me?.client.termsAcceptedAt ?? '';
+    return accepted.isEmpty ? 'Not recorded' : dateTimeLabel(accepted);
+  }
+
+  String get _acceptedLegalVersion {
+    final history = _me?.client.legalAcceptanceHistory ?? const [];
+    if (history.isNotEmpty && history.first.legalDocumentVersion.isNotEmpty) {
+      return history.first.legalDocumentVersion;
+    }
+    final version = _me?.client.legalDocumentVersion ?? '';
+    return version.isEmpty ? 'Not recorded' : version;
+  }
+
+  Widget _legalLink(String label, String url) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: context.text.bodySmall)),
+        TextButton(
+          onPressed: () => openLegalDocument(context, url),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            minimumSize: const Size(0, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('View'),
+        ),
+      ],
     );
   }
 

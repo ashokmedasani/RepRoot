@@ -1276,7 +1276,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       cursor.setDate(cursor.getDate() - 1);
     }
 
-    while (entryDates.has(cursor.toISOString().slice(0, 10))) {
+    while (entryDates.has(this.toLocalIso(cursor))) {
       streak += 1;
       cursor.setDate(cursor.getDate() - 1);
     }
@@ -1361,7 +1361,22 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Local calendar date, NOT `toISOString()`.
+   *
+   *  `toISOString()` converts to UTC first, so anywhere west of UTC it returns
+   *  tomorrow's date after ~19:00 local (and anywhere east returns yesterday's
+   *  early in the morning). Entry dates are stored as local calendar days, so
+   *  comparing them against a UTC "today" silently broke the streak and
+   *  completion figures for part of every day — and made the web disagree with
+   *  the Flutter app, which has always used the local date. */
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return this.toLocalIso(new Date());
+  }
+
+  private toLocalIso(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }

@@ -17,6 +17,50 @@ class ProfessionalUpgradeTier {
       };
 }
 
+/// One tier in the Free/Pro/Premium comparison list — mirrors a single
+/// entry of `settings.REPROOT_PLAN_TIERS` as serialized by the billing
+/// status endpoint's `plans` array. Every limit comes from here; nothing
+/// about tier numbers is ever hardcoded in Dart, so a change to
+/// REPROOT_PLAN_TIERS on the backend needs zero Flutter changes.
+class ProfessionalPlanTier {
+  const ProfessionalPlanTier({
+    required this.code,
+    required this.name,
+    required this.leadForms,
+    required this.clients,
+    required this.storageBytes,
+    required this.groups,
+    required this.resources,
+    required this.categories,
+    required this.clientDataRetentionDays,
+  });
+
+  final String code;
+  final String name;
+  final int leadForms;
+
+  /// null means unlimited (every tier today is unlimited clients).
+  final int? clients;
+  final int storageBytes;
+  final int groups;
+  final int resources;
+  final int categories;
+  final int clientDataRetentionDays;
+
+  factory ProfessionalPlanTier.fromJson(Map<String, dynamic> json) =>
+      ProfessionalPlanTier(
+        code: json['code']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        leadForms: (json['lead_forms'] as num?)?.toInt() ?? 0,
+        clients: (json['clients'] as num?)?.toInt(),
+        storageBytes: (json['professional_storage_bytes'] as num?)?.toInt() ?? 0,
+        groups: (json['groups'] as num?)?.toInt() ?? 0,
+        resources: (json['resources'] as num?)?.toInt() ?? 0,
+        categories: (json['categories'] as num?)?.toInt() ?? 0,
+        clientDataRetentionDays: (json['client_data_retention_days'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class ProfessionalBillingStatus {
   const ProfessionalBillingStatus({
     required this.planCode,
@@ -37,6 +81,7 @@ class ProfessionalBillingStatus {
     required this.categoryCascadeResourceCount,
     required this.clientsLosingAccess,
     required this.supportEmail,
+    required this.plans,
   });
 
   final String planCode;
@@ -65,6 +110,9 @@ class ProfessionalBillingStatus {
   final int categoryCascadeResourceCount;
   final List<Map<String, dynamic>> clientsLosingAccess;
   final String supportEmail;
+
+  /// Free/Pro/Premium comparison list, straight from `REPROOT_PLAN_TIERS`.
+  final List<ProfessionalPlanTier> plans;
 
   List<String> get upgradeTiers =>
       availableUpgrades.entries.where((e) => e.value).map((e) => e.key).toList();
@@ -105,6 +153,11 @@ class ProfessionalBillingStatus {
           .map((e) => Map<String, dynamic>.from(e as Map<dynamic, dynamic>? ?? {}))
           .toList(),
       supportEmail: assessment['support_email']?.toString() ?? '',
+      plans: (json['plans'] as List<dynamic>? ?? [])
+          .map((e) => ProfessionalPlanTier.fromJson(
+                Map<String, dynamic>.from(e as Map<dynamic, dynamic>? ?? {}),
+              ))
+          .toList(),
     );
   }
 }

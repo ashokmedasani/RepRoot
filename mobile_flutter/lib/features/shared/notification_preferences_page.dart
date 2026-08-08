@@ -204,10 +204,14 @@ class _PreferenceCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
+            // "In-App", not "Website / in-app". There is one in-app channel
+            // (`in_app_enabled`) shared by web and mobile; naming it after
+            // one of the two surfaces implied a second, separate setting.
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              title: const Text('Website / in-app'),
+              title: const Text('In-App'),
+              subtitle: const Text('Your notification inbox, on web and mobile'),
               value: row.inAppEnabled,
               onChanged: saving ? null : onInAppChanged,
             ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/plan_lock_api.dart';
 import '../../core/api/resources_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/video/open_resource.dart';
@@ -23,11 +24,38 @@ class ProfessionalResourcesPage extends ConsumerStatefulWidget {
       _ProfessionalResourcesPageState();
 }
 
+/// Copy for the Resource Library `i` popup. The page shows the library; the
+/// rules about how it is structured and what locking means live in here.
+const _libraryInfo =
+    'Your Resource Library is what clients see attached to their templates — '
+    'PDFs, links, videos, notes.\n\n'
+    'HOW IT IS ORGANISED\n'
+    'Categories are the top level, and each one holds resources. A resource '
+    'can also be filed under a subcategory inside its category, so a large '
+    'category stays browsable.\n\n'
+    'ORDER\n'
+    'Drag a category by the handle to reorder the library. That order is not '
+    'only cosmetic: categories take your plan\'s slots from the top down, so '
+    'whatever you drag to the bottom is what locks first if you go over.\n\n'
+    'LOCKED CATEGORIES\n'
+    'A locked category is past your plan\'s limit. Every resource inside it '
+    'locks with it and is hidden from clients. Nothing is deleted — drag the '
+    'category higher, free a slot, or upgrade, and it all comes back.';
+
+const _lockedCategoriesInfo =
+    'These categories are past your current plan\'s category limit.\n\n'
+    'Every resource inside them is locked too, and hidden from your clients. '
+    'Nothing has been deleted.\n\n'
+    'To unlock one: drag it higher in Categories so it takes a slot ahead of '
+    'another category, delete a category you no longer need, or upgrade your '
+    'plan.';
+
 class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResourcesPage> {
   final _query = TextEditingController();
 
   List<ResourceCategoryRecord> _categories = [];
   List<ProfessionalResourceRecord> _resources = [];
+  PlanLockStatus _lockStatus = const PlanLockStatus();
   ResourceUsage _usage = const ResourceUsage(used: 0, limit: null);
   String _message = '';
   bool _loading = true;
@@ -95,12 +123,77 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       _categories.where((c) => c.id == categoryId).firstOrNull?.subcategories ??
       const [];
 
+  // ----- plan-limit lock ordering -----
+
+  PlanLockSection get _categoryLock =>
+      _lockStatus.section(PlanLockModelKey.categories);
+
+  PlanLockSection get _resourceLock =>
+      _lockStatus.section(PlanLockModelKey.resources);
+
+  /// Until the lock-status call lands (or if it fails) there is no split to
+  /// honour, so the library renders flat and drag is disabled.
+  bool get _categoryLockLoaded =>
+      _lockStatus.sections.containsKey(PlanLockModelKey.categories);
+
+  bool get _resourceLockLoaded =>
+      _lockStatus.sections.containsKey(PlanLockModelKey.resources);
+
+  /// Order comes from the lock status' active_ids, never a separate local
+  /// list, so a drag cannot drift out of sync with the stored order.
+  List<ResourceCategoryRecord> get _activeCategories {
+    if (!_categoryLockLoaded) return _categories;
+    final byId = {for (final category in _categories) category.id: category};
+    return [
+      for (final id in _categoryLock.activeIds)
+        if (byId[id] != null) byId[id]!,
+    ];
+  }
+
+  List<ResourceCategoryRecord> get _lockedCategories {
+    if (!_categoryLockLoaded) return const [];
+    final lockedIds = _categoryLock.lockedIds.toSet();
+    return _categories.where((category) => lockedIds.contains(category.id)).toList();
+  }
+
+  List<ProfessionalResourceRecord> _activeResourcesFor(
+    String categoryName,
+    String subcategory,
+  ) {
+    if (!_resourceLockLoaded) return _resourcesFor(categoryName, subcategory);
+    final byId = {for (final resource in _resources) resource.id: resource};
+    return [
+      for (final id in _resourceLock.activeIds)
+        if (byId[id] != null &&
+            byId[id]!.categoryName == categoryName &&
+            byId[id]!.subcategory == subcategory)
+          byId[id]!,
+    ];
+  }
+
+  List<ProfessionalResourceRecord> _lockedResourcesFor(
+    String categoryName,
+    String subcategory,
+  ) {
+    if (!_resourceLockLoaded) return const [];
+    final lockedIds = _resourceLock.lockedIds.toSet();
+    return _resourcesFor(categoryName, subcategory)
+        .where((resource) => lockedIds.contains(resource.id))
+        .toList();
+  }
+
+  /// Drag indices address the unfiltered list, so reordering is only offered
+  /// when nothing is being searched.
+  bool get _searching => _query.text.trim().isNotEmpty;
+
   /// Searches the category and everything inside it, so a hit on a resource
   /// keeps its parent visible.
-  List<ResourceCategoryRecord> get _visibleCategories {
+  List<ResourceCategoryRecord> _matchingSearch(
+    List<ResourceCategoryRecord> source,
+  ) {
     final term = _query.text.trim().toLowerCase();
-    if (term.isEmpty) return _categories;
-    return _categories.where((category) {
+    if (term.isEmpty) return source;
+    return source.where((category) {
       final haystack = [
         category.name,
         category.description,
@@ -114,6 +207,12 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       return haystack.contains(term);
     }).toList();
   }
+
+  List<ResourceCategoryRecord> get _visibleCategories =>
+      _matchingSearch(_activeCategories);
+
+  List<ResourceCategoryRecord> get _visibleLockedCategories =>
+      _matchingSearch(_lockedCategories);
 
   bool _isCategoryOpen(int id) =>
       _expandedCategoryId == id || _query.text.trim().isNotEmpty;
@@ -148,6 +247,91 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
         _loading = false;
       });
     }
+    await _loadLockStatus();
+  }
+
+  Future<void> _loadLockStatus() async {
+    try {
+      final status = await ref.read(planLockApiProvider).getLockStatus();
+      if (mounted) setState(() => _lockStatus = status);
+    } catch (_) {/* the library just renders flat, without lock badges */}
+  }
+
+  /// Sends the permuted active order for one model and adopts the lock status
+  /// the backend recomputes. Locked ids are never in the payload — the
+  /// backend rejects any order that includes one.
+  Future<void> _submitReorder(
+    String modelKey,
+    List<int> orderedIds,
+    String failureMessage,
+  ) async {
+    final previous = _lockStatus;
+    // Optimistic so the row stays where it was dropped during the round trip.
+    setState(() {
+      _lockStatus = _lockStatus.withSection(
+        modelKey,
+        _lockStatus.section(modelKey).copyWith(activeIds: orderedIds),
+      );
+    });
+
+    try {
+      final status =
+          await ref.read(planLockApiProvider).reorder(modelKey, orderedIds);
+      if (mounted) setState(() => _lockStatus = status);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _lockStatus = previous);
+      _toast(error is ApiException ? error.message : failureMessage);
+    }
+  }
+
+  // onReorderItem already adjusts newIndex for the removed row.
+  Future<void> _reorderCategories(int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+
+    final orderedIds = [..._categoryLock.activeIds];
+    if (oldIndex < 0 || oldIndex >= orderedIds.length) return;
+    orderedIds.insert(newIndex, orderedIds.removeAt(oldIndex));
+
+    await _submitReorder(
+      PlanLockModelKey.categories,
+      orderedIds,
+      'Could not reorder categories.',
+    );
+  }
+
+  /// Resources are ranked professional-wide, but the library only shows one
+  /// subcategory at a time. Dragging inside a subcategory reorders just that
+  /// visible subset while preserving the exact slots those resources occupy
+  /// in the full ranking, so priority against resources elsewhere is
+  /// untouched. Mirrors dropResource() in the web references component.
+  Future<void> _reorderResources(
+    String categoryName,
+    String subcategory,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    // onReorderItem already adjusts newIndex for the removed row.
+    if (oldIndex == newIndex) return;
+
+    final scopedIds = _activeResourcesFor(categoryName, subcategory)
+        .map((resource) => resource.id)
+        .toList();
+    if (oldIndex < 0 || oldIndex >= scopedIds.length) return;
+    scopedIds.insert(newIndex, scopedIds.removeAt(oldIndex));
+
+    final scopedIdSet = scopedIds.toSet();
+    var cursor = 0;
+    final mergedIds = [
+      for (final id in _resourceLock.activeIds)
+        if (scopedIdSet.contains(id)) scopedIds[cursor++] else id,
+    ];
+
+    await _submitReorder(
+      PlanLockModelKey.resources,
+      mergedIds,
+      'Could not reorder resources.',
+    );
   }
 
   void _toast(String text) {
@@ -541,11 +725,15 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
             const SizedBox(height: AppSpacing.md),
             _categoryEditor(),
           ],
-          const SizedBox(height: AppSpacing.md),
+          SectionHeader(
+            title: 'Categories',
+            infoBody: _libraryInfo,
+            topSpace: AppSpacing.lg,
+          ),
 
           if (_loading)
             for (var i = 0; i < 4; i++) const SkeletonBox(height: 64)
-          else if (categories.isEmpty)
+          else if (categories.isEmpty && _visibleLockedCategories.isEmpty)
             EmptyState(
               compact: false,
               icon: Icons.folder_open_outlined,
@@ -557,18 +745,61 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                   ? () => _openCategoryEditor(CategoryEditorMode.create)
                   : null,
             )
-          else
-            for (final category in categories) _categoryTile(category),
+          else ...[
+            if (_canReorderCategories) ...[
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                // Tiles expand on tap, so an explicit handle keeps a tap from
+                // being read as the start of a drag.
+                buildDefaultDragHandles: false,
+                itemCount: categories.length,
+                onReorderItem: _reorderCategories,
+                itemBuilder: (context, index) => _categoryTile(
+                  categories[index],
+                  key: ValueKey(categories[index].id),
+                  dragIndex: index,
+                ),
+              ),
+            ] else
+              for (final category in categories)
+                _categoryTile(category, key: ValueKey(category.id)),
+
+            if (_visibleLockedCategories.isNotEmpty) ...[
+              SectionHeader(
+                title: 'Locked categories',
+                infoBody: _lockedCategoriesInfo,
+              ),
+              for (final category in _visibleLockedCategories)
+                _categoryTile(
+                  category,
+                  key: ValueKey('locked-${category.id}'),
+                  locked: true,
+                ),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  Widget _categoryTile(ResourceCategoryRecord category) {
+  bool get _canReorderCategories =>
+      _categoryLockLoaded && !_searching && _activeCategories.length > 1;
+
+  /// One category tile. [dragIndex] adds the reorder handle (active tiles
+  /// inside the reorderable list only); [locked] renders the plan-lock
+  /// variant, which cannot be edited until it unlocks.
+  Widget _categoryTile(
+    ResourceCategoryRecord category, {
+    required Key key,
+    int? dragIndex,
+    bool locked = false,
+  }) {
     final open = _isCategoryOpen(category.id);
     final tokens = context.tokens;
 
     return Padding(
+      key: key,
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: AppCard(
         padding: EdgeInsets.zero,
@@ -584,6 +815,17 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                 padding: const EdgeInsets.all(AppSpacing.card),
                 child: Row(
                   children: [
+                    if (dragIndex != null) ...[
+                      ReorderableDragStartListener(
+                        index: dragIndex,
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: AppSize.iconRow,
+                          color: tokens.muted,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                    ],
                     Icon(
                       open ? Icons.expand_more : Icons.chevron_right,
                       size: AppSize.iconRow,
@@ -605,14 +847,23 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                         ],
                       ),
                     ),
-                    StatusPill(label: '${category.resourceCount}'),
+                    StatusPill(
+                      label: locked ? 'Locked' : '${category.resourceCount}',
+                      tone: locked ? PillTone.warn : PillTone.neutral,
+                    ),
                     IconButton(
-                      onPressed: () =>
-                          _openCategoryEditor(CategoryEditorMode.edit, category),
+                      onPressed: locked
+                          ? null
+                          : () => _openCategoryEditor(
+                                CategoryEditorMode.edit,
+                                category,
+                              ),
                       icon: const Icon(Icons.edit_outlined),
                       iconSize: AppSize.iconRow,
                       visualDensity: VisualDensity.compact,
-                      tooltip: 'Edit category',
+                      tooltip: locked
+                          ? 'Locked categories can\'t be edited until they unlock'
+                          : 'Edit category',
                     ),
                     IconButton(
                       onPressed: () => _removeCategory(category),
@@ -642,7 +893,11 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (final subcategory in _subcategoriesOf(category))
-                      _subcategoryBlock(category, subcategory),
+                      _subcategoryBlock(
+                        category,
+                        subcategory,
+                        categoryLocked: locked,
+                      ),
                     const SizedBox(height: AppSpacing.sm),
                     Wrap(
                       spacing: AppSpacing.sm,
@@ -670,8 +925,21 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
     );
   }
 
-  Widget _subcategoryBlock(ResourceCategoryRecord category, String subcategory) {
-    final items = _resourcesFor(category.name, subcategory);
+  Widget _subcategoryBlock(
+    ResourceCategoryRecord category,
+    String subcategory, {
+    bool categoryLocked = false,
+  }) {
+    // Everything inside a locked category is locked by cascade, so nothing
+    // there is reorderable regardless of the resources lock section.
+    final active = categoryLocked
+        ? const <ProfessionalResourceRecord>[]
+        : _activeResourcesFor(category.name, subcategory);
+    final locked = categoryLocked
+        ? _resourcesFor(category.name, subcategory)
+        : _lockedResourcesFor(category.name, subcategory);
+    final canReorder =
+        !categoryLocked && _resourceLockLoaded && !_searching && active.length > 1;
     final tokens = context.tokens;
 
     return Padding(
@@ -710,23 +978,61 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                 ),
             ],
           ),
-          if (items.isEmpty)
+          if (active.isEmpty && locked.isEmpty)
             Padding(
               padding: const EdgeInsets.only(left: AppSpacing.sm),
               child: Text('No resources here yet.', style: context.text.bodySmall),
             )
-          else
-            for (final resource in items) _resourceRow(resource),
+          else ...[
+            if (canReorder)
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                // Rows expand on tap, so an explicit handle keeps a tap from
+                // being read as the start of a drag.
+                buildDefaultDragHandles: false,
+                itemCount: active.length,
+                onReorderItem: (oldIndex, newIndex) => _reorderResources(
+                  category.name,
+                  subcategory,
+                  oldIndex,
+                  newIndex,
+                ),
+                itemBuilder: (context, index) => _resourceRow(
+                  active[index],
+                  key: ValueKey(active[index].id),
+                  dragIndex: index,
+                ),
+              )
+            else
+              for (final resource in active)
+                _resourceRow(resource, key: ValueKey(resource.id)),
+            for (final resource in locked)
+              _resourceRow(
+                resource,
+                key: ValueKey('locked-${resource.id}'),
+                locked: true,
+              ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _resourceRow(ProfessionalResourceRecord resource) {
+  /// One resource row. [dragIndex] adds the reorder handle (active rows inside
+  /// the reorderable list only); [locked] rows are hidden from clients and
+  /// cannot be edited, but can still be opened or deleted to free a slot.
+  Widget _resourceRow(
+    ProfessionalResourceRecord resource, {
+    required Key key,
+    int? dragIndex,
+    bool locked = false,
+  }) {
     final expanded = _expandedResourceId == resource.id;
     final tokens = context.tokens;
 
     return Container(
+      key: key,
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
         color: tokens.surfaceSoft,
@@ -743,6 +1049,17 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
               padding: const EdgeInsets.all(AppSpacing.sm + 2),
               child: Row(
                 children: [
+                  if (dragIndex != null) ...[
+                    ReorderableDragStartListener(
+                      index: dragIndex,
+                      child: Icon(
+                        Icons.drag_indicator,
+                        size: AppSize.iconRow,
+                        color: tokens.muted,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
                   Container(
                     width: 30,
                     height: 30,
@@ -778,6 +1095,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                       ],
                     ),
                   ),
+                  if (locked) ...[
+                    const StatusPill(label: 'Locked', tone: PillTone.warn),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
                   Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
                     size: AppSize.iconRow,
@@ -798,6 +1119,16 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (locked)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Text(
+                        'This resource is locked and hidden from clients. It '
+                        'can still be deleted to free a slot, but not edited '
+                        'until it unlocks.',
+                        style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                      ),
+                    ),
                   if (resource.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -826,7 +1157,8 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                           ),
                         ),
                       TextButton.icon(
-                        onPressed: () => _startEditResource(resource),
+                        onPressed:
+                            locked ? null : () => _startEditResource(resource),
                         icon: const Icon(Icons.edit_outlined, size: AppSize.iconRow),
                         label: const Text('Edit'),
                         style: TextButton.styleFrom(
@@ -835,8 +1167,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                         ),
                       ),
                       TextButton.icon(
-                        onPressed:
-                            _atLimit ? null : () => _duplicateResource(resource),
+                        onPressed: _atLimit || locked
+                            ? null
+                            : () => _duplicateResource(resource),
                         icon: const Icon(Icons.copy_outlined, size: AppSize.iconRow),
                         label: const Text('Duplicate'),
                         style: TextButton.styleFrom(

@@ -63,12 +63,18 @@ class _ErrorInterceptor extends Interceptor {
 
   final SessionStore _session;
 
+  /// The marker access_permissions.py / client_auth.py put in the 403 body
+  /// when the legal version was bumped mid-session. Same substring the web
+  /// checks in error.interceptor.ts — keep the three in sync.
+  static const _legalConsentMarker =
+      'Terms & Conditions and Privacy Notice must be accepted';
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    final scheme =
+        err.requestOptions.extra[kAuthSchemeKey] as AuthScheme? ??
+        AuthScheme.none;
     if (err.response?.statusCode == 401) {
-      final scheme =
-          err.requestOptions.extra[kAuthSchemeKey] as AuthScheme? ??
-          AuthScheme.none;
       switch (scheme) {
         case AuthScheme.professional:
           _session.invalidateProfessionalSession();
@@ -76,6 +82,19 @@ class _ErrorInterceptor extends Interceptor {
           _session.invalidateClientSession();
         case AuthScheme.none:
           break;
+      }
+    }
+    // Mid-session re-consent — the mobile copy of the web's
+    // error.interceptor.ts: a 403 whose detail says updated legal documents
+    // must be accepted flips a session flag; the router (refreshListenable)
+    // then redirects to the matching consent page.
+    if (err.response?.statusCode == 403 && scheme != AuthScheme.none) {
+      final data = err.response?.data;
+      final detail = data is Map ? (data['detail']?.toString() ?? '') : '';
+      if (detail.contains(_legalConsentMarker)) {
+        _session.flagLegalConsentRequired(
+          scheme == AuthScheme.client ? 'client' : 'professional',
+        );
       }
     }
     handler.reject(err.copyWith(error: _toApiException(err)));

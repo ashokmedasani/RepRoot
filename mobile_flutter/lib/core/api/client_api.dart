@@ -8,6 +8,8 @@ import 'api_client.dart';
 import 'chat_api.dart';
 import 'models/client_models.dart';
 import 'models/forms_groups_models.dart';
+import 'models/legal_models.dart';
+import 'models/scheduling_models.dart';
 import 'models/support_models.dart';
 import 'models/template_models.dart';
 import 'models/notification_models.dart';
@@ -130,6 +132,38 @@ class ClientApi {
         options: _auth,
       );
       return ClientLoginResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  // ----- legal documents -----
+
+  /// Public endpoint (no token): current published versions + effective date.
+  /// Same URL the professional API uses — one configuration serves both roles.
+  Future<LegalConfiguration> getLegalConfiguration() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>('/legal/configuration/');
+      return LegalConfiguration.fromJson(res.data ?? {});
+    });
+  }
+
+  /// Records acceptance of the current client Terms + Privacy Notice and
+  /// returns the refreshed access record. The caller must re-store it, exactly
+  /// as the web writes the response back to sessionStorage — otherwise the
+  /// cached record still reads "not accepted" and the gate loops.
+  Future<ClientAccessRecord> acceptLegalDocuments() {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/client/legal-acceptance/',
+        data: {
+          'accept_terms': true,
+          'accept_privacy': true,
+          'client_timezone': localTimezoneLabel(),
+        },
+        options: _auth,
+      );
+      return ClientAccessRecord.fromJson(
+        res.data?['client'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
@@ -363,6 +397,50 @@ class ClientApi {
     return res.data ?? const [];
   });
 
+  /// Open times on the client's own professional's calendar. [start] and
+  /// [end] are "yyyy-MM-dd"; the backend only accepts 15- or 30-minute video
+  /// meetings and a range of 31 days or less.
+  Future<ClientSlotsResponse> getSchedulingSlots({
+    required String start,
+    required String end,
+    required int durationMinutes,
+  }) => runApi(() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/client/scheduling/slots/',
+      queryParameters: {
+        'start': start,
+        'end': end,
+        'duration_minutes': durationMinutes,
+      },
+      options: _auth,
+    );
+    return ClientSlotsResponse.fromJson(res.data ?? {});
+  });
+
+  /// Propose a meeting time. It stays `pending_approval` until the
+  /// professional accepts it, and the backend re-checks that the slot is
+  /// still free (409 if someone took it in the meantime).
+  Future<ClientMeetingRecord> requestMeeting({
+    required String start,
+    required int durationMinutes,
+    required String title,
+    String notes = '',
+  }) => runApi(() async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/client/scheduling/meeting-requests/',
+      data: {
+        'start': start,
+        'duration_minutes': durationMinutes,
+        'title': title,
+        'notes': notes,
+      },
+      options: _auth,
+    );
+    return ClientMeetingRecord.fromJson(
+      res.data?['meeting'] as Map<String, dynamic>? ?? {},
+    );
+  });
+
   // ----- profile change / deletion requests -----
 
   Future<ClientDetailChangeRequest?> getDetailChangeRequest() {
@@ -515,6 +593,11 @@ class ClientApi {
     await _session.storeClientToken(token);
     await _session.write(SessionKeys.clientAccess, jsonEncode(client.toJson()));
   }
+
+  /// Refreshes the cached access record without touching the token — used after
+  /// legal acceptance, where the token is unchanged but the consent flags move.
+  Future<void> storeClient(ClientAccessRecord client) =>
+      _session.write(SessionKeys.clientAccess, jsonEncode(client.toJson()));
 
   Future<void> clearSession() => _session.clearClientSession();
 

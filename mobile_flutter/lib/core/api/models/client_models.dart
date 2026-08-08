@@ -3,6 +3,8 @@
 /// Field names match the Django payloads exactly; do not rename them.
 library;
 
+import 'legal_models.dart';
+
 /// 'text' | 'link' | 'reference'
 class AdditionalInfoType {
   const AdditionalInfoType._();
@@ -82,12 +84,20 @@ class ClientAccessRecord {
     required this.registrationAnswers,
     this.additionalInfo = const [],
     required this.additionalInfoShared,
+    this.hasPortalAccess = false,
     required this.mustChangePassword,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
     this.leadSubmission,
     this.registrationSubmission,
+    this.termsAccepted = false,
+    this.privacyPolicyAccepted = false,
+    this.termsAcceptedAt = '',
+    this.privacyPolicyAcceptedAt = '',
+    this.legalDocumentVersion = '',
+    this.currentLegalDocumentVersion = '',
+    this.legalAcceptanceHistory = const [],
   });
 
   final int id;
@@ -107,15 +117,42 @@ class ClientAccessRecord {
   final List<AdditionalInfoItem> additionalInfo;
   final bool additionalInfoShared;
 
+  /// Whether this client has portal login credentials at all — an info-only
+  /// client created without portal access has none. Mirrors the backend's
+  /// `has_portal_access` field (ClientAccessSerializer), which the web reads
+  /// directly for its "No portal access" pill.
+  final bool hasPortalAccess;
+
   /// Set when the client came from a public lead form / group registration.
   final int? leadSubmission;
   final int? registrationSubmission;
 
   /// Drives the forced password change on first login.
   final bool mustChangePassword;
+
+  /// Legal consent. ClientAccessSerializer.to_representation forces
+  /// [termsAccepted] and [privacyPolicyAccepted] to false whenever the stored
+  /// [legalDocumentVersion] is behind the published one, so
+  /// `!termsAccepted || !privacyPolicyAccepted` is the whole consent gate —
+  /// exactly what clientAuthGuard checks on the web.
+  final bool termsAccepted;
+  final bool privacyPolicyAccepted;
+  final String termsAcceptedAt;
+  final String privacyPolicyAcceptedAt;
+  final String legalDocumentVersion;
+
+  /// `settings.REPROOT_CLIENT_LEGAL_VERSION` as the backend sees it.
+  final String currentLegalDocumentVersion;
+
+  /// Newest first (the backend slices `legal_acceptance_records` at 20).
+  final List<LegalAcceptanceEntry> legalAcceptanceHistory;
+
   final bool isActive;
   final String createdAt;
   final String updatedAt;
+
+  /// Mirrors the web guard's `legalAccepted` expression.
+  bool get legalAccepted => termsAccepted && privacyPolicyAccepted;
 
   String get displayName =>
       [firstName, lastName].where((part) => part.isNotEmpty).join(' ').trim();
@@ -142,9 +179,20 @@ class ClientAccessRecord {
             .map(AdditionalInfoItem.fromJson)
             .toList(),
         additionalInfoShared: json['additional_info_shared'] as bool? ?? false,
+        hasPortalAccess: json['has_portal_access'] as bool? ?? false,
         leadSubmission: json['lead_submission'] as int?,
         registrationSubmission: json['registration_submission'] as int?,
         mustChangePassword: json['must_change_password'] as bool? ?? false,
+        termsAccepted: json['terms_accepted'] as bool? ?? false,
+        privacyPolicyAccepted: json['privacy_policy_accepted'] as bool? ?? false,
+        termsAcceptedAt: json['terms_accepted_at']?.toString() ?? '',
+        privacyPolicyAcceptedAt:
+            json['privacy_policy_accepted_at']?.toString() ?? '',
+        legalDocumentVersion: json['legal_document_version'] as String? ?? '',
+        currentLegalDocumentVersion:
+            json['current_legal_document_version'] as String? ?? '',
+        legalAcceptanceHistory:
+            LegalAcceptanceEntry.listFrom(json['legal_acceptance_history']),
         isActive: json['is_active'] as bool? ?? true,
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
@@ -165,7 +213,19 @@ class ClientAccessRecord {
         'registration_answers': registrationAnswers,
         'additional_info': additionalInfo.map((i) => i.toJson()).toList(),
         'additional_info_shared': additionalInfoShared,
+        'has_portal_access': hasPortalAccess,
         'must_change_password': mustChangePassword,
+        // Persisted with the session so the router's consent gate can read it
+        // without a network round-trip, the way the web guard reads
+        // sessionStorage 'client-access'.
+        'terms_accepted': termsAccepted,
+        'privacy_policy_accepted': privacyPolicyAccepted,
+        'terms_accepted_at': termsAcceptedAt,
+        'privacy_policy_accepted_at': privacyPolicyAcceptedAt,
+        'legal_document_version': legalDocumentVersion,
+        'current_legal_document_version': currentLegalDocumentVersion,
+        'legal_acceptance_history':
+            legalAcceptanceHistory.map((entry) => entry.toJson()).toList(),
         'is_active': isActive,
         'created_at': createdAt,
         'updated_at': updatedAt,
@@ -396,4 +456,24 @@ class ProfessionalDirectoryEntry {
         professionalName: json['professional_name'] as String? ?? '',
         professionalHeadline: json['professional_headline'] as String? ?? '',
       );
+}
+
+/// Result of granting a client portal access.
+///
+/// [temporaryPassword] is echoed back so the professional can read it out or
+/// copy it when they chose not to have it emailed; [credentialsSent] reports
+/// whether the backend actually managed to send that email, which is not the
+/// same as having asked it to (delivery can fail with the grant still valid).
+class GrantPortalAccessResult {
+  const GrantPortalAccessResult({
+    required this.client,
+    required this.temporaryPassword,
+    required this.credentialsSent,
+    required this.message,
+  });
+
+  final ClientAccessRecord client;
+  final String temporaryPassword;
+  final bool credentialsSent;
+  final String message;
 }

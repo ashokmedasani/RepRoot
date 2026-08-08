@@ -9,8 +9,12 @@ import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 
-/// More tab — profile header + menu rows (Shop deferred, as in the Ionic app).
-/// Replica of mobile/src/app/pages/professional/more/professional-more.page.ts.
+/// More tab — blue hero profile card + colorful menu rows (Shop and a
+/// standalone "Workspace" section deferred by design; Workspace would just
+/// duplicate what the Manage tab and Dashboard quick actions already cover).
+/// Replica of mobile/src/app/pages/professional/more/professional-more.page.ts,
+/// restyled to match the colorful Notion/iOS-style reference mockup while
+/// keeping the app's real blue brand (see app_tokens.dart).
 class ProfessionalMorePage extends ConsumerStatefulWidget {
   const ProfessionalMorePage({super.key});
 
@@ -65,6 +69,13 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
     return letters.length > 2 ? letters.substring(0, 2) : letters;
   }
 
+  /// Display fallback only — the real plan name comes from `_usage.planName`
+  /// whenever the data-usage call succeeds.
+  String get _planDisplayName {
+    final planName = _usage?.planName ?? '';
+    return planName.isNotEmpty ? planName : 'Free Plan';
+  }
+
   double get _usagePercent => ((_usage?.usagePercent ?? 0) * 10).round() / 10;
 
   Future<void> _logout() async {
@@ -103,99 +114,223 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
     if (confirmed == true) await _logout();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildHero(BuildContext context) {
     final tokens = context.tokens;
+    final primary = context.colors.primary;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('More')),
-      body: PagePad(
-        onRefresh: _load,
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [primary, tokens.primaryStrong],
+        ),
+        borderRadius: AppRadius.lgAll,
+        boxShadow: tokens.shadowMd,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppCard(
-            onTap: () => context.go(Routes.professionalProfile),
-            child: Row(
-              children: [
-                AppAvatar(
-                  initials: _initials,
-                  imageUrl: Env.mediaUrl(_profile?.profilePhotoUrl ?? ''),
-                  size: 46,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _fullName,
-                        style: context.text.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppAvatar(
+                initials: _initials,
+                imageUrl: Env.mediaUrl(_profile?.profilePhotoUrl ?? ''),
+                size: 52,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _fullName,
+                      style: context.text.titleMedium?.copyWith(
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _profile?.professionalHeadline.isNotEmpty ?? false
-                            ? _profile!.professionalHeadline
-                            : 'Personal Professional',
-                        style: context.text.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _profile?.professionalHeadline.isNotEmpty ?? false
+                          ? _profile!.professionalHeadline
+                          : 'Personal Professional',
+                      style: context.text.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: AppRadius.smAll,
+                      ),
+                      child: Text(
+                        _planDisplayName,
+                        style: context.text.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: tokens.muted,
-                  size: AppSize.iconRow,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Storage used',
+                style: context.text.bodySmall?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
-              ],
+              ),
+              Text(
+                '$_usagePercent%',
+                style: context.text.bodySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: (_usagePercent / 100).clamp(0, 1),
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.22),
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+          InkWell(
+            onTap: () => context.go(Routes.professionalProfile),
+            borderRadius: AppRadius.smAll,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'View Profile',
+                    style: context.text.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white,
+                    size: AppSize.iconRow,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          _MenuCard(
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // No AppBar — same header shape as every other tab; the bare 52px
+      // toolbar here had nothing in it.
+      body: SafeArea(
+        child: PagePad(
+          onRefresh: _load,
+          children: [
+          // Same eyebrow/title/subtitle header pattern as every other tab.
+          // More is mobile-only (profile/settings/support combined into one
+          // tab, unlike the web's separate Profile/Settings sidebar items),
+          // so the copy describes what it aggregates rather than quoting a
+          // specific web string.
+          PageHeader(
+            eyebrow: 'PROFESSIONAL WORKSPACE',
+            title: 'More',
+            info: 'Your own account, rather than your clients\'.\n\n'
+                'SETTINGS\n'
+                'Your public profile, sign-in security, notification '
+                'preferences, how you take payments, and your plan.\n\n'
+                'SUPPORT & LEGAL\n'
+                'Getting help, and the terms and policies you have '
+                'accepted.\n\n'
+                'On mobile these are gathered here; on the website they sit '
+                'in the sidebar.',
+          ),
+          _buildHero(context),
+
+          const _Eyebrow('SETTINGS'),
+          ColorfulMenuCard(
             items: [
-              _MenuItem(
+              ColorfulMenuItem(
                 icon: Icons.person_outline,
-                label: 'Professional Profile',
+                accent: MenuAccent.blue,
+                label: 'My Profile',
                 onTap: () => context.go(Routes.professionalProfile),
               ),
-              _MenuItem(
-                icon: Icons.folder_open_outlined,
-                label: 'Resource Library',
-                onTap: () => context.go(Routes.professionalResources),
+              ColorfulMenuItem(
+                icon: Icons.lock_outline,
+                accent: MenuAccent.orange,
+                label: 'Security',
+                onTap: () => context.push(Routes.professionalSettingsSecurity),
               ),
-              _MenuItem(
-                icon: Icons.storage_outlined,
-                label: 'Plan & Storage',
-                trailingText: '$_usagePercent% used',
-                onTap: () => context.go(Routes.professionalSettings),
+              ColorfulMenuItem(
+                icon: Icons.notifications_outlined,
+                accent: MenuAccent.purple,
+                label: 'Notifications',
+                onTap: () =>
+                    context.push('${Routes.professionalNotifications}/preferences'),
+              ),
+              ColorfulMenuItem(
+                icon: Icons.payments_outlined,
+                accent: MenuAccent.green,
+                label: 'Payment Settings',
+                onTap: () => context.push(Routes.professionalSettingsPayment),
+              ),
+              ColorfulMenuItem(
+                icon: Icons.credit_card_outlined,
+                accent: MenuAccent.teal,
+                label: 'Plan & Billing',
+                onTap: () => context.push(Routes.professionalSettingsBilling),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
 
-          _MenuCard(
+          const _Eyebrow('SUPPORT & LEGAL'),
+          ColorfulMenuCard(
             items: [
-              _MenuItem(
-                icon: Icons.settings_outlined,
-                label: 'Settings',
-                onTap: () => context.go(Routes.professionalSettings),
-              ),
-              _MenuItem(
+              ColorfulMenuItem(
                 icon: Icons.help_outline,
-                label: 'Help & Support',
+                accent: MenuAccent.blue,
+                label: 'Support',
                 onTap: () => context.go(Routes.professionalSupport),
               ),
-              _MenuItem(
-                icon: Icons.notifications_outlined,
-                label: 'Notifications',
-                onTap: () => context.go(Routes.professionalNotifications),
+              ColorfulMenuItem(
+                icon: Icons.gavel_outlined,
+                accent: MenuAccent.pink,
+                label: 'About & Legal',
+                onTap: () => context.push(Routes.professionalSupportLegal),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.lg),
 
           AppCard(
             padding: EdgeInsets.zero,
@@ -205,14 +340,23 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.card,
-                  vertical: AppSpacing.md + 2,
+                  vertical: AppSpacing.md,
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.logout,
-                      size: AppSize.iconRow,
-                      color: context.colors.error,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: context.colors.error.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.logout,
+                        size: AppSize.iconRow,
+                        color: context.colors.error,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Text(
@@ -227,93 +371,33 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _MenuItem {
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.trailingText,
-  });
+/// Small bold muted-color eyebrow section label — matches the "STORAGE
+/// BREAKDOWN" / "ONE-TIME SETUP" all-caps label pattern already used on
+/// professional_settings_plan_storage_page.dart and the dashboard's
+/// reporting-currency card.
+class _Eyebrow extends StatelessWidget {
+  const _Eyebrow(this.label);
 
-  final IconData icon;
   final String label;
-  final VoidCallback onTap;
-  final String? trailingText;
-}
-
-/// Grouped menu rows with hairline dividers — the .menu-card rule.
-class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.items});
-
-  final List<_MenuItem> items;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            InkWell(
-              onTap: items[i].onTap,
-              borderRadius: i == 0
-                  ? const BorderRadius.vertical(
-                      top: Radius.circular(AppRadius.md),
-                    )
-                  : i == items.length - 1
-                  ? const BorderRadius.vertical(
-                      bottom: Radius.circular(AppRadius.md),
-                    )
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.card,
-                  vertical: AppSpacing.md + 2,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      items[i].icon,
-                      size: AppSize.iconRow,
-                      color: tokens.muted,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Text(
-                        items[i].label,
-                        style: context.text.bodyLarge,
-                      ),
-                    ),
-                    if (items[i].trailingText != null)
-                      Text(
-                        items[i].trailingText!,
-                        style: context.text.labelSmall?.copyWith(
-                          color: tokens.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    else
-                      Icon(
-                        Icons.chevron_right,
-                        size: AppSize.iconRow,
-                        color: tokens.muted,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (i < items.length - 1)
-              Divider(height: 1, thickness: 1, color: tokens.border),
-          ],
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.sm),
+      child: Text(
+        label,
+        style: context.text.labelSmall?.copyWith(
+          color: context.tokens.muted,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.6,
+        ),
       ),
     );
   }

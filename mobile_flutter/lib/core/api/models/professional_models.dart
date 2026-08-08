@@ -2,6 +2,8 @@
 /// Field names match the Django payloads exactly; do not rename them.
 library;
 
+import 'legal_models.dart';
+
 class ProfessionalAccount {
   const ProfessionalAccount({
     required this.id,
@@ -61,6 +63,87 @@ class ProfessionalLoginResponse {
   }
 }
 
+/// Response from GET /professional/dashboard/onboarding-status/ — the "Action
+/// Required" workspace-setup checklist. `profile_complete` is intentionally
+/// not surfaced on the dashboard checklist (profile setup already gates
+/// reaching the dashboard at all — see the router's redirect logic), only
+/// the five items the reference dashboard design shows.
+class ProfessionalOnboardingStatus {
+  const ProfessionalOnboardingStatus({
+    required this.formCreated,
+    required this.groupCreated,
+    required this.templateCreated,
+    required this.resourceCreated,
+    required this.meetingSetupComplete,
+    required this.missingActions,
+    required this.message,
+  });
+
+  final bool formCreated;
+  final bool groupCreated;
+  final bool templateCreated;
+  final bool resourceCreated;
+  final bool meetingSetupComplete;
+  final List<String> missingActions;
+  final String message;
+
+  /// Fixed at 5 — the number of checks this card tracks, matching the
+  /// backend's `checks` dict minus `profile`.
+  static const int totalChecks = 5;
+
+  int get completedCount =>
+      [formCreated, groupCreated, templateCreated, resourceCreated, meetingSetupComplete]
+          .where((done) => done)
+          .length;
+
+  bool get hasPendingSetup => completedCount < totalChecks;
+
+  factory ProfessionalOnboardingStatus.fromJson(Map<String, dynamic> json) {
+    return ProfessionalOnboardingStatus(
+      formCreated: json['form_created'] as bool? ?? false,
+      groupCreated: json['group_created'] as bool? ?? false,
+      templateCreated: json['template_created'] as bool? ?? false,
+      resourceCreated: json['resource_created'] as bool? ?? false,
+      meetingSetupComplete: json['meeting_setup_complete'] as bool? ?? false,
+      missingActions: (json['missing_actions'] as List<dynamic>? ?? [])
+          .map((e) => e.toString())
+          .toList(),
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
+/// Response from POST /professional/auth/google/ — used for both "Continue
+/// with Google" signup and "Log in with Google". The backend decides whether
+/// to create, link, or just log in based on the verified Google account;
+/// [isNewAccount] is how the caller tells those cases apart (see
+/// ProfessionalGoogleAuthSerializer.validate on the backend).
+class ProfessionalGoogleAuthResponse {
+  const ProfessionalGoogleAuthResponse({
+    required this.token,
+    required this.professional,
+    required this.isNewAccount,
+    required this.message,
+  });
+
+  final String token;
+  final ProfessionalAccount? professional;
+  final bool isNewAccount;
+  final String message;
+
+  factory ProfessionalGoogleAuthResponse.fromJson(Map<String, dynamic> json) {
+    final professional = json['professional'];
+    return ProfessionalGoogleAuthResponse(
+      token: json['token'] as String? ?? '',
+      professional: professional is Map<String, dynamic>
+          ? ProfessionalAccount.fromJson(professional)
+          : null,
+      isNewAccount: json['is_new_account'] as bool? ?? false,
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
 class ProfessionalSignupPayload {
   const ProfessionalSignupPayload({
     required this.email,
@@ -68,6 +151,8 @@ class ProfessionalSignupPayload {
     required this.password,
     required this.confirmPassword,
     required this.emailVerificationToken,
+    required this.acceptTerms,
+    required this.acceptPrivacy,
   });
 
   final String email;
@@ -76,12 +161,19 @@ class ProfessionalSignupPayload {
   final String confirmPassword;
   final String emailVerificationToken;
 
+  /// ProfessionalSignupSerializer declares both as required BooleanFields and
+  /// rejects anything falsy, so signup fails with 400 unless they are sent.
+  final bool acceptTerms;
+  final bool acceptPrivacy;
+
   Map<String, dynamic> toJson() => {
         'email': email,
         'username': username,
         'password': password,
         'confirm_password': confirmPassword,
         'email_verification_token': emailVerificationToken,
+        'accept_terms': acceptTerms,
+        'accept_privacy': acceptPrivacy,
       };
 }
 
@@ -147,6 +239,28 @@ class EmailOtpVerifyResult {
       );
 }
 
+/// Response of `/professional/password-reset/verify-otp/`. The `reset_token` is
+/// short-lived and must be echoed back to the confirm endpoint — same contract
+/// the web portal uses.
+class PasswordResetOtpVerifyResult {
+  const PasswordResetOtpVerifyResult({
+    required this.email,
+    required this.resetToken,
+    required this.message,
+  });
+
+  final String email;
+  final String resetToken;
+  final String message;
+
+  factory PasswordResetOtpVerifyResult.fromJson(Map<String, dynamic> json) =>
+      PasswordResetOtpVerifyResult(
+        email: json['email'] as String? ?? '',
+        resetToken: json['reset_token'] as String? ?? '',
+        message: json['message'] as String? ?? '',
+      );
+}
+
 class ProfessionalDataUsage {
   const ProfessionalDataUsage({
     required this.planCode,
@@ -159,6 +273,7 @@ class ProfessionalDataUsage {
     this.fileBytes = 0,
     this.planLimits = const {},
     this.resourceUsage = const {},
+    this.sections = const {},
     this.warnings = const [],
     this.usageLabel = '',
     this.isWarning = false,
@@ -182,7 +297,19 @@ class ProfessionalDataUsage {
   /// null values mean "unlimited" for that limit.
   final Map<String, int?> planLimits;
   final Map<String, PlanResourceUsage> resourceUsage;
+
+  /// Per-section storage breakdown, keyed by the backend section name
+  /// ('clients', 'resources', ...). Every plan gets percent + record count;
+  /// only Pro/Premium get `total_bytes` on each section, so
+  /// [ProfessionalUsageSection.totalBytes] is null on the free tier.
+  final Map<String, ProfessionalUsageSection> sections;
   final List<String> warnings;
+
+  /// True when the backend ships byte-level detail for this professional --
+  /// see data_usage._sanitize_sections(include_bytes=...), which only fills
+  /// `total_bytes` for the paid tiers.
+  bool get hasSectionBytes =>
+      planCode == 'pro' || planCode == 'premium_unlimited';
 
   /// Human capacity label + threshold flags, matching the web data-usage API.
   final String usageLabel;
@@ -209,6 +336,12 @@ class ProfessionalDataUsage {
           (key, value) => MapEntry(
             key.toString(),
             PlanResourceUsage.fromJson(value as Map<String, dynamic>? ?? {}),
+          ),
+        ),
+        sections: (json['sections'] as Map<dynamic, dynamic>? ?? {}).map(
+          (key, value) => MapEntry(
+            key.toString(),
+            ProfessionalUsageSection.fromJson(value as Map<String, dynamic>? ?? {}),
           ),
         ),
         warnings: (json['warnings'] as List<dynamic>? ?? [])
@@ -239,6 +372,44 @@ class PlanResourceUsage {
       );
 
   String get label => limit == null ? '$used used' : '$used / $limit used';
+}
+
+/// One row of the storage breakdown table (`sections` in the data-usage
+/// response). [totalBytes] is null on the Free plan: the backend deliberately
+/// withholds byte totals there and only sends percent + record count, so a
+/// null must render as "—" rather than "0 B".
+class ProfessionalUsageSection {
+  const ProfessionalUsageSection({
+    required this.percentOfQuota,
+    required this.recordCount,
+    this.totalBytes,
+  });
+
+  final double percentOfQuota;
+  final int recordCount;
+  final int? totalBytes;
+
+  factory ProfessionalUsageSection.fromJson(Map<String, dynamic> json) =>
+      ProfessionalUsageSection(
+        percentOfQuota: (json['percent_of_quota'] as num?)?.toDouble() ?? 0,
+        recordCount: (json['record_count'] as num?)?.toInt() ?? 0,
+        totalBytes: (json['total_bytes'] as num?)?.toInt(),
+      );
+
+  /// Backend section keys -> the same labels the web Settings page uses
+  /// (professional-account-settings.component.ts `professionalUsageLabels`).
+  static const Map<String, String> labels = {
+    'professional_profile': 'Professional profile',
+    'forms_groups': 'Forms & groups',
+    'clients': 'Client profiles',
+    'schedules_progress': 'Schedules & progress',
+    'resources': 'Resources',
+    'templates_tracking': 'Templates & tracking',
+    'messages': 'Messages',
+  };
+
+  static String labelFor(String key) =>
+      labels[key] ?? key.replaceAll('_', ' ');
 }
 
 class ProfessionalProfileImage {
@@ -311,6 +482,12 @@ class ProfessionalProfile {
     required this.profileImages,
     required this.profileLinks,
     required this.profileVisibility,
+    this.termsAccepted = false,
+    this.privacyPolicyAccepted = false,
+    this.termsAcceptedAt = '',
+    this.privacyPolicyAcceptedAt = '',
+    this.legalDocumentVersion = '',
+    this.legalAcceptanceHistory = const [],
   });
 
   final String firstName;
@@ -349,6 +526,17 @@ class ProfessionalProfile {
   final List<ProfessionalProfileImage> profileImages;
   final List<ProfessionalProfileLink> profileLinks;
   final Map<String, bool> profileVisibility;
+
+  // Legal consent — ProfessionalProfileSerializer exposes these alongside the
+  // profile so Settings can show what was accepted and when.
+  final bool termsAccepted;
+  final bool privacyPolicyAccepted;
+  final String termsAcceptedAt;
+  final String privacyPolicyAcceptedAt;
+  final String legalDocumentVersion;
+
+  /// Newest first (the backend slices `legal_acceptance_records` at 20).
+  final List<LegalAcceptanceEntry> legalAcceptanceHistory;
 
   String get displayName => [firstName, lastName]
       .where((part) => part.isNotEmpty)
@@ -401,5 +589,13 @@ class ProfessionalProfile {
             (json['profile_visibility'] as Map<dynamic, dynamic>? ?? {}).map(
           (key, value) => MapEntry(key.toString(), value == true),
         ),
+        termsAccepted: json['terms_accepted'] as bool? ?? false,
+        privacyPolicyAccepted: json['privacy_policy_accepted'] as bool? ?? false,
+        termsAcceptedAt: json['terms_accepted_at']?.toString() ?? '',
+        privacyPolicyAcceptedAt:
+            json['privacy_policy_accepted_at']?.toString() ?? '',
+        legalDocumentVersion: json['legal_document_version'] as String? ?? '',
+        legalAcceptanceHistory:
+            LegalAcceptanceEntry.listFrom(json['legal_acceptance_history']),
       );
 }

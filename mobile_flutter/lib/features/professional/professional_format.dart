@@ -5,10 +5,35 @@
 /// graph_engine.dart for why the TS's `new Date(iso)` shifts a day west of UTC.
 library;
 
+import 'package:flutter/material.dart' show TimeOfDay;
+
 const _months = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
+
+/// A [DateTime]'s **local** calendar day as `YYYY-MM-DD`.
+///
+/// Deliberately built from `.year`/`.month`/`.day` rather than
+/// `toIso8601String()`, for the same reason the web's `toISOString()` was
+/// wrong: any UTC round-trip lands on the neighbouring day for part of every
+/// day outside UTC. Entry dates, reminder dates and payment dates are all
+/// local calendar days, so they must be formatted locally to compare
+/// correctly against what the backend stores.
+///
+/// This lived as six identical private copies across the feature pages; it is
+/// centralised here so a future edit can't fix one and miss the rest.
+String isoDate(DateTime date) =>
+    '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+/// Today's local calendar day as `YYYY-MM-DD`.
+String todayIso() => isoDate(DateTime.now());
+
+/// A [TimeOfDay] as the backend's `HH:mm`.
+String isoTime(TimeOfDay time) =>
+    '${time.hour.toString().padLeft(2, '0')}:'
+    '${time.minute.toString().padLeft(2, '0')}';
 
 /// `date: 'dd MMM'` -> "15 Jul"
 String shortDate(String iso) {
@@ -46,9 +71,6 @@ String dateTimeLabel(String iso) {
 /// Trims a backend "HH:mm:ss" to "HH:mm"; empty stays empty.
 String hhmm(String time) =>
     time.length >= 5 ? time.substring(0, 5) : time;
-
-/// "Any time" when a reminder has no clock time, matching the Ionic template.
-String timeOrAnytime(String time) => time.isEmpty ? 'Any time' : hhmm(time);
 
 /// Human byte size for storage/usage displays.
 String formatBytes(int bytes) {

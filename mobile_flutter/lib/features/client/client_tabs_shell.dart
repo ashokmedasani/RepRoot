@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/client_api.dart';
-import '../../core/theme/app_tokens.dart';
+import '../../shared/widgets/app_bottom_nav.dart';
 
 /// Client bottom-tab shell: Dashboard | Programs | Professional | More.
 /// The unread badge sits on Professional, since chat lives there as a segment
@@ -54,49 +54,22 @@ class _ClientTabsShellState extends ConsumerState<ClientTabsShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: widget.navigationShell,
-      bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: context.tokens.border)),
+      bottomNavigationBar: AppBottomNavBar(
+        selectedIndex: widget.navigationShell.currentIndex,
+        onSelect: (index) => widget.navigationShell.goBranch(
+          index,
+          initialLocation: index == widget.navigationShell.currentIndex,
         ),
-        child: NavigationBar(
-          selectedIndex: widget.navigationShell.currentIndex,
-          onDestinationSelected: (index) => widget.navigationShell.goBranch(
-            index,
-            initialLocation: index == widget.navigationShell.currentIndex,
+        items: [
+          const AppNavItem(icon: Icons.grid_view_rounded, label: 'Dashboard'),
+          const AppNavItem(icon: Icons.list_alt_rounded, label: 'Programs'),
+          AppNavItem(
+            icon: Icons.badge_rounded,
+            label: 'Professional',
+            badgeCount: _unread,
           ),
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view_rounded),
-              label: 'Dashboard',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.list_alt_outlined),
-              selectedIcon: Icon(Icons.list_alt_rounded),
-              label: 'Programs',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: _unread > 0,
-                label: Text(_unread > 99 ? '99+' : '$_unread'),
-                backgroundColor: const Color(0xFFE11D48),
-                child: const Icon(Icons.badge_outlined),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: _unread > 0,
-                label: Text(_unread > 99 ? '99+' : '$_unread'),
-                backgroundColor: const Color(0xFFE11D48),
-                child: const Icon(Icons.badge_rounded),
-              ),
-              label: 'Professional',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.more_horiz_outlined),
-              selectedIcon: Icon(Icons.more_horiz_rounded),
-              label: 'More',
-            ),
-          ],
-        ),
+          const AppNavItem(icon: Icons.more_horiz_rounded, label: 'More'),
+        ],
       ),
     );
   }

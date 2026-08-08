@@ -198,11 +198,15 @@ class PaymentsApi {
   Future<({String message, bool needsLogging})> acknowledgePaymentProof(
     int proofId, {
     String acknowledgementNote = '',
+    required String settlementStatus,
   }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/payments/proofs/$proofId/acknowledge/',
-        data: {'acknowledgement_note': acknowledgementNote},
+        data: {
+          'acknowledgement_note': acknowledgementNote,
+          'settlement_status': settlementStatus,
+        },
         options: _auth,
       );
       return (
@@ -246,23 +250,36 @@ class PaymentsApi {
     });
   }
 
-  Future<int> getProfessionalPaymentUnread() {
+  /// The payment notification feed and its unread total.
+  ///
+  /// Returns the whole response rather than just the count: the dashboard
+  /// renders the items themselves, and throwing them away here was why the
+  /// mobile dashboard had no payment feed at all.
+  Future<PaymentNotificationsResponse> getProfessionalPaymentNotifications() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/payments/notifications/',
         options: _auth,
       );
-      return (res.data?['unread_count'] as num?)?.toInt() ?? 0;
+      return PaymentNotificationsResponse.fromJson(res.data ?? {});
     });
   }
 
-  Future<void> markProfessionalPaymentNotificationsRead() {
+  /// Clears unread payment notifications and returns the new unread count.
+  ///
+  /// Pass [requestId] to clear just that request's notifications (the normal
+  /// path, when its detail is opened); omit it for an explicit "mark all as
+  /// read". Mirrors the web's two-mode payload exactly.
+  Future<int> markProfessionalPaymentNotificationsRead({String? requestId}) {
     return runApi(() async {
-      await _dio.post<Map<String, dynamic>>(
+      final res = await _dio.post<Map<String, dynamic>>(
         '/professional/payments/notifications/',
-        data: const {},
+        data: requestId != null && requestId.isNotEmpty
+            ? {'request_id': requestId}
+            : const {'mark_all': true},
         options: _auth,
       );
+      return (res.data?['unread_count'] as num?)?.toInt() ?? 0;
     });
   }
 
@@ -284,6 +301,22 @@ class PaymentsApi {
         options: _auth,
       );
       return RevenueSummaryResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  /// Every payment action for a client, newest first — powers the client
+  /// detail page's Payments → Activity sub-tab.
+  Future<List<PaymentActivityItem>> getProfessionalPaymentActivity(int clientId) {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/payments/activity/',
+        queryParameters: {'client_id': clientId},
+        options: _auth,
+      );
+      return (res.data?['items'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(PaymentActivityItem.fromJson)
+          .toList();
     });
   }
 
@@ -351,7 +384,8 @@ class PaymentsApi {
     });
   }
 
-  /// [payload] is multipart: proof fields plus an optional screenshot file.
+  /// [payload] is multipart: proof fields plus an optional `proof_file`
+  /// (JPG/PNG/WEBP/PDF, 5MB max — enforced again server-side).
   Future<String> submitPaymentProof(String requestId, FormData payload) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
@@ -360,6 +394,19 @@ class PaymentsApi {
         options: _clientAuth,
       );
       return res.data?['message'] as String? ?? '';
+    });
+  }
+
+  /// Streams back a proof the client submitted. There is no public media URL
+  /// for payment proofs — this authenticated endpoint is the only way to fetch
+  /// one, so it comes back as raw bytes for the caller to save/share.
+  Future<List<int>> downloadPaymentProofFile(int proofId) {
+    return runApi(() async {
+      final res = await _dio.get<List<int>>(
+        '/client/payments/proofs/$proofId/file/',
+        options: _clientAuth.copyWith(responseType: ResponseType.bytes),
+      );
+      return res.data ?? const [];
     });
   }
 

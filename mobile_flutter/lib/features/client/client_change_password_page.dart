@@ -83,7 +83,13 @@ class _ClientChangePasswordPageState
         await api.storeSession(response.token, client);
       }
       if (!mounted) return;
-      context.go(Routes.clientDashboard);
+      // Legal consent is the next gate once the password is dealt with, the
+      // same handoff the web component makes with `needsLegalAcceptance`.
+      context.go(
+        client != null && !client.legalAccepted
+            ? Routes.clientLegalConsent
+            : Routes.clientDashboard,
+      );
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {

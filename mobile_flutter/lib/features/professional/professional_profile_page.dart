@@ -25,19 +25,6 @@ class ProfessionalProfilePage extends ConsumerStatefulWidget {
 /// The six Private/Public sections the web professional profile exposes.
 /// The keys are the backend's, and `certification` is singular on purpose —
 /// sending `certifications` silently does nothing.
-const _visibilitySections = <({String key, String label})>[
-  (key: 'professional_headline', label: 'Headline'),
-  (key: 'about', label: 'About me'),
-  (key: 'professional_summary', label: 'Professional details'),
-  (key: 'specializations', label: 'Specializations'),
-  (key: 'experience', label: 'Experience'),
-  (key: 'languages', label: 'Languages'),
-  (key: 'training_style', label: 'Training style'),
-  (key: 'certification', label: 'Certifications'),
-  (key: 'images', label: 'Images'),
-  (key: 'links', label: 'Links'),
-];
-
 const _months = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -52,6 +39,7 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
   String _message = '';
   bool _messageIsError = false;
   XFile? _photoFile;
+  bool _isRemovingPhoto = false;
 
   // Edit fields
   final _firstName = TextEditingController();
@@ -176,6 +164,56 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       imageQuality: 85,
     );
     if (picked != null) setState(() => _photoFile = picked);
+  }
+
+  /// Deletes the saved photo immediately rather than on Save — it's its own
+  /// endpoint, and the multipart save treats "no file" as "keep the current
+  /// one", so there is no way to express removal through the normal save.
+  Future<void> _removePhoto() async {
+    if (_isRemovingPhoto) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove photo?'),
+        content: const Text(
+          'Your profile will show your initials instead. You can upload a new '
+          'photo at any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.error,
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isRemovingPhoto = true);
+    try {
+      final updated =
+          await ref.read(professionalAuthApiProvider).removeProfilePhoto();
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _photoFile = null;
+        _isRemovingPhoto = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isRemovingPhoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove the photo.')),
+      );
+    }
   }
 
   Future<void> _save() async {
@@ -369,6 +407,9 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
           ),
         ),
 
+        // Account details have no visibility key on the backend — they are
+        // never shown to clients — so this is the one section without a
+        // control.
         const SectionHeader(title: 'Details'),
         AppCard(
           child: Column(
@@ -383,70 +424,101 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                     ? '${_months[p.birthMonth! - 1]} ${p.birthYear}'
                     : '',
               ),
-              _kv('Location', [p.state, p.country].where((s) => s.isNotEmpty).join(', ')),
+              _kv('Location',
+                  [p.state, p.country].where((s) => s.isNotEmpty).join(', ')),
             ],
           ),
         ),
 
-        const SectionHeader(title: 'Professional'),
-        AppCard(
-          child: Column(
-            children: [
-              _kv('Type', p.professionalType),
-              _kv('Experience', p.yearsExperience != null ? '${p.yearsExperience} years' : ''),
-              _kv('Specializations', p.specializations),
-              _kv('Languages', p.languagesKnown),
-              _kv('Certification', p.certificationName),
-              _kv('Issued by', p.certificationIssuedBy),
-              _kv('Certified', p.certificationYear?.toString() ?? ''),
-            ],
-          ),
-        ),
-
-        if (p.aboutMe.isNotEmpty || p.trainingStyle.isNotEmpty) ...[
-          const SectionHeader(title: 'About'),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (p.aboutMe.isNotEmpty) ...[
-                  Text('About me', style: context.text.titleSmall),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(p.aboutMe, style: context.text.bodyMedium),
-                ],
-                if (p.trainingStyle.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Text('Training style', style: context.text.titleSmall),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(p.trainingStyle, style: context.text.bodyMedium),
-                ],
-              ],
+        // From here down, every section carries its own Private / Public
+        // control, exactly as the web's `.read-card > .card-head` does. The
+        // single "Client visibility" panel that used to hold ten switches is
+        // gone: it listed section names far away from the sections they
+        // governed, so setting one meant remembering which content it meant.
+        _visibilitySection(
+          title: 'Professional details',
+          visibilityKey: 'professional_summary',
+          children: [
+            _kv('Type', p.professionalType),
+            _kv(
+              'Experience',
+              p.yearsExperience != null ? '${p.yearsExperience} years' : '',
             ),
-          ),
-        ],
+          ],
+        ),
 
-        const SectionHeader(title: 'Client visibility'),
-        AppCard(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Column(
+        if (p.specializations.trim().isNotEmpty)
+          _visibilitySection(
+            title: 'Specializations',
+            visibilityKey: 'specializations',
+            children: [Text(p.specializations, style: context.text.bodyMedium)],
+          ),
+
+        if (p.languagesKnown.trim().isNotEmpty)
+          _visibilitySection(
+            title: 'Languages',
+            visibilityKey: 'languages',
+            children: [Text(p.languagesKnown, style: context.text.bodyMedium)],
+          ),
+
+        if (p.aboutMe.trim().isNotEmpty)
+          _visibilitySection(
+            title: 'About me',
+            visibilityKey: 'about',
+            children: [Text(p.aboutMe, style: context.text.bodyMedium)],
+          ),
+
+        if (p.trainingStyle.trim().isNotEmpty)
+          _visibilitySection(
+            title: 'Training style',
+            visibilityKey: 'training_style',
+            children: [Text(p.trainingStyle, style: context.text.bodyMedium)],
+          ),
+
+        if (p.certificationName.trim().isNotEmpty ||
+            p.certificationIssuedBy.trim().isNotEmpty)
+          _visibilitySection(
+            title: 'Certification',
+            visibilityKey: 'certification',
             children: [
-              for (final section in _visibilitySections)
-                SwitchListTile(
-                  value: _visibility[section.key] ?? false,
-                  onChanged: (value) => _toggleVisibility(section.key, value),
-                  title: Text(section.label, style: context.text.bodyLarge),
-                  subtitle: Text(
-                    (_visibility[section.key] ?? false)
-                        ? 'Visible to clients'
-                        : 'Private',
-                    style: context.text.bodySmall,
-                  ),
-                  dense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.card,
-                  ),
-                ),
+              _kv('Name', p.certificationName),
+              _kv('Issued by', p.certificationIssuedBy),
+              _kv('Year', p.certificationYear?.toString() ?? ''),
             ],
+          ),
+      ],
+    );
+  }
+
+  /// One profile section with its visibility control in the heading — the
+  /// web's `card-head` pattern. [visibilityKey] is the backend
+  /// `profile_visibility` key; both platforms write the same map.
+  Widget _visibilitySection({
+    required String title,
+    required String visibilityKey,
+    required List<Widget> children,
+  }) {
+    final isPublic = _visibility[visibilityKey] ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: SectionHeader(title: title)),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: _VisibilityChip(
+                isPublic: isPublic,
+                onChanged: (value) => _toggleVisibility(visibilityKey, value),
+              ),
+            ),
+          ],
+        ),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
           ),
         ),
       ],
@@ -510,6 +582,25 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                               style: context.text.bodySmall,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        // Only offered when there is a saved photo to remove —
+                        // an unsaved pick is cleared with Cancel instead.
+                        if (_photoFile == null &&
+                            (_profile?.profilePhotoUrl ?? '').isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.xs),
+                            child: TextButton.icon(
+                              onPressed: _isRemovingPhoto ? null : _removePhoto,
+                              icon: const Icon(Icons.delete_outline,
+                                  size: AppSize.iconRow),
+                              label: Text(
+                                _isRemovingPhoto ? 'Removing…' : 'Remove photo',
+                              ),
+                              style: TextButton.styleFrom(
+                                foregroundColor: context.colors.error,
+                                minimumSize: const Size(0, AppSize.buttonHeightSm),
+                              ),
                             ),
                           ),
                       ],
@@ -653,6 +744,63 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       textCapitalization:
           capitalize ? TextCapitalization.words : TextCapitalization.sentences,
       decoration: InputDecoration(labelText: label, helperText: helper),
+    );
+  }
+}
+
+/// The web's `.visibility-toggle`: a two-state Private / Public pair, sized to
+/// sit inline in a section heading.
+///
+/// "Public" rather than "Visible to clients" because that is the word the
+/// website uses, and a professional's public profile is genuinely public —
+/// it is what prospects see on a lead form, not only existing clients.
+class _VisibilityChip extends StatelessWidget {
+  const _VisibilityChip({required this.isPublic, required this.onChanged});
+
+  final bool isPublic;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+
+    Widget half(String label, bool value) {
+      final selected = isPublic == value;
+      return InkWell(
+        onTap: selected ? null : () => onChanged(value),
+        borderRadius: AppRadius.pillAll,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm + 2,
+            vertical: 5,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? context.colors.surface : Colors.transparent,
+            borderRadius: AppRadius.pillAll,
+            boxShadow: selected ? tokens.shadowSm : null,
+          ),
+          child: Text(
+            label,
+            style: context.text.labelSmall?.copyWith(
+              color: selected ? context.colors.primary : tokens.muted,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: tokens.surfaceSoft,
+        borderRadius: AppRadius.pillAll,
+        border: Border.all(color: tokens.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [half('Private', false), half('Public', true)],
+      ),
     );
   }
 }

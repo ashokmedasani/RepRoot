@@ -70,6 +70,55 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     await load();
   }
 
+  /// Deletes the whole inbox rather than just marking it read.
+  ///
+  /// Professional-only for now: the client API has no matching endpoint, so
+  /// the action is hidden rather than offered and then failing.
+  Future<void> clearAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear all notifications?'),
+        content: const Text(
+          'Every notification is deleted, not just marked read. This cannot be '
+          'undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => context.pop(true),
+            child: const Text('Clear all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final result =
+          await ref.read(professionalAuthApiProvider).clearNotifications();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.deletedCount == 1
+                ? '1 notification cleared.'
+                : '${result.deletedCount} notifications cleared.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not clear notifications.')),
+      );
+    }
+    await load();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -85,6 +134,15 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           tooltip: 'Preferences',
         ),
         TextButton(onPressed: readAll, child: const Text('Read all')),
+        if (widget.professional)
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'clear') clearAll();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'clear', child: Text('Clear all')),
+            ],
+          ),
       ],
     ),
     body: Column(

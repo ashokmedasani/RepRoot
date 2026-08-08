@@ -69,7 +69,8 @@ class _ClientTemplateResourcesPageState
   Widget build(BuildContext context) {
     final template = _template;
 
-    final accent = template != null ? parseAccentColor(template.accent) : null;
+    final accent =
+        template != null ? TemplateAccent.of(context, template.accent) : null;
 
     return Scaffold(
       appBar: AppBar(

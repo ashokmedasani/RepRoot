@@ -146,10 +146,6 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
             selected: {_tab},
             showSelectedIcon: false,
             onSelectionChanged: (s) => setState(() => _tab = s.first),
-            style: SegmentedButton.styleFrom(
-              textStyle: context.text.labelMedium,
-              visualDensity: VisualDensity.compact,
-            ),
           ),
         ),
         Expanded(
@@ -240,10 +236,6 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
             setState(() => _range = s.first);
             _rebuild();
           },
-          style: SegmentedButton.styleFrom(
-            textStyle: context.text.labelMedium,
-            visualDensity: VisualDensity.compact,
-          ),
         ),
         const SizedBox(height: AppSpacing.md),
         if (_chartGroups.isEmpty)

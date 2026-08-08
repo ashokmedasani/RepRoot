@@ -114,11 +114,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     });
   }
 
-  String _isoDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  String _isoTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   Future<void> _submitEntry() async {
     final template = _selectedTemplate;
@@ -134,8 +130,8 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     try {
       await ref.read(clientApiProvider).submitEntry(
             templateId: template.id,
-            entryDate: _isoDate(_entryDate),
-            entryTime: _isoTime(_entryTime),
+            entryDate: isoDate(_entryDate),
+            entryTime: isoTime(_entryTime),
             answers: answers,
             note: _note.text.trim(),
           );
@@ -203,10 +199,6 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               selected: {_tab},
               showSelectedIcon: false,
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-              style: SegmentedButton.styleFrom(
-                textStyle: context.text.labelMedium,
-                visualDensity: VisualDensity.compact,
-              ),
             ),
           ),
           Expanded(
@@ -393,7 +385,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
                       },
                       icon: const Icon(Icons.calendar_today_outlined,
                           size: AppSize.iconRow),
-                      label: Text(shortDate(_isoDate(_entryDate))),
+                      label: Text(shortDate(isoDate(_entryDate))),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, AppSize.buttonHeightSm),
                       ),
@@ -410,7 +402,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
                         if (picked != null) setState(() => _entryTime = picked);
                       },
                       icon: const Icon(Icons.schedule, size: AppSize.iconRow),
-                      label: Text(_isoTime(_entryTime)),
+                      label: Text(isoTime(_entryTime)),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, AppSize.buttonHeightSm),
                       ),
@@ -472,7 +464,7 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               subtitle:
                   '${TemplateCadence.label(template.cadence)} · ${template.resources.length} resource${template.resources.length == 1 ? '' : 's'}',
               leading: Icon(Icons.folder_open_outlined,
-                  size: 22, color: parseAccentColor(template.accent)),
+                  size: 22, color: TemplateAccent.of(context, template.accent)),
               trailing: const Icon(Icons.chevron_right, size: AppSize.iconRow),
               onTap: () => context.go(
                 '${Routes.clientPrograms}/${template.id}/resources',
@@ -500,10 +492,6 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               selected: {value.isEmpty ? 'no' : value},
               showSelectedIcon: false,
               onSelectionChanged: (s) => setState(() => _answers[key] = s.first),
-              style: SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                textStyle: context.text.labelSmall,
-              ),
             ),
           ],
         );

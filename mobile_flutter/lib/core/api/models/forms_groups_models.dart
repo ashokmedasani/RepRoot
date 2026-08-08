@@ -193,6 +193,67 @@ class LeadForm {
       );
 }
 
+/// A public-form applicant's request for the professional's introductory
+/// meeting slot. 1:1 port of the web's `LeadMeetingRequest` interface
+/// (forms-groups-api.service.ts) — surfaced under a lead form's
+/// "Introductory Meeting Settings" section, not tied to the general
+/// scheduling module.
+class LeadMeetingRequest {
+  const LeadMeetingRequest({
+    required this.id,
+    required this.referenceId,
+    required this.applicantName,
+    required this.formTitle,
+    required this.contactEmail,
+    required this.contactMobile,
+    required this.requestedStart,
+    required this.requestedEnd,
+    required this.status,
+    required this.trainerNote,
+    required this.meetingUrl,
+    required this.expiresAt,
+    this.reviewedAt,
+  });
+
+  final int id;
+  final String referenceId;
+  final String applicantName;
+  final String formTitle;
+  final String contactEmail;
+  final String contactMobile;
+  final String requestedStart;
+  final String requestedEnd;
+
+  /// 'pending' | 'accepted' | 'declined' | 'expired'
+  final String status;
+  final String trainerNote;
+  final String meetingUrl;
+  final String expiresAt;
+  final String? reviewedAt;
+
+  bool get isPending => status == 'pending';
+  bool get isAccepted => status == 'accepted';
+
+  DateTime? get requestedStartDate => DateTime.tryParse(requestedStart);
+
+  factory LeadMeetingRequest.fromJson(Map<String, dynamic> json) =>
+      LeadMeetingRequest(
+        id: json['id'] as int? ?? 0,
+        referenceId: json['reference_id'] as String? ?? '',
+        applicantName: json['applicant_name'] as String? ?? '',
+        formTitle: json['form_title'] as String? ?? '',
+        contactEmail: json['contact_email'] as String? ?? '',
+        contactMobile: json['contact_mobile'] as String? ?? '',
+        requestedStart: json['requested_start'] as String? ?? '',
+        requestedEnd: json['requested_end'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        trainerNote: json['trainer_note'] as String? ?? '',
+        meetingUrl: json['meeting_url'] as String? ?? '',
+        expiresAt: json['expires_at'] as String? ?? '',
+        reviewedAt: json['reviewed_at'] as String?,
+      );
+}
+
 class ClientRegistrationForm {
   const ClientRegistrationForm({
     required this.id,
@@ -306,6 +367,8 @@ class LeadSubmission {
     this.convertedAt,
     this.deletedAt,
     this.clientAccess,
+    this.leadForm,
+    this.leadFormTitle = '',
   });
 
   final int id;
@@ -324,6 +387,11 @@ class LeadSubmission {
   final String? convertedAt;
   final String? deletedAt;
   final LeadSubmissionClientAccess? clientAccess;
+
+  /// Which of the professional's (possibly several) lead forms this came
+  /// through — added so the mobile requests list can filter/tag by form.
+  final int? leadForm;
+  final String leadFormTitle;
 
   factory LeadSubmission.fromJson(Map<String, dynamic> json) {
     final access = json['client_access'];
@@ -346,6 +414,8 @@ class LeadSubmission {
       clientAccess: access is Map<String, dynamic>
           ? LeadSubmissionClientAccess.fromJson(access)
           : null,
+      leadForm: json['lead_form'] as int?,
+      leadFormTitle: json['lead_form_title'] as String? ?? '',
     );
   }
 }
@@ -354,6 +424,8 @@ class FormsGroupsOverview {
   const FormsGroupsOverview({
     required this.hasLeadForm,
     this.leadForm,
+    this.leadForms = const [],
+    this.maxLeadForms = 0,
     required this.groups,
     required this.pendingForms,
     required this.approvedForms,
@@ -362,7 +434,14 @@ class FormsGroupsOverview {
   });
 
   final bool hasLeadForm;
+
+  /// The professional's default/primary lead form — kept for the common
+  /// single-form case (matches web's `overview.lead_form`).
   final LeadForm? leadForm;
+
+  /// Every lead form the professional has, plan-gated by [maxLeadForms].
+  final List<LeadForm> leadForms;
+  final int maxLeadForms;
   final List<ProfessionalGroup> groups;
   final List<LeadSubmission> pendingForms;
   final List<LeadSubmission> approvedForms;
@@ -370,6 +449,9 @@ class FormsGroupsOverview {
   final int maxGroups;
 
   bool get atGroupLimit => maxGroups > 0 && groups.length >= maxGroups;
+
+  bool get atLeadFormLimit =>
+      maxLeadForms > 0 && leadForms.length >= maxLeadForms;
 
   factory FormsGroupsOverview.fromJson(Map<String, dynamic> json) {
     List<LeadSubmission> subs(String key) =>
@@ -382,6 +464,11 @@ class FormsGroupsOverview {
     return FormsGroupsOverview(
       hasLeadForm: json['has_lead_form'] as bool? ?? false,
       leadForm: form is Map<String, dynamic> ? LeadForm.fromJson(form) : null,
+      leadForms: (json['lead_forms'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(LeadForm.fromJson)
+          .toList(),
+      maxLeadForms: json['max_lead_forms'] as int? ?? 0,
       groups: (json['groups'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(ProfessionalGroup.fromJson)
@@ -676,6 +763,195 @@ class GroupUsersResponse {
   final ProfessionalGroup group;
   final List<ClientAccessRecord> clients;
   final List<GroupRegistrationSubmission> registrationSubmissions;
+}
+
+// ----- group CSV import (bulk member import) -----
+
+/// One header from the uploaded CSV, matched against the group's client
+/// registration form fields by accounts/group_import.py `match_columns`.
+class GroupImportColumnMatch {
+  const GroupImportColumnMatch({
+    required this.fileColumn,
+    this.matchedFieldKey,
+    this.matchedFieldLabel,
+    this.confidence,
+  });
+
+  final String fileColumn;
+  final String? matchedFieldKey;
+  final String? matchedFieldLabel;
+
+  /// 'exact' | 'partial' | null (unmatched — the column is ignored on import).
+  final String? confidence;
+
+  factory GroupImportColumnMatch.fromJson(Map<String, dynamic> json) =>
+      GroupImportColumnMatch(
+        fileColumn: json['file_column']?.toString() ?? '',
+        matchedFieldKey: json['matched_field_key'] as String?,
+        matchedFieldLabel: json['matched_field_label'] as String?,
+        confidence: json['confidence'] as String?,
+      );
+}
+
+/// A registration-form field a CSV column can be mapped onto.
+class GroupImportField {
+  const GroupImportField({
+    required this.key,
+    required this.label,
+    required this.required,
+  });
+
+  final String key;
+  final String label;
+  final bool required;
+
+  factory GroupImportField.fromJson(Map<String, dynamic> json) =>
+      GroupImportField(
+        key: json['key']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        required: json['required'] as bool? ?? false,
+      );
+}
+
+/// Step 1 response — nothing is written to the database yet.
+class GroupImportPreviewResponse {
+  const GroupImportPreviewResponse({
+    required this.columns,
+    required this.rowsPreview,
+    required this.rowCount,
+    required this.unmatchedColumns,
+    required this.fields,
+  });
+
+  final List<GroupImportColumnMatch> columns;
+
+  /// The first few parsed rows, keyed by the file's own column headers.
+  final List<Map<String, String>> rowsPreview;
+  final int rowCount;
+  final List<String> unmatchedColumns;
+  final List<GroupImportField> fields;
+
+  factory GroupImportPreviewResponse.fromJson(Map<String, dynamic> json) =>
+      GroupImportPreviewResponse(
+        columns: (json['columns'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupImportColumnMatch.fromJson)
+            .toList(),
+        rowsPreview: (json['rows_preview'] as List<dynamic>? ?? [])
+            .whereType<Map<dynamic, dynamic>>()
+            .map((row) => row.map(
+                  (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+                ))
+            .toList(),
+        rowCount: (json['row_count'] as num?)?.toInt() ?? 0,
+        unmatchedColumns: (json['unmatched_columns'] as List<dynamic>? ?? [])
+            .map((column) => column.toString())
+            .toList(),
+        fields: (json['fields'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupImportField.fromJson)
+            .toList(),
+      );
+}
+
+/// The professional-approved column mapping sent back on confirm.
+class GroupImportMappingEntry {
+  GroupImportMappingEntry({required this.fileColumn, this.matchedFieldKey});
+
+  final String fileColumn;
+
+  /// null means "ignore this column".
+  String? matchedFieldKey;
+
+  Map<String, dynamic> toJson() => {
+        'file_column': fileColumn,
+        'matched_field_key': matchedFieldKey,
+      };
+}
+
+/// A row the confirm step created. [rowIndex] is the spreadsheet row number
+/// (the header is row 1), matching the web's "Row" column.
+class GroupImportCreatedRow {
+  const GroupImportCreatedRow({
+    required this.rowIndex,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.hasPortalAccess,
+    required this.temporaryPassword,
+    required this.credentialsSent,
+  });
+
+  final int rowIndex;
+  final String firstName;
+  final String lastName;
+  final String email;
+  final bool hasPortalAccess;
+
+  /// Only returned when portal access was created; shown once and never again.
+  final String temporaryPassword;
+  final bool credentialsSent;
+
+  String get displayName => '$firstName $lastName'.trim();
+
+  factory GroupImportCreatedRow.fromJson(Map<String, dynamic> json) {
+    final client = json['client_access'] as Map<String, dynamic>? ?? const {};
+    return GroupImportCreatedRow(
+      rowIndex: (json['row_index'] as num?)?.toInt() ?? 0,
+      firstName: client['first_name'] as String? ?? '',
+      lastName: client['last_name'] as String? ?? '',
+      email: client['email'] as String? ?? '',
+      hasPortalAccess: client['has_portal_access'] as bool? ?? false,
+      temporaryPassword: json['temporary_password'] as String? ?? '',
+      credentialsSent: json['credentials_sent'] as bool? ?? false,
+    );
+  }
+}
+
+/// A row the confirm step rejected, with the backend's own reason string.
+class GroupImportErrorRow {
+  const GroupImportErrorRow({required this.rowIndex, required this.error});
+
+  final int rowIndex;
+  final String error;
+
+  factory GroupImportErrorRow.fromJson(Map<String, dynamic> json) =>
+      GroupImportErrorRow(
+        rowIndex: (json['row_index'] as num?)?.toInt() ?? 0,
+        error: json['error']?.toString() ?? 'Invalid row.',
+      );
+}
+
+/// Step 2 response — the two result tables the web renders.
+class GroupImportConfirmResponse {
+  const GroupImportConfirmResponse({
+    required this.created,
+    required this.errors,
+    required this.createdCount,
+    required this.errorCount,
+    required this.message,
+  });
+
+  final List<GroupImportCreatedRow> created;
+  final List<GroupImportErrorRow> errors;
+  final int createdCount;
+  final int errorCount;
+  final String message;
+
+  factory GroupImportConfirmResponse.fromJson(Map<String, dynamic> json) =>
+      GroupImportConfirmResponse(
+        created: (json['created'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupImportCreatedRow.fromJson)
+            .toList(),
+        errors: (json['errors'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupImportErrorRow.fromJson)
+            .toList(),
+        createdCount: (json['created_count'] as num?)?.toInt() ?? 0,
+        errorCount: (json['error_count'] as num?)?.toInt() ?? 0,
+        message: json['message'] as String? ?? '',
+      );
 }
 
 class ClientDetailChangeRequest {

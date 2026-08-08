@@ -21,6 +21,21 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 
 const WEEKDAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+/** A Date's local calendar day as `YYYY-MM-DD`.
+ *
+ *  Deliberately not `toISOString().slice(0, 10)`: that converts to UTC first,
+ *  so a Date built at local midnight lands on the previous day east of UTC,
+ *  and `new Date()` reads as tomorrow west of UTC late in the evening. Meeting
+ *  and availability dates are local calendar days, so a UTC round-trip shifted
+ *  the whole calendar grid by one cell in those zones — and disagreed with the
+ *  Flutter app, which has always compared local dates. */
+function toLocalIso(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface CalendarCell {
   iso: string;
   day: number;
@@ -91,7 +106,7 @@ export class ProfessionalScheduleComponent implements OnInit {
   // date off would never show up in the backend's own list (it only
   // returns today-or-later), so allowing one to be entered just meant it'd
   // vanish again on reload.
-  readonly todayIso = new Date().toISOString().slice(0, 10);
+  readonly todayIso = toLocalIso(new Date());
 
   // Days off — specific blocked-off dates, layered on top of the recurring
   // weekly windows above rather than replacing them. Opened from a button
@@ -148,7 +163,7 @@ export class ProfessionalScheduleComponent implements OnInit {
   showScheduleForm = false;
   scheduleForm = { client_ids: [] as number[], duration_minutes: null as number | null, title: '', notes: '' };
   clientSearchQuery = '';
-  slotDate = new Date().toISOString().slice(0, 10);
+  slotDate = toLocalIso(new Date());
   slots: SlotsByDate = {};
   selectedSlot = '';
   isLoadingSlots = false;
@@ -378,7 +393,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     const gridStart = new Date(firstOfMonth);
     gridStart.setDate(gridStart.getDate() - firstOfMonth.getDay());
 
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = toLocalIso(new Date());
     const countsByDate = this.meetingCountsByDate();
     const minutesByDate = this.meetingMinutesByDate();
 
@@ -392,7 +407,7 @@ export class ProfessionalScheduleComponent implements OnInit {
     for (let i = 0; i < 42; i++) {
       const cellDate = new Date(gridStart);
       cellDate.setDate(gridStart.getDate() + i);
-      const iso = cellDate.toISOString().slice(0, 10);
+      const iso = toLocalIso(cellDate);
       const bookedMinutes = minutesByDate[iso] || 0;
       // JS getDay(): Sun=0..Sat=6. Our weekday fields: Mon=0..Sun=6.
       const ourWeekday = (cellDate.getDay() + 6) % 7;

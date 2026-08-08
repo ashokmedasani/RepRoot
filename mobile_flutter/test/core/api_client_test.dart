@@ -335,6 +335,9 @@ void main() {
         'must_change_password': true,
         'is_active': true,
         'registration_answers': {'goal': 'strength'},
+        'terms_accepted': true,
+        'privacy_policy_accepted': true,
+        'legal_document_version': '2026-07-30',
       };
 
       final parsed = ClientAccessRecord.fromJson(raw);
@@ -346,6 +349,15 @@ void main() {
       expect(reparsed.id, 63);
       expect(reparsed.mustChangePassword, isTrue);
       expect(reparsed.displayName, 'Ava Martinez');
+      // The router's consent gate reads these back out of the stored session,
+      // so they have to survive the round-trip.
+      expect(reparsed.legalAccepted, isTrue);
+      expect(reparsed.legalDocumentVersion, '2026-07-30');
+    });
+
+    test('a client record with no legal fields fails closed', () {
+      final parsed = ClientAccessRecord.fromJson(const {'id': 1});
+      expect(parsed.legalAccepted, isFalse);
     });
 
     test('ClientLoginResponse handles a null client', () {

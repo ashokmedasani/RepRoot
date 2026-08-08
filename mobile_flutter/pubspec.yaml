@@ -46,6 +46,11 @@ dependencies:
   file_picker: 11.0.0
   url_launcher: ^6.3.2
   youtube_player_iframe: ^6.0.2
+  google_sign_in: ^7.2.0
+  # Needed directly for `web_only.renderButton()` — the endorsed web
+  # implementation is pulled in automatically, but importing its API
+  # requires declaring it (per the package's own README).
+  google_sign_in_web: ^1.1.3
 
 dev_dependencies:
   flutter_test:

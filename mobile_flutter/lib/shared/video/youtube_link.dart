@@ -33,5 +33,3 @@ String? youtubeVideoId(String url) {
   return (id == null || id.isEmpty) ? null : id;
 }
 
-/// Whether [url] can be played by the in-app player.
-bool isYoutubeLink(String url) => youtubeVideoId(url) != null;

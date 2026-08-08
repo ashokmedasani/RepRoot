@@ -45,3 +45,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local build config (--dart-define-from-file). Contains environment-specific
+# values such as the API host and the Google OAuth client ID; the .example
+# file is the committed template.
+dart_defines.json

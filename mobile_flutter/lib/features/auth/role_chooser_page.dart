@@ -25,23 +25,46 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _redirectIfSignedIn());
   }
 
-  void _redirectIfSignedIn() {
+  Future<void> _redirectIfSignedIn() async {
     if (!mounted) return;
-    if (ref.read(professionalAuthApiProvider).hasSession()) {
-      context.go(Routes.professionalDashboard);
+    final professionalApi = ref.read(professionalAuthApiProvider);
+    if (professionalApi.hasSession()) {
+      // A published legal-document version can change between launches, and a
+      // professional who has not accepted it gets a 403 on every screen. The
+      // status endpoint is one of the few that still answers in that state, so
+      // ask it here — the same check the web runs after login. A failure keeps
+      // the old behaviour of going straight to the dashboard rather than
+      // stranding an offline user on the chooser.
+      var destination = Routes.professionalDashboard;
+      try {
+        final status = await professionalApi.getProfileStatus();
+        destination = status.legalAcceptanceRequired
+            ? Routes.professionalLegalConsent
+            : status.profileSetupCompleted
+                ? Routes.professionalDashboard
+                : Routes.professionalProfileSetup;
+      } catch (_) {
+        // Keep the optimistic destination.
+      }
+      if (!mounted) return;
+      context.go(destination);
       return;
     }
 
     final clientApi = ref.read(clientApiProvider);
     if (!clientApi.hasSession()) return;
 
-    // Restoring a session must honour the password gate too, otherwise a client
-    // could skip it by relaunching the app.
+    // Restoring a session must honour the password and consent gates too,
+    // otherwise a client could skip them by relaunching the app. Both read the
+    // cached record, so this stays synchronous.
     final stored = clientApi.storedClient();
+    if (!mounted) return;
     context.go(
       stored?.mustChangePassword ?? false
           ? Routes.clientChangePassword
-          : Routes.clientDashboard,
+          : !(stored?.legalAccepted ?? false)
+              ? Routes.clientLegalConsent
+              : Routes.clientDashboard,
     );
   }
 
@@ -60,7 +83,7 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _Brand(tokens: tokens, text: text),
+                  _Brand(text: text),
                   const SizedBox(height: AppSpacing.xxl + AppSpacing.sm), // 2.5rem
                   _Choices(tokens: tokens, text: text),
                 ],
@@ -74,9 +97,8 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
 }
 
 class _Brand extends StatelessWidget {
-  const _Brand({required this.tokens, required this.text});
+  const _Brand({required this.text});
 
-  final AppTokens tokens;
   final TextTheme text;
 
   @override
@@ -92,15 +114,10 @@ class _Brand extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Text('RepRoot', style: text.displaySmall),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          'Professional & Client Management',
-          style: text.bodyMedium?.copyWith(
-            color: tokens.muted,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        // "RepRoot Studio" is the product name the website uses (its
+        // `brand__text`), so the signed-out screen now says the same thing
+        // both places instead of describing the product differently.
+        Text('RepRoot Studio', style: text.displaySmall),
       ],
     );
   }
@@ -116,10 +133,11 @@ class _Choices extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.screen),
+      // Borderless: the shadow already separates this from the page, and a
+      // hairline on top of it reads as belt-and-braces at this radius.
       decoration: BoxDecoration(
         color: context.colors.surface,
-        borderRadius: AppRadius.xlAll,
-        border: Border.all(color: tokens.border),
+        borderRadius: AppRadius.sheetAll,
         boxShadow: tokens.shadowMd,
       ),
       child: Column(
@@ -128,7 +146,7 @@ class _Choices extends StatelessWidget {
             'CONTINUE AS',
             style: text.labelSmall?.copyWith(
               color: tokens.muted,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0.08 * 11,
             ),
           ),

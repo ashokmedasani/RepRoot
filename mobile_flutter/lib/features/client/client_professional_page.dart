@@ -165,10 +165,6 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
               selected: {_tab},
               showSelectedIcon: false,
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-              style: SegmentedButton.styleFrom(
-                textStyle: context.text.labelMedium,
-                visualDensity: VisualDensity.compact,
-              ),
             ),
           ),
           Expanded(

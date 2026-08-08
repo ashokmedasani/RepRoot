@@ -32,11 +32,20 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
   List<ChartSpec> _statCards = [];
   String _message = '';
   bool _loading = true;
+  int _notificationUnread = 0;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadNotificationCount();
+  }
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final inbox = await ref.read(clientApiProvider).getNotifications(limit: 1);
+      if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
+    } catch (_) {/* the badge just stays at zero */}
   }
 
   String get _greeting {
@@ -60,9 +69,7 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
 
   /// Anything dated today or earlier that is not done.
   List<ClientReminder> get _dueToday {
-    final now = DateTime.now();
-    final today =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final today = todayIso();
     return _upcoming
         .where((item) => item.date.compareTo(today) <= 0 && !item.isDone)
         .toList();
@@ -185,7 +192,17 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.sm),
+                // The client side had no notification affordance anywhere —
+                // the API and the inbox page both existed, but the only way in
+                // was More → Notifications, so a client had no way of knowing
+                // anything was waiting. Clients open this app daily; this is
+                // the screen they land on.
+                NotificationBell(
+                  unread: _notificationUnread,
+                  onTap: () => context.go(Routes.clientNotifications),
+                ),
+                const SizedBox(width: AppSpacing.xs),
                 AppAvatar(
                   initials: _initials,
                   imageUrl: Env.mediaUrl(_me?.client.photo ?? ''),
@@ -221,35 +238,40 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
           ],
 
           const SectionHeader(title: 'Your consistency', topSpace: AppSpacing.lg),
-          KpiGrid(
-            children: [
-              KpiTile(
-                label: 'Streak',
+          // The last place still on the old white KpiTile. These four numbers
+          // are the client's whole reason for opening the app each day, so
+          // they get the same tinted treatment as everywhere else — and a
+          // streak that's alive burns orange rather than sitting grey.
+          CompactStatRow(
+            stats: [
+              CompactStat(
                 icon: Icons.local_fire_department_outlined,
-                iconColor: tokens.accent,
+                accent: (summary?.currentStreak ?? 0) > 0
+                    ? MenuAccent.orange
+                    : (fg: tokens.muted, bg: tokens.surfaceSoft),
                 value: '${summary?.currentStreak ?? 0}',
+                label: 'Streak',
                 caption: 'days in a row',
-                valueColor: (summary?.currentStreak ?? 0) > 0 ? tokens.accent : null,
               ),
-              KpiTile(
-                label: 'Consistency',
+              CompactStat(
                 icon: Icons.percent_outlined,
-                iconColor: context.colors.primary,
+                accent: MenuAccent.blue,
                 value: '${summary?.consistencyPercent ?? 0}%',
+                label: 'Consistency',
                 caption: 'last 30 days',
               ),
-              KpiTile(
-                label: 'Entries',
+              CompactStat(
                 icon: Icons.edit_note_outlined,
-                iconColor: tokens.success,
+                accent: MenuAccent.green,
                 value: '${summary?.totalEntries ?? 0}',
+                label: 'Entries',
                 caption: '${summary?.entriesThisWeek ?? 0} this week',
               ),
-              KpiTile(
-                label: 'Active days',
+              CompactStat(
                 icon: Icons.calendar_today_outlined,
-                iconColor: tokens.primaryStrong,
+                accent: MenuAccent.purple,
                 value: '${summary?.activeDaysLast30 ?? 0}',
+                label: 'Active days',
                 caption: 'of last 30',
               ),
             ],
@@ -282,7 +304,7 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
                 ].join(' · '),
                 trailing: item.isDone
                     ? const StatusPill(label: 'Done', tone: PillTone.good)
-                    : (item.date.compareTo(_todayIso()) <= 0
+                    : (item.date.compareTo(todayIso()) <= 0
                         ? const StatusPill(label: 'Due', tone: PillTone.warn)
                         : null),
               ),
@@ -300,7 +322,7 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
                   width: 5,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: parseAccentColor(template.accent),
+                    color: TemplateAccent.of(context, template.accent),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -311,8 +333,4 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
     );
   }
 
-  String _todayIso() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
 }

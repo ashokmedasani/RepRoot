@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../session/session_store.dart';
 import 'api_client.dart';
 import 'models/account_models.dart';
+import 'models/legal_models.dart';
 import 'models/support_models.dart';
 import 'models/professional_models.dart';
 import 'models/notification_models.dart';
@@ -69,6 +70,81 @@ class ProfessionalAuthApi {
     });
   }
 
+  /// Used for both "Continue with Google" signup and "Log in with Google" —
+  /// the backend decides whether to create, link, or just log in based on
+  /// the verified Google account. 1:1 port of
+  /// ProfessionalAuthApiService.googleAuth in the web frontend:
+  /// [acceptLegalTerms] is sent as both `accept_terms` and `accept_privacy`,
+  /// and gates whether the backend is allowed to create a new account
+  /// (`allow_create` in ProfessionalGoogleAuthSerializer.validate) — the
+  /// login flow leaves it false so a Google sign-in never silently creates
+  /// an account, while signup only calls this after the legal review sheet
+  /// is accepted.
+  Future<ProfessionalGoogleAuthResponse> googleAuth(
+    String credential, {
+    bool acceptLegalTerms = false,
+  }) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/auth/google/',
+        data: {
+          'credential': credential,
+          'accept_terms': acceptLegalTerms,
+          'accept_privacy': acceptLegalTerms,
+        },
+      );
+      return ProfessionalGoogleAuthResponse.fromJson(res.data ?? {});
+    });
+  }
+
+  // ----- password reset (forgot password — unauthenticated) -----
+
+  /// `available == true` in the response means no professional account owns
+  /// this email, so nothing was sent — the same signal the web portal branches
+  /// on to offer Sign up / Login instead.
+  Future<EmailOtpRequestResult> requestPasswordResetOtp(String email) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/password-reset/request-otp/',
+        data: {'email': email},
+      );
+      return EmailOtpRequestResult.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<PasswordResetOtpVerifyResult> verifyPasswordResetOtp(
+    String email,
+    String otp,
+  ) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/password-reset/verify-otp/',
+        data: {'email': email, 'otp': otp},
+      );
+      return PasswordResetOtpVerifyResult.fromJson(res.data ?? {});
+    });
+  }
+
+  Future<String> confirmPasswordReset(
+    String email,
+    String resetToken,
+    String password,
+    String confirmPassword,
+  ) {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/password-reset/confirm/',
+        data: {
+          'email': email,
+          'reset_token': resetToken,
+          'password': password,
+          'confirm_password': confirmPassword,
+        },
+      );
+      return res.data?['message'] as String? ?? '';
+    });
+  }
+
   Future<String> logout() {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
@@ -96,6 +172,23 @@ class ProfessionalAuthApi {
       options: _auth,
     );
   });
+
+  /// Deletes every notification, read or not, and returns the new unread
+  /// count. Distinct from [markNotificationRead] with no id, which only marks
+  /// them read and leaves the list in place.
+  Future<({int deletedCount, int unreadCount})> clearNotifications() {
+    return runApi(() async {
+      final res = await _dio.delete<Map<String, dynamic>>(
+        '/professional/notifications/',
+        options: _auth,
+      );
+      final data = res.data ?? const <String, dynamic>{};
+      return (
+        deletedCount: (data['deleted_count'] as num?)?.toInt() ?? 0,
+        unreadCount: (data['unread_count'] as num?)?.toInt() ?? 0,
+      );
+    });
+  }
 
   Future<List<NotificationPreferenceRow>> getNotificationPreferences() {
     return runApi(() async {
@@ -158,6 +251,24 @@ class ProfessionalAuthApi {
     });
   }
 
+  /// Clears the profile photo, falling back to the initials avatar.
+  ///
+  /// A separate DELETE rather than a [saveProfile] with an empty photo field:
+  /// the multipart PUT treats an absent file as "leave it alone", so there was
+  /// no way to actually remove one.
+  Future<ProfessionalProfile> removeProfilePhoto() {
+    return runApi(() async {
+      final res = await _dio.delete<Map<String, dynamic>>(
+        '/professional/profile/photo/',
+        options: _auth,
+      );
+      final profile = res.data?['profile'];
+      return ProfessionalProfile.fromJson(
+        profile is Map<String, dynamic> ? profile : {},
+      );
+    });
+  }
+
   /// Send every visibility key — omitted keys reset to false server-side.
   Future<Map<String, bool>> updateProfileVisibility(
     Map<String, bool> visibility,
@@ -176,13 +287,63 @@ class ProfessionalAuthApi {
     });
   }
 
-  Future<bool> getProfileStatus() {
+  /// Carries both post-login gates: profile setup and legal re-consent.
+  /// One of the few professional endpoints marked `allow_outdated_legal`, so it
+  /// still answers while consent is pending.
+  Future<ProfessionalProfileStatus> getProfileStatus() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/profile/status/',
         options: _auth,
       );
-      return res.data?['profile_setup_completed'] as bool? ?? false;
+      return ProfessionalProfileStatus.fromJson(res.data ?? {});
+    });
+  }
+
+  // ----- legal documents -----
+
+  /// Public endpoint (no token): current published versions + effective date.
+  Future<LegalConfiguration> getLegalConfiguration() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>('/legal/configuration/');
+      return LegalConfiguration.fromJson(res.data ?? {});
+    });
+  }
+
+  /// Records acceptance of the current professional Terms + Privacy Notice.
+  /// The backend rejects anything but `true` for both flags.
+  ///
+  /// `client_timezone` is stored verbatim on the acceptance record for
+  /// evidence. The web sends an IANA zone from `Intl.DateTimeFormat`; Dart has
+  /// no IANA name without a new dependency, so this sends the platform
+  /// abbreviation (e.g. "IST") plus the UTC offset, which the backend keeps as
+  /// an opaque 80-char string.
+  Future<ProfessionalProfile> acceptLegalDocuments() {
+    return runApi(() async {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '/professional/legal-acceptance/',
+        data: {
+          'accept_terms': true,
+          'accept_privacy': true,
+          'client_timezone': localTimezoneLabel(),
+        },
+        options: _auth,
+      );
+      return ProfessionalProfile.fromJson(
+        res.data?['profile'] as Map<String, dynamic>? ?? {},
+      );
+    });
+  }
+
+  /// "Action Required" workspace-setup checklist — 1:1 port of
+  /// ProfessionalAuthApiService.getOnboardingStatus in the web frontend.
+  Future<ProfessionalOnboardingStatus> getOnboardingStatus() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/dashboard/onboarding-status/',
+        options: _auth,
+      );
+      return ProfessionalOnboardingStatus.fromJson(res.data ?? {});
     });
   }
 
@@ -309,8 +470,15 @@ class ProfessionalAuthApi {
     });
   }
 
+  /// No `current_password`: the backend's ProfessionalPasswordChangeSerializer
+  /// declares only `password` / `confirm_password`, so the field mobile used
+  /// to send was silently dropped by DRF. Sending it implied a verification
+  /// that was not happening. Google-authenticated professionals have no
+  /// password to re-enter either.
+  ///
+  /// The request is authenticated by token, and the view revokes every token
+  /// afterwards, forcing a fresh sign-in everywhere.
   Future<String> changePassword(
-    String currentPassword,
     String password,
     String confirmPassword,
   ) {
@@ -318,7 +486,6 @@ class ProfessionalAuthApi {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/account/change-password/',
         data: {
-          'current_password': currentPassword,
           'password': password,
           'confirm_password': confirmPassword,
         },

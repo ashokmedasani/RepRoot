@@ -112,11 +112,15 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
       if (!mounted) return;
       // A professional-issued temporary password must be replaced before the client
       // can use the app. The Ionic app skipped this and went straight to the
-      // dashboard; the web portal gates here, and so do we.
+      // dashboard; the web portal gates here, and so do we. Legal consent is
+      // the second gate, in the same order as verifyClientLogin() on the web
+      // (the change-password screen re-checks it on the way out).
       context.go(
         client.mustChangePassword
             ? Routes.clientChangePassword
-            : Routes.clientDashboard,
+            : !client.legalAccepted
+                ? Routes.clientLegalConsent
+                : Routes.clientDashboard,
       );
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -213,10 +217,10 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
+      // Tinted and flat — the wash separates it, so no border and no shadow.
       decoration: BoxDecoration(
         color: tokens.surfaceSoft,
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: tokens.border),
+        borderRadius: AppRadius.tileAll,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

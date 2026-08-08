@@ -198,6 +198,9 @@ class PaymentRequestRecord {
     required this.description,
     required this.requestedAmount,
     required this.requestedCurrency,
+    this.acceptedAmount = '0',
+    this.remainingAmount = '0',
+    this.overpaidAmount = '0',
     required this.dueDate,
     required this.paymentType,
     required this.status,
@@ -215,6 +218,9 @@ class PaymentRequestRecord {
   final String description;
   final String requestedAmount;
   final String requestedCurrency;
+  final String acceptedAmount;
+  final String remainingAmount;
+  final String overpaidAmount;
   final String? dueDate;
   final String paymentType; // 'manual' | 'integrated' | 'both'
   final String status;
@@ -233,6 +239,9 @@ class PaymentRequestRecord {
         description: json['description'] as String? ?? '',
         requestedAmount: json['requested_amount']?.toString() ?? '0',
         requestedCurrency: json['requested_currency'] as String? ?? 'USD',
+        acceptedAmount: json['accepted_amount']?.toString() ?? '0',
+        remainingAmount: json['remaining_amount']?.toString() ?? '0',
+        overpaidAmount: json['overpaid_amount']?.toString() ?? '0',
         dueDate: json['due_date'] as String?,
         paymentType: json['payment_type'] as String? ?? 'manual',
         status: json['status'] as String? ?? 'sent',
@@ -308,6 +317,7 @@ class PaymentRecordRow {
     required this.clientVisibility,
     required this.internalNote,
     required this.clientNote,
+    this.recordType = 'manual_log',
   });
 
   final int id;
@@ -325,6 +335,7 @@ class PaymentRecordRow {
   final String clientVisibility;
   final String internalNote;
   final String clientNote;
+  final String recordType; // 'manual_log' | 'integrated'
 
   factory PaymentRecordRow.fromJson(Map<String, dynamic> json) => PaymentRecordRow(
         id: (json['id'] as num?)?.toInt() ?? 0,
@@ -342,6 +353,116 @@ class PaymentRecordRow {
         clientVisibility: json['client_visibility'] as String? ?? 'visible',
         internalNote: json['internal_note'] as String? ?? '',
         clientNote: json['client_note'] as String? ?? '',
+        recordType: json['record_type'] as String? ?? 'manual_log',
+      );
+}
+
+/// One professional-side payment-activity feed entry — every acknowledge /
+/// reject / cancel / log action against a client's payment requests.
+class PaymentActivityItem {
+  const PaymentActivityItem({
+    required this.id,
+    required this.action,
+    required this.actionLabel,
+    required this.requestId,
+    required this.recordId,
+    required this.changedBy,
+    required this.reason,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String action;
+  final String actionLabel;
+  final String requestId;
+  final String recordId;
+  final String changedBy;
+  final String reason;
+  final String createdAt;
+
+  factory PaymentActivityItem.fromJson(Map<String, dynamic> json) => PaymentActivityItem(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        action: json['action'] as String? ?? '',
+        actionLabel: json['action_label'] as String? ?? '',
+        requestId: json['request_id'] as String? ?? '',
+        recordId: json['record_id'] as String? ?? '',
+        changedBy: json['changed_by'] as String? ?? '',
+        reason: json['reason'] as String? ?? '',
+        createdAt: json['created_at'] as String? ?? '',
+      );
+}
+
+/// One payment notification in the professional's feed.
+///
+/// [payload] carries a backend-set `action_url` pointing at the exact client /
+/// request that triggered the notification, plus a `request_id` — see
+/// [PaymentNotificationItem.requestId] and [clientId] for the accessors that
+/// pick those apart for routing.
+class PaymentNotificationItem {
+  const PaymentNotificationItem({
+    required this.id,
+    required this.notifType,
+    required this.title,
+    required this.body,
+    required this.payload,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  final int id;
+  final String notifType;
+  final String title;
+  final String body;
+  final Map<String, dynamic> payload;
+  final bool isRead;
+  final String createdAt;
+
+  /// The payment request this notification is about, or '' when it isn't
+  /// request-scoped (e.g. a plain settings change).
+  String get requestId => payload['request_id'] as String? ?? '';
+
+  /// The client id parsed out of the backend's `action_url`.
+  ///
+  /// The URL is a *web* route (`/professional/clients/5?tab=payments`), so it
+  /// can't be navigated to directly on mobile — only the id inside it is
+  /// portable. Returns null when the URL is missing or shaped differently,
+  /// in which case the caller should fall back to the Payments tab.
+  int? get clientId {
+    final actionUrl = payload['action_url'] as String? ?? '';
+    final match =
+        RegExp(r'/professional/clients/(\d+)').firstMatch(actionUrl);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  factory PaymentNotificationItem.fromJson(Map<String, dynamic> json) =>
+      PaymentNotificationItem(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        notifType: json['notif_type'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        body: json['body'] as String? ?? '',
+        payload: json['payload'] as Map<String, dynamic>? ?? const {},
+        isRead: json['is_read'] as bool? ?? false,
+        createdAt: json['created_at'] as String? ?? '',
+      );
+}
+
+/// The professional's payment notification feed plus its unread total.
+class PaymentNotificationsResponse {
+  const PaymentNotificationsResponse({
+    required this.unreadCount,
+    required this.items,
+  });
+
+  final int unreadCount;
+  final List<PaymentNotificationItem> items;
+
+  factory PaymentNotificationsResponse.fromJson(Map<String, dynamic> json) =>
+      PaymentNotificationsResponse(
+        unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+        items: (json['items'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(PaymentNotificationItem.fromJson)
+            .toList(),
       );
 }
 

@@ -593,7 +593,14 @@ export class ProfessionalClientTemplateComponent implements OnInit {
     });
   }
 
+  /** Local calendar date, NOT `toISOString()` — that converts to UTC first and
+   *  so returns the wrong day for part of every day outside UTC. Entry dates
+   *  are local calendar days; the Flutter app uses the local date too. */
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }

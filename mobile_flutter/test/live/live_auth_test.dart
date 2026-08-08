@@ -47,8 +47,9 @@ void main() {
 
         session.seed({SessionKeys.professionalToken: response.token});
 
-        final complete = await professionalApi.getProfileStatus();
-        expect(complete, isTrue);
+        final status = await professionalApi.getProfileStatus();
+        expect(status.profileSetupCompleted, isTrue);
+        expect(status.currentLegalDocumentVersion, isNotEmpty);
 
         final profile = await professionalApi.getProfile();
         expect(profile.displayName, isNotEmpty);

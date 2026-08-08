@@ -1,7 +1,7 @@
 import 'package:reproot/core/api/api_client.dart';
 import 'package:reproot/core/api/chat_api.dart';
 import 'package:reproot/core/api/forms_groups_api.dart';
-import 'package:reproot/core/api/references_api.dart';
+import 'package:reproot/core/api/resources_api.dart';
 import 'package:reproot/core/api/templates_api.dart';
 import 'package:reproot/core/api/professional_auth_api.dart';
 import 'package:reproot/core/session/session_store.dart';
@@ -28,7 +28,7 @@ void main() {
       late SessionStore session;
       late FormsGroupsApi formsGroups;
       late TemplatesApi templates;
-      late ReferencesApi references;
+      late ResourcesApi resources;
       late ChatApi chat;
 
       setUpAll(() async {
@@ -44,7 +44,7 @@ void main() {
 
         formsGroups = FormsGroupsApi(dio);
         templates = TemplatesApi(dio);
-        references = ReferencesApi(dio);
+        resources = ResourcesApi(dio);
         chat = ChatApi(dio);
       });
 
@@ -88,16 +88,16 @@ void main() {
         expect(standards.first.fields, isNotEmpty);
       });
 
-      test('references and categories parse', () async {
-        final categories = await references.getCategories();
-        final list = await references.getReferences();
+      test('resources and categories parse', () async {
+        final categories = await resources.getCategories();
+        final list = await resources.getResources();
 
         expect(list.usage.used, greaterThanOrEqualTo(0));
         for (final category in categories) {
           expect(category.name, isNotEmpty);
         }
-        for (final reference in list.references) {
-          expect(reference.title, isNotEmpty);
+        for (final resource in list.resources) {
+          expect(resource.title, isNotEmpty);
         }
       });
 
