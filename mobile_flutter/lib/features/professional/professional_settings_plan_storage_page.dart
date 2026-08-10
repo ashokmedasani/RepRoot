@@ -25,6 +25,7 @@ class ProfessionalSettingsPlanStoragePage extends ConsumerStatefulWidget {
 class _ProfessionalSettingsPlanStoragePageState
     extends ConsumerState<ProfessionalSettingsPlanStoragePage> {
   ProfessionalDataUsage? _usage;
+  String _loadError = '';
 
   @override
   void initState() {
@@ -34,10 +35,18 @@ class _ProfessionalSettingsPlanStoragePageState
 
   Future<void> _load() async {
     final api = ref.read(professionalAuthApiProvider);
+    if (mounted) setState(() => _loadError = '');
     try {
       final usage = await api.getDataUsage();
       if (mounted) setState(() => _usage = usage);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Could not load data usage (${error.runtimeType}).\n$stackTrace',
+      );
+      if (mounted) {
+        setState(() => _loadError = 'Data usage could not be loaded.');
+      }
+    }
   }
 
   double get _usagePercent => ((_usage?.usagePercent ?? 0) * 10).round() / 10;
@@ -62,8 +71,8 @@ class _ProfessionalSettingsPlanStoragePageState
           records: entry.value.recordCount,
           size: usage.hasSectionBytes
               ? (entry.value.totalBytes == null
-                  ? '—'
-                  : formatBytes(entry.value.totalBytes!))
+                    ? '—'
+                    : formatBytes(entry.value.totalBytes!))
               : null,
           percent: (entry.value.percentOfQuota * 10).round() / 10,
         ),
@@ -88,21 +97,30 @@ class _ProfessionalSettingsPlanStoragePageState
             subtitle: 'View storage and data usage details.',
           ),
           const SizedBox(height: AppSpacing.md),
+          if (_loadError.isNotEmpty) ...[
+            ErrorNote(message: _loadError, onRetry: _load),
+            const SizedBox(height: AppSpacing.md),
+          ],
           _Card(
-            title: 'Plan & Storage',
+            title: 'Plan and Storage',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _KvList(
                   rows: [
-                    ('Plan', _usage?.planName.isNotEmpty ?? false ? _usage!.planName : '—'),
+                    (
+                      'Plan',
+                      _usage?.planName.isNotEmpty ?? false
+                          ? _usage!.planName
+                          : '—',
+                    ),
                     ('Storage used', '$_usagePercent%'),
                     if ((_usage?.usageLabel ?? '').isNotEmpty)
                       ('Capacity', titleCase(_usage!.usageLabel)),
                     (
                       'Records',
                       '${_usage?.recordCount ?? 0}'
-                          '${_usage != null && _usage!.totalBytes > 0 ? ' · ${formatBytes(_usage!.totalBytes)}' : ''}'
+                          '${_usage != null && _usage!.totalBytes > 0 ? ' · ${formatBytes(_usage!.totalBytes)}' : ''}',
                     ),
                   ],
                 ),
@@ -116,8 +134,8 @@ class _ProfessionalSettingsPlanStoragePageState
                     color: _usage?.isDanger ?? false
                         ? context.colors.error
                         : _usage?.isWarning ?? false
-                            ? tokens.accent
-                            : context.colors.primary,
+                        ? tokens.accent
+                        : context.colors.primary,
                   ),
                 ),
                 if (_usage?.isLocked ?? false) ...[
@@ -126,13 +144,17 @@ class _ProfessionalSettingsPlanStoragePageState
                     _usage!.lockReason.isNotEmpty
                         ? _usage!.lockReason
                         : 'Uploads are paused — you are over your storage quota.',
-                    style: context.text.bodySmall?.copyWith(color: context.colors.error),
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.error,
+                    ),
                   ),
                 ] else if (_usage?.gracePeriodEndsAt != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Grace period ends ${shortDate(_usage!.gracePeriodEndsAt!)}.',
-                    style: context.text.bodySmall?.copyWith(color: tokens.accent),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.accent,
+                    ),
                   ),
                 ],
                 if (_storageRows.isNotEmpty) ...[
@@ -151,7 +173,9 @@ class _ProfessionalSettingsPlanStoragePageState
                   if (_usage!.hasSectionBytes)
                     Text(
                       'Sizes are included with your ${_usage!.planName} plan.',
-                      style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                      style: context.text.bodySmall?.copyWith(
+                        color: tokens.muted,
+                      ),
                     ),
                 ],
               ],
@@ -165,8 +189,10 @@ class _ProfessionalSettingsPlanStoragePageState
                 icon: Icons.delete_outline,
                 accent: MenuAccent.orange,
                 label: 'Recycle Bin',
-                subtitle: 'Restore or permanently delete recently-deleted items',
-                onTap: () => context.push(Routes.professionalSettingsRecycleBin),
+                subtitle:
+                    'Restore or permanently delete recently-deleted items',
+                onTap: () =>
+                    context.push(Routes.professionalSettingsRecycleBin),
               ),
             ],
           ),
@@ -234,7 +260,6 @@ class _KvList extends StatelessWidget {
   }
 }
 
-
 /// One row of the storage breakdown.
 class _StorageRow {
   const _StorageRow({
@@ -265,17 +290,21 @@ class _StorageTable extends StatelessWidget {
     final tokens = context.tokens;
     final showSize = rows.any((r) => r.size != null);
 
-    Widget cell(String text, {required int flex, TextAlign align = TextAlign.right, TextStyle? style}) =>
-        Expanded(
-          flex: flex,
-          child: Text(
-            text,
-            textAlign: align,
-            style: style,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
+    Widget cell(
+      String text, {
+      required int flex,
+      TextAlign align = TextAlign.right,
+      TextStyle? style,
+    }) => Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        textAlign: align,
+        style: style,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
 
     final headerStyle = context.text.labelSmall?.copyWith(
       color: tokens.muted,
@@ -288,7 +317,12 @@ class _StorageTable extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Row(
             children: [
-              cell('SECTION', flex: 5, align: TextAlign.left, style: headerStyle),
+              cell(
+                'SECTION',
+                flex: 5,
+                align: TextAlign.left,
+                style: headerStyle,
+              ),
               cell('RECORDS', flex: 3, style: headerStyle),
               if (showSize) cell('SIZE', flex: 3, style: headerStyle),
               cell('SHARE', flex: 2, style: headerStyle),
@@ -301,18 +335,24 @@ class _StorageTable extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Row(
               children: [
-                cell(row.label,
-                    flex: 5,
-                    align: TextAlign.left,
-                    style: context.text.bodyMedium),
+                cell(
+                  row.label,
+                  flex: 5,
+                  align: TextAlign.left,
+                  style: context.text.bodyMedium,
+                ),
                 cell('${row.records}', flex: 3, style: context.text.bodyMedium),
                 if (showSize)
-                  cell(row.size ?? '—', flex: 3, style: context.text.bodyMedium),
-                cell('${trimNumber(row.percent)}%',
-                    flex: 2,
-                    style: context.text.bodyMedium?.copyWith(
-                      color: tokens.muted,
-                    )),
+                  cell(
+                    row.size ?? '—',
+                    flex: 3,
+                    style: context.text.bodyMedium,
+                  ),
+                cell(
+                  '${trimNumber(row.percent)}%',
+                  flex: 2,
+                  style: context.text.bodyMedium?.copyWith(color: tokens.muted),
+                ),
               ],
             ),
           ),

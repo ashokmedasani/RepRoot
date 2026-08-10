@@ -13,8 +13,15 @@ import '../../core/api/payments_api.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 
-/// Professional payment settings + manual payment methods.
-/// Replica of mobile/src/app/pages/professional/professional-payment-settings.
+enum _PaymentSection {
+  reporting,
+  transactions,
+  methods,
+  integrated,
+  disclosures,
+}
+
+/// Professional payment workspace, aligned with the website's payment page.
 class ProfessionalPaymentsPage extends ConsumerStatefulWidget {
   const ProfessionalPaymentsPage({super.key});
 
@@ -23,7 +30,8 @@ class ProfessionalPaymentsPage extends ConsumerStatefulWidget {
       _ProfessionalPaymentsPageState();
 }
 
-class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsPage> {
+class _ProfessionalPaymentsPageState
+    extends ConsumerState<ProfessionalPaymentsPage> {
   PaymentSettingsRecord? _settings;
   List<String> _currencyOptions = [];
   List<ManualPaymentMethodRecord> _methods = [];
@@ -31,6 +39,9 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
   bool _loading = true;
   String _message = '';
   bool _savingSettings = false;
+  _PaymentSection _section = _PaymentSection.reporting;
+  List<FinancialTransactionRecord> _transactions = [];
+  String _transactionsMessage = '';
 
   RevenueSummaryResponse? _revenue;
   String _revenuePeriod = '30';
@@ -43,7 +54,10 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _message = ''; });
+    setState(() {
+      _loading = true;
+      _message = '';
+    });
     try {
       final api = ref.read(paymentsApiProvider);
       final settings = await api.getPaymentSettings();
@@ -58,37 +72,78 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
       });
       _loadRevenue();
       _loadReconciliation();
-    } catch (_) {
-      if (mounted) setState(() { _message = 'Could not load payment settings.'; _loading = false; });
+      _loadTransactions();
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Payment settings load failed (${error.runtimeType})\n$stackTrace',
+      );
+      if (mounted) {
+        setState(() {
+          _message = 'Could not load payment settings.';
+          _loading = false;
+        });
+      }
     }
   }
 
   Future<void> _loadRevenue() async {
     try {
-      final revenue = await ref.read(paymentsApiProvider).getRevenueSummary(_revenuePeriod);
+      final revenue = await ref
+          .read(paymentsApiProvider)
+          .getRevenueSummary(_revenuePeriod);
       if (mounted) setState(() => _revenue = revenue);
-    } catch (_) {/* revenue is optional; the rest of the page still works */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Payment revenue load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   Future<void> _loadReconciliation() async {
     try {
-      final recon = await ref.read(paymentsApiProvider).getPaymentReconciliation();
+      final recon = await ref
+          .read(paymentsApiProvider)
+          .getPaymentReconciliation();
       if (mounted) setState(() => _reconciliation = recon);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Payment reconciliation load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
-  Future<void> _updateSettings({
-    bool? trackingEnabled,
-    String? currency,
-    bool? historyEnabled,
-  }) async {
+  Future<void> _loadTransactions() async {
+    try {
+      final transactions = await ref
+          .read(paymentsApiProvider)
+          .getTransactionLedger();
+      if (!mounted) return;
+      setState(() {
+        _transactions = transactions;
+        _transactionsMessage = '';
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Payment transaction load failed (${error.runtimeType})\n$stackTrace',
+      );
+      if (mounted) {
+        setState(
+          () =>
+              _transactionsMessage = 'Could not load the transaction history.',
+        );
+      }
+    }
+  }
+
+  Future<void> _setReportingCurrency(String currency) async {
     if (_savingSettings) return;
     setState(() => _savingSettings = true);
     try {
-      final response = await ref.read(paymentsApiProvider).updatePaymentSettings(
-            paymentTrackingEnabled: trackingEnabled,
+      final response = await ref
+          .read(paymentsApiProvider)
+          .updatePaymentSettings(
             reportingCurrency: currency,
-            clientPaymentHistoryEnabled: historyEnabled,
+            confirmReportingCurrency: true,
           );
       if (mounted) {
         setState(() {
@@ -96,8 +151,11 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
           _currencyOptions = response.currencyOptions;
         });
       }
+      _toast('Reporting currency saved. It is now locked.');
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update settings.');
+      _toast(
+        error is ApiException ? error.message : 'Could not update settings.',
+      );
     }
     if (mounted) setState(() => _savingSettings = false);
   }
@@ -118,15 +176,22 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
 
   Future<void> _toggleMethodStatus(ManualPaymentMethodRecord method) async {
     try {
-      final updated = await ref.read(paymentsApiProvider).setPaymentMethodStatus(
+      final updated = await ref
+          .read(paymentsApiProvider)
+          .setPaymentMethodStatus(
             method.id,
             method.isActive ? 'inactive' : 'active',
           );
       if (!mounted) return;
-      setState(() =>
-          _methods = _methods.map((m) => m.id == method.id ? updated : m).toList());
+      setState(
+        () => _methods = _methods
+            .map((m) => m.id == method.id ? updated : m)
+            .toList(),
+      );
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update the method.');
+      _toast(
+        error is ApiException ? error.message : 'Could not update the method.',
+      );
     }
   }
 
@@ -137,7 +202,10 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
         title: Text('Delete ${method.name}?'),
         content: const Text('Clients will no longer see this payment method.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -152,230 +220,404 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
     if (confirmed != true) return;
     try {
       await ref.read(paymentsApiProvider).deletePaymentMethod(method.id);
-      if (mounted) setState(() => _methods = _methods.where((m) => m.id != method.id).toList());
+      if (mounted) {
+        setState(
+          () => _methods = _methods.where((m) => m.id != method.id).toList(),
+        );
+      }
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not delete the method.');
+      _toast(
+        error is ApiException ? error.message : 'Could not delete the method.',
+      );
     }
   }
 
+  Future<void> _confirmCurrency(String currency) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Use $currency for reporting?'),
+        content: const Text(
+          'This currency is used for payment totals and reporting. Once saved, '
+          'it is locked to keep financial records consistent.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _setReportingCurrency(currency);
+  }
+
+  Widget _reportingSection(BuildContext context) {
+    final settings = _settings;
+    if (settings == null) {
+      return ErrorNote(
+        message: 'Payment settings are unavailable.',
+        onRetry: _load,
+      );
+    }
+    if (settings.reportingCurrencyLocked) {
+      return AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.lock_outline, color: context.colors.primary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Reporting currency', style: context.text.labelMedium),
+                  Text(
+                    settings.reportingCurrency,
+                    style: context.text.headlineSmall,
+                  ),
+                  Text(
+                    'Locked to keep payment records consistent.',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.tokens.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const StatusPill(label: 'Locked', tone: PillTone.good),
+          ],
+        ),
+      );
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Choose reporting currency', style: context.text.titleMedium),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Check your normal billing currency before confirming. It cannot be '
+            'changed after financial records are created.',
+            style: context.text.bodySmall?.copyWith(
+              color: context.tokens.muted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          DropdownButtonFormField<String>(
+            initialValue: _currencyOptions.contains(settings.reportingCurrency)
+                ? settings.reportingCurrency
+                : null,
+            decoration: const InputDecoration(labelText: 'Reporting currency'),
+            items: [
+              for (final currency in _currencyOptions)
+                DropdownMenuItem(value: currency, child: Text(currency)),
+            ],
+            onChanged: _savingSettings
+                ? null
+                : (currency) {
+                    if (currency != null) _confirmCurrency(currency);
+                  },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _transactionsSection(BuildContext context) {
+    final revenue = _revenue;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppSegmentedFilter<String>(
+          value: _revenuePeriod,
+          options: const [
+            ('7', '7 days'),
+            ('30', '30 days'),
+            ('90', '90 days'),
+            ('lifetime', 'All time'),
+          ],
+          onChanged: (period) {
+            setState(() => _revenuePeriod = period);
+            _loadRevenue();
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (revenue == null)
+          const SkeletonBox(height: 112)
+        else
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Revenue overview', style: context.text.titleMedium),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Selected period',
+                        value:
+                            '${revenue.reportingCurrency} ${revenue.totalRevenue}',
+                      ),
+                    ),
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'This month',
+                        value:
+                            '${revenue.reportingCurrency} ${revenue.thisMonthTotal}',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        if ((_reconciliation?.unloggedCount ?? 0) > 0) ...[
+          const SectionHeader(
+            title: 'Needs reconciliation',
+            topSpace: AppSpacing.md,
+          ),
+          AppCard(
+            color: context.tokens.warningSoft,
+            child: Text(
+              '${_reconciliation!.unloggedCount} acknowledged '
+              'payment${_reconciliation!.unloggedCount == 1 ? '' : 's'} '
+              'still need a payment record.',
+              style: context.text.bodyMedium,
+            ),
+          ),
+        ],
+        const SectionHeader(
+          title: 'Transaction history',
+          topSpace: AppSpacing.md,
+        ),
+        if (_transactionsMessage.isNotEmpty)
+          ErrorNote(message: _transactionsMessage, onRetry: _loadTransactions)
+        else if (_transactions.isEmpty)
+          const EmptyState(
+            compact: false,
+            icon: Icons.receipt_long_outlined,
+            message: 'No payment transactions have been recorded yet.',
+          )
+        else
+          for (final transaction in _transactions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppCard(
+                radius: AppRadius.tile,
+                elevated: false,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: context.tokens.primarySoft,
+                      child: Icon(
+                        Icons.receipt_outlined,
+                        color: context.colors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${transaction.currency} ${transaction.amount}',
+                            style: context.text.titleSmall,
+                          ),
+                          Text(
+                            transaction.description.isNotEmpty
+                                ? transaction.description
+                                : transaction.source,
+                            style: context.text.bodySmall,
+                          ),
+                          if (transaction.paymentRequestReference.isNotEmpty)
+                            Text(
+                              transaction.paymentRequestReference,
+                              style: context.text.labelSmall?.copyWith(
+                                color: context.tokens.muted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    StatusPill(
+                      label: transaction.status.isEmpty
+                          ? 'Recorded'
+                          : transaction.status,
+                      tone: transaction.status.toLowerCase() == 'completed'
+                          ? PillTone.good
+                          : PillTone.neutral,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _methodsSection(BuildContext context) {
+    final activeCount = _methods.where((method) => method.isActive).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: _maxActive > 0
+              ? 'Manual methods ($activeCount / $_maxActive active)'
+              : 'Manual payment methods',
+          topSpace: 0,
+          actionLabel: 'Add method',
+          onAction: () => _addOrEditMethod(),
+        ),
+        Text(
+          'Share payment instructions with clients. Payments still happen '
+          'outside RepRoot Studio.',
+          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (_methods.isEmpty)
+          EmptyState(
+            compact: false,
+            icon: Icons.account_balance_wallet_outlined,
+            message: 'No payment methods yet.',
+            actionLabel: 'Add payment method',
+            onAction: () => _addOrEditMethod(),
+          )
+        else
+          for (final method in _methods)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: AppCard(
+                onTap: () => _addOrEditMethod(method),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(method.name, style: context.text.titleSmall),
+                          Text(
+                            ManualPaymentCategory.label(method.category),
+                            style: context.text.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: method.isActive,
+                      onChanged: (_) => _toggleMethodStatus(method),
+                    ),
+                    IconButton(
+                      tooltip: 'Delete method',
+                      onPressed: () => _deleteMethod(method),
+                      icon: const Icon(Icons.delete_outline),
+                      color: context.colors.error,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Widget _disclosuresSection(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Payment disclosures', style: context.text.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Manual payment methods are supplied by the professional. Payments '
+            'made through them happen outside RepRoot Studio.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Clients submit transaction details or proof for review. A payment '
+            'is complete only after the professional acknowledges it.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text('Integrated payments are not currently available.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _currentSection(BuildContext context) => switch (_section) {
+    _PaymentSection.reporting => _reportingSection(context),
+    _PaymentSection.transactions => _transactionsSection(context),
+    _PaymentSection.methods => _methodsSection(context),
+    _PaymentSection.integrated => const EmptyState(
+      compact: false,
+      icon: Icons.link_off_outlined,
+      message:
+          'Integrated payments are coming later.\n'
+          'No provider is connected now.',
+    ),
+    _PaymentSection.disclosures => _disclosuresSection(context),
+  };
+
   @override
   Widget build(BuildContext context) {
-    final settings = _settings;
-    final activeCount = _methods.where((m) => m.isActive).length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payments'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addOrEditMethod(),
-        icon: const Icon(Icons.add),
-        label: const Text('Method'),
+        leading: BackButton(
+          onPressed: () => context.canPop()
+              ? context.pop()
+              : context.go(Routes.professionalMore),
+        ),
       ),
       body: _loading
-          ? const PagePad(children: [SkeletonBox(height: 120), SkeletonBox(height: 120)])
+          ? const PagePad(
+              children: [SkeletonBox(height: 120), SkeletonBox(height: 120)],
+            )
           : PagePad(
               onRefresh: _load,
               children: [
-                if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
-
-                if (_revenue != null && (_settings?.paymentTrackingEnabled ?? false)) ...[
-                  AppCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Revenue', style: context.text.titleSmall),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.xs,
-                          children: [
-                            for (final period in const [
-                              ('7', '7d'),
-                              ('30', '30d'),
-                              ('90', '90d'),
-                              ('lifetime', 'All'),
-                            ])
-                              ChoiceChip(
-                                label: Text(period.$2),
-                                selected: _revenuePeriod == period.$1,
-                                onSelected: (_) {
-                                  setState(() => _revenuePeriod = period.$1);
-                                  _loadRevenue();
-                                },
-                              ),
-                          ],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Review transactions, reporting currency, and the '
+                        'payment methods shared with clients.',
+                        style: context.text.bodyMedium?.copyWith(
+                          color: context.tokens.muted,
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _MiniStat(
-                                label: 'This period',
-                                value: '${_revenue!.reportingCurrency} ${_revenue!.totalRevenue}',
-                              ),
-                            ),
-                            Expanded(
-                              child: _MiniStat(
-                                label: 'This month',
-                                value: '${_revenue!.reportingCurrency} ${_revenue!.thisMonthTotal}',
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_revenue!.recentTransactions.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          Text('Recent', style: context.text.labelMedium),
-                          for (final txn in _revenue!.recentTransactions.take(5))
-                            Padding(
-                              padding: const EdgeInsets.only(top: AppSpacing.xs),
-                              child: Row(
-                                children: [
-                                  Expanded(child: Text(txn.clientName, style: context.text.bodySmall)),
-                                  Text('${txn.currency} ${txn.amount}',
-                                      style: context.text.bodySmall),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
-
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Settings', style: context.text.titleSmall),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: const Text('Payment tracking'),
-                        subtitle: const Text('Show the revenue dashboard and summaries'),
-                        value: settings?.paymentTrackingEnabled ?? false,
-                        onChanged: _savingSettings
-                            ? null
-                            : (value) => _updateSettings(trackingEnabled: value),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: const Text('Client payment history'),
-                        subtitle: const Text('Let clients see their own payment records'),
-                        value: settings?.clientPaymentHistoryEnabled ?? false,
-                        onChanged: _savingSettings
-                            ? null
-                            : (value) => _updateSettings(historyEnabled: value),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      DropdownButtonFormField<String>(
-                        initialValue: (settings != null &&
-                                _currencyOptions.contains(settings.reportingCurrency))
-                            ? settings.reportingCurrency
-                            : null,
-                        decoration: const InputDecoration(labelText: 'Reporting currency'),
-                        items: [
-                          for (final c in _currencyOptions)
-                            DropdownMenuItem(value: c, child: Text(c)),
-                        ],
-                        onChanged: _savingSettings
-                            ? null
-                            : (value) {
-                                if (value != null) _updateSettings(currency: value);
-                              },
-                      ),
-                    ],
-                  ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const InfoDot(
+                      title: 'About client payments',
+                      body:
+                          'Payments recorded here are separate from your '
+                          'RepRoot Studio subscription.',
+                    ),
+                  ],
                 ),
-
-                SectionHeader(
-                  title: _maxActive > 0
-                      ? 'Payment methods ($activeCount / $_maxActive active)'
-                      : 'Payment methods',
+                if (_message.isNotEmpty)
+                  ErrorNote(message: _message, onRetry: _load),
+                AppSegmentedFilter<_PaymentSection>(
+                  value: _section,
+                  options: const [
+                    (_PaymentSection.reporting, 'Currency'),
+                    (_PaymentSection.transactions, 'Transactions'),
+                    (_PaymentSection.methods, 'Methods'),
+                    (_PaymentSection.integrated, 'Integrated'),
+                    (_PaymentSection.disclosures, 'Disclosures'),
+                  ],
+                  onChanged: (section) => setState(() => _section = section),
                 ),
-                if (_methods.isEmpty)
-                  const EmptyState(
-                    compact: false,
-                    icon: Icons.account_balance_wallet_outlined,
-                    message: 'No payment methods yet.\nAdd one so clients know how to pay you.',
-                  )
-                else
-                  for (final method in _methods)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: AppCard(
-                        onTap: () => _addOrEditMethod(method),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(method.name, style: context.text.titleSmall),
-                                  Text(
-                                    ManualPaymentCategory.label(method.category),
-                                    style: context.text.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: method.isActive,
-                              onChanged: (_) => _toggleMethodStatus(method),
-                            ),
-                            IconButton(
-                              onPressed: () => _deleteMethod(method),
-                              icon: const Icon(Icons.delete_outline),
-                              iconSize: AppSize.iconRow,
-                              color: context.colors.error,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                if ((_reconciliation?.unloggedCount ?? 0) > 0) ...[
-                  const SectionHeader(title: 'To reconcile'),
-                  AppCard(
-                    color: context.tokens.primarySoft,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_reconciliation!.unloggedCount} acknowledged '
-                          'payment${_reconciliation!.unloggedCount == 1 ? '' : 's'} not yet logged',
-                          style: context.text.titleSmall,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        for (final req in _reconciliation!.unloggedRequests)
-                          Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.xs),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${req.clientName} · ${req.title}',
-                                    style: context.text.bodySmall,
-                                  ),
-                                ),
-                                Text('${req.requestedCurrency} ${req.requestedAmount}',
-                                    style: context.text.bodySmall),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Open a client\'s Payments to log these against a record.',
-                          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 72),
+                const SizedBox(height: AppSpacing.md),
+                _currentSection(context),
+                const SizedBox(height: AppSpacing.xxl),
               ],
             ),
     );
@@ -392,7 +634,10 @@ class _MiniStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: context.text.bodySmall?.copyWith(color: context.tokens.muted)),
+        Text(
+          label,
+          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+        ),
         Text(value, style: context.text.titleMedium),
       ],
     );
@@ -423,7 +668,9 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
     super.initState();
     final existing = widget.existing;
     _name = TextEditingController(text: existing?.name ?? '');
-    _instructions = TextEditingController(text: existing?.clientInstructions ?? '');
+    _instructions = TextEditingController(
+      text: existing?.clientInstructions ?? '',
+    );
     _category = existing?.category ?? 'upi';
     _fields = TextEditingController(
       text: (existing?.clientVisibleFields.entries ?? [])
@@ -445,7 +692,10 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
       setState(() => _error = 'Give the method a name.');
       return;
     }
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     // Parse "key: value" lines into the client-visible fields map.
     final fields = <String, String>{};
     for (final line in _fields.text.split('\n')) {
@@ -477,7 +727,9 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not save the method.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not save the method.';
         });
       }
     }
@@ -498,13 +750,17 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.existing == null ? 'Add payment method' : 'Edit payment method',
+              widget.existing == null
+                  ? 'Add payment method'
+                  : 'Edit payment method',
               style: context.text.titleMedium,
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Name (e.g. My UPI)'),
+              decoration: const InputDecoration(
+                labelText: 'Name (e.g. My UPI)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             DropdownButtonFormField<String>(
@@ -512,7 +768,10 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
               decoration: const InputDecoration(labelText: 'Type'),
               items: [
                 for (final c in ManualPaymentCategory.all)
-                  DropdownMenuItem(value: c, child: Text(ManualPaymentCategory.label(c))),
+                  DropdownMenuItem(
+                    value: c,
+                    child: Text(ManualPaymentCategory.label(c)),
+                  ),
               ],
               onChanged: (value) => setState(() => _category = value ?? 'upi'),
             ),
@@ -523,14 +782,17 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
               maxLines: 5,
               decoration: const InputDecoration(
                 labelText: 'Details clients see',
-                helperText: 'One per line, "Label: value" (e.g. UPI ID: me@bank)',
+                helperText:
+                    'One per line, "Label: value" (e.g. UPI ID: me@bank)',
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _instructions,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Instructions (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Instructions (optional)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
@@ -543,7 +805,11 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
                 if (picked != null) setState(() => _qrFile = picked);
               },
               icon: const Icon(Icons.qr_code_2, size: 18),
-              label: Text(_qrFile == null ? 'Attach QR code (optional)' : 'QR code selected'),
+              label: Text(
+                _qrFile == null
+                    ? 'Attach QR code (optional)'
+                    : 'QR code selected',
+              ),
             ),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sm),

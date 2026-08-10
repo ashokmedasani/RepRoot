@@ -24,28 +24,38 @@ class DynamicFieldType {
   static const address = 'address';
 
   static const all = [
-    shortText, longText, email, phone, number, dropdown,
-    checkbox, radio, yesNo, date, location, address,
+    shortText,
+    longText,
+    email,
+    phone,
+    number,
+    dropdown,
+    checkbox,
+    radio,
+    yesNo,
+    date,
+    location,
+    address,
   ];
 
   /// Types whose answers come from a fixed option list.
   static const withOptions = [dropdown, checkbox, radio];
 
   static String label(String type) => switch (type) {
-        shortText => 'Short text',
-        longText => 'Long text',
-        email => 'Email',
-        phone => 'Phone',
-        number => 'Number',
-        dropdown => 'Dropdown',
-        checkbox => 'Checkboxes',
-        radio => 'Radio buttons',
-        yesNo => 'Yes / No',
-        date => 'Date',
-        location => 'Location',
-        address => 'Address',
-        _ => type,
-      };
+    shortText => 'Short text',
+    longText => 'Long text',
+    email => 'Email',
+    phone => 'Phone',
+    number => 'Number',
+    dropdown => 'Dropdown',
+    checkbox => 'Checkboxes',
+    radio => 'Radio buttons',
+    yesNo => 'Yes / No',
+    date => 'Date',
+    location => 'Location',
+    address => 'Address',
+    _ => type,
+  };
 }
 
 class DynamicField {
@@ -84,41 +94,40 @@ class DynamicField {
     String? helpText,
     List<String>? options,
     bool? isCore,
-  }) =>
-      DynamicField(
-        key: key ?? this.key,
-        label: label ?? this.label,
-        fieldType: fieldType ?? this.fieldType,
-        required: required ?? this.required,
-        placeholder: placeholder ?? this.placeholder,
-        helpText: helpText ?? this.helpText,
-        options: options ?? this.options,
-        isCore: isCore ?? this.isCore,
-      );
+  }) => DynamicField(
+    key: key ?? this.key,
+    label: label ?? this.label,
+    fieldType: fieldType ?? this.fieldType,
+    required: required ?? this.required,
+    placeholder: placeholder ?? this.placeholder,
+    helpText: helpText ?? this.helpText,
+    options: options ?? this.options,
+    isCore: isCore ?? this.isCore,
+  );
 
   factory DynamicField.fromJson(Map<String, dynamic> json) => DynamicField(
-        key: json['key'] as String? ?? '',
-        label: json['label'] as String? ?? '',
-        fieldType: json['field_type'] as String? ?? '',
-        required: json['required'] as bool? ?? false,
-        placeholder: json['placeholder'] as String? ?? '',
-        helpText: json['help_text'] as String? ?? '',
-        options: (json['options'] as List<dynamic>? ?? [])
-            .map((o) => o.toString())
-            .toList(),
-        isCore: json['is_core'] as bool? ?? false,
-      );
+    key: json['key'] as String? ?? '',
+    label: json['label'] as String? ?? '',
+    fieldType: json['field_type'] as String? ?? '',
+    required: json['required'] as bool? ?? false,
+    placeholder: json['placeholder'] as String? ?? '',
+    helpText: json['help_text'] as String? ?? '',
+    options: (json['options'] as List<dynamic>? ?? [])
+        .map((o) => o.toString())
+        .toList(),
+    isCore: json['is_core'] as bool? ?? false,
+  );
 
   Map<String, dynamic> toJson() => {
-        if (key.isNotEmpty) 'key': key,
-        'label': label,
-        'field_type': fieldType,
-        'required': required,
-        'placeholder': placeholder,
-        'help_text': helpText,
-        if (options.isNotEmpty) 'options': options,
-        if (isCore) 'is_core': isCore,
-      };
+    if (key.isNotEmpty) 'key': key,
+    'label': label,
+    'field_type': fieldType,
+    'required': required,
+    'placeholder': placeholder,
+    'help_text': helpText,
+    if (options.isNotEmpty) 'options': options,
+    if (isCore) 'is_core': isCore,
+  };
 }
 
 class LeadForm {
@@ -164,33 +173,33 @@ class LeadForm {
   final bool introductoryMeetingRequiresApproval;
 
   factory LeadForm.fromJson(Map<String, dynamic> json) => LeadForm(
-        id: json['id'] as int? ?? 0,
-        title: json['title'] as String? ?? '',
-        publicSlug: json['public_slug'] as String? ?? '',
-        publicLink: json['public_link'] as String? ?? '',
-        fields: (json['fields'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(DynamicField.fromJson)
-            .toList(),
-        createdAt: json['created_at'] as String? ?? '',
-        updatedAt: json['updated_at'] as String? ?? '',
-        isActive: json['is_active'] as bool? ?? true,
-        isMandatory: json['is_mandatory'] as bool? ?? false,
-        introductoryMeetingEnabled:
-            json['introductory_meeting_enabled'] as bool? ?? false,
-        introductoryMeetingTitle:
-            json['introductory_meeting_title'] as String? ?? '',
-        introductoryMeetingDurationMinutes:
-            (json['introductory_meeting_duration_minutes'] as num?)?.toInt() ?? 30,
-        introductoryMeetingMinNoticeHours:
-            (json['introductory_meeting_min_notice_hours'] as num?)?.toInt() ?? 0,
-        introductoryMeetingMaxAdvanceDays:
-            (json['introductory_meeting_max_advance_days'] as num?)?.toInt() ?? 30,
-        introductoryMeetingBufferMinutes:
-            (json['introductory_meeting_buffer_minutes'] as num?)?.toInt() ?? 0,
-        introductoryMeetingRequiresApproval:
-            json['introductory_meeting_requires_approval'] as bool? ?? false,
-      );
+    id: json['id'] as int? ?? 0,
+    title: json['title'] as String? ?? '',
+    publicSlug: json['public_slug'] as String? ?? '',
+    publicLink: json['public_link'] as String? ?? '',
+    fields: (json['fields'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(DynamicField.fromJson)
+        .toList(),
+    createdAt: json['created_at'] as String? ?? '',
+    updatedAt: json['updated_at'] as String? ?? '',
+    isActive: json['is_active'] as bool? ?? true,
+    isMandatory: json['is_mandatory'] as bool? ?? false,
+    introductoryMeetingEnabled:
+        json['introductory_meeting_enabled'] as bool? ?? false,
+    introductoryMeetingTitle:
+        json['introductory_meeting_title'] as String? ?? '',
+    introductoryMeetingDurationMinutes:
+        (json['introductory_meeting_duration_minutes'] as num?)?.toInt() ?? 30,
+    introductoryMeetingMinNoticeHours:
+        (json['introductory_meeting_min_notice_hours'] as num?)?.toInt() ?? 0,
+    introductoryMeetingMaxAdvanceDays:
+        (json['introductory_meeting_max_advance_days'] as num?)?.toInt() ?? 30,
+    introductoryMeetingBufferMinutes:
+        (json['introductory_meeting_buffer_minutes'] as num?)?.toInt() ?? 0,
+    introductoryMeetingRequiresApproval:
+        json['introductory_meeting_requires_approval'] as bool? ?? false,
+  );
 }
 
 /// A public-form applicant's request for the professional's introductory
@@ -454,11 +463,10 @@ class FormsGroupsOverview {
       maxLeadForms > 0 && leadForms.length >= maxLeadForms;
 
   factory FormsGroupsOverview.fromJson(Map<String, dynamic> json) {
-    List<LeadSubmission> subs(String key) =>
-        (json[key] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(LeadSubmission.fromJson)
-            .toList();
+    List<LeadSubmission> subs(String key) => (json[key] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(LeadSubmission.fromJson)
+        .toList();
 
     final form = json['lead_form'];
     return FormsGroupsOverview(
@@ -487,6 +495,7 @@ class ClientAccessPayload {
     required this.username,
     required this.password,
     required this.confirmPassword,
+    this.hasPortalAccess = true,
     this.photo = '',
     this.registrationAnswers = const {},
     this.sendCredentials,
@@ -497,22 +506,24 @@ class ClientAccessPayload {
   final String username;
   final String password;
   final String confirmPassword;
+  final bool hasPortalAccess;
   final String photo;
   final Map<String, String> registrationAnswers;
   final bool? sendCredentials;
   final int? registrationSubmissionId;
 
   Map<String, dynamic> toJson() => {
-        'group_id': groupId,
-        'username': username,
-        'password': password,
-        'confirm_password': confirmPassword,
-        if (photo.isNotEmpty) 'photo': photo,
-        'registration_answers': registrationAnswers,
-        if (sendCredentials != null) 'send_credentials': sendCredentials,
-        if (registrationSubmissionId != null)
-          'registration_submission_id': registrationSubmissionId,
-      };
+    'group_id': groupId,
+    'username': username,
+    'password': password,
+    'confirm_password': confirmPassword,
+    'has_portal_access': hasPortalAccess,
+    if (photo.isNotEmpty) 'photo': photo,
+    'registration_answers': registrationAnswers,
+    if (sendCredentials != null) 'send_credentials': sendCredentials,
+    if (registrationSubmissionId != null)
+      'registration_submission_id': registrationSubmissionId,
+  };
 }
 
 class ManualClientResult {
@@ -617,18 +628,18 @@ class ClientReminder {
   bool get isDone => status == ReminderStatus.done;
 
   factory ClientReminder.fromJson(Map<String, dynamic> json) => ClientReminder(
-        id: json['id'] as int? ?? 0,
-        client: json['client'] as int? ?? 0,
-        clientName: json['client_name'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        date: json['date'] as String? ?? '',
-        time: json['time'] as String? ?? '',
-        notes: json['notes'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        notifyProfessional: json['notify_professional'] as bool? ?? false,
-        createdAt: json['created_at'] as String? ?? '',
-        updatedAt: json['updated_at'] as String? ?? '',
-      );
+    id: json['id'] as int? ?? 0,
+    client: json['client'] as int? ?? 0,
+    clientName: json['client_name'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    date: json['date'] as String? ?? '',
+    time: json['time'] as String? ?? '',
+    notes: json['notes'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    notifyProfessional: json['notify_professional'] as bool? ?? false,
+    createdAt: json['created_at'] as String? ?? '',
+    updatedAt: json['updated_at'] as String? ?? '',
+  );
 }
 
 class ScheduleSummary {
@@ -652,7 +663,8 @@ class ScheduleSummary {
   final int pendingProfileEdits;
   final String nearestDate;
 
-  factory ScheduleSummary.fromJson(Map<String, dynamic> json) => ScheduleSummary(
+  factory ScheduleSummary.fromJson(Map<String, dynamic> json) =>
+      ScheduleSummary(
         totalPending: json['total_pending'] as int? ?? 0,
         overdue: json['overdue'] as int? ?? 0,
         due24Hours: json['due_24_hours'] as int? ?? 0,
@@ -740,17 +752,17 @@ class ProgressEntry {
   final String updatedAt;
 
   factory ProgressEntry.fromJson(Map<String, dynamic> json) => ProgressEntry(
-        id: json['id'] as int? ?? 0,
-        client: json['client'] as int? ?? 0,
-        title: json['title'] as String? ?? '',
-        date: json['date'] as String? ?? '',
-        notes: json['notes'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        nextStep: json['next_step'] as String? ?? '',
-        createdBy: json['created_by'] as String? ?? '',
-        createdAt: json['created_at'] as String? ?? '',
-        updatedAt: json['updated_at'] as String? ?? '',
-      );
+    id: json['id'] as int? ?? 0,
+    client: json['client'] as int? ?? 0,
+    title: json['title'] as String? ?? '',
+    date: json['date'] as String? ?? '',
+    notes: json['notes'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    nextStep: json['next_step'] as String? ?? '',
+    createdBy: json['created_by'] as String? ?? '',
+    createdAt: json['created_at'] as String? ?? '',
+    updatedAt: json['updated_at'] as String? ?? '',
+  );
 }
 
 class GroupUsersResponse {
@@ -839,9 +851,12 @@ class GroupImportPreviewResponse {
             .toList(),
         rowsPreview: (json['rows_preview'] as List<dynamic>? ?? [])
             .whereType<Map<dynamic, dynamic>>()
-            .map((row) => row.map(
-                  (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
-                ))
+            .map(
+              (row) => row.map(
+                (key, value) =>
+                    MapEntry(key.toString(), value?.toString() ?? ''),
+              ),
+            )
             .toList(),
         rowCount: (json['row_count'] as num?)?.toInt() ?? 0,
         unmatchedColumns: (json['unmatched_columns'] as List<dynamic>? ?? [])
@@ -864,9 +879,9 @@ class GroupImportMappingEntry {
   String? matchedFieldKey;
 
   Map<String, dynamic> toJson() => {
-        'file_column': fileColumn,
-        'matched_field_key': matchedFieldKey,
-      };
+    'file_column': fileColumn,
+    'matched_field_key': matchedFieldKey,
+  };
 }
 
 /// A row the confirm step created. [rowIndex] is the spreadsheet row number
@@ -990,8 +1005,8 @@ class ClientDetailChangeRequest {
         requestType: json['request_type'] as String? ?? '',
         proposedAnswers:
             (json['proposed_answers'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
-        ),
+              (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+            ),
         status: json['status'] as String? ?? '',
         clientNote: json['client_note'] as String? ?? '',
         professionalNote: json['professional_note'] as String? ?? '',
@@ -1033,10 +1048,12 @@ class ClientAccessDetailResponse {
           .whereType<Map<String, dynamic>>()
           .map(DynamicField.fromJson)
           .toList(),
-      leadSubmission:
-          lead is Map<String, dynamic> ? LeadSubmission.fromJson(lead) : null,
+      leadSubmission: lead is Map<String, dynamic>
+          ? LeadSubmission.fromJson(lead)
+          : null,
       professionalNotes: json['professional_notes'] as String? ?? '',
-      professionalNotesUpdatedAt: json['professional_notes_updated_at'] as String?,
+      professionalNotesUpdatedAt:
+          json['professional_notes_updated_at'] as String?,
       pendingChangeRequest: change is Map<String, dynamic>
           ? ClientDetailChangeRequest.fromJson(change)
           : null,

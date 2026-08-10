@@ -8,8 +8,18 @@ library;
 import 'package:flutter/material.dart' show TimeOfDay;
 
 const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// A [DateTime]'s **local** calendar day as `YYYY-MM-DD`.
@@ -69,8 +79,7 @@ String dateTimeLabel(String iso) {
 }
 
 /// Trims a backend "HH:mm:ss" to "HH:mm"; empty stays empty.
-String hhmm(String time) =>
-    time.length >= 5 ? time.substring(0, 5) : time;
+String hhmm(String time) => time.length >= 5 ? time.substring(0, 5) : time;
 
 /// Human byte size for storage/usage displays.
 String formatBytes(int bytes) {

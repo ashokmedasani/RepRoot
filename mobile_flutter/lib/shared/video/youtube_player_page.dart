@@ -78,9 +78,9 @@ class _YoutubePlayerPageState extends State<YoutubePlayerPage> {
     if (uri == null) return;
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open YouTube.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not open YouTube.')));
     }
   }
 
@@ -144,20 +144,18 @@ class _PlaybackError extends StatelessWidget {
   /// "error 101" has no idea whether they typed the link wrong or the video's
   /// owner locked it down.
   String get _message => switch (error) {
-        // YouTube reports the same "embedding disabled" restriction under three
-        // codes (101/150/152); all three mean the same thing to a reader.
-        YoutubeError.notEmbeddable ||
-        YoutubeError.sameAsNotEmbeddable ||
-        YoutubeError.sameAsNotEmbeddable2 =>
-          "This video's owner doesn't allow it to play inside other apps. "
-              'You can still watch it on YouTube.',
-        YoutubeError.videoNotFound ||
-        YoutubeError.cannotFindVideo =>
-          'This video is unavailable — it may have been removed or made private.',
-        YoutubeError.invalidParam =>
-          "That link doesn't point at a YouTube video.",
-        _ => "This video couldn't be played here.",
-      };
+    // YouTube reports the same "embedding disabled" restriction under three
+    // codes (101/150/152); all three mean the same thing to a reader.
+    YoutubeError.notEmbeddable ||
+    YoutubeError.sameAsNotEmbeddable ||
+    YoutubeError.sameAsNotEmbeddable2 =>
+      "This video's owner doesn't allow it to play inside other apps. "
+          'You can still watch it on YouTube.',
+    YoutubeError.videoNotFound || YoutubeError.cannotFindVideo =>
+      'This video is unavailable — it may have been removed or made private.',
+    YoutubeError.invalidParam => "That link doesn't point at a YouTube video.",
+    _ => "This video couldn't be played here.",
+  };
 
   @override
   Widget build(BuildContext context) {

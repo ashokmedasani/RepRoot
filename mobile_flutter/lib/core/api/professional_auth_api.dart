@@ -156,15 +156,17 @@ class ProfessionalAuthApi {
     });
   }
 
-  Future<NotificationInbox> getNotifications({int limit = 50, String? category}) =>
-      runApi(() async {
-        final res = await _dio.get<Map<String, dynamic>>(
-          '/professional/notifications/',
-          queryParameters: {'limit': limit, 'category': ?category},
-          options: _auth,
-        );
-        return NotificationInbox.fromJson(res.data ?? {});
-      });
+  Future<NotificationInbox> getNotifications({
+    int limit = 50,
+    String? category,
+  }) => runApi(() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/professional/notifications/',
+      queryParameters: {'limit': limit, 'category': ?category},
+      options: _auth,
+    );
+    return NotificationInbox.fromJson(res.data ?? {});
+  });
   Future<void> markNotificationRead({int? id}) => runApi(() async {
     await _dio.patch<Map<String, dynamic>>(
       '/professional/notifications/',
@@ -478,17 +480,11 @@ class ProfessionalAuthApi {
   ///
   /// The request is authenticated by token, and the view revokes every token
   /// afterwards, forcing a fresh sign-in everywhere.
-  Future<String> changePassword(
-    String password,
-    String confirmPassword,
-  ) {
+  Future<String> changePassword(String password, String confirmPassword) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/account/change-password/',
-        data: {
-          'password': password,
-          'confirm_password': confirmPassword,
-        },
+        data: {'password': password, 'confirm_password': confirmPassword},
         options: _auth,
       );
       return res.data?['message'] as String? ?? '';

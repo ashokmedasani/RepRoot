@@ -9,15 +9,32 @@ import 'package:flutter_test/flutter_test.dart';
 /// Live smoke test against a running Django backend — the Phase 2 exit
 /// criterion ("sign in as professional and client against the live backend").
 ///
-/// Skipped by default so `flutter test` stays hermetic. To run it:
-///
-///   1. start the backend:  backend/.venv/Scripts/python.exe manage.py runserver 0.0.0.0:8000
-///   2. flutter test test/live --dart-define=LIVE=true --dart-define=API_BASE_URL=http://localhost:8000
+/// Skipped by default so `flutter test` stays hermetic. Live credentials must
+/// be supplied through protected runtime defines and belong to an isolated,
+/// disposable test account.
 ///
 /// Session methods are bypassed here: FlutterSecureStorage needs a platform
 /// channel that `flutter test` does not provide, so tokens are seeded into the
 /// store's cache instead. The real app path is exercised on device.
-const bool _live = bool.fromEnvironment('LIVE');
+const bool _liveRequested = bool.fromEnvironment('LIVE');
+const String _professionalLogin = String.fromEnvironment(
+  'LIVE_PROFESSIONAL_LOGIN',
+);
+const String _professionalPassword = String.fromEnvironment(
+  'LIVE_PROFESSIONAL_PASSWORD',
+);
+const String _clientProfessionalCode = String.fromEnvironment(
+  'LIVE_CLIENT_PROFESSIONAL_CODE',
+);
+const String _clientUsername = String.fromEnvironment('LIVE_CLIENT_USERNAME');
+const String _clientPassword = String.fromEnvironment('LIVE_CLIENT_PASSWORD');
+const bool _live =
+    _liveRequested &&
+    _professionalLogin != '' &&
+    _professionalPassword != '' &&
+    _clientProfessionalCode != '' &&
+    _clientUsername != '' &&
+    _clientPassword != '';
 
 void main() {
   group(
@@ -40,8 +57,8 @@ void main() {
 
       test('professional signs in and reads profile + status', () async {
         final response = await professionalApi.login(
-          'nolan.performance@example.com',
-          'ProfessionalScale!2026',
+          _professionalLogin,
+          _professionalPassword,
         );
         expect(response.token, isNotEmpty);
 
@@ -55,20 +72,30 @@ void main() {
         expect(profile.displayName, isNotEmpty);
         // The professional code is what clients type to sign in — it must exist.
         expect(
-          profile.professionalId.isNotEmpty || profile.professionalCode.isNotEmpty,
+          profile.professionalId.isNotEmpty ||
+              profile.professionalCode.isNotEmpty,
           isTrue,
         );
       });
 
-      test('professional sign-in with a bad password returns a readable error',
-          () async {
-        await expectLater(
-          professionalApi.login('nolan.performance@example.com', 'wrong-password'),
-          throwsA(
-            isA<ApiException>().having((e) => e.message, 'message', isNotEmpty),
-          ),
-        );
-      });
+      test(
+        'professional sign-in with a bad password returns a readable error',
+        () async {
+          await expectLater(
+            professionalApi.login(
+              _professionalLogin,
+              '${_professionalPassword}__invalid',
+            ),
+            throwsA(
+              isA<ApiException>().having(
+                (e) => e.message,
+                'message',
+                isNotEmpty,
+              ),
+            ),
+          );
+        },
+      );
 
       test('professional directory lists professionals', () async {
         final professionals = await clientApi.getProfessionalDirectory();
@@ -78,22 +105,31 @@ void main() {
 
       test('client signs in with professional code + username', () async {
         final response = await clientApi.login(
-          'nolan',
-          'ava_martinez',
-          'ClientScale!2026',
+          _clientProfessionalCode,
+          _clientUsername,
+          _clientPassword,
         );
         expect(response.token, isNotEmpty);
         expect(response.client, isNotNull);
         expect(response.client!.displayName, isNotEmpty);
       });
 
-      test('client sign-in with a wrong professional code fails cleanly', () async {
-        await expectLater(
-          clientApi.login('not-a-code', 'ava_martinez', 'ClientScale!2026'),
-          throwsA(isA<ApiException>()),
-        );
-      });
+      test(
+        'client sign-in with a wrong professional code fails cleanly',
+        () async {
+          await expectLater(
+            clientApi.login(
+              'invalid-$_clientProfessionalCode',
+              _clientUsername,
+              _clientPassword,
+            ),
+            throwsA(isA<ApiException>()),
+          );
+        },
+      );
     },
-    skip: _live ? false : 'live backend test — run with --dart-define=LIVE=true',
+    skip: _live
+        ? false
+        : 'live backend test — run with --dart-define=LIVE=true',
   );
 }

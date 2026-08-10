@@ -107,8 +107,10 @@ class _ProfessionalClientTemplatePageState
   List<TrackingEntryRecord> get _visibleEntries {
     final ordered = _templateEntries().toList()
       ..sort((a, b) {
-        final left = '${a.entryDate} ${a.entryTime.isEmpty ? '00:00' : a.entryTime}';
-        final right = '${b.entryDate} ${b.entryTime.isEmpty ? '00:00' : b.entryTime}';
+        final left =
+            '${a.entryDate} ${a.entryTime.isEmpty ? '00:00' : a.entryTime}';
+        final right =
+            '${b.entryDate} ${b.entryTime.isEmpty ? '00:00' : b.entryTime}';
         return right.compareTo(left);
       });
     return ordered.take(25).toList();
@@ -140,11 +142,18 @@ class _ProfessionalClientTemplatePageState
         try {
           final detail = await formsGroups.getClientProfile(widget.clientId);
           if (mounted) setState(() => _clientName = detail.client.displayName);
-        } catch (_) {/* the header just falls back to 'Client' */}
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Template client header load failed '
+            '(${error.runtimeType})\n$stackTrace',
+          );
+        }
       }(),
       () async {
         try {
-          final assignments = await templatesApi.getAssignments(widget.clientId);
+          final assignments = await templatesApi.getAssignments(
+            widget.clientId,
+          );
           final assignment = assignments
               .where((item) => item.id == widget.assignmentId)
               .firstOrNull;
@@ -154,10 +163,14 @@ class _ProfessionalClientTemplatePageState
             return;
           }
           setState(() => _assignment = assignment);
-          final template = await templatesApi.getTemplate(assignment.templateId);
+          final template = await templatesApi.getTemplate(
+            assignment.templateId,
+          );
           if (mounted) setState(() => _template = template);
         } catch (_) {
-          if (mounted) setState(() => _message = 'Could not load the template.');
+          if (mounted) {
+            setState(() => _message = 'Could not load the template.');
+          }
         }
       }(),
       () async {
@@ -182,7 +195,6 @@ class _ProfessionalClientTemplatePageState
     setState(() => _loading = false);
     _rebuild();
   }
-
 
   Future<void> _saveEntry() async {
     final template = _template;
@@ -231,8 +243,9 @@ class _ProfessionalClientTemplatePageState
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _isSavingEntry = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -271,7 +284,9 @@ class _ProfessionalClientTemplatePageState
     if (library.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Add resources to your library first, then share them here.'),
+          content: Text(
+            'Add resources to your library first, then share them here.',
+          ),
         ),
       );
       return;
@@ -371,8 +386,9 @@ class _ProfessionalClientTemplatePageState
       setState(() => _assignment = updated);
     } on ApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
@@ -461,11 +477,15 @@ class _ProfessionalClientTemplatePageState
     } catch (error) {
       if (!mounted) return;
       setState(() => _isSavingProgress = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          error is ApiException ? error.message : 'Progress record could not be saved.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error is ApiException
+                ? error.message
+                : 'Progress record could not be saved.',
+          ),
         ),
-      ));
+      );
     }
   }
 
@@ -478,7 +498,10 @@ class _ProfessionalClientTemplatePageState
           'The client will no longer see this template. Past entries stay saved.',
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -495,11 +518,14 @@ class _ProfessionalClientTemplatePageState
       await ref
           .read(templatesApiProvider)
           .unassignTemplate(widget.clientId, widget.assignmentId);
-      if (mounted) context.go('${Routes.professionalClients}/${widget.clientId}');
+      if (mounted) {
+        context.go('${Routes.professionalClients}/${widget.clientId}');
+      }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Could not unassign.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Could not unassign.')));
       }
     }
   }
@@ -521,7 +547,8 @@ class _ProfessionalClientTemplatePageState
       appBar: AppBar(
         title: Text(template?.name ?? 'Template'),
         leading: BackButton(
-          onPressed: () => context.go('${Routes.professionalClients}/${widget.clientId}'),
+          onPressed: () =>
+              context.go('${Routes.professionalClients}/${widget.clientId}'),
         ),
         actions: [
           IconButton(
@@ -613,8 +640,11 @@ class _ProfessionalClientTemplatePageState
             color: context.tokens.surfaceSoft,
             child: Row(
               children: [
-                Icon(Icons.insights_outlined,
-                    size: AppSize.iconButton, color: context.colors.primary),
+                Icon(
+                  Icons.insights_outlined,
+                  size: AppSize.iconButton,
+                  color: context.colors.primary,
+                ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
@@ -632,8 +662,9 @@ class _ProfessionalClientTemplatePageState
                             TemplateCadence.label(template.cadence),
                           '${_templateEntries().length} entries',
                         ].join(' · '),
-                        style: context.text.bodySmall
-                            ?.copyWith(color: context.tokens.muted),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.tokens.muted,
+                        ),
                       ),
                     ],
                   ),
@@ -792,8 +823,9 @@ class _ProfessionalClientTemplatePageState
             ),
             Text(
               shortDate(entry.date),
-              style: context.text.labelSmall
-                  ?.copyWith(color: context.tokens.muted),
+              style: context.text.labelSmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
             if (entry.notes.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -803,16 +835,18 @@ class _ProfessionalClientTemplatePageState
               const SizedBox(height: 2),
               Text(
                 'Next: ${entry.nextStep}',
-                style: context.text.bodySmall
-                    ?.copyWith(color: context.tokens.muted),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               ),
             ],
             if (entry.createdBy.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
                 'By ${entry.createdBy}',
-                style: context.text.labelSmall
-                    ?.copyWith(color: context.tokens.muted),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               ),
             ],
           ],
@@ -857,7 +891,10 @@ class _ProfessionalClientTemplatePageState
                     const StatusPill(label: 'Edited', tone: PillTone.info),
                   IconButton(
                     onPressed: () => _startEntryEdit(entry),
-                    icon: const Icon(Icons.edit_outlined, size: AppSize.iconRow),
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: AppSize.iconRow,
+                    ),
                     tooltip: 'Edit entry',
                   ),
                 ],
@@ -874,7 +911,9 @@ class _ProfessionalClientTemplatePageState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _editingProgressId != null ? 'Update record' : 'New progress record',
+            _editingProgressId != null
+                ? 'Update record'
+                : 'New progress record',
             style: context.text.titleSmall,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -897,7 +936,10 @@ class _ProfessionalClientTemplatePageState
               );
               if (picked != null) setState(() => _progressDate = picked);
             },
-            icon: const Icon(Icons.calendar_today_outlined, size: AppSize.iconRow),
+            icon: const Icon(
+              Icons.calendar_today_outlined,
+              size: AppSize.iconRow,
+            ),
             label: Text(shortDate(isoDate(_progressDate))),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -920,7 +962,9 @@ class _ProfessionalClientTemplatePageState
           const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _progressNextStep,
-            decoration: const InputDecoration(labelText: 'Next step (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Next step (optional)',
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -938,7 +982,9 @@ class _ProfessionalClientTemplatePageState
                   child: Text(
                     _isSavingProgress
                         ? 'Saving…'
-                        : (_editingProgressId != null ? 'Update record' : 'Save record'),
+                        : (_editingProgressId != null
+                              ? 'Update record'
+                              : 'Save record'),
                   ),
                 ),
               ),
@@ -962,7 +1008,9 @@ class _ProfessionalClientTemplatePageState
             const SizedBox(height: AppSpacing.xs),
             Text(
               'The client sees this entry as edited by you.',
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
           ],
           const SizedBox(height: AppSpacing.md),
@@ -977,7 +1025,10 @@ class _ProfessionalClientTemplatePageState
               );
               if (picked != null) setState(() => _entryDate = picked);
             },
-            icon: const Icon(Icons.calendar_today_outlined, size: AppSize.iconRow),
+            icon: const Icon(
+              Icons.calendar_today_outlined,
+              size: AppSize.iconRow,
+            ),
             label: Text(shortDate(isoDate(_entryDate))),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -1014,7 +1065,9 @@ class _ProfessionalClientTemplatePageState
                   child: Text(
                     _isSavingEntry
                         ? 'Saving…'
-                        : (_editingEntryId != null ? 'Update entry' : 'Save entry'),
+                        : (_editingEntryId != null
+                              ? 'Update entry'
+                              : 'Save entry'),
                   ),
                 ),
               ),
@@ -1059,7 +1112,9 @@ class _ProfessionalClientTemplatePageState
         );
 
       case TemplateFieldType.rating:
-        final scale = (field.scale == null || field.scale == 0) ? 5 : field.scale!;
+        final scale = (field.scale == null || field.scale == 0)
+            ? 5
+            : field.scale!;
         final clamped = scale.clamp(2, 10);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1073,7 +1128,8 @@ class _ProfessionalClientTemplatePageState
                   ChoiceChip(
                     label: Text('$i'),
                     selected: value == '$i',
-                    onSelected: (_) => setState(() => _entryAnswers[key] = '$i'),
+                    onSelected: (_) =>
+                        setState(() => _entryAnswers[key] = '$i'),
                   ),
               ],
             ),

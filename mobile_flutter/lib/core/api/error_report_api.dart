@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../session/session_store.dart';
 import 'api_client.dart';
@@ -13,13 +14,17 @@ class ErrorReportApi {
   final Dio _dio;
   final SessionStore _session;
 
-  Future<void> report(String message, {String stackTrace = '', String level = 'fatal'}) async {
+  Future<void> report(
+    String message, {
+    String stackTrace = '',
+    String level = 'fatal',
+  }) async {
     try {
       final scheme = _session.hasClientSession
           ? AuthScheme.client
           : _session.hasProfessionalSession
-              ? AuthScheme.professional
-              : AuthScheme.none;
+          ? AuthScheme.professional
+          : AuthScheme.none;
       await _dio.post<void>(
         '/errors/report/',
         data: {
@@ -30,10 +35,15 @@ class ErrorReportApi {
         },
         options: authOptions(scheme),
       );
-    } catch (_) {
-      // A failed crash report must never itself crash the app.
+    } catch (error, stackTrace) {
+      // A failed crash report must never itself crash the app, but it should
+      // remain visible to developers during diagnostics.
+      debugPrint(
+        'Error report delivery failed (${error.runtimeType})\n$stackTrace',
+      );
     }
   }
 
-  String _truncate(String value, int max) => value.length > max ? value.substring(0, max) : value;
+  String _truncate(String value, int max) =>
+      value.length > max ? value.substring(0, max) : value;
 }

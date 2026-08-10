@@ -316,15 +316,17 @@ class ClientApi {
     });
   }
 
-  Future<NotificationInbox> getNotifications({int limit = 50, String? category}) =>
-      runApi(() async {
-        final res = await _dio.get<Map<String, dynamic>>(
-          '/client/notifications/',
-          queryParameters: {'limit': limit, 'category': ?category},
-          options: _auth,
-        );
-        return NotificationInbox.fromJson(res.data ?? {});
-      });
+  Future<NotificationInbox> getNotifications({
+    int limit = 50,
+    String? category,
+  }) => runApi(() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/client/notifications/',
+      queryParameters: {'limit': limit, 'category': ?category},
+      options: _auth,
+    );
+    return NotificationInbox.fromJson(res.data ?? {});
+  });
   Future<void> markNotificationRead({int? id}) => runApi(() async {
     await _dio.patch<Map<String, dynamic>>(
       '/client/notifications/',
@@ -368,6 +370,7 @@ class ClientApi {
       return NotificationPreferenceRow.fromJson(res.data ?? {});
     });
   }
+
   Future<List<ClientMeetingRecord>> getMeetings() => runApi(() async {
     final res = await _dio.get<Map<String, dynamic>>(
       '/client/scheduling/meetings/',

@@ -14,7 +14,7 @@ import '../../shared/widgets/app_widgets.dart';
 import 'professional_format.dart';
 
 /// Manage hub — banner + quick-create shortcuts + a Management list of every
-/// real destination (Lead Forms/Groups/Templates/Resources/Schedules/Add
+/// real destination (Lead Forms/Groups/Templates/Resources/Add
 /// Client), plus recent items and pending review below.
 /// Replica of mobile/src/app/pages/professional/manage/professional-manage.page.ts,
 /// restyled to match the colorful reference mockup. There is deliberately no
@@ -26,10 +26,12 @@ class ProfessionalManagePage extends ConsumerStatefulWidget {
   const ProfessionalManagePage({super.key});
 
   @override
-  ConsumerState<ProfessionalManagePage> createState() => _ProfessionalManagePageState();
+  ConsumerState<ProfessionalManagePage> createState() =>
+      _ProfessionalManagePageState();
 }
 
-class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage> {
+class _ProfessionalManagePageState
+    extends ConsumerState<ProfessionalManagePage> {
   FormsGroupsOverview? _overview;
   List<TrackingTemplateRecord> _templates = [];
   ProfessionalDataUsage? _usage;
@@ -48,7 +50,12 @@ class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage>
         try {
           final overview = await ref.read(formsGroupsApiProvider).getOverview();
           if (mounted) setState(() => _overview = overview);
-        } catch (_) {/* leave the hub usable if the overview fails */}
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Management overview load failed '
+            '(${error.runtimeType})\n$stackTrace',
+          );
+        }
       }(),
       () async {
         try {
@@ -60,17 +67,31 @@ class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage>
       }(),
       () async {
         try {
-          final usage = await ref.read(professionalAuthApiProvider).getDataUsage();
+          final usage = await ref
+              .read(professionalAuthApiProvider)
+              .getDataUsage();
           if (mounted) setState(() => _usage = usage);
-        } catch (_) {/* the Management counts just show blank */}
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Management schedule counts load failed '
+            '(${error.runtimeType})\n$stackTrace',
+          );
+        }
       }(),
       () async {
         try {
           // Just the header badge count — the full inbox is its own page,
           // same pattern as the Dashboard AppBar.
-          final inbox = await ref.read(professionalAuthApiProvider).getNotifications(limit: 1);
+          final inbox = await ref
+              .read(professionalAuthApiProvider)
+              .getNotifications(limit: 1);
           if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
-        } catch (_) {}
+        } catch (error, stackTrace) {
+          debugPrint(
+            'Could not load the notification badge (${error.runtimeType}).\n'
+            '$stackTrace',
+          );
+        }
       }(),
     ]);
     if (mounted) setState(() => _loading = false);
@@ -104,142 +125,159 @@ class _ProfessionalManagePageState extends ConsumerState<ProfessionalManagePage>
             PageHeader(
               eyebrow: 'PROFESSIONAL WORKSPACE',
               title: 'Manage',
-              info: 'The setup side of your practice — everything you build '
+              info:
+                  'The setup side of your practice — everything you build '
                   'once and then use with clients.\n\n'
                   'Lead forms and groups bring people in. Templates decide '
                   'what clients log. Resources are what you share with them. '
-                  'Payments and schedules configure how you get paid and when '
-                  'you are available.\n\n'
+                  'Payment settings configure how you get paid.\n\n'
                   'Day-to-day client work lives in Clients, not here.',
               trailing: NotificationBell(
                 unread: _notificationUnread,
-                onTap: () => context.go(Routes.professionalNotifications),
+                onTap: () => context.push(Routes.professionalNotifications),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
 
-          _ManagementList(
-            rows: [
-              _ManagementRow(
-                icon: Icons.description_outlined,
-                accent: MenuAccent.blue,
-                title: 'Lead Forms',
-                subtitle: 'Create and manage your lead forms',
-                count: (overview?.maxLeadForms ?? 0) > 0
-                    ? '${overview?.leadForms.length ?? 0}/${overview?.maxLeadForms}'
-                    : null,
-                onTap: () => context.go(Routes.professionalFormsGroups),
-              ),
-              _ManagementRow(
-                icon: Icons.people_outline,
-                accent: MenuAccent.green,
-                title: 'Groups',
-                subtitle: 'Manage client groups and requests',
-                count: usage?.resourceUsage['groups'] != null
-                    ? '${usage!.resourceUsage['groups']!.used}'
-                        '${usage.resourceUsage['groups']!.limit != null ? '/${usage.resourceUsage['groups']!.limit}' : ''}'
-                    : null,
-                onTap: () => context.go('${Routes.professionalFormsGroups}?tab=groups'),
-              ),
-              _ManagementRow(
-                icon: Icons.layers_outlined,
-                accent: MenuAccent.orange,
-                title: 'Templates',
-                subtitle: 'Create and assign templates to clients',
-                count: usage?.resourceUsage['templates'] != null
-                    ? '${usage!.resourceUsage['templates']!.used}'
-                        '${usage.resourceUsage['templates']!.limit != null ? '/${usage.resourceUsage['templates']!.limit}' : ''}'
-                    : null,
-                onTap: () => context.go(Routes.professionalTemplates),
-              ),
-              _ManagementRow(
-                icon: Icons.folder_open_outlined,
-                accent: MenuAccent.teal,
-                title: 'Resources',
-                subtitle: 'Categories, subcategories & resources',
-                count: usage?.resourceUsage['resources'] != null
-                    ? '${usage!.resourceUsage['resources']!.used}'
-                        '${usage.resourceUsage['resources']!.limit != null ? '/${usage.resourceUsage['resources']!.limit}' : ''}'
-                    : null,
-                onTap: () => context.go(Routes.professionalResources),
-              ),
-              _ManagementRow(
-                icon: Icons.calendar_month_outlined,
-                accent: MenuAccent.purple,
-                title: 'Schedules',
-                subtitle: 'Meetings, availability and reminders',
-                onTap: () => context.go(Routes.professionalSchedule),
-              ),
-              _ManagementRow(
-                icon: Icons.person_add_alt_outlined,
-                accent: MenuAccent.pink,
-                title: 'Add Client',
-                subtitle: 'Create a new client profile',
-                onTap: () => context.go(Routes.professionalClientCreate),
-              ),
-            ],
-          ),
-
-          const SectionHeader(title: 'Recent items'),
-          if (_loading)
-            for (var i = 0; i < 3; i++) const SkeletonBox(height: 66)
-          else if (nothingYet)
-            const EmptyState(
-              message: 'Create your first form, group, or template to see it here.',
-            )
-          else ...[
-            if (leadForm != null)
-              RowItem(
-                title: leadForm.title,
-                subtitle: 'Main form · updated ${shortDate(leadForm.updatedAt)}',
-                leading: Icon(
-                  Icons.description_outlined,
-                  color: tokens.success,
-                  size: 22,
+            _ManagementList(
+              rows: [
+                _ManagementRow(
+                  icon: Icons.description_outlined,
+                  accent: MenuAccent.blue,
+                  title: 'Lead Forms',
+                  subtitle: 'Create and manage your lead forms',
+                  count: (overview?.maxLeadForms ?? 0) > 0
+                      ? '${overview?.leadForms.length ?? 0}/${overview?.maxLeadForms}'
+                      : null,
+                  onTap: () => context.go(Routes.professionalFormsGroups),
                 ),
-                trailing: const StatusPill(label: 'Form', tone: PillTone.info),
-                onTap: () => context.go(Routes.professionalFormsGroups),
-              ),
-            for (final template in _templates.take(2))
-              RowItem(
-                title: template.name,
-                subtitle: 'Template · updated ${shortDate(template.updatedAt)}',
-                leading: Icon(
-                  Icons.layers_outlined,
-                  color: context.colors.primary,
-                  size: 22,
+                _ManagementRow(
+                  icon: Icons.people_outline,
+                  accent: MenuAccent.green,
+                  title: 'Groups',
+                  subtitle: 'Manage client groups and requests',
+                  count: usage?.resourceUsage['groups'] != null
+                      ? '${usage!.resourceUsage['groups']!.used}'
+                            '${usage.resourceUsage['groups']!.limit != null ? '/${usage.resourceUsage['groups']!.limit}' : ''}'
+                      : null,
+                  onTap: () => context.go(
+                    '${Routes.professionalFormsGroups}?tab=groups',
+                  ),
                 ),
-                trailing: const StatusPill(label: 'Template', tone: PillTone.info),
-                onTap: () => context.go(Routes.professionalTemplates),
-              ),
-            for (final group in groups.take(2))
-              RowItem(
-                title: group.name,
-                subtitle: group.hasRegistrationForm
-                    ? 'Group · registration link active'
-                    : 'Group',
-                leading: Icon(Icons.people_outline, color: tokens.accent, size: 22),
-                trailing: const StatusPill(label: 'Group', tone: PillTone.info),
-                onTap: () => context.go('${Routes.professionalGroups}/${group.id}'),
-              ),
-          ],
-
-          if (pending.isNotEmpty) ...[
-            SectionHeader(
-              title: 'Waiting for review',
-              actionLabel: 'Open',
-              onAction: () =>
-                  context.go('${Routes.professionalFormsGroups}?tab=requests'),
+                _ManagementRow(
+                  icon: Icons.layers_outlined,
+                  accent: MenuAccent.orange,
+                  title: 'Templates',
+                  subtitle: 'Create and assign templates to clients',
+                  count: usage?.resourceUsage['templates'] != null
+                      ? '${usage!.resourceUsage['templates']!.used}'
+                            '${usage.resourceUsage['templates']!.limit != null ? '/${usage.resourceUsage['templates']!.limit}' : ''}'
+                      : null,
+                  onTap: () => context.go(Routes.professionalTemplates),
+                ),
+                _ManagementRow(
+                  icon: Icons.folder_open_outlined,
+                  accent: MenuAccent.teal,
+                  title: 'Resources',
+                  subtitle: 'Categories, subcategories and resources',
+                  count: usage?.resourceUsage['resources'] != null
+                      ? '${usage!.resourceUsage['resources']!.used}'
+                            '${usage.resourceUsage['resources']!.limit != null ? '/${usage.resourceUsage['resources']!.limit}' : ''}'
+                      : null,
+                  onTap: () => context.go(Routes.professionalResources),
+                ),
+                _ManagementRow(
+                  icon: Icons.person_add_alt_outlined,
+                  accent: MenuAccent.pink,
+                  title: 'Add Client',
+                  subtitle: 'Create a new client profile',
+                  onTap: () => context.go(Routes.professionalClientCreate),
+                ),
+              ],
             ),
-            for (final submission in pending.take(3))
-              RowItem(
-                title: submission.applicantName,
-                subtitle: 'Submitted ${shortDate(submission.submittedAt)}',
-                trailing: const StatusPill(label: 'Pending', tone: PillTone.warn),
-                onTap: () =>
-                    context.go('${Routes.professionalFormsGroups}?tab=requests'),
+
+            const SectionHeader(title: 'Recent items'),
+            if (_loading)
+              for (var i = 0; i < 3; i++) const SkeletonBox(height: 66)
+            else if (nothingYet)
+              const EmptyState(
+                message:
+                    'Create your first form, group, or template to see it here.',
+              )
+            else ...[
+              if (leadForm != null)
+                RowItem(
+                  title: leadForm.title,
+                  subtitle:
+                      'Main form · updated ${shortDate(leadForm.updatedAt)}',
+                  leading: Icon(
+                    Icons.description_outlined,
+                    color: tokens.success,
+                    size: 22,
+                  ),
+                  trailing: const StatusPill(
+                    label: 'Form',
+                    tone: PillTone.info,
+                  ),
+                  onTap: () => context.go(Routes.professionalFormsGroups),
+                ),
+              for (final template in _templates.take(2))
+                RowItem(
+                  title: template.name,
+                  subtitle:
+                      'Template · updated ${shortDate(template.updatedAt)}',
+                  leading: Icon(
+                    Icons.layers_outlined,
+                    color: context.colors.primary,
+                    size: 22,
+                  ),
+                  trailing: const StatusPill(
+                    label: 'Template',
+                    tone: PillTone.info,
+                  ),
+                  onTap: () => context.go(Routes.professionalTemplates),
+                ),
+              for (final group in groups.take(2))
+                RowItem(
+                  title: group.name,
+                  subtitle: group.hasRegistrationForm
+                      ? 'Group · registration link active'
+                      : 'Group',
+                  leading: Icon(
+                    Icons.people_outline,
+                    color: tokens.accent,
+                    size: 22,
+                  ),
+                  trailing: const StatusPill(
+                    label: 'Group',
+                    tone: PillTone.info,
+                  ),
+                  onTap: () =>
+                      context.go('${Routes.professionalGroups}/${group.id}'),
+                ),
+            ],
+
+            if (pending.isNotEmpty) ...[
+              SectionHeader(
+                title: 'Waiting for review',
+                actionLabel: 'Open',
+                onAction: () => context.go(
+                  '${Routes.professionalFormsGroups}?tab=requests',
+                ),
               ),
-          ],
+              for (final submission in pending.take(3))
+                RowItem(
+                  title: submission.applicantName,
+                  subtitle: 'Submitted ${shortDate(submission.submittedAt)}',
+                  trailing: const StatusPill(
+                    label: 'Pending',
+                    tone: PillTone.warn,
+                  ),
+                  onTap: () => context.go(
+                    '${Routes.professionalFormsGroups}?tab=requests',
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -285,10 +323,14 @@ class _ManagementList extends StatelessWidget {
             InkWell(
               onTap: rows[i].onTap,
               borderRadius: i == 0
-                  ? const BorderRadius.vertical(top: Radius.circular(AppRadius.md))
+                  ? const BorderRadius.vertical(
+                      top: Radius.circular(AppRadius.md),
+                    )
                   : i == rows.length - 1
-                      ? const BorderRadius.vertical(bottom: Radius.circular(AppRadius.md))
-                      : null,
+                  ? const BorderRadius.vertical(
+                      bottom: Radius.circular(AppRadius.md),
+                    )
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.card,
@@ -304,7 +346,11 @@ class _ManagementList extends StatelessWidget {
                         color: rows[i].accent.bg,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(rows[i].icon, size: AppSize.iconRow, color: rows[i].accent.fg),
+                      child: Icon(
+                        rows[i].icon,
+                        size: AppSize.iconRow,
+                        color: rows[i].accent.fg,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
@@ -315,7 +361,9 @@ class _ManagementList extends StatelessWidget {
                           Text(rows[i].title, style: context.text.titleSmall),
                           Text(
                             rows[i].subtitle,
-                            style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                            style: context.text.bodySmall?.copyWith(
+                              color: tokens.muted,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -326,12 +374,17 @@ class _ManagementList extends StatelessWidget {
                       StatusPill(label: rows[i].count!, tone: PillTone.info),
                       const SizedBox(width: AppSpacing.xs),
                     ],
-                    Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(
+                      Icons.chevron_right,
+                      size: AppSize.iconRow,
+                      color: tokens.muted,
+                    ),
                   ],
                 ),
               ),
             ),
-            if (i < rows.length - 1) Divider(height: 1, thickness: 1, color: tokens.border),
+            if (i < rows.length - 1)
+              Divider(height: 1, thickness: 1, color: tokens.border),
           ],
         ],
       ),

@@ -37,6 +37,10 @@ class GoogleSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final tokens = context.tokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return OutlinedButton.icon(
       onPressed: enabled && !busy ? onPressed : null,
       icon: busy
@@ -48,6 +52,13 @@ class GoogleSignInButton extends StatelessWidget {
           : const _GoogleGlyph(),
       label: Text(_label),
       style: OutlinedButton.styleFrom(
+        backgroundColor: isDark ? tokens.surfaceSoft : colors.surface,
+        foregroundColor: colors.onSurface,
+        disabledBackgroundColor: isDark
+            ? tokens.surfaceSoft.withValues(alpha: 0.55)
+            : colors.surface.withValues(alpha: 0.55),
+        disabledForegroundColor: tokens.muted,
+        side: BorderSide(color: tokens.border, width: 1.2),
         minimumSize: const Size.fromHeight(AppSize.buttonHeightSm),
       ),
     );

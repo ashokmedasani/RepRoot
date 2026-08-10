@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/models/notification_models.dart';
 import '../../core/api/professional_auth_api.dart';
+import '../../shared/widgets/app_widgets.dart';
 
 class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key, required this.professional});
@@ -17,7 +18,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   NotificationInbox? inbox;
   String error = '';
   bool loading = true;
-  String? category;
 
   @override
   void initState() {
@@ -32,8 +32,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     });
     try {
       final value = widget.professional
-          ? await ref.read(professionalAuthApiProvider).getNotifications(category: category)
-          : await ref.read(clientApiProvider).getNotifications(category: category);
+          ? await ref.read(professionalAuthApiProvider).getNotifications()
+          : await ref.read(clientApiProvider).getNotifications();
       if (mounted) {
         setState(() {
           inbox = value;
@@ -98,8 +98,9 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     if (confirmed != true) return;
 
     try {
-      final result =
-          await ref.read(professionalAuthApiProvider).clearNotifications();
+      final result = await ref
+          .read(professionalAuthApiProvider)
+          .clearNotifications();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -145,89 +146,61 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           ),
       ],
     ),
-    body: Column(
-      children: [
-        SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: const Text('All'),
-                  selected: category == null,
-                  onSelected: (_) {
-                    setState(() => category = null);
-                    load();
-                  },
-                ),
-              ),
-              for (final c in NotificationCategory.all)
+    body: RefreshIndicator(
+      onRefresh: load,
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error.isNotEmpty
+          ? ListView(
+              children: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(NotificationCategory.label(c)),
-                    selected: category == c,
-                    onSelected: (_) {
-                      setState(() => category = c);
-                      load();
-                    },
+                  padding: const EdgeInsets.all(24),
+                  child: ErrorNote(message: error, onRetry: load),
+                ),
+              ],
+            )
+          : (inbox?.notifications.isEmpty ?? true)
+          ? ListView(
+              children: const [
+                Padding(
+                  padding: EdgeInsets.all(24),
+                  child: EmptyState(
+                    compact: false,
+                    icon: Icons.notifications_none,
+                    message: 'No notifications yet.',
                   ),
                 ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: load,
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : error.isNotEmpty
-                ? ListView(
-                    children: [
-                      Padding(padding: const EdgeInsets.all(24), child: Text(error)),
-                    ],
-                  )
-                : (inbox?.notifications.isEmpty ?? true)
-                ? ListView(
-                    children: const [
-                      Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('No notifications here.'),
-                      ),
-                    ],
-                  )
-                : ListView.separated(
-                    itemCount: inbox?.notifications.length ?? 0,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final item = inbox!.notifications[index];
-                      return ListTile(
-                        onTap: () => read(item),
-                        leading: Icon(
-                          item.isRead
-                              ? Icons.notifications_none
-                              : Icons.notifications_active,
-                        ),
-                        title: Text(
-                          item.title,
-                          style: TextStyle(
-                            fontWeight: item.isRead
-                                ? FontWeight.w500
-                                : FontWeight.w800,
-                          ),
-                        ),
-                        subtitle: Text(item.body),
-                        trailing: Text(NotificationCategory.label(item.category)),
-                      );
-                    },
+              ],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: inbox?.notifications.length ?? 0,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = inbox!.notifications[index];
+                return ListTile(
+                  onTap: () => read(item),
+                  leading: Icon(
+                    item.isRead
+                        ? Icons.notifications_none
+                        : Icons.notifications_active,
                   ),
-          ),
-        ),
-      ],
+                  title: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontWeight: item.isRead
+                          ? FontWeight.w500
+                          : FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: Text(item.body),
+                  trailing: StatusPill(
+                    label: NotificationCategory.label(item.category),
+                    tone: item.isRead ? PillTone.neutral : PillTone.info,
+                  ),
+                );
+              },
+            ),
     ),
   );
 }

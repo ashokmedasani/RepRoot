@@ -39,6 +39,7 @@ class _ProfessionalClientCreatePageState
 
   List<ProfessionalGroup> _groups = [];
   int _groupId = 0;
+  bool _hasPortalAccess = true;
   bool _sendCredentials = true;
   bool _loading = true;
   bool _isSaving = false;
@@ -47,6 +48,7 @@ class _ProfessionalClientCreatePageState
   String _createdPassword = '';
   String _createdUsername = '';
   bool _credentialsSent = false;
+  bool _created = false;
 
   @override
   void initState() {
@@ -159,15 +161,15 @@ class _ProfessionalClientCreatePageState
       _answer('first_name').isNotEmpty &&
       _answer('last_name').isNotEmpty &&
       _answer('email').isNotEmpty &&
-      _username.text.trim().isNotEmpty &&
-      _password.text.trim().length >= 8;
+      (!_hasPortalAccess ||
+          (_username.text.trim().isNotEmpty &&
+              _password.text.trim().length >= 8));
 
   /// Mirrors the TS generator: an unambiguous alphabet (no O/0, l/1) so a
   /// password read aloud or copied by hand still works, plus a guaranteed
   /// special character to satisfy the backend's strength rule.
   void _generatePassword() {
-    const alphabet =
-        'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     final random = Random.secure();
     final value = List.generate(
       10,
@@ -193,14 +195,19 @@ class _ProfessionalClientCreatePageState
     };
 
     try {
-      final result = await ref.read(formsGroupsApiProvider).createManualClient(
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .createManualClient(
             ClientAccessPayload(
               groupId: _groupId,
-              username: _username.text.trim().toLowerCase(),
-              password: _password.text.trim(),
-              confirmPassword: _password.text.trim(),
+              username: _hasPortalAccess
+                  ? _username.text.trim().toLowerCase()
+                  : '',
+              password: _hasPortalAccess ? _password.text.trim() : '',
+              confirmPassword: _hasPortalAccess ? _password.text.trim() : '',
+              hasPortalAccess: _hasPortalAccess,
               registrationAnswers: answers,
-              sendCredentials: _sendCredentials,
+              sendCredentials: _hasPortalAccess && _sendCredentials,
             ),
           );
       if (!mounted) return;
@@ -210,6 +217,7 @@ class _ProfessionalClientCreatePageState
             ? result.clientAccess.username
             : _username.text.trim();
         _credentialsSent = result.credentialsSent;
+        _created = true;
         _isSaving = false;
       });
     } on ApiException catch (error) {
@@ -226,7 +234,9 @@ class _ProfessionalClientCreatePageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Client'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalClients)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalClients),
+        ),
       ),
       body: _loading
           ? const PagePad(
@@ -234,10 +244,11 @@ class _ProfessionalClientCreatePageState
             )
           : PagePad(
               children: [
-                if (_createdPassword.isNotEmpty)
+                if (_created)
                   _CreatedCard(
                     username: _createdUsername,
                     password: _createdPassword,
+                    hasPortalAccess: _hasPortalAccess,
                     credentialsSent: _credentialsSent,
                     onDone: () => context.go(Routes.professionalClients),
                   )
@@ -260,8 +271,9 @@ class _ProfessionalClientCreatePageState
                         ),
                         const SizedBox(height: AppSpacing.md),
                         FilledButton(
-                          onPressed: () => context.go(Routes.professionalFormsGroups),
-                          child: const Text('Open Forms & Groups'),
+                          onPressed: () =>
+                              context.go(Routes.professionalFormsGroups),
+                          child: const Text('Open Forms and Groups'),
                         ),
                       ],
                     ),
@@ -276,6 +288,7 @@ class _ProfessionalClientCreatePageState
                     optionsFor: _optionsFor,
                     username: _username,
                     password: _password,
+                    hasPortalAccess: _hasPortalAccess,
                     sendCredentials: _sendCredentials,
                     isSaving: _isSaving,
                     canSave: _canSave,
@@ -284,6 +297,10 @@ class _ProfessionalClientCreatePageState
                     onAnswer: _setAnswer,
                     onSendCredentials: (value) =>
                         setState(() => _sendCredentials = value),
+                    onPortalAccess: (value) => setState(() {
+                      _hasPortalAccess = value;
+                      if (!value) _sendCredentials = false;
+                    }),
                     onChanged: () => setState(() {}),
                     onGenerate: _generatePassword,
                     onSave: _save,
@@ -304,6 +321,7 @@ class _Form extends StatelessWidget {
     required this.optionsFor,
     required this.username,
     required this.password,
+    required this.hasPortalAccess,
     required this.sendCredentials,
     required this.isSaving,
     required this.canSave,
@@ -311,6 +329,7 @@ class _Form extends StatelessWidget {
     required this.onGroup,
     required this.onAnswer,
     required this.onSendCredentials,
+    required this.onPortalAccess,
     required this.onChanged,
     required this.onGenerate,
     required this.onSave,
@@ -324,6 +343,7 @@ class _Form extends StatelessWidget {
   final List<String> Function(DynamicField) optionsFor;
   final TextEditingController username;
   final TextEditingController password;
+  final bool hasPortalAccess;
   final bool sendCredentials;
   final bool isSaving;
   final bool canSave;
@@ -331,18 +351,19 @@ class _Form extends StatelessWidget {
   final ValueChanged<int> onGroup;
   final void Function(String key, String value) onAnswer;
   final ValueChanged<bool> onSendCredentials;
+  final ValueChanged<bool> onPortalAccess;
   final VoidCallback onChanged;
   final VoidCallback onGenerate;
   final VoidCallback onSave;
 
   TextInputType _keyboardFor(String fieldType) => switch (fieldType) {
-        DynamicFieldType.email => TextInputType.emailAddress,
-        DynamicFieldType.phone => TextInputType.phone,
-        DynamicFieldType.number => TextInputType.number,
-        DynamicFieldType.longText => TextInputType.multiline,
-        DynamicFieldType.address => TextInputType.streetAddress,
-        _ => TextInputType.text,
-      };
+    DynamicFieldType.email => TextInputType.emailAddress,
+    DynamicFieldType.phone => TextInputType.phone,
+    DynamicFieldType.number => TextInputType.number,
+    DynamicFieldType.longText => TextInputType.multiline,
+    DynamicFieldType.address => TextInputType.streetAddress,
+    _ => TextInputType.text,
+  };
 
   /// One registration-form field, rendered by its configured type — the mobile
   /// equivalent of the web's @if/@else chain over field_type.
@@ -363,8 +384,9 @@ class _Form extends StatelessWidget {
           field.placeholder.isEmpty ? 'Select an option' : field.placeholder,
         ),
         items: options
-            .map((option) =>
-                DropdownMenuItem(value: option, child: Text(option)))
+            .map(
+              (option) => DropdownMenuItem(value: option, child: Text(option)),
+            )
             .toList(),
         onChanged: (value) => onAnswer(key, value ?? ''),
       );
@@ -399,7 +421,8 @@ class _Form extends StatelessWidget {
       );
     }
 
-    final multiline = field.fieldType == DynamicFieldType.longText ||
+    final multiline =
+        field.fieldType == DynamicFieldType.longText ||
         field.fieldType == DynamicFieldType.address;
 
     return TextField(
@@ -411,8 +434,8 @@ class _Form extends StatelessWidget {
       textCapitalization: multiline
           ? TextCapitalization.sentences
           : field.fieldType == DynamicFieldType.shortText
-              ? TextCapitalization.words
-              : TextCapitalization.none,
+          ? TextCapitalization.words
+          : TextCapitalization.none,
       onChanged: (value) => onAnswer(key, value),
       decoration: InputDecoration(
         labelText: label,
@@ -459,8 +482,19 @@ class _Form extends StatelessWidget {
           ],
 
           const SizedBox(height: AppSpacing.md),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            value: hasPortalAccess,
+            onChanged: onPortalAccess,
+            title: const Text('Create client portal access'),
+            subtitle: const Text(
+              'Turn this off to create the client record only. Portal access can be granted later.',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: username,
+            enabled: hasPortalAccess,
             onChanged: (_) => onChanged(),
             autocorrect: false,
             decoration: const InputDecoration(labelText: 'Username'),
@@ -472,6 +506,7 @@ class _Form extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: password,
+                  enabled: hasPortalAccess,
                   onChanged: (_) => onChanged(),
                   autocorrect: false,
                   decoration: const InputDecoration(
@@ -483,7 +518,7 @@ class _Form extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.xs),
                 child: OutlinedButton(
-                  onPressed: onGenerate,
+                  onPressed: hasPortalAccess ? onGenerate : null,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(92, AppSize.buttonHeightSm),
                   ),
@@ -494,13 +529,17 @@ class _Form extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           InkWell(
-            onTap: () => onSendCredentials(!sendCredentials),
+            onTap: hasPortalAccess
+                ? () => onSendCredentials(!sendCredentials)
+                : null,
             borderRadius: AppRadius.smAll,
             child: Row(
               children: [
                 Checkbox(
                   value: sendCredentials,
-                  onChanged: (value) => onSendCredentials(value ?? false),
+                  onChanged: hasPortalAccess
+                      ? (value) => onSendCredentials(value ?? false)
+                      : null,
                   visualDensity: VisualDensity.compact,
                 ),
                 Expanded(
@@ -514,8 +553,9 @@ class _Form extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Minimum 8 characters. The client must change this password on '
-            'first login.',
+            hasPortalAccess
+                ? 'Minimum 8 characters. The client must change this password on first login.'
+                : 'No login is created. You can grant portal access later from the client profile.',
             style: context.text.bodySmall,
           ),
           if (message.isNotEmpty) ...[
@@ -537,12 +577,14 @@ class _CreatedCard extends StatelessWidget {
   const _CreatedCard({
     required this.username,
     required this.password,
+    required this.hasPortalAccess,
     required this.credentialsSent,
     required this.onDone,
   });
 
   final String username;
   final String password;
+  final bool hasPortalAccess;
   final bool credentialsSent;
   final VoidCallback onDone;
 
@@ -563,17 +605,20 @@ class _CreatedCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Share these one-time credentials. The client must change the '
-            'password on first login.',
+            hasPortalAccess
+                ? 'Share these one-time credentials. The client must change the password on first login.'
+                : 'The client record was created without portal access. Access can be granted later from the client profile.',
             style: context.text.bodySmall,
           ),
-          const SizedBox(height: AppSpacing.md),
-          _Kv(label: 'Username', value: username),
-          _Kv(label: 'Temporary password', value: password, mono: true),
-          _Kv(
-            label: 'Credentials emailed',
-            value: credentialsSent ? 'Yes' : 'No',
-          ),
+          if (hasPortalAccess) ...[
+            const SizedBox(height: AppSpacing.md),
+            _Kv(label: 'Username', value: username),
+            _Kv(label: 'Temporary password', value: password, mono: true),
+            _Kv(
+              label: 'Credentials emailed',
+              value: credentialsSent ? 'Yes' : 'No',
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           FilledButton(onPressed: onDone, child: const Text('Done')),
         ],
@@ -603,10 +648,7 @@ class _Kv extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: mono
-                  ? context.text.titleSmall?.copyWith(
-                      fontFamily: 'monospace',
-                      letterSpacing: 0.5,
-                    )
+                  ? context.text.titleSmall?.copyWith(letterSpacing: 0.5)
                   : context.text.titleSmall,
             ),
           ),

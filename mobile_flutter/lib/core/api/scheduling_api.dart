@@ -72,7 +72,11 @@ class SchedulingApi {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/scheduling/availability-windows/',
-        data: {'weekday': weekday, 'start_time': startTime, 'end_time': endTime},
+        data: {
+          'weekday': weekday,
+          'start_time': startTime,
+          'end_time': endTime,
+        },
         options: _auth,
       );
       return AvailabilityWindowRecord.fromJson(
@@ -116,7 +120,11 @@ class SchedulingApi {
 
   // ----- slots + meetings (professional) -----
 
-  Future<SlotsByDate> getSlots(String start, String end, {int? durationMinutes}) {
+  Future<SlotsByDate> getSlots(
+    String start,
+    String end, {
+    int? durationMinutes,
+  }) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/scheduling/slots/',
@@ -161,7 +169,8 @@ class SchedulingApi {
           'duration_minutes': ?durationMinutes,
           'title': ?(title.isEmpty ? null : title),
           'notes': ?(notes.isEmpty ? null : notes),
-          'guest_client_ids': ?((guestClientIds == null || guestClientIds.isEmpty)
+          'guest_client_ids':
+              ?((guestClientIds == null || guestClientIds.isEmpty)
               ? null
               : guestClientIds),
         },
@@ -173,7 +182,11 @@ class SchedulingApi {
     });
   }
 
-  Future<ScheduledMeetingRecord> rescheduleMeeting(int meetingId, String start, {String? reason}) {
+  Future<ScheduledMeetingRecord> rescheduleMeeting(
+    int meetingId,
+    String start, {
+    String? reason,
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/scheduling/meetings/$meetingId/reschedule/',
@@ -186,7 +199,10 @@ class SchedulingApi {
     });
   }
 
-  Future<ScheduledMeetingRecord> cancelMeeting(int meetingId, {String? reason}) {
+  Future<ScheduledMeetingRecord> cancelMeeting(
+    int meetingId, {
+    String? reason,
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/scheduling/meetings/$meetingId/cancel/',
@@ -214,7 +230,10 @@ class SchedulingApi {
     });
   }
 
-  Future<ScheduledMeetingRecord> respondToMeeting(int meetingId, String responseStatus) {
+  Future<ScheduledMeetingRecord> respondToMeeting(
+    int meetingId,
+    String responseStatus,
+  ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/client/scheduling/meetings/$meetingId/respond/',
@@ -322,5 +341,6 @@ class SchedulingApi {
   }
 }
 
-final schedulingApiProvider =
-    Provider<SchedulingApi>((ref) => SchedulingApi(ref.watch(dioProvider)));
+final schedulingApiProvider = Provider<SchedulingApi>(
+  (ref) => SchedulingApi(ref.watch(dioProvider)),
+);

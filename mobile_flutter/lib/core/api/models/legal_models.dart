@@ -75,10 +75,10 @@ class LegalAcceptanceEntry {
       );
 
   Map<String, dynamic> toJson() => {
-        'legal_document_version': legalDocumentVersion,
-        'accepted_at': acceptedAt,
-        'client_timezone': clientTimezone,
-      };
+    'legal_document_version': legalDocumentVersion,
+    'accepted_at': acceptedAt,
+    'client_timezone': clientTimezone,
+  };
 
   static List<LegalAcceptanceEntry> listFrom(dynamic raw) =>
       (raw as List<dynamic>? ?? [])
@@ -107,7 +107,8 @@ class ProfessionalProfileStatus {
 
   factory ProfessionalProfileStatus.fromJson(Map<String, dynamic> json) =>
       ProfessionalProfileStatus(
-        profileSetupCompleted: json['profile_setup_completed'] as bool? ?? false,
+        profileSetupCompleted:
+            json['profile_setup_completed'] as bool? ?? false,
         legalAcceptanceRequired:
             json['legal_acceptance_required'] as bool? ?? false,
         currentLegalDocumentVersion:

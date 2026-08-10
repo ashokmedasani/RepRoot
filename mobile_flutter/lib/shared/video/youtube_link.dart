@@ -33,6 +33,5 @@ String? youtubeVideoId(String url) {
   return (id == null || id.isEmpty) ? null : id;
 }
 
-
 /// True when [url] is a YouTube link. Covered by test/shared/youtube_link_test.dart.
 bool isYoutubeLink(String url) => youtubeVideoId(url) != null;

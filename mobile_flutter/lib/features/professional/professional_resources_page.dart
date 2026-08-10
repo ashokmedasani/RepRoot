@@ -50,7 +50,8 @@ const _lockedCategoriesInfo =
     'another category, delete a category you no longer need, or upgrade your '
     'plan.';
 
-class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResourcesPage> {
+class _ProfessionalResourcesPageState
+    extends ConsumerState<ProfessionalResourcesPage> {
   final _query = TextEditingController();
 
   List<ResourceCategoryRecord> _categories = [];
@@ -109,8 +110,12 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   List<ProfessionalResourceRecord> _resourcesForCategory(String name) =>
       _resources.where((r) => r.categoryName == name).toList();
 
-  List<ProfessionalResourceRecord> _resourcesFor(String name, String subcategory) =>
-      _resourcesForCategory(name).where((r) => r.subcategory == subcategory).toList();
+  List<ProfessionalResourceRecord> _resourcesFor(
+    String name,
+    String subcategory,
+  ) => _resourcesForCategory(
+    name,
+  ).where((r) => r.subcategory == subcategory).toList();
 
   /// Includes the unnamed bucket when resources sit directly on the category.
   List<String> _subcategoriesOf(ResourceCategoryRecord category) {
@@ -153,7 +158,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   List<ResourceCategoryRecord> get _lockedCategories {
     if (!_categoryLockLoaded) return const [];
     final lockedIds = _categoryLock.lockedIds.toSet();
-    return _categories.where((category) => lockedIds.contains(category.id)).toList();
+    return _categories
+        .where((category) => lockedIds.contains(category.id))
+        .toList();
   }
 
   List<ProfessionalResourceRecord> _activeResourcesFor(
@@ -177,9 +184,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   ) {
     if (!_resourceLockLoaded) return const [];
     final lockedIds = _resourceLock.lockedIds.toSet();
-    return _resourcesFor(categoryName, subcategory)
-        .where((resource) => lockedIds.contains(resource.id))
-        .toList();
+    return _resourcesFor(
+      categoryName,
+      subcategory,
+    ).where((resource) => lockedIds.contains(resource.id)).toList();
   }
 
   /// Drag indices address the unfiltered list, so reordering is only offered
@@ -218,10 +226,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       _expandedCategoryId == id || _query.text.trim().isNotEmpty;
 
   String get _categoryEditorTitle => switch (_categoryMode) {
-        CategoryEditorMode.create => 'Create category',
-        CategoryEditorMode.edit => 'Edit category',
-        CategoryEditorMode.subcategory => 'Add subcategory',
-      };
+    CategoryEditorMode.create => 'Create category',
+    CategoryEditorMode.edit => 'Edit category',
+    CategoryEditorMode.subcategory => 'Add subcategory',
+  };
 
   Future<void> _load() async {
     final api = ref.read(resourcesApiProvider);
@@ -254,7 +262,11 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
     try {
       final status = await ref.read(planLockApiProvider).getLockStatus();
       if (mounted) setState(() => _lockStatus = status);
-    } catch (_) {/* the library just renders flat, without lock badges */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Resource lock status load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   /// Sends the permuted active order for one model and adopts the lock status
@@ -275,8 +287,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
     });
 
     try {
-      final status =
-          await ref.read(planLockApiProvider).reorder(modelKey, orderedIds);
+      final status = await ref
+          .read(planLockApiProvider)
+          .reorder(modelKey, orderedIds);
       if (mounted) setState(() => _lockStatus = status);
     } catch (error) {
       if (!mounted) return;
@@ -314,9 +327,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
     // onReorderItem already adjusts newIndex for the removed row.
     if (oldIndex == newIndex) return;
 
-    final scopedIds = _activeResourcesFor(categoryName, subcategory)
-        .map((resource) => resource.id)
-        .toList();
+    final scopedIds = _activeResourcesFor(
+      categoryName,
+      subcategory,
+    ).map((resource) => resource.id).toList();
     if (oldIndex < 0 || oldIndex >= scopedIds.length) return;
     scopedIds.insert(newIndex, scopedIds.removeAt(oldIndex));
 
@@ -337,7 +351,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(milliseconds: 1800)),
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 1800),
+      ),
     );
   }
 
@@ -355,7 +372,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
 
   // ----- category editor -----
 
-  void _openCategoryEditor(CategoryEditorMode mode, [ResourceCategoryRecord? category]) {
+  void _openCategoryEditor(
+    CategoryEditorMode mode, [
+    ResourceCategoryRecord? category,
+  ]) {
     setState(() {
       _categoryMode = mode;
       _editingCategoryId = category?.id ?? 0;
@@ -378,11 +398,13 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       .toList();
 
   Future<void> _saveCategory() async {
-    final current =
-        _categories.where((c) => c.id == _editingCategoryId).firstOrNull;
+    final current = _categories
+        .where((c) => c.id == _editingCategoryId)
+        .firstOrNull;
     final entered = _parseSubcategories(_categorySubs.text);
     // "Add subcategory" merges into the existing list; "edit" replaces it.
-    final subcategories = _categoryMode == CategoryEditorMode.subcategory && current != null
+    final subcategories =
+        _categoryMode == CategoryEditorMode.subcategory && current != null
         ? {...current.subcategories, ...entered}.toList()
         : entered;
 
@@ -429,7 +451,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       );
       return;
     }
-    if (!await _confirm('Delete ${category.name}?', 'This category will be removed.')) {
+    if (!await _confirm(
+      'Delete ${category.name}?',
+      'This category will be removed.',
+    )) {
       return;
     }
     try {
@@ -453,11 +478,16 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       );
       return;
     }
-    if (!await _confirm('Delete $subcategory?', 'This subcategory will be removed.')) {
+    if (!await _confirm(
+      'Delete $subcategory?',
+      'This subcategory will be removed.',
+    )) {
       return;
     }
     try {
-      await ref.read(resourcesApiProvider).updateCategory(
+      await ref
+          .read(resourcesApiProvider)
+          .updateCategory(
             category.id,
             category.name,
             category.description,
@@ -471,7 +501,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
 
   // ----- resource editor -----
 
-  void _startCreateResource(ResourceCategoryRecord category, String subcategory) {
+  void _startCreateResource(
+    ResourceCategoryRecord category,
+    String subcategory,
+  ) {
     if (_atLimit) {
       _toast('Resource limit reached on your plan.');
       return;
@@ -522,7 +555,8 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   String _validateResource() {
     if (_draftTitle.text.trim().isEmpty) return 'Add a title for the resource.';
     if (_draftCategory == 0) return 'Choose a category.';
-    if (_draftType == ResourceType.videoLink && _draftLink.text.trim().isEmpty) {
+    if (_draftType == ResourceType.videoLink &&
+        _draftLink.text.trim().isEmpty) {
       return 'Add a video URL.';
     }
     if (_draftType == ResourceType.pdf &&
@@ -596,7 +630,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
       return;
     }
     try {
-      final copy = await ref.read(resourcesApiProvider).createResource(
+      final copy = await ref
+          .read(resourcesApiProvider)
+          .createResource(
             ResourcePayload(
               category: resource.category,
               subcategory: resource.subcategory,
@@ -634,15 +670,15 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   }
 
   Future<void> _alert(String title, String body) => showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: [
-            TextButton(onPressed: () => context.pop(), child: const Text('Close')),
-          ],
-        ),
-      );
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(onPressed: () => context.pop(), child: const Text('Close')),
+      ],
+    ),
+  );
 
   Future<bool> _confirm(String title, String body) async {
     final result = await showDialog<bool>(
@@ -651,7 +687,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
         title: Text(title),
         content: Text(body),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -675,7 +714,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
     return Scaffold(
       appBar: AppBar(
         title: const Text('Resource Library'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalManage),
+        ),
         actions: [
           IconButton(
             onPressed: () => _openCategoryEditor(CategoryEditorMode.create),
@@ -807,7 +848,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
           children: [
             InkWell(
               onTap: () => setState(() {
-                _expandedCategoryId = _expandedCategoryId == category.id ? 0 : category.id;
+                _expandedCategoryId = _expandedCategoryId == category.id
+                    ? 0
+                    : category.id;
                 _expandedResourceId = 0;
               }),
               borderRadius: AppRadius.mdAll,
@@ -855,9 +898,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                       onPressed: locked
                           ? null
                           : () => _openCategoryEditor(
-                                CategoryEditorMode.edit,
-                                category,
-                              ),
+                              CategoryEditorMode.edit,
+                              category,
+                            ),
                       icon: const Icon(Icons.edit_outlined),
                       iconSize: AppSize.iconRow,
                       visualDensity: VisualDensity.compact,
@@ -939,7 +982,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
         ? _resourcesFor(category.name, subcategory)
         : _lockedResourcesFor(category.name, subcategory);
     final canReorder =
-        !categoryLocked && _resourceLockLoaded && !_searching && active.length > 1;
+        !categoryLocked &&
+        _resourceLockLoaded &&
+        !_searching &&
+        active.length > 1;
     final tokens = context.tokens;
 
     return Padding(
@@ -981,7 +1027,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
           if (active.isEmpty && locked.isEmpty)
             Padding(
               padding: const EdgeInsets.only(left: AppSpacing.sm),
-              child: Text('No resources here yet.', style: context.text.bodySmall),
+              child: Text(
+                'No resources here yet.',
+                style: context.text.bodySmall,
+              ),
             )
           else ...[
             if (canReorder)
@@ -1126,13 +1175,18 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                         'This resource is locked and hidden from clients. It '
                         'can still be deleted to free a slot, but not edited '
                         'until it unlocks.',
-                        style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                        style: context.text.bodySmall?.copyWith(
+                          color: tokens.muted,
+                        ),
                       ),
                     ),
                   if (resource.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: Text(resource.description, style: context.text.bodySmall),
+                      child: Text(
+                        resource.description,
+                        style: context.text.bodySmall,
+                      ),
                     ),
                   if (resource.tags.isNotEmpty)
                     Wrap(
@@ -1146,10 +1200,14 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                   Wrap(
                     spacing: AppSpacing.xs,
                     children: [
-                      if (resource.fileUrl.isNotEmpty || resource.link.isNotEmpty)
+                      if (resource.fileUrl.isNotEmpty ||
+                          resource.link.isNotEmpty)
                         TextButton.icon(
                           onPressed: () => _open(resource),
-                          icon: const Icon(Icons.open_in_new, size: AppSize.iconRow),
+                          icon: const Icon(
+                            Icons.open_in_new,
+                            size: AppSize.iconRow,
+                          ),
                           label: const Text('Open'),
                           style: TextButton.styleFrom(
                             minimumSize: const Size(0, 32),
@@ -1157,9 +1215,13 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                           ),
                         ),
                       TextButton.icon(
-                        onPressed:
-                            locked ? null : () => _startEditResource(resource),
-                        icon: const Icon(Icons.edit_outlined, size: AppSize.iconRow),
+                        onPressed: locked
+                            ? null
+                            : () => _startEditResource(resource),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('Edit'),
                         style: TextButton.styleFrom(
                           minimumSize: const Size(0, 32),
@@ -1170,7 +1232,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                         onPressed: _atLimit || locked
                             ? null
                             : () => _duplicateResource(resource),
-                        icon: const Icon(Icons.copy_outlined, size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.copy_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('Duplicate'),
                         style: TextButton.styleFrom(
                           minimumSize: const Size(0, 32),
@@ -1179,7 +1244,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                       ),
                       TextButton.icon(
                         onPressed: () => _removeResource(resource),
-                        icon: const Icon(Icons.delete_outline, size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('Delete'),
                         style: TextButton.styleFrom(
                           foregroundColor: context.colors.error,
@@ -1230,7 +1298,8 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
             children: [
               Expanded(
                 child: FilledButton(
-                  onPressed: _isSavingCategory || _categoryName.text.trim().isEmpty
+                  onPressed:
+                      _isSavingCategory || _categoryName.text.trim().isEmpty
                       ? null
                       : _saveCategory,
                   child: Text(_isSavingCategory ? 'Saving…' : 'Save'),
@@ -1249,10 +1318,10 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
   }
 
   Widget _resourceEditor() {
-    final needsFile = _draftType == ResourceType.image ||
-        _draftType == ResourceType.pdf;
-    final needsLink = _draftType == ResourceType.videoLink ||
-        _draftType == ResourceType.pdf;
+    final needsFile =
+        _draftType == ResourceType.image || _draftType == ResourceType.pdf;
+    final needsLink =
+        _draftType == ResourceType.videoLink || _draftType == ResourceType.pdf;
 
     return AppCard(
       child: Column(
@@ -1278,20 +1347,23 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
             onChanged: (value) => setState(() {
               _draftCategory = value ?? 0;
               // Reset the subcategory to the new category's first, as in the TS.
-              _draftSubcategory = _subcategoriesFor(_draftCategory).firstOrNull ?? '';
+              _draftSubcategory =
+                  _subcategoriesFor(_draftCategory).firstOrNull ?? '';
             }),
           ),
           if (_subcategoriesFor(_draftCategory).isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
-              initialValue: _subcategoriesFor(_draftCategory).contains(_draftSubcategory)
+              initialValue:
+                  _subcategoriesFor(_draftCategory).contains(_draftSubcategory)
                   ? _draftSubcategory
                   : null,
               decoration: const InputDecoration(labelText: 'Subcategory'),
-              items: _subcategoriesFor(_draftCategory)
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (value) => setState(() => _draftSubcategory = value ?? ''),
+              items: _subcategoriesFor(
+                _draftCategory,
+              ).map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (value) =>
+                  setState(() => _draftSubcategory = value ?? ''),
             ),
           ],
           const SizedBox(height: AppSpacing.md),
@@ -1299,10 +1371,12 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
             initialValue: _draftType,
             decoration: const InputDecoration(labelText: 'Type'),
             items: ResourceType.all
-                .map((t) => DropdownMenuItem(
-                      value: t,
-                      child: Text(ResourceType.label(t)),
-                    ))
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(ResourceType.label(t)),
+                  ),
+                )
                 .toList(),
             onChanged: (value) => setState(() {
               _draftType = value ?? ResourceType.videoLink;
@@ -1330,7 +1404,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
                   onPressed: _pickFile,
                   icon: const Icon(Icons.attach_file, size: AppSize.iconRow),
                   label: Text(
-                    _draftType == ResourceType.image ? 'Choose image' : 'Choose PDF',
+                    _draftType == ResourceType.image
+                        ? 'Choose image'
+                        : 'Choose PDF',
                   ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -1353,7 +1429,9 @@ class _ProfessionalResourcesPageState extends ConsumerState<ProfessionalResource
             controller: _draftDescription,
             maxLines: _draftType == ResourceType.textNote ? 5 : 2,
             decoration: InputDecoration(
-              labelText: _draftType == ResourceType.textNote ? 'Text' : 'Description',
+              labelText: _draftType == ResourceType.textNote
+                  ? 'Text'
+                  : 'Description',
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1433,7 +1511,9 @@ class _UsageBar extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Limit reached — delete a resource or upgrade to add more.',
-              style: context.text.bodySmall?.copyWith(color: context.colors.error),
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
           ],
         ],

@@ -67,7 +67,7 @@ class _ErrorInterceptor extends Interceptor {
   /// when the legal version was bumped mid-session. Same substring the web
   /// checks in error.interceptor.ts — keep the three in sync.
   static const _legalConsentMarker =
-      'Terms & Conditions and Privacy Notice must be accepted';
+      'Terms and Conditions and Privacy Notice must be accepted';
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {

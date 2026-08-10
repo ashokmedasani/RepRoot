@@ -45,24 +45,29 @@ class _ClientLegalConsentPageState
 
   Future<void> _loadConfiguration() async {
     try {
-      final configuration =
-          await ref.read(clientApiProvider).getLegalConfiguration();
+      final configuration = await ref
+          .read(clientApiProvider)
+          .getLegalConfiguration();
       if (!mounted) return;
       setState(() {
         _version = configuration.clientVersion;
         _effectiveDate = configuration.effectiveDate;
       });
-    } catch (_) {
-      // Informational only — the web component ignores this failure too.
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client legal configuration load failed (${error.runtimeType})\n$stackTrace',
+      );
     }
   }
 
   Future<void> _submit() async {
     if (_submitting) return;
     if (!_accepted) {
-      setState(() => _message =
-          'Review and accept the Client Terms & Conditions and Privacy Notice '
-          'to continue.');
+      setState(
+        () => _message =
+            'Review and accept the Client Terms and Conditions and Privacy Notice '
+            'to continue.',
+      );
       return;
     }
 
@@ -99,8 +104,11 @@ class _ClientLegalConsentPageState
     final api = ref.read(clientApiProvider);
     try {
       await api.logout();
-    } catch (_) {
-      // Clearing the local session is what matters.
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client server logout failed; clearing local session '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
     await api.clearSession();
     if (!mounted) return;

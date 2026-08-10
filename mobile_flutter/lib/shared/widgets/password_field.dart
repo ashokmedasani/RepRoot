@@ -42,7 +42,11 @@ class _PasswordFieldState extends State<PasswordField> {
         labelText: widget.label,
         suffixIcon: IconButton(
           onPressed: () => setState(() => _visible = !_visible),
-          icon: Icon(_visible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+          icon: Icon(
+            _visible
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+          ),
           iconSize: AppSize.iconRow,
           tooltip: _visible ? 'Hide password' : 'Show password',
         ),

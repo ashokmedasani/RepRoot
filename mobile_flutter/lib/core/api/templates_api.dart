@@ -7,7 +7,10 @@ import 'models/template_models.dart';
 /// Tracking templates, assignments, and entries.
 /// 1:1 port of mobile/src/app/core/api/templates-api.service.ts.
 class TemplateListResponse {
-  const TemplateListResponse({required this.templates, required this.maxTemplates});
+  const TemplateListResponse({
+    required this.templates,
+    required this.maxTemplates,
+  });
 
   final List<TrackingTemplateRecord> templates;
   final int maxTemplates;
@@ -268,5 +271,6 @@ class TemplatesApi {
   }
 }
 
-final templatesApiProvider =
-    Provider<TemplatesApi>((ref) => TemplatesApi(ref.watch(dioProvider)));
+final templatesApiProvider = Provider<TemplatesApi>(
+  (ref) => TemplatesApi(ref.watch(dioProvider)),
+);

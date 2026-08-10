@@ -52,19 +52,20 @@ class _DraftField {
   List<String> options;
 
   DynamicField toField() => DynamicField(
-        label: label.trim(),
-        fieldType: fieldType,
-        required: required,
-        options:
-            DynamicFieldType.withOptions.contains(fieldType) ? options : const [],
-      );
+    label: label.trim(),
+    fieldType: fieldType,
+    required: required,
+    options: DynamicFieldType.withOptions.contains(fieldType)
+        ? options
+        : const [],
+  );
 
   static _DraftField from(DynamicField f) => _DraftField(
-        label: f.label,
-        fieldType: f.fieldType,
-        required: f.required,
-        options: [...f.options],
-      );
+    label: f.label,
+    fieldType: f.fieldType,
+    required: f.required,
+    options: [...f.options],
+  );
 }
 
 class _ProfessionalGroupDetailPageState
@@ -154,9 +155,11 @@ class _ProfessionalGroupDetailPageState
       final overview = await api.getOverview();
       final publicLink = overview.leadForm?.publicLink ?? '';
       if (mounted) {
-        setState(() => _registrationLinkBase = publicLink.contains('/public/')
-            ? publicLink.split('/public/').first
-            : Env.apiBaseUrl);
+        setState(
+          () => _registrationLinkBase = publicLink.contains('/public/')
+              ? publicLink.split('/public/').first
+              : Env.apiBaseUrl,
+        );
       }
     } catch (_) {
       if (mounted) setState(() => _registrationLinkBase = Env.apiBaseUrl);
@@ -165,13 +168,20 @@ class _ProfessionalGroupDetailPageState
     try {
       final status = await ref.read(planLockApiProvider).getLockStatus();
       if (mounted) setState(() => _lockStatus = status);
-    } catch (_) {/* the Overview tab just shows no lock status */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Group lock status load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(milliseconds: 2400)),
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 2400),
+      ),
     );
   }
 
@@ -215,9 +225,11 @@ class _ProfessionalGroupDetailPageState
         child: StatefulBuilder(
           builder: (dialogContext, setPageState) => Scaffold(
             appBar: AppBar(
-              title: Text(_group?.registrationForm == null
-                  ? 'Create registration form'
-                  : 'Edit registration form'),
+              title: Text(
+                _group?.registrationForm == null
+                    ? 'Create registration form'
+                    : 'Edit registration form',
+              ),
               leading: IconButton(
                 onPressed: saving ? null : () => dialogContext.pop(false),
                 icon: const Icon(Icons.close),
@@ -270,8 +282,7 @@ class _ProfessionalGroupDetailPageState
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   title: const Text('Require before adding a client'),
-                  subtitle:
-                      const Text('Clients must complete this form first'),
+                  subtitle: const Text('Clients must complete this form first'),
                   value: _formMandatory,
                   onChanged: (value) =>
                       setPageState(() => _formMandatory = value),
@@ -289,7 +300,9 @@ class _ProfessionalGroupDetailPageState
   /// every field the professional had just added.
   Future<bool> _saveRegistrationForm() async {
     try {
-      await ref.read(formsGroupsApiProvider).saveRegistrationForm(
+      await ref
+          .read(formsGroupsApiProvider)
+          .saveRegistrationForm(
             widget.groupId,
             _customFields
                 .where((f) => f.label.trim().isNotEmpty)
@@ -312,19 +325,19 @@ class _ProfessionalGroupDetailPageState
   String _generatePassword() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     final random = Random.secure();
-    final value =
-        List.generate(10, (_) => alphabet[random.nextInt(alphabet.length)]).join();
+    final value = List.generate(
+      10,
+      (_) => alphabet[random.nextInt(alphabet.length)],
+    ).join();
     return '${value.substring(0, 8)}!${value.substring(8)}';
   }
 
   void _startConvert(GroupRegistrationSubmission submission) {
     setState(() {
       _convertingId = submission.id;
-      _convertUsername.text =
-          '${submission.firstName}.${submission.lastName}'.toLowerCase().replaceAll(
-                RegExp(r'[^a-z0-9.-]+'),
-                '',
-              );
+      _convertUsername.text = '${submission.firstName}.${submission.lastName}'
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9.-]+'), '');
       _convertPassword.text = _generatePassword();
       _convertSendCredentials = true;
     });
@@ -334,7 +347,9 @@ class _ProfessionalGroupDetailPageState
     setState(() => _isConverting = true);
     final password = _convertPassword.text.trim();
     try {
-      final result = await ref.read(formsGroupsApiProvider).createManualClient(
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .createManualClient(
             ClientAccessPayload(
               groupId: widget.groupId,
               username: _convertUsername.text.trim(),
@@ -355,7 +370,9 @@ class _ProfessionalGroupDetailPageState
       if (mounted) {
         await _showCredentials(
           _convertUsername.text.trim(),
-          result.temporaryPassword.isNotEmpty ? result.temporaryPassword : password,
+          result.temporaryPassword.isNotEmpty
+              ? result.temporaryPassword
+              : password,
         );
       }
     } on ApiException catch (error) {
@@ -403,7 +420,10 @@ class _ProfessionalGroupDetailPageState
           .read(formsGroupsApiProvider)
           .declineRegistrationSubmission(widget.groupId, submission.id);
       if (!mounted) return;
-      setState(() => _message = message.isNotEmpty ? message : 'Registration declined.');
+      setState(
+        () =>
+            _message = message.isNotEmpty ? message : 'Registration declined.',
+      );
       await _load();
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -428,10 +448,7 @@ class _ProfessionalGroupDetailPageState
             const SizedBox(height: AppSpacing.md),
             Text('Username: $username', style: context.text.titleSmall),
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Password: $password',
-              style: context.text.titleSmall?.copyWith(fontFamily: 'monospace'),
-            ),
+            Text('Password: $password', style: context.text.titleSmall),
           ],
         ),
         actions: [
@@ -457,7 +474,9 @@ class _ProfessionalGroupDetailPageState
 
   Future<void> _saveGroup() async {
     try {
-      await ref.read(formsGroupsApiProvider).updateGroup(
+      await ref
+          .read(formsGroupsApiProvider)
+          .updateGroup(
             widget.groupId,
             _editName.text.trim(),
             _editDescription.text.trim(),
@@ -489,7 +508,8 @@ class _ProfessionalGroupDetailPageState
       appBar: AppBar(
         title: Text('Group: ${_group?.name ?? ''}'.trimRight()),
         leading: BackButton(
-          onPressed: () => context.go('${Routes.professionalFormsGroups}?tab=groups'),
+          onPressed: () =>
+              context.go('${Routes.professionalFormsGroups}?tab=groups'),
         ),
       ),
       body: Column(
@@ -548,7 +568,10 @@ class _ProfessionalGroupDetailPageState
     );
   }
 
-  Future<void> _bulkSetStatus(List<ClientAccessRecord> members, bool active) async {
+  Future<void> _bulkSetStatus(
+    List<ClientAccessRecord> members,
+    bool active,
+  ) async {
     if (_bulkBusy || _selectedMembers.isEmpty) return;
     setState(() => _bulkBusy = true);
     final api = ref.read(formsGroupsApiProvider);
@@ -567,9 +590,13 @@ class _ProfessionalGroupDetailPageState
         _selectedMembers.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failures == 0
-            ? (active ? 'Members activated.' : 'Members deactivated.')
-            : '$failures update(s) failed.')),
+        SnackBar(
+          content: Text(
+            failures == 0
+                ? (active ? 'Members activated.' : 'Members deactivated.')
+                : '$failures update(s) failed.',
+          ),
+        ),
       );
     }
     _load();
@@ -618,7 +645,9 @@ class _ProfessionalGroupDetailPageState
                   'Over your current plan\'s group limit. Clients in this group '
                   'lose portal access — their data is kept — until you upgrade '
                   'or free a slot.',
-                  style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.tokens.muted,
+                  ),
                 ),
               ],
             ],
@@ -713,14 +742,18 @@ class _ProfessionalGroupDetailPageState
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: _bulkBusy ? null : () => _bulkSetStatus(members, true),
+                    onPressed: _bulkBusy
+                        ? null
+                        : () => _bulkSetStatus(members, true),
                     child: const Text('Activate'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _bulkBusy ? null : () => _bulkSetStatus(members, false),
+                    onPressed: _bulkBusy
+                        ? null
+                        : () => _bulkSetStatus(members, false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: context.colors.error,
                     ),
@@ -739,7 +772,9 @@ class _ProfessionalGroupDetailPageState
         else
           for (final client in members)
             RowItem(
-              title: client.displayName.isEmpty ? client.username : client.displayName,
+              title: client.displayName.isEmpty
+                  ? client.username
+                  : client.displayName,
               subtitle: client.email.isEmpty ? client.username : client.email,
               leading: _selectionMode
                   ? Checkbox(
@@ -762,13 +797,15 @@ class _ProfessionalGroupDetailPageState
                   : const StatusPill(label: 'Inactive', tone: PillTone.bad),
               onTap: _selectionMode
                   ? () => setState(() {
-                        if (_selectedMembers.contains(client.id)) {
-                          _selectedMembers.remove(client.id);
-                        } else {
-                          _selectedMembers.add(client.id);
-                        }
-                      })
-                  : () => context.go('${Routes.professionalClients}/${client.id}'),
+                      if (_selectedMembers.contains(client.id)) {
+                        _selectedMembers.remove(client.id);
+                      } else {
+                        _selectedMembers.add(client.id);
+                      }
+                    })
+                  : () => context.go(
+                      '${Routes.professionalClients}/${client.id}',
+                    ),
             ),
       ],
     );
@@ -813,10 +850,14 @@ class _ProfessionalGroupDetailPageState
               form.isMandatory
                   ? 'Required before a client can be added.'
                   : 'Optional — clients can be added without it.',
-              style: context.text.bodySmall
-                  ?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
-            const SectionHeader(title: 'Always collected', topSpace: AppSpacing.lg),
+            const SectionHeader(
+              title: 'Always collected',
+              topSpace: AppSpacing.lg,
+            ),
             Text(
               'Name, email, and phone are built in and cannot be removed.',
               style: context.text.bodySmall,
@@ -828,8 +869,9 @@ class _ProfessionalGroupDetailPageState
             if (custom.isEmpty)
               Text(
                 'None yet — the form collects the built-in fields only.',
-                style: context.text.bodySmall
-                    ?.copyWith(color: context.tokens.muted),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               )
             else
               for (final field in custom)
@@ -855,8 +897,9 @@ class _ProfessionalGroupDetailPageState
                                   if (field.options.isNotEmpty)
                                     field.options.join(', '),
                                 ].join(' · '),
-                                style: context.text.bodySmall
-                                    ?.copyWith(color: context.tokens.muted),
+                                style: context.text.bodySmall?.copyWith(
+                                  color: context.tokens.muted,
+                                ),
                               ),
                             ],
                           ),
@@ -888,7 +931,8 @@ class _ProfessionalGroupDetailPageState
   }
 
   Widget _registrationsTab() {
-    final hasForm = _group?.registrationForm != null;
+    final registrationForm = _group?.registrationForm;
+    final hasForm = registrationForm != null;
     final pending = _pendingSubmissions;
     final converted = (_data?.registrationSubmissions ?? [])
         .where((s) => s.status == 'converted')
@@ -911,8 +955,10 @@ class _ProfessionalGroupDetailPageState
               Row(
                 children: [
                   Expanded(
-                    child: Text('Registration form',
-                        style: context.text.titleSmall),
+                    child: Text(
+                      'Registration form',
+                      style: context.text.titleSmall,
+                    ),
                   ),
                   StatusPill(
                     label: hasForm ? 'Active' : 'Not set up',
@@ -923,8 +969,8 @@ class _ProfessionalGroupDetailPageState
               const SizedBox(height: AppSpacing.xs),
               Text(
                 hasForm
-                    ? '${_group!.registrationForm!.fields.length} fields · '
-                        '${_group!.registrationForm!.isMandatory ? 'Required before adding a client' : 'Optional'}'
+                    ? '${registrationForm.fields.length} fields · '
+                          '${registrationForm.isMandatory ? 'Required before adding a client' : 'Optional'}'
                     : 'Add a registration form so people can join this group.',
                 style: context.text.bodySmall,
               ),
@@ -953,8 +999,9 @@ class _ProfessionalGroupDetailPageState
                         Expanded(
                           child: Text(
                             _registrationLink,
-                            style: context.text.bodySmall
-                                ?.copyWith(color: context.colors.primary),
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.colors.primary,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -985,8 +1032,10 @@ class _ProfessionalGroupDetailPageState
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _openFormPreview,
-                        icon: const Icon(Icons.visibility_outlined,
-                            size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.visibility_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('View'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -998,8 +1047,10 @@ class _ProfessionalGroupDetailPageState
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: _openFormBuilder,
-                        icon: const Icon(Icons.edit_outlined,
-                            size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('Edit'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -1109,8 +1160,9 @@ class _ProfessionalGroupDetailPageState
                     child: TextField(
                       controller: _convertPassword,
                       autocorrect: false,
-                      decoration:
-                          const InputDecoration(labelText: 'Temporary password'),
+                      decoration: const InputDecoration(
+                        labelText: 'Temporary password',
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -1154,8 +1206,12 @@ class _ProfessionalGroupDetailPageState
                 children: [
                   Expanded(
                     child: FilledButton(
-                      onPressed: _isConverting ? null : () => _convert(submission),
-                      child: Text(_isConverting ? 'Creating…' : 'Create client'),
+                      onPressed: _isConverting
+                          ? null
+                          : () => _convert(submission),
+                      child: Text(
+                        _isConverting ? 'Creating…' : 'Create client',
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -1197,21 +1253,15 @@ class _ProfessionalGroupDetailPageState
   }
 
   Widget _detailRow(String label, String value) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 2,
-              child: Text(label, style: context.text.bodySmall),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(value, style: context.text.bodyMedium),
-            ),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: Text(label, style: context.text.bodySmall)),
+        Expanded(flex: 3, child: Text(value, style: context.text.bodyMedium)),
+      ],
+    ),
+  );
 
   /// Editing happens in a dialog with an explicit Save, never inline. An
   /// always-open field has no moment of commitment — you can't tell whether
@@ -1303,11 +1353,17 @@ class _ProfessionalGroupDetailPageState
               Row(
                 children: [
                   Expanded(
-                    child: Text('Group details', style: context.text.titleSmall),
+                    child: Text(
+                      'Group details',
+                      style: context.text.titleSmall,
+                    ),
                   ),
                   TextButton.icon(
                     onPressed: _openGroupDetailsDialog,
-                    icon: const Icon(Icons.edit_outlined, size: AppSize.iconRow),
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: AppSize.iconRow,
+                    ),
                     label: const Text('Edit'),
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -1372,10 +1428,12 @@ class _FieldEditor extends StatelessWidget {
             initialValue: field.fieldType,
             decoration: const InputDecoration(labelText: 'Type'),
             items: DynamicFieldType.all
-                .map((t) => DropdownMenuItem(
-                      value: t,
-                      child: Text(DynamicFieldType.label(t)),
-                    ))
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(DynamicFieldType.label(t)),
+                  ),
+                )
                 .toList(),
             onChanged: (v) {
               field.fieldType = v ?? DynamicFieldType.shortText;

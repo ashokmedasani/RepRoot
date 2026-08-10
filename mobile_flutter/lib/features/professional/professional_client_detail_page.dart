@@ -88,7 +88,6 @@ class _ProfessionalClientDetailPageState
   bool _isGrantingAccess = false;
   bool _isRevokingAccess = false;
 
-
   Timer? _unreadPoll;
 
   @override
@@ -98,7 +97,10 @@ class _ProfessionalClientDetailPageState
     _loadUnread();
     // Only the unread count is needed here now; the conversation itself
     // polls inside ProfessionalClientChatPage.
-    _unreadPoll = Timer.periodic(const Duration(seconds: 5), (_) => _loadUnread());
+    _unreadPoll = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadUnread(),
+    );
   }
 
   @override
@@ -139,7 +141,8 @@ class _ProfessionalClientDetailPageState
     return _entries.where((e) => e.entryDate.startsWith(monthPrefix)).length;
   }
 
-  TrackingEntryRecord? get _lastEntry => _entries.isNotEmpty ? _entries.first : null;
+  TrackingEntryRecord? get _lastEntry =>
+      _entries.isNotEmpty ? _entries.first : null;
 
   int get _currentStreak {
     final entryDates = _entries.map((e) => e.entryDate).toSet();
@@ -167,7 +170,9 @@ class _ProfessionalClientDetailPageState
   }
 
   String _labelFor(String key) {
-    final field = _registrationFields.where((f) => f.answerKey == key).firstOrNull;
+    final field = _registrationFields
+        .where((f) => f.answerKey == key)
+        .firstOrNull;
     return field?.label ?? key.replaceAll('_', ' ');
   }
 
@@ -220,7 +225,9 @@ class _ProfessionalClientDetailPageState
       }(),
       () async {
         try {
-          final reminders = await formsGroups.getClientReminders(widget.clientId);
+          final reminders = await formsGroups.getClientReminders(
+            widget.clientId,
+          );
           if (mounted) setState(() => _reminders = reminders);
         } catch (_) {
           if (mounted) setState(() => _reminders = []);
@@ -228,7 +235,9 @@ class _ProfessionalClientDetailPageState
       }(),
       () async {
         try {
-          final assignments = await templatesApi.getAssignments(widget.clientId);
+          final assignments = await templatesApi.getAssignments(
+            widget.clientId,
+          );
           if (mounted) setState(() => _assignments = assignments);
         } catch (_) {
           if (mounted) setState(() => _assignments = []);
@@ -257,7 +266,8 @@ class _ProfessionalClientDetailPageState
           final entries = await templatesApi.getClientEntries(widget.clientId);
           // The web assumes its API response arrives newest-first; sort
           // defensively here rather than assuming the same of this endpoint.
-          final sorted = [...entries]..sort((a, b) {
+          final sorted = [...entries]
+            ..sort((a, b) {
               final byDate = b.entryDate.compareTo(a.entryDate);
               return byDate != 0 ? byDate : b.id.compareTo(a.id);
             });
@@ -274,7 +284,9 @@ class _ProfessionalClientDetailPageState
   /// Polls incrementally: only messages newer than the last one seen.
   Future<void> _loadUnread() async {
     try {
-      final summary = await ref.read(chatApiProvider).getProfessionalUnreadCounts();
+      final summary = await ref
+          .read(chatApiProvider)
+          .getProfessionalUnreadCounts();
       if (mounted) {
         setState(() => _chatUnreadCount = summary.forClient(widget.clientId));
       }
@@ -286,7 +298,10 @@ class _ProfessionalClientDetailPageState
   void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(milliseconds: 1800)),
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 1800),
+      ),
     );
   }
 
@@ -310,7 +325,9 @@ class _ProfessionalClientDetailPageState
     if (request == null) return;
     setState(() => _isReviewing = true);
     try {
-      final result = await ref.read(formsGroupsApiProvider).reviewChangeRequest(
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .reviewChangeRequest(
             widget.clientId,
             request.id,
             action,
@@ -350,15 +367,21 @@ class _ProfessionalClientDetailPageState
     }
   }
 
-  Future<void> _setAccessLevel(TemplateAssignmentRecord assignment, String level) async {
+  Future<void> _setAccessLevel(
+    TemplateAssignmentRecord assignment,
+    String level,
+  ) async {
     if (assignment.clientAccessLevel == level) return;
     try {
       final updated = await ref
           .read(templatesApiProvider)
           .updateAssignmentAccessLevel(widget.clientId, assignment.id, level);
       if (!mounted) return;
-      setState(() => _assignments =
-          _assignments.map((a) => a.id == assignment.id ? updated : a).toList());
+      setState(
+        () => _assignments = _assignments
+            .map((a) => a.id == assignment.id ? updated : a)
+            .toList(),
+      );
       _toast('Client access updated.');
     } catch (_) {
       _toast('Could not update access level.');
@@ -378,22 +401,30 @@ class _ProfessionalClientDetailPageState
           .read(templatesApiProvider)
           .unassignTemplate(widget.clientId, assignment.id);
       if (!mounted) return;
-      setState(() => _assignments =
-          _assignments.where((a) => a.id != assignment.id).toList());
+      setState(
+        () => _assignments = _assignments
+            .where((a) => a.id != assignment.id)
+            .toList(),
+      );
     } catch (_) {
       _toast('Could not remove the template.');
     }
   }
 
   Future<void> _toggleReminder(ClientReminder reminder) async {
-    final status = reminder.isDone ? ReminderStatus.pending : ReminderStatus.done;
+    final status = reminder.isDone
+        ? ReminderStatus.pending
+        : ReminderStatus.done;
     try {
       final updated = await ref
           .read(formsGroupsApiProvider)
           .updateReminder(reminder.id, status: status);
       if (!mounted) return;
-      setState(() => _reminders =
-          _reminders.map((r) => r.id == reminder.id ? updated : r).toList());
+      setState(
+        () => _reminders = _reminders
+            .map((r) => r.id == reminder.id ? updated : r)
+            .toList(),
+      );
     } catch (_) {
       _toast('Could not update the schedule.');
     }
@@ -403,8 +434,10 @@ class _ProfessionalClientDetailPageState
     try {
       await ref.read(formsGroupsApiProvider).deleteReminder(reminder.id);
       if (!mounted) return;
-      setState(() =>
-          _reminders = _reminders.where((r) => r.id != reminder.id).toList());
+      setState(
+        () =>
+            _reminders = _reminders.where((r) => r.id != reminder.id).toList(),
+      );
     } catch (_) {
       _toast('Could not delete the schedule.');
     }
@@ -414,7 +447,9 @@ class _ProfessionalClientDetailPageState
     final date = _reminderDate;
     if (_reminderTitle.text.trim().isEmpty || date == null) return;
     try {
-      final reminder = await ref.read(formsGroupsApiProvider).createClientReminder(
+      final reminder = await ref
+          .read(formsGroupsApiProvider)
+          .createClientReminder(
             widget.clientId,
             title: _reminderTitle.text.trim(),
             date: isoDate(date),
@@ -443,7 +478,10 @@ class _ProfessionalClientDetailPageState
       lastDate: now.add(const Duration(days: 365)),
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (time == null || !mounted) return;
     final notesCtrl = TextEditingController();
     final titleCtrl = TextEditingController();
@@ -472,21 +510,30 @@ class _ProfessionalClientDetailPageState
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: titleCtrl,
-                decoration: const InputDecoration(labelText: 'Title (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Title (optional)',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: notesCtrl,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Notes (optional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                ),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () => context.pop(true),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
               child: const Text('Schedule'),
             ),
           ],
@@ -498,9 +545,17 @@ class _ProfessionalClientDetailPageState
       notesCtrl.dispose();
       return;
     }
-    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final start = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     try {
-      final meeting = await ref.read(schedulingApiProvider).createMeeting(
+      final meeting = await ref
+          .read(schedulingApiProvider)
+          .createMeeting(
             client: widget.clientId,
             start: start.toIso8601String(),
             durationMinutes: durationMinutes,
@@ -527,16 +582,19 @@ class _ProfessionalClientDetailPageState
     );
     if (!confirmed) return;
     try {
-      final updated = await ref.read(schedulingApiProvider).cancelMeeting(meeting.id);
+      final updated = await ref
+          .read(schedulingApiProvider)
+          .cancelMeeting(meeting.id);
       if (!mounted) return;
-      setState(() =>
-          _meetings = _meetings.map((m) => m.id == meeting.id ? updated : m).toList());
+      setState(
+        () => _meetings = _meetings
+            .map((m) => m.id == meeting.id ? updated : m)
+            .toList(),
+      );
     } catch (_) {
       _toast('Could not cancel the meeting.');
     }
   }
-
-
 
   Future<void> _toggleActive() async {
     final client = _client;
@@ -566,15 +624,19 @@ class _ProfessionalClientDetailPageState
   String _generateTemporaryPassword() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     final random = Random.secure();
-    final value =
-        List.generate(9, (_) => alphabet[random.nextInt(alphabet.length)]).join();
+    final value = List.generate(
+      9,
+      (_) => alphabet[random.nextInt(alphabet.length)],
+    ).join();
     return '${value.substring(0, 8)}!${value.substring(8)}';
   }
 
   Future<void> _resetPassword() async {
     // Option A: the professional defines the temporary password, prefilled with a
     // suggestion — same as manual creation.
-    final controller = TextEditingController(text: _generateTemporaryPassword());
+    final controller = TextEditingController(
+      text: _generateTemporaryPassword(),
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -591,12 +653,17 @@ class _ProfessionalClientDetailPageState
             TextField(
               controller: controller,
               autocorrect: false,
-              decoration: const InputDecoration(labelText: 'Temporary password'),
+              decoration: const InputDecoration(
+                labelText: 'Temporary password',
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -689,7 +756,9 @@ class _ProfessionalClientDetailPageState
               TextField(
                 controller: confirmCtrl,
                 autocorrect: false,
-                decoration: const InputDecoration(labelText: 'Confirm password'),
+                decoration: const InputDecoration(
+                  labelText: 'Confirm password',
+                ),
               ),
               if (client.email.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
@@ -742,7 +811,9 @@ class _ProfessionalClientDetailPageState
 
     setState(() => _isGrantingAccess = true);
     try {
-      final result = await ref.read(formsGroupsApiProvider).grantPortalAccess(
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .grantPortalAccess(
             widget.clientId,
             username: username,
             password: password,
@@ -755,11 +826,14 @@ class _ProfessionalClientDetailPageState
         // Surfaced in the same banner the reset-password flow uses, so the
         // professional can still read the password out when the email either
         // wasn't requested or didn't send.
-        _temporaryPassword =
-            result.credentialsSent ? '' : result.temporaryPassword;
+        _temporaryPassword = result.credentialsSent
+            ? ''
+            : result.temporaryPassword;
         _isGrantingAccess = false;
       });
-      _toast(result.message.isNotEmpty ? result.message : 'Portal access granted.');
+      _toast(
+        result.message.isNotEmpty ? result.message : 'Portal access granted.',
+      );
     } on ApiException catch (error) {
       if (mounted) setState(() => _isGrantingAccess = false);
       _toast(error.message);
@@ -803,15 +877,18 @@ class _ProfessionalClientDetailPageState
 
     setState(() => _isRevokingAccess = true);
     try {
-      final result =
-          await ref.read(formsGroupsApiProvider).revokePortalAccess(widget.clientId);
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .revokePortalAccess(widget.clientId);
       if (!mounted) return;
       setState(() {
         _client = result.client;
         _temporaryPassword = '';
         _isRevokingAccess = false;
       });
-      _toast(result.message.isNotEmpty ? result.message : 'Portal access revoked.');
+      _toast(
+        result.message.isNotEmpty ? result.message : 'Portal access revoked.',
+      );
     } on ApiException catch (error) {
       if (mounted) setState(() => _isRevokingAccess = false);
       _toast(error.message);
@@ -845,7 +922,9 @@ class _ProfessionalClientDetailPageState
     if (verification == null) return;
     setState(() => _isResettingClient = true);
     try {
-      final updated = await ref.read(formsGroupsApiProvider).resetClient(
+      final updated = await ref
+          .read(formsGroupsApiProvider)
+          .resetClient(
             widget.clientId,
             currentPassword: verification.password,
             confirmation: verification.confirmation,
@@ -881,7 +960,9 @@ class _ProfessionalClientDetailPageState
     if (verification == null) return;
     setState(() => _isDeletingClient = true);
     try {
-      await ref.read(formsGroupsApiProvider).deleteClient(
+      await ref
+          .read(formsGroupsApiProvider)
+          .deleteClient(
             widget.clientId,
             currentPassword: verification.password,
             confirmation: verification.confirmation,
@@ -901,8 +982,9 @@ class _ProfessionalClientDetailPageState
     if (_isExportingClient) return;
     setState(() => _isExportingClient = true);
     try {
-      final bytes =
-          await ref.read(formsGroupsApiProvider).exportClientData(widget.clientId);
+      final bytes = await ref
+          .read(formsGroupsApiProvider)
+          .exportClientData(widget.clientId);
       final refId = _client?.referenceId ?? widget.clientId.toString();
       final dir = await getTemporaryDirectory();
       final file = File('${dir.path}/reproot-$refId-export.zip');
@@ -926,7 +1008,7 @@ class _ProfessionalClientDetailPageState
   /// password + typed confirmation phrase + a reason. Returns null if the
   /// professional cancels or the fields don't validate.
   Future<({String password, String confirmation, String reason})?>
-      _verifyDangerousAction({
+  _verifyDangerousAction({
     required String title,
     required String impact,
     required String confirmLabel,
@@ -986,8 +1068,10 @@ class _ProfessionalClientDetailPageState
                 if (passwordCtrl.text.isEmpty ||
                     confirmationCtrl.text.trim() != expected ||
                     reasonCtrl.text.trim().isEmpty) {
-                  setDialogState(() => error =
-                      'Enter your password, type $expected exactly, and give a reason.');
+                  setDialogState(
+                    () => error =
+                        'Enter your password, type $expected exactly, and give a reason.',
+                  );
                   return;
                 }
                 context.pop(true);
@@ -1003,7 +1087,8 @@ class _ProfessionalClientDetailPageState
       ),
     );
 
-    final ok = result == true &&
+    final ok =
+        result == true &&
         passwordCtrl.text.isNotEmpty &&
         confirmationCtrl.text.trim() == expected &&
         reasonCtrl.text.trim().isNotEmpty;
@@ -1064,10 +1149,15 @@ class _ProfessionalClientDetailPageState
           ),
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
             child: const Text('Save'),
           ),
         ],
@@ -1077,12 +1167,16 @@ class _ProfessionalClientDetailPageState
     if (saved == true) {
       setState(() => _isSavingClientInfo = true);
       try {
-        final updated = await ref.read(formsGroupsApiProvider).updateClientProfile(
+        final updated = await ref
+            .read(formsGroupsApiProvider)
+            .updateClientProfile(
               widget.clientId,
               firstName: firstNameCtrl.text.trim(),
               lastName: lastNameCtrl.text.trim(),
               email: emailCtrl.text.trim(),
-              username: client.username.isNotEmpty ? usernameCtrl.text.trim() : null,
+              username: client.username.isNotEmpty
+                  ? usernameCtrl.text.trim()
+                  : null,
             );
         if (mounted) setState(() => _client = updated);
         _toast('Client information updated.');
@@ -1099,16 +1193,17 @@ class _ProfessionalClientDetailPageState
     usernameCtrl.dispose();
   }
 
-  Future<void> _persistAdditionalInfo(List<AdditionalInfoItem> items, {bool? shared}) async {
+  Future<void> _persistAdditionalInfo(
+    List<AdditionalInfoItem> items, {
+    bool? shared,
+  }) async {
     if (_isSavingAdditional) return;
     final previous = _client;
     setState(() => _isSavingAdditional = true);
     try {
-      final updated = await ref.read(formsGroupsApiProvider).updateClientAdditionalInfo(
-            widget.clientId,
-            items,
-            shared: shared,
-          );
+      final updated = await ref
+          .read(formsGroupsApiProvider)
+          .updateClientAdditionalInfo(widget.clientId, items, shared: shared);
       if (mounted) setState(() => _client = updated);
     } on ApiException catch (error) {
       if (mounted) setState(() => _client = previous);
@@ -1123,29 +1218,31 @@ class _ProfessionalClientDetailPageState
   Future<void> _toggleAdditionalShared(bool shared) async {
     final client = _client;
     if (client == null || client.additionalInfoShared == shared) return;
-    setState(() => _client = ClientAccessRecord(
-          id: client.id,
-          group: client.group,
-          groupName: client.groupName,
-          professionalName: client.professionalName,
-          referenceId: client.referenceId,
-          onboardingMethod: client.onboardingMethod,
-          firstName: client.firstName,
-          lastName: client.lastName,
-          email: client.email,
-          username: client.username,
-          photo: client.photo,
-          registrationAnswers: client.registrationAnswers,
-          additionalInfo: client.additionalInfo,
-          additionalInfoShared: shared,
-          hasPortalAccess: client.hasPortalAccess,
-          mustChangePassword: client.mustChangePassword,
-          isActive: client.isActive,
-          createdAt: client.createdAt,
-          updatedAt: client.updatedAt,
-          leadSubmission: client.leadSubmission,
-          registrationSubmission: client.registrationSubmission,
-        ));
+    setState(
+      () => _client = ClientAccessRecord(
+        id: client.id,
+        group: client.group,
+        groupName: client.groupName,
+        professionalName: client.professionalName,
+        referenceId: client.referenceId,
+        onboardingMethod: client.onboardingMethod,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        username: client.username,
+        photo: client.photo,
+        registrationAnswers: client.registrationAnswers,
+        additionalInfo: client.additionalInfo,
+        additionalInfoShared: shared,
+        hasPortalAccess: client.hasPortalAccess,
+        mustChangePassword: client.mustChangePassword,
+        isActive: client.isActive,
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+        leadSubmission: client.leadSubmission,
+        registrationSubmission: client.registrationSubmission,
+      ),
+    );
     await _persistAdditionalInfo(client.additionalInfo, shared: shared);
   }
 
@@ -1175,10 +1272,18 @@ class _ProfessionalClientDetailPageState
                   initialValue: type,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [
-                    DropdownMenuItem(value: AdditionalInfoType.text, child: Text('Text')),
-                    DropdownMenuItem(value: AdditionalInfoType.link, child: Text('Link')),
+                    DropdownMenuItem(
+                      value: AdditionalInfoType.text,
+                      child: Text('Text'),
+                    ),
+                    DropdownMenuItem(
+                      value: AdditionalInfoType.link,
+                      child: Text('Link'),
+                    ),
                   ],
-                  onChanged: (value) => setDialogState(() => type = value ?? AdditionalInfoType.text),
+                  onChanged: (value) => setDialogState(
+                    () => type = value ?? AdditionalInfoType.text,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 if (type == AdditionalInfoType.text)
@@ -1198,17 +1303,25 @@ class _ProfessionalClientDetailPageState
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Shared with client'),
                   value: visibility == 'client',
-                  onChanged: (value) =>
-                      setDialogState(() => visibility = value ? 'client' : 'private'),
+                  onChanged: (value) => setDialogState(
+                    () => visibility = value ? 'client' : 'private',
+                  ),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
-              onPressed: titleCtrl.text.trim().isEmpty ? null : () => context.pop(true),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              onPressed: titleCtrl.text.trim().isEmpty
+                  ? null
+                  : () => context.pop(true),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
               child: const Text('Add'),
             ),
           ],
@@ -1240,18 +1353,20 @@ class _ProfessionalClientDetailPageState
     if (client == null) return;
     final nextVisibility = item.visibility == 'client' ? 'private' : 'client';
     final items = client.additionalInfo
-        .map((i) => i.id == item.id
-            ? AdditionalInfoItem(
-                id: i.id,
-                title: i.title,
-                type: i.type,
-                visibility: nextVisibility,
-                text: i.text,
-                link: i.link,
-                referenceId: i.referenceId,
-                referenceTitle: i.referenceTitle,
-              )
-            : i)
+        .map(
+          (i) => i.id == item.id
+              ? AdditionalInfoItem(
+                  id: i.id,
+                  title: i.title,
+                  type: i.type,
+                  visibility: nextVisibility,
+                  text: i.text,
+                  link: i.link,
+                  referenceId: i.referenceId,
+                  referenceTitle: i.referenceTitle,
+                )
+              : i,
+        )
         .toList();
     await _persistAdditionalInfo(items);
   }
@@ -1282,7 +1397,10 @@ class _ProfessionalClientDetailPageState
         title: Text(title),
         content: Text(body),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -1305,10 +1423,14 @@ class _ProfessionalClientDetailPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(client?.displayName.isNotEmpty ?? false
-            ? client!.displayName
-            : 'Client'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalClients)),
+        title: Text(
+          client?.displayName.isNotEmpty ?? false
+              ? client!.displayName
+              : 'Client',
+        ),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalClients),
+        ),
         actions: [
           // Top-right of the page, in brand blue, labelled as well as
           // iconned — chat is the single most-used action on a client and
@@ -1324,7 +1446,9 @@ class _ProfessionalClientDetailPageState
               icon: Badge(
                 isLabelVisible: _chatUnreadCount > 0,
                 backgroundColor: context.colors.error,
-                label: Text(_chatUnreadCount > 99 ? '99+' : '$_chatUnreadCount'),
+                label: Text(
+                  _chatUnreadCount > 99 ? '99+' : '$_chatUnreadCount',
+                ),
                 child: Icon(
                   _chatUnreadCount > 0
                       ? Icons.chat_bubble
@@ -1394,7 +1518,9 @@ class _ProfessionalClientDetailPageState
 
   Widget _body() {
     if (_message.isNotEmpty) {
-      return PagePad(children: [ErrorNote(message: _message, onRetry: _load)]);
+      return PagePad(
+        children: [ErrorNote(message: _message, onRetry: _load)],
+      );
     }
     return switch (_tab) {
       DetailTab.workspace => _workspaceTab(),
@@ -1438,10 +1564,17 @@ class _ProfessionalClientDetailPageState
                       spacing: AppSpacing.xs,
                       runSpacing: 4,
                       children: [
-                        Text(client?.displayName ?? '', style: context.text.titleMedium),
+                        Text(
+                          client?.displayName ?? '',
+                          style: context.text.titleMedium,
+                        ),
                         StatusPill(
-                          label: (client?.isActive ?? true) ? 'Active' : 'Inactive',
-                          tone: (client?.isActive ?? true) ? PillTone.good : PillTone.bad,
+                          label: (client?.isActive ?? true)
+                              ? 'Active'
+                              : 'Inactive',
+                          tone: (client?.isActive ?? true)
+                              ? PillTone.good
+                              : PillTone.bad,
                         ),
                         if (!(client?.hasPortalAccess ?? true))
                           const StatusPill(label: 'No portal access'),
@@ -1472,7 +1605,9 @@ class _ProfessionalClientDetailPageState
                   TextButton.icon(
                     onPressed: _openClientProfileSheet,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                      ),
                       minimumSize: const Size(0, 30),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -1482,12 +1617,16 @@ class _ProfessionalClientDetailPageState
                   TextButton.icon(
                     onPressed: _isSavingClientInfo ? null : _editClientInfo,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                      ),
                       minimumSize: const Size(0, 30),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     icon: const Icon(Icons.edit_outlined, size: 15),
-                    label: Text(_isSavingClientInfo ? 'Saving…' : 'Edit profile'),
+                    label: Text(
+                      _isSavingClientInfo ? 'Saving…' : 'Edit profile',
+                    ),
                   ),
                 ],
               ),
@@ -1497,7 +1636,6 @@ class _ProfessionalClientDetailPageState
       ),
     );
   }
-
 
   /// Everything about the client that used to crowd the page header: the info
   /// grid, registration answers, and the Additional Information editor.
@@ -1525,7 +1663,8 @@ class _ProfessionalClientDetailPageState
                 .firstOrNull;
             final phoneValue = phoneField == null
                 ? ''
-                : (client?.registrationAnswers[phoneField.answerKey] ?? '').trim();
+                : (client?.registrationAnswers[phoneField.answerKey] ?? '')
+                      .trim();
 
             return ListView(
               controller: scrollController,
@@ -1550,10 +1689,15 @@ class _ProfessionalClientDetailPageState
                     'Username',
                     (client?.username.isNotEmpty ?? false)
                         ? client!.username
-                        : ((client?.hasPortalAccess ?? true) ? '' : 'No portal access'),
+                        : ((client?.hasPortalAccess ?? true)
+                              ? ''
+                              : 'No portal access'),
                   ),
                   ('Group', client?.groupName ?? ''),
-                  ('Status', (client?.isActive ?? true) ? 'Active' : 'Inactive'),
+                  (
+                    'Status',
+                    (client?.isActive ?? true) ? 'Active' : 'Inactive',
+                  ),
                   if (phoneValue.isNotEmpty) (phoneField!.label, phoneValue),
                 ]),
                 const SizedBox(height: AppSpacing.md),
@@ -1562,24 +1706,27 @@ class _ProfessionalClientDetailPageState
                 // Joined date, Professional Code and Reference ID are real
                 // fields on the record — mirrors the web's
                 // clientInformationRows().
-            if ((client?.createdAt ?? '').isNotEmpty)
-              _infoRow('Joined date', shortDate(client!.createdAt)),
-            if ((client?.professionalName ?? '').isNotEmpty)
-              _infoRow('Professional Code', client!.professionalName),
-            if ((client?.referenceId ?? '').isNotEmpty)
-              _infoRow('Reference ID', client!.referenceId),
-            Text('Registration details', style: context.text.titleSmall),
-            const SizedBox(height: AppSpacing.md),
-            if (_registrationFields.isEmpty)
-              const EmptyState(message: 'No registration fields.')
-            else
-              for (final field in _registrationFields)
-                _infoRow(
-                  field.label,
-                  client?.registrationAnswers[field.answerKey]?.trim().isNotEmpty ?? false
-                      ? client!.registrationAnswers[field.answerKey]!
-                      : '',
-                ),
+                if ((client?.createdAt ?? '').isNotEmpty)
+                  _infoRow('Joined date', shortDate(client!.createdAt)),
+                if ((client?.professionalName ?? '').isNotEmpty)
+                  _infoRow('Professional Code', client!.professionalName),
+                if ((client?.referenceId ?? '').isNotEmpty)
+                  _infoRow('Reference ID', client!.referenceId),
+                Text('Registration details', style: context.text.titleSmall),
+                const SizedBox(height: AppSpacing.md),
+                if (_registrationFields.isEmpty)
+                  const EmptyState(message: 'No registration fields.')
+                else
+                  for (final field in _registrationFields)
+                    _infoRow(
+                      field.label,
+                      client?.registrationAnswers[field.answerKey]
+                                  ?.trim()
+                                  .isNotEmpty ??
+                              false
+                          ? client!.registrationAnswers[field.answerKey]!
+                          : '',
+                    ),
                 const SizedBox(height: AppSpacing.lg),
                 // Edit sits at the bottom, under the details it edits.
                 FilledButton.icon(
@@ -1616,7 +1763,11 @@ class _ProfessionalClientDetailPageState
         children: [
           Row(
             children: [
-              Icon(Icons.rate_review_outlined, size: 20, color: context.colors.primary),
+              Icon(
+                Icons.rate_review_outlined,
+                size: 20,
+                color: context.colors.primary,
+              ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -1631,7 +1782,9 @@ class _ProfessionalClientDetailPageState
           if (_detail!.pendingChangeRequest!.createdAt.isNotEmpty)
             Text(
               'Requested ${dateTimeLabel(_detail!.pendingChangeRequest!.createdAt)}',
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
           if (_detail!.pendingChangeRequest!.clientNote.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -1704,25 +1857,22 @@ class _ProfessionalClientDetailPageState
   }
 
   Widget _infoRow(String label, String value) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 2,
-              child: Text(label, style: context.text.bodySmall),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                value.trim().isNotEmpty ? value : '—',
-                style: context.text.titleSmall,
-                textAlign: TextAlign.right,
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 2, child: Text(label, style: context.text.bodySmall)),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value.trim().isNotEmpty ? value : '—',
+            style: context.text.titleSmall,
+            textAlign: TextAlign.right,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   /// The header's always-visible 2-column info grid — each field's label
   /// small/muted above its value, two per row (mirrors the website's
@@ -1862,8 +2012,11 @@ class _ProfessionalClientDetailPageState
               children: [
                 Row(
                   children: [
-                    Icon(Icons.lock_outline,
-                        size: AppSize.iconRow, color: tokens.warningStrong),
+                    Icon(
+                      Icons.lock_outline,
+                      size: AppSize.iconRow,
+                      color: tokens.warningStrong,
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text.rich(
@@ -1900,7 +2053,9 @@ class _ProfessionalClientDetailPageState
                       ? 'No notes yet. Only you can see what you write here.'
                       : body,
                   style: context.text.bodySmall?.copyWith(
-                    color: body.isEmpty ? tokens.muted : context.colors.onSurface,
+                    color: body.isEmpty
+                        ? tokens.muted
+                        : context.colors.onSurface,
                     height: 1.5,
                   ),
                   maxLines: 4,
@@ -2001,7 +2156,8 @@ class _ProfessionalClientDetailPageState
         const SectionHeader(
           title: 'Client Activity',
           topSpace: 0,
-          infoBody: 'How consistently this client is logging against the '
+          infoBody:
+              'How consistently this client is logging against the '
               'templates you assigned them.\n\n'
               'TOTAL ENTRIES\n'
               'Everything they submitted this calendar month.\n\n'
@@ -2027,7 +2183,9 @@ class _ProfessionalClientDetailPageState
             CompactStat(
               icon: Icons.event_outlined,
               accent: MenuAccent.purple,
-              value: _lastEntry != null ? shortDate(_lastEntry!.entryDate) : '—',
+              value: _lastEntry != null
+                  ? shortDate(_lastEntry!.entryDate)
+                  : '—',
               label: 'Last Entry',
               caption: (_lastEntry?.templateName.isNotEmpty ?? false)
                   ? _lastEntry!.templateName
@@ -2075,7 +2233,8 @@ class _ProfessionalClientDetailPageState
               child: SectionHeader(
                 title: 'Additional Information',
                 topSpace: AppSpacing.xl,
-                infoBody: 'Payments, membership, agreements, documents, or '
+                infoBody:
+                    'Payments, membership, agreements, documents, or '
                     'anything else you want on file about this client.\n\n'
                     'VISIBILITY\n'
                     'The Private / Shared with Client switch applies to this '
@@ -2121,7 +2280,9 @@ class _ProfessionalClientDetailPageState
                       children: [
                         Text(item.title, style: context.text.bodyMedium),
                         Text(
-                          item.type == AdditionalInfoType.link ? item.link : item.text,
+                          item.type == AdditionalInfoType.link
+                              ? item.link
+                              : item.text,
                           style: context.text.bodySmall,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -2141,13 +2302,16 @@ class _ProfessionalClientDetailPageState
                           ? context.colors.primary
                           : context.tokens.muted,
                     ),
-                    tooltip: item.isSharedWithClient ? 'Shared with client' : 'Private',
+                    tooltip: item.isSharedWithClient
+                        ? 'Shared with client'
+                        : 'Private',
                     iconSize: AppSize.iconRow,
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    onPressed:
-                        _isSavingAdditional ? null : () => _removeAdditionalInfoItem(item),
+                    onPressed: _isSavingAdditional
+                        ? null
+                        : () => _removeAdditionalInfoItem(item),
                     icon: const Icon(Icons.delete_outline),
                     iconSize: AppSize.iconRow,
                     color: context.colors.error,
@@ -2163,7 +2327,8 @@ class _ProfessionalClientDetailPageState
         // features that happened to land next to each other.
         SectionHeader(
           title: 'Schedule and Follow-Ups',
-          infoBody: 'Two different things, kept apart on purpose.\n\n'
+          infoBody:
+              'Two different things, kept apart on purpose.\n\n'
               'REMINDERS / FOLLOW-UPS\n'
               'Private nudges for you about this client — check in on an '
               'injury, chase a missing entry, review progress. The client '
@@ -2176,7 +2341,8 @@ class _ProfessionalClientDetailPageState
           title: 'Reminders / Follow-Ups',
           subheading: true,
           actionLabel: _showReminderForm ? 'Close' : 'Add',
-          onAction: () => setState(() => _showReminderForm = !_showReminderForm),
+          onAction: () =>
+              setState(() => _showReminderForm = !_showReminderForm),
           topSpace: AppSpacing.sm,
         ),
         if (_showReminderForm) ...[
@@ -2204,10 +2370,14 @@ class _ProfessionalClientDetailPageState
                             firstDate: now.subtract(const Duration(days: 365)),
                             lastDate: now.add(const Duration(days: 365 * 2)),
                           );
-                          if (picked != null) setState(() => _reminderDate = picked);
+                          if (picked != null) {
+                            setState(() => _reminderDate = picked);
+                          }
                         },
-                        icon: const Icon(Icons.calendar_today_outlined,
-                            size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.calendar_today_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: Text(
                           _reminderDate == null
                               ? 'Date'
@@ -2223,7 +2393,9 @@ class _ProfessionalClientDetailPageState
                             context: context,
                             initialTime: TimeOfDay.now(),
                           );
-                          if (picked != null) setState(() => _reminderTime = picked);
+                          if (picked != null) {
+                            setState(() => _reminderTime = picked);
+                          }
                         },
                         icon: const Icon(Icons.schedule, size: AppSize.iconRow),
                         label: Text(
@@ -2237,7 +2409,8 @@ class _ProfessionalClientDetailPageState
                 ),
                 const SizedBox(height: AppSpacing.md),
                 FilledButton(
-                  onPressed: _reminderTitle.text.trim().isEmpty ||
+                  onPressed:
+                      _reminderTitle.text.trim().isEmpty ||
                           _reminderDate == null
                       ? null
                       : _addReminder,
@@ -2339,17 +2512,23 @@ class _ProfessionalClientDetailPageState
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        initialValue: _templateToAssign > 0 ? _templateToAssign : null,
-                        decoration: const InputDecoration(labelText: 'Template'),
+                        initialValue: _templateToAssign > 0
+                            ? _templateToAssign
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Template',
+                        ),
                         hint: const Text('Choose'),
                         items: _assignableTemplates
-                            .map((t) => DropdownMenuItem(
-                                  value: t.id,
-                                  child: Text(
-                                    t.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ))
+                            .map(
+                              (t) => DropdownMenuItem(
+                                value: t.id,
+                                child: Text(
+                                  t.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
                             .toList(),
                         onChanged: (value) =>
                             setState(() => _templateToAssign = value ?? 0),
@@ -2438,10 +2617,7 @@ class _ProfessionalClientDetailPageState
                 const SizedBox(height: AppSpacing.sm),
                 SelectableText(
                   _temporaryPassword,
-                  style: context.text.titleMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    letterSpacing: 0.5,
-                  ),
+                  style: context.text.titleMedium?.copyWith(letterSpacing: 0.5),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -2456,8 +2632,12 @@ class _ProfessionalClientDetailPageState
 
         const SectionHeader(title: 'Account Actions', topSpace: 0),
         _ActionRow(
-          icon: client?.isActive ?? true ? Icons.pause_circle_outline : Icons.play_circle_outline,
-          title: client?.isActive ?? true ? 'Deactivate account' : 'Activate account',
+          icon: client?.isActive ?? true
+              ? Icons.pause_circle_outline
+              : Icons.play_circle_outline,
+          title: client?.isActive ?? true
+              ? 'Deactivate account'
+              : 'Activate account',
           subtitle: client?.isActive ?? true
               ? 'Stops the client logging in. Data is kept.'
               : 'Lets the client log in again.',
@@ -2488,14 +2668,17 @@ class _ProfessionalClientDetailPageState
           _ActionRow(
             icon: Icons.person_add_alt_1_outlined,
             title: _isGrantingAccess ? 'Granting…' : 'Grant portal access',
-            subtitle: 'Create a username and password so this client can sign in.',
+            subtitle:
+                'Create a username and password so this client can sign in.',
             onTap: _isGrantingAccess ? () {} : _grantPortalAccess,
           ),
 
         const SectionHeader(title: 'Destructive data actions'),
         _ActionRow(
           icon: Icons.download_outlined,
-          title: _isExportingClient ? 'Preparing export…' : 'Download client data',
+          title: _isExportingClient
+              ? 'Preparing export…'
+              : 'Download client data',
           subtitle: 'Export everything before clearing history or deleting.',
           onTap: _isExportingClient ? () {} : _exportClientData,
         ),
@@ -2588,9 +2771,7 @@ class _TabBar extends StatelessWidget {
               value: entry.key,
               label: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(entry.value),
-                ],
+                children: [Text(entry.value)],
               ),
             ),
         ],
@@ -2685,7 +2866,9 @@ class _DiffLine extends StatelessWidget {
             width: 78,
             child: Text(
               label,
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
           ),
           Expanded(

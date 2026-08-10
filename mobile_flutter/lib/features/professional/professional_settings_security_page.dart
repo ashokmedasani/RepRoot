@@ -57,7 +57,11 @@ class _ProfessionalSettingsSecurityPageState
             : profile.professionalCode;
         _originalCode = _professionalCode.text;
       });
-    } catch (_) {/* the code field just shows blank */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Professional code load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   bool get _canSaveCode =>
@@ -103,10 +107,9 @@ class _ProfessionalSettingsSecurityPageState
       _passwordMessage = '';
     });
     try {
-      final message = await ref.read(professionalAuthApiProvider).changePassword(
-            _newPassword.text,
-            _confirmPassword.text,
-          );
+      final message = await ref
+          .read(professionalAuthApiProvider)
+          .changePassword(_newPassword.text, _confirmPassword.text);
       if (!mounted) return;
       setState(() {
         _isChangingPassword = false;
@@ -131,7 +134,7 @@ class _ProfessionalSettingsSecurityPageState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Security'),
+        title: const Text('Settings'),
         leading: BackButton(onPressed: () => context.pop()),
       ),
       body: PagePad(
@@ -143,7 +146,7 @@ class _ProfessionalSettingsSecurityPageState
           ),
           const SizedBox(height: AppSpacing.md),
           _Card(
-            title: 'Security',
+            title: 'Account security',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -189,7 +192,9 @@ class _ProfessionalSettingsSecurityPageState
                     child: Text(
                       _codeMessage,
                       style: context.text.bodySmall?.copyWith(
-                        color: _codeError ? context.colors.error : tokens.success,
+                        color: _codeError
+                            ? context.colors.error
+                            : tokens.success,
                       ),
                     ),
                   ),
@@ -223,8 +228,9 @@ class _ProfessionalSettingsSecurityPageState
                     child: Text(
                       _passwordMessage,
                       style: context.text.bodySmall?.copyWith(
-                        color:
-                            _passwordError ? context.colors.error : tokens.success,
+                        color: _passwordError
+                            ? context.colors.error
+                            : tokens.success,
                       ),
                     ),
                   ),

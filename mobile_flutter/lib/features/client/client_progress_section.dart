@@ -59,8 +59,11 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
     final filtered = _historyTemplateId > 0
         ? _entries.where((e) => e.template == _historyTemplateId).toList()
         : [..._entries];
-    filtered.sort((a, b) =>
-        '${b.entryDate} ${b.entryTime}'.compareTo('${a.entryDate} ${a.entryTime}'));
+    filtered.sort(
+      (a, b) => '${b.entryDate} ${b.entryTime}'.compareTo(
+        '${a.entryDate} ${a.entryTime}',
+      ),
+    );
     return filtered.take(40).toList();
   }
 
@@ -100,17 +103,20 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
 
       final fields = template.fields.map((f) => f.toFieldLike()).toList();
       final charts = buildFieldCharts(fields, templateEntries, _range);
-      final templateStats = numericFieldStats(fields, templateEntries)
-          .where((stat) => stat.hasData)
-          .toList();
+      final templateStats = numericFieldStats(
+        fields,
+        templateEntries,
+      ).where((stat) => stat.hasData).toList();
       stats.addAll(templateStats);
 
       if (charts.isNotEmpty) {
-        groups.add(TemplateChartGroup(
-          template: template,
-          charts: charts,
-          stats: templateStats,
-        ));
+        groups.add(
+          TemplateChartGroup(
+            template: template,
+            charts: charts,
+            stats: templateStats,
+          ),
+        );
       }
     }
 
@@ -139,7 +145,10 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
           ),
           child: SegmentedButton<ProgressTab>(
             segments: const [
-              ButtonSegment(value: ProgressTab.overview, label: Text('Overview')),
+              ButtonSegment(
+                value: ProgressTab.overview,
+                label: Text('Overview'),
+              ),
               ButtonSegment(value: ProgressTab.charts, label: Text('Charts')),
               ButtonSegment(value: ProgressTab.history, label: Text('History')),
             ],
@@ -189,7 +198,10 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Text('${stat.count} entries', style: context.text.bodySmall),
+                    Text(
+                      '${stat.count} entries',
+                      style: context.text.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -205,7 +217,9 @@ class _ClientProgressSectionState extends ConsumerState<ClientProgressSection> {
         children: [
           Text(
             label,
-            style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
+            style: context.text.labelSmall?.copyWith(
+              color: context.tokens.muted,
+            ),
           ),
           const SizedBox(height: 2),
           Text(

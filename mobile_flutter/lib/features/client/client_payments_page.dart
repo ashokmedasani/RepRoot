@@ -44,10 +44,22 @@ class _ClientPaymentsPageState extends ConsumerState<ClientPaymentsPage> {
       _message = '';
     });
     try {
-      final requests = await ref.read(paymentsApiProvider).getMyPaymentRequests();
-      if (mounted) setState(() { _requests = requests; _loading = false; });
+      final requests = await ref
+          .read(paymentsApiProvider)
+          .getMyPaymentRequests();
+      if (mounted) {
+        setState(() {
+          _requests = requests;
+          _loading = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() { _message = 'Could not load payments.'; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _message = 'Could not load payments.';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -56,16 +68,20 @@ class _ClientPaymentsPageState extends ConsumerState<ClientPaymentsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Payments')),
       body: _loading
-          ? const PagePad(children: [SkeletonBox(height: 80), SkeletonBox(height: 80)])
+          ? const PagePad(
+              children: [SkeletonBox(height: 80), SkeletonBox(height: 80)],
+            )
           : PagePad(
               onRefresh: _load,
               children: [
-                if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
+                if (_message.isNotEmpty)
+                  ErrorNote(message: _message, onRetry: _load),
                 if (_requests.isEmpty)
                   const EmptyState(
                     compact: false,
                     icon: Icons.receipt_long_outlined,
-                    message: 'No payment requests.\nYour professional hasn\'t sent any yet.',
+                    message:
+                        'No payment requests.\nYour professional hasn\'t sent any yet.',
                   )
                 else
                   for (final request in _requests)
@@ -73,7 +89,9 @@ class _ClientPaymentsPageState extends ConsumerState<ClientPaymentsPage> {
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: AppCard(
                         onTap: () async {
-                          await context.push('/client/tabs/more/payments/${request.requestId}');
+                          await context.push(
+                            '/client/tabs/more/payments/${request.requestId}',
+                          );
                           _load();
                         },
                         child: Row(
@@ -82,7 +100,10 @@ class _ClientPaymentsPageState extends ConsumerState<ClientPaymentsPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(request.title, style: context.text.titleSmall),
+                                  Text(
+                                    request.title,
+                                    style: context.text.titleSmall,
+                                  ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${request.requestedCurrency} ${request.requestedAmount}'
@@ -94,7 +115,11 @@ class _ClientPaymentsPageState extends ConsumerState<ClientPaymentsPage> {
                             ),
                             _StatusPill(status: request.status),
                             const SizedBox(width: AppSpacing.xs),
-                            Icon(Icons.chevron_right, size: AppSize.iconRow, color: context.tokens.muted),
+                            Icon(
+                              Icons.chevron_right,
+                              size: AppSize.iconRow,
+                              color: context.tokens.muted,
+                            ),
                           ],
                         ),
                       ),
@@ -131,13 +156,27 @@ class _ClientPaymentRequestDetailPageState
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _message = ''; });
+    setState(() {
+      _loading = true;
+      _message = '';
+    });
     try {
-      final request =
-          await ref.read(paymentsApiProvider).getMyPaymentRequestDetail(widget.requestId);
-      if (mounted) setState(() { _request = request; _loading = false; });
+      final request = await ref
+          .read(paymentsApiProvider)
+          .getMyPaymentRequestDetail(widget.requestId);
+      if (mounted) {
+        setState(() {
+          _request = request;
+          _loading = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() { _message = 'Could not load this request.'; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _message = 'Could not load this request.';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -162,12 +201,14 @@ class _ClientPaymentRequestDetailPageState
     if (_openingProofId != 0) return;
     setState(() => _openingProofId = proof.id);
     try {
-      final bytes =
-          await ref.read(paymentsApiProvider).downloadPaymentProofFile(proof.id);
+      final bytes = await ref
+          .read(paymentsApiProvider)
+          .downloadPaymentProofFile(proof.id);
       final type = _proofFileType(bytes);
       final directory = await getTemporaryDirectory();
-      final file =
-          File('${directory.path}/payment-proof-${proof.id}${type.suffix}');
+      final file = File(
+        '${directory.path}/payment-proof-${proof.id}${type.suffix}',
+      );
       await file.writeAsBytes(bytes, flush: true);
       if (!mounted) return;
       setState(() => _openingProofId = 0);
@@ -186,14 +227,14 @@ class _ClientPaymentRequestDetailPageState
 
   void _toast(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
   Widget build(BuildContext context) {
     final request = _request;
-    final canSubmit = request != null &&
+    final canSubmit =
+        request != null &&
         !const {'completed', 'cancelled', 'refunded'}.contains(request.status);
 
     return Scaffold(
@@ -206,100 +247,133 @@ class _ClientPaymentRequestDetailPageState
             )
           : null,
       body: _loading
-          ? const PagePad(children: [SkeletonBox(height: 120), SkeletonBox(height: 120)])
+          ? const PagePad(
+              children: [SkeletonBox(height: 120), SkeletonBox(height: 120)],
+            )
           : request == null
-              ? PagePad(children: [ErrorNote(message: _message, onRetry: _load)])
-              : PagePad(
-                  onRefresh: _load,
-                  children: [
-                    AppCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          ? PagePad(
+              children: [ErrorNote(message: _message, onRetry: _load)],
+            )
+          : PagePad(
+              onRefresh: _load,
+              children: [
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(child: Text(request.title, style: context.text.titleMedium)),
-                              _StatusPill(status: request.status),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            '${request.requestedCurrency} ${request.requestedAmount}',
-                            style: context.text.headlineSmall,
-                          ),
-                          if (request.dueDate != null)
-                            Text('Due ${shortDate(request.dueDate!)}', style: context.text.bodySmall),
-                          Text('From ${request.professionalName}', style: context.text.bodySmall),
-                          if (request.description.isNotEmpty) ...[
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(request.description, style: context.text.bodyMedium),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    if (request.availableMethods.isNotEmpty) ...[
-                      const SectionHeader(title: 'How to pay'),
-                      for (final method in request.availableMethods)
-                        _MethodCard(method: method),
-                    ],
-
-                    const SectionHeader(title: 'Your proofs'),
-                    if (request.proofs.isEmpty)
-                      const EmptyState(message: 'No proof submitted yet.')
-                    else
-                      for (final proof in request.proofs)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: AppCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        '${proof.reportedCurrency} ${proof.reportedAmount}',
-                                        style: context.text.titleSmall,
-                                      ),
-                                    ),
-                                    _ProofStatusPill(status: proof.status),
-                                  ],
-                                ),
-                                if (proof.paymentMethodLabel.isNotEmpty)
-                                  Text(proof.paymentMethodLabel, style: context.text.bodySmall),
-                                if (proof.transactionReference.isNotEmpty)
-                                  Text('Ref: ${proof.transactionReference}', style: context.text.bodySmall),
-                                if (proof.reviewNote.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text('Professional: ${proof.reviewNote}',
-                                      style: context.text.bodySmall?.copyWith(
-                                          fontStyle: FontStyle.italic)),
-                                ],
-                                if (proof.hasFile) ...[
-                                  const SizedBox(height: AppSpacing.xs),
-                                  OutlinedButton.icon(
-                                    onPressed: _openingProofId == proof.id
-                                        ? null
-                                        : () => _openProofFile(proof),
-                                    icon: const Icon(Icons.attachment,
-                                        size: AppSize.iconRow),
-                                    label: Text(_openingProofId == proof.id
-                                        ? 'Opening…'
-                                        : 'View attachment'),
-                                    style: OutlinedButton.styleFrom(
-                                      minimumSize:
-                                          const Size(0, AppSize.buttonHeightSm),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          Expanded(
+                            child: Text(
+                              request.title,
+                              style: context.text.titleMedium,
                             ),
                           ),
+                          _StatusPill(status: request.status),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${request.requestedCurrency} ${request.requestedAmount}',
+                        style: context.text.headlineSmall,
+                      ),
+                      if (request.dueDate != null)
+                        Text(
+                          'Due ${shortDate(request.dueDate!)}',
+                          style: context.text.bodySmall,
                         ),
-                    const SizedBox(height: 72),
-                  ],
+                      Text(
+                        'From ${request.professionalName}',
+                        style: context.text.bodySmall,
+                      ),
+                      if (request.description.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          request.description,
+                          style: context.text.bodyMedium,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
+
+                if (request.availableMethods.isNotEmpty) ...[
+                  const SectionHeader(title: 'How to pay'),
+                  for (final method in request.availableMethods)
+                    _MethodCard(method: method),
+                ],
+
+                const SectionHeader(title: 'Your proofs'),
+                if (request.proofs.isEmpty)
+                  const EmptyState(message: 'No proof submitted yet.')
+                else
+                  for (final proof in request.proofs)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: AppCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${proof.reportedCurrency} ${proof.reportedAmount}',
+                                    style: context.text.titleSmall,
+                                  ),
+                                ),
+                                _ProofStatusPill(status: proof.status),
+                              ],
+                            ),
+                            if (proof.paymentMethodLabel.isNotEmpty)
+                              Text(
+                                proof.paymentMethodLabel,
+                                style: context.text.bodySmall,
+                              ),
+                            if (proof.transactionReference.isNotEmpty)
+                              Text(
+                                'Ref: ${proof.transactionReference}',
+                                style: context.text.bodySmall,
+                              ),
+                            if (proof.reviewNote.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                'Professional: ${proof.reviewNote}',
+                                style: context.text.bodySmall?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                            if (proof.hasFile) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              OutlinedButton.icon(
+                                onPressed: _openingProofId == proof.id
+                                    ? null
+                                    : () => _openProofFile(proof),
+                                icon: const Icon(
+                                  Icons.attachment,
+                                  size: AppSize.iconRow,
+                                ),
+                                label: Text(
+                                  _openingProofId == proof.id
+                                      ? 'Opening…'
+                                      : 'View attachment',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(
+                                    0,
+                                    AppSize.buttonHeightSm,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 72),
+              ],
+            ),
     );
   }
 }
@@ -329,15 +403,17 @@ class _MethodCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text('${entry.key}: ${entry.value}',
-                          style: context.text.bodySmall),
+                      child: Text(
+                        '${entry.key}: ${entry.value}',
+                        style: context.text.bodySmall,
+                      ),
                     ),
                     IconButton(
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: entry.value));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Copied')),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(const SnackBar(content: Text('Copied')));
                       },
                       icon: const Icon(Icons.copy),
                       iconSize: 16,
@@ -397,7 +473,6 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
     super.dispose();
   }
 
-
   /// Same accept list and 5MB ceiling the web input enforces; the backend
   /// re-checks both (and sniffs the real file signature) on submit.
   Future<void> _pickProofFile() async {
@@ -420,8 +495,10 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
     }
     if (picked.size > _maxProofBytes) {
       final megabytes = (picked.size / (1024 * 1024)).toStringAsFixed(1);
-      setState(() => _error =
-          'That file is ${megabytes}MB. Proof files must be under 5MB.');
+      setState(
+        () => _error =
+            'That file is ${megabytes}MB. Proof files must be under 5MB.',
+      );
       return;
     }
 
@@ -438,15 +515,19 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
     }
     // The backend requires a transaction reference OR a file, not both.
     if (_reference.text.trim().isEmpty && _proofFile == null) {
-      setState(() => _error =
-          'Enter a transaction reference or attach a proof file.');
+      setState(
+        () => _error = 'Enter a transaction reference or attach a proof file.',
+      );
       return;
     }
     if (!_confirmed) {
       setState(() => _error = 'Please confirm the details are accurate.');
       return;
     }
-    setState(() { _submitting = true; _error = ''; });
+    setState(() {
+      _submitting = true;
+      _error = '';
+    });
     try {
       // Multipart, exactly as the web submits it — the optional attachment
       // rides along under `proof_file`.
@@ -461,10 +542,17 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
         proofFilePath: _proofFile?.path,
         proofFileName: _proofFile?.name,
       ).build();
-      await ref.read(paymentsApiProvider).submitPaymentProof(widget.request.requestId, form);
+      await ref
+          .read(paymentsApiProvider)
+          .submitPaymentProof(widget.request.requestId, form);
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
-      if (mounted) setState(() { _submitting = false; _error = error.toString(); });
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _error = error.toString();
+        });
+      }
     }
   }
 
@@ -486,12 +574,16 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _reference,
-              decoration: const InputDecoration(labelText: 'Transaction reference'),
+              decoration: const InputDecoration(
+                labelText: 'Transaction reference',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _amount,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: 'Amount paid (${widget.request.requestedCurrency})',
               ),
@@ -505,9 +597,11 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
                   for (final m in widget.request.availableMethods)
                     DropdownMenuItem(
                       value: m.id,
-                      child: Text(m.displayLabel.isNotEmpty
-                          ? m.displayLabel
-                          : ManualPaymentCategory.label(m.category)),
+                      child: Text(
+                        m.displayLabel.isNotEmpty
+                            ? m.displayLabel
+                            : ManualPaymentCategory.label(m.category),
+                      ),
                     ),
                 ],
                 onChanged: (value) => setState(() => _methodId = value),
@@ -532,7 +626,9 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
                 OutlinedButton.icon(
                   onPressed: _submitting ? null : _pickProofFile,
                   icon: const Icon(Icons.attach_file, size: AppSize.iconRow),
-                  label: Text(_proofFile == null ? 'Attach proof' : 'Replace file'),
+                  label: Text(
+                    _proofFile == null ? 'Attach proof' : 'Replace file',
+                  ),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, AppSize.buttonHeightSm),
                   ),
@@ -562,7 +658,9 @@ class _SubmitProofSheetState extends ConsumerState<_SubmitProofSheet> {
             Text(
               'JPG, PNG, WEBP or PDF, up to 5MB. Enter a transaction reference '
               'or attach a file — at least one is required.',
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -619,19 +717,19 @@ class FormDataProof {
   final String? proofFileName;
 
   Future<FormData> build() async => FormData.fromMap({
-        'transaction_reference': transactionReference,
-        'reported_amount': reportedAmount,
-        'reported_currency': reportedCurrency,
-        'reported_payment_date': reportedPaymentDate,
-        if (paymentMethod != null) 'payment_method': paymentMethod,
-        'note': note,
-        'confirmed_accurate': confirmedAccurate,
-        if (proofFilePath != null && proofFilePath!.isNotEmpty)
-          'proof_file': await MultipartFile.fromFile(
-            proofFilePath!,
-            filename: proofFileName,
-          ),
-      });
+    'transaction_reference': transactionReference,
+    'reported_amount': reportedAmount,
+    'reported_currency': reportedCurrency,
+    'reported_payment_date': reportedPaymentDate,
+    if (paymentMethod != null) 'payment_method': paymentMethod,
+    'note': note,
+    'confirmed_accurate': confirmedAccurate,
+    if (proofFilePath != null && proofFilePath!.isNotEmpty)
+      'proof_file': await MultipartFile.fromFile(
+        proofFilePath!,
+        filename: proofFileName,
+      ),
+  });
 }
 
 /// Signature sniff for a downloaded proof, so the temp file gets a usable

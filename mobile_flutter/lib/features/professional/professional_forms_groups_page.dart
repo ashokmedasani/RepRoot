@@ -53,24 +53,24 @@ class _DraftField {
   List<String> options;
 
   DynamicField toField() => DynamicField(
-        label: label.trim(),
-        fieldType: fieldType,
-        required: required,
-        placeholder: placeholder,
-        helpText: helpText,
-        options: DynamicFieldType.withOptions.contains(fieldType)
-            ? options
-            : const [],
-      );
+    label: label.trim(),
+    fieldType: fieldType,
+    required: required,
+    placeholder: placeholder,
+    helpText: helpText,
+    options: DynamicFieldType.withOptions.contains(fieldType)
+        ? options
+        : const [],
+  );
 
   static _DraftField from(DynamicField field) => _DraftField(
-        label: field.label,
-        fieldType: field.fieldType,
-        required: field.required,
-        placeholder: field.placeholder,
-        helpText: field.helpText,
-        options: [...field.options],
-      );
+    label: field.label,
+    fieldType: field.fieldType,
+    required: field.required,
+    placeholder: field.placeholder,
+    helpText: field.helpText,
+    options: [...field.options],
+  );
 }
 
 class _ProfessionalFormsGroupsPageState
@@ -158,8 +158,9 @@ class _ProfessionalFormsGroupsPageState
         // If the previously-selected form was deleted (or nothing was
         // selected yet), fall back to the professional's default form —
         // mirrors the web's loadOverview() reconciliation.
-        final stillExists =
-            overview.leadForms.any((form) => form.id == _selectedLeadFormId);
+        final stillExists = overview.leadForms.any(
+          (form) => form.id == _selectedLeadFormId,
+        );
         if (!stillExists) {
           _selectedLeadFormId = overview.leadForm?.id;
         }
@@ -167,7 +168,7 @@ class _ProfessionalFormsGroupsPageState
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _message = 'Could not load forms & groups.';
+        _message = 'Could not load forms and groups.';
         _loading = false;
       });
     }
@@ -178,8 +179,9 @@ class _ProfessionalFormsGroupsPageState
 
   Future<void> _loadAvailabilityStatus() async {
     try {
-      final windows =
-          await ref.read(schedulingApiProvider).listAvailabilityWindows();
+      final windows = await ref
+          .read(schedulingApiProvider)
+          .listAvailabilityWindows();
       if (mounted) {
         setState(() => _hasAvailability = windows.any((w) => w.isActive));
       }
@@ -192,19 +194,33 @@ class _ProfessionalFormsGroupsPageState
 
   Future<void> _loadMeetingRequests() async {
     try {
-      final requests =
-          await ref.read(formsGroupsApiProvider).getLeadMeetingRequests();
+      final requests = await ref
+          .read(formsGroupsApiProvider)
+          .getLeadMeetingRequests();
       if (mounted) setState(() => _meetingRequests = requests);
-    } catch (_) {
-      // The meeting-settings section just shows no requests.
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Lead meeting requests load failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
   }
 
   List<({String value, String label})> _createLastSixMonthOptions() {
     final now = DateTime.now();
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return List.generate(6, (index) {
       final month = DateTime(now.year, now.month - index, 1);
@@ -217,12 +233,17 @@ class _ProfessionalFormsGroupsPageState
     try {
       final status = await ref.read(planLockApiProvider).getLockStatus();
       if (mounted) setState(() => _lockStatus = status);
-    } catch (_) {/* the list just renders flat, without lock badges */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Plan lock status load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   // ----- plan-limit lock ordering (groups) -----
 
-  PlanLockSection get _groupLock => _lockStatus.section(PlanLockModelKey.groups);
+  PlanLockSection get _groupLock =>
+      _lockStatus.section(PlanLockModelKey.groups);
 
   /// Until the lock-status call lands (or if it fails) there is no split to
   /// honour, so groups render flat and drag is disabled.
@@ -278,14 +299,19 @@ class _ProfessionalFormsGroupsPageState
     } catch (error) {
       if (!mounted) return;
       setState(() => _lockStatus = previous);
-      _toast(error is ApiException ? error.message : 'Could not reorder groups.');
+      _toast(
+        error is ApiException ? error.message : 'Could not reorder groups.',
+      );
     }
   }
 
   void _toast(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(milliseconds: 2400)),
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 2400),
+      ),
     );
   }
 
@@ -371,7 +397,9 @@ class _ProfessionalFormsGroupsPageState
   Future<bool> _saveForm() async {
     final creating = _editingFormId == null;
     try {
-      final saved = await ref.read(formsGroupsApiProvider).saveLeadForm(
+      final saved = await ref
+          .read(formsGroupsApiProvider)
+          .saveLeadForm(
             _formTitle.text.trim(),
             _customFields
                 .where((field) => field.label.trim().isNotEmpty)
@@ -417,7 +445,9 @@ class _ProfessionalFormsGroupsPageState
     if (_togglingMeeting) return;
     setState(() => _togglingMeeting = true);
     try {
-      await ref.read(formsGroupsApiProvider).saveLeadMeetingSettings(
+      await ref
+          .read(formsGroupsApiProvider)
+          .saveLeadMeetingSettings(
             introductoryMeetingEnabled: enabled,
             formId: formId,
           );
@@ -430,13 +460,18 @@ class _ProfessionalFormsGroupsPageState
   }
 
   Future<void> _editMeetingSettings(LeadForm leadForm) async {
-    final titleCtrl = TextEditingController(text: leadForm.introductoryMeetingTitle);
-    final durationCtrl =
-        TextEditingController(text: '${leadForm.introductoryMeetingDurationMinutes}');
-    final noticeCtrl =
-        TextEditingController(text: '${leadForm.introductoryMeetingMinNoticeHours}');
-    final advanceCtrl =
-        TextEditingController(text: '${leadForm.introductoryMeetingMaxAdvanceDays}');
+    final titleCtrl = TextEditingController(
+      text: leadForm.introductoryMeetingTitle,
+    );
+    final durationCtrl = TextEditingController(
+      text: '${leadForm.introductoryMeetingDurationMinutes}',
+    );
+    final noticeCtrl = TextEditingController(
+      text: '${leadForm.introductoryMeetingMinNoticeHours}',
+    );
+    final advanceCtrl = TextEditingController(
+      text: '${leadForm.introductoryMeetingMaxAdvanceDays}',
+    );
     var requiresApproval = leadForm.introductoryMeetingRequiresApproval;
 
     final saved = await showDialog<bool>(
@@ -456,34 +491,46 @@ class _ProfessionalFormsGroupsPageState
                 TextField(
                   controller: durationCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Duration (minutes)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Duration (minutes)',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: noticeCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Minimum notice (hours)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Minimum notice (hours)',
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: advanceCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Max advance (days)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Max advance (days)',
+                  ),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires my approval'),
                   value: requiresApproval,
-                  onChanged: (value) => setDialogState(() => requiresApproval = value),
+                  onChanged: (value) =>
+                      setDialogState(() => requiresApproval = value),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () => context.pop(true),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
               child: const Text('Save'),
             ),
           ],
@@ -493,14 +540,19 @@ class _ProfessionalFormsGroupsPageState
 
     if (saved == true) {
       try {
-        await ref.read(formsGroupsApiProvider).saveLeadMeetingSettings(
+        await ref
+            .read(formsGroupsApiProvider)
+            .saveLeadMeetingSettings(
               introductoryMeetingTitle: titleCtrl.text.trim(),
               introductoryMeetingDurationMinutes:
-                  int.tryParse(durationCtrl.text.trim()) ?? leadForm.introductoryMeetingDurationMinutes,
+                  int.tryParse(durationCtrl.text.trim()) ??
+                  leadForm.introductoryMeetingDurationMinutes,
               introductoryMeetingMinNoticeHours:
-                  int.tryParse(noticeCtrl.text.trim()) ?? leadForm.introductoryMeetingMinNoticeHours,
+                  int.tryParse(noticeCtrl.text.trim()) ??
+                  leadForm.introductoryMeetingMinNoticeHours,
               introductoryMeetingMaxAdvanceDays:
-                  int.tryParse(advanceCtrl.text.trim()) ?? leadForm.introductoryMeetingMaxAdvanceDays,
+                  int.tryParse(advanceCtrl.text.trim()) ??
+                  leadForm.introductoryMeetingMaxAdvanceDays,
               introductoryMeetingRequiresApproval: requiresApproval,
               formId: leadForm.id,
             );
@@ -528,27 +580,49 @@ class _ProfessionalFormsGroupsPageState
         .toList();
   }
 
-  List<LeadMeetingRequest> _upcomingMeetingsOf(List<LeadMeetingRequest> requests) {
+  List<LeadMeetingRequest> _upcomingMeetingsOf(
+    List<LeadMeetingRequest> requests,
+  ) {
     final now = DateTime.now();
-    final upcoming = requests
-        .where((r) => r.isAccepted && (r.requestedStartDate?.isAfter(now) ?? false))
-        .toList()
-      ..sort((a, b) =>
-          (a.requestedStartDate ?? now).compareTo(b.requestedStartDate ?? now));
+    final upcoming =
+        requests
+            .where(
+              (r) =>
+                  r.isAccepted && (r.requestedStartDate?.isAfter(now) ?? false),
+            )
+            .toList()
+          ..sort(
+            (a, b) => (a.requestedStartDate ?? now).compareTo(
+              b.requestedStartDate ?? now,
+            ),
+          );
     return upcoming.take(5).toList();
   }
 
-  List<LeadMeetingRequest> _overdueMeetingsOf(List<LeadMeetingRequest> requests) {
+  List<LeadMeetingRequest> _overdueMeetingsOf(
+    List<LeadMeetingRequest> requests,
+  ) {
     final now = DateTime.now();
-    final overdue = requests
-        .where((r) => r.isAccepted && (r.requestedStartDate?.isBefore(now) ?? false))
-        .toList()
-      ..sort((a, b) =>
-          (b.requestedStartDate ?? now).compareTo(a.requestedStartDate ?? now));
+    final overdue =
+        requests
+            .where(
+              (r) =>
+                  r.isAccepted &&
+                  (r.requestedStartDate?.isBefore(now) ?? false),
+            )
+            .toList()
+          ..sort(
+            (a, b) => (b.requestedStartDate ?? now).compareTo(
+              a.requestedStartDate ?? now,
+            ),
+          );
     return overdue.take(5).toList();
   }
 
-  Future<void> _reviewMeetingRequest(LeadMeetingRequest request, String action) async {
+  Future<void> _reviewMeetingRequest(
+    LeadMeetingRequest request,
+    String action,
+  ) async {
     if (_reviewingMeetingRequestId != 0) return;
     setState(() => _reviewingMeetingRequestId = request.id);
     try {
@@ -571,7 +645,9 @@ class _ProfessionalFormsGroupsPageState
     if (message.isEmpty || _sendingFollowupId != 0) return;
     setState(() => _sendingFollowupId = request.id);
     try {
-      final result = await ref.read(formsGroupsApiProvider).reviewLeadMeetingRequest(
+      final result = await ref
+          .read(formsGroupsApiProvider)
+          .reviewLeadMeetingRequest(
             request.id,
             'send_followup',
             trainerNote: message,
@@ -595,15 +671,17 @@ class _ProfessionalFormsGroupsPageState
     // Label the submitted answers using the form the applicant actually
     // filled in, not just whichever form happens to be selected — matters
     // once a professional has more than one lead form.
-    final sourceForm =
-        _leadForms.where((form) => form.id == submission.leadForm).firstOrNull;
+    final sourceForm = _leadForms
+        .where((form) => form.id == submission.leadForm)
+        .firstOrNull;
     final outcome = await showModalBottomSheet<_RequestOutcome>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _FormRequestSheet(
         submission: submission,
         groups: _overview?.groups ?? const [],
-        leadFormFields: sourceForm?.fields ?? _overview?.leadForm?.fields ?? const [],
+        leadFormFields:
+            sourceForm?.fields ?? _overview?.leadForm?.fields ?? const [],
       ),
     );
 
@@ -634,11 +712,14 @@ class _ProfessionalFormsGroupsPageState
               style: context.text.bodySmall,
             ),
             const SizedBox(height: AppSpacing.md),
-            SelectableText('Username: $username', style: context.text.titleSmall),
+            SelectableText(
+              'Username: $username',
+              style: context.text.titleSmall,
+            ),
             const SizedBox(height: AppSpacing.xs),
             SelectableText(
               'Password: $password',
-              style: context.text.titleSmall?.copyWith(fontFamily: 'monospace'),
+              style: context.text.titleSmall,
             ),
           ],
         ),
@@ -670,7 +751,10 @@ class _ProfessionalFormsGroupsPageState
         title: Text('Delete ${submission.applicantName}?'),
         content: const Text('This enquiry will be removed from your requests.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -696,10 +780,9 @@ class _ProfessionalFormsGroupsPageState
   Future<void> _createGroup() async {
     setState(() => _isSavingGroup = true);
     try {
-      await ref.read(formsGroupsApiProvider).createGroup(
-            _groupName.text.trim(),
-            _groupDescription.text.trim(),
-          );
+      await ref
+          .read(formsGroupsApiProvider)
+          .createGroup(_groupName.text.trim(), _groupDescription.text.trim());
       if (!mounted) return;
       setState(() {
         _isSavingGroup = false;
@@ -727,7 +810,9 @@ class _ProfessionalFormsGroupsPageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Forms and Groups'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalManage),
+        ),
       ),
       body: _loading
           ? const PagePad(
@@ -745,19 +830,19 @@ class _ProfessionalFormsGroupsPageState
                   child: SizedBox(
                     width: double.infinity,
                     child: SegmentedButton<FormsTab>(
-                    segments: [
-                      ButtonSegment(
-                        value: FormsTab.forms,
-                        label: Text('Lead Forms'),
-                      ),
-                      ButtonSegment(
-                        value: FormsTab.groups,
-                        label: Text('Client Groups'),
-                      ),
-                    ],
-                    selected: {_tab},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (s) => setState(() => _tab = s.first),
+                      segments: [
+                        ButtonSegment(
+                          value: FormsTab.forms,
+                          label: Text('Lead Forms'),
+                        ),
+                        ButtonSegment(
+                          value: FormsTab.groups,
+                          label: Text('Client Groups'),
+                        ),
+                      ],
+                      selected: {_tab},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (s) => setState(() => _tab = s.first),
                     ),
                   ),
                 ),
@@ -792,7 +877,10 @@ class _ProfessionalFormsGroupsPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("You haven't created a form yet.", style: context.text.titleSmall),
+                Text(
+                  "You haven't created a form yet.",
+                  style: context.text.titleSmall,
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Create your public lead form so people can enquire.',
@@ -856,7 +944,8 @@ class _ProfessionalFormsGroupsPageState
                       ),
                     ),
                 ],
-                onChanged: (value) => _selectLeadForm(value == 0 ? null : value),
+                onChanged: (value) =>
+                    _selectLeadForm(value == 0 ? null : value),
               ),
               const SizedBox(height: AppSpacing.md),
             ],
@@ -866,10 +955,12 @@ class _ProfessionalFormsGroupsPageState
                   child: Text(
                     atLimit
                         ? 'Form limit reached on your plan '
-                            '(${forms.length} of ${maxForms > 0 ? maxForms : '—'}).'
+                              '(${forms.length} of ${maxForms > 0 ? maxForms : '—'}).'
                         : '${forms.length} form${forms.length == 1 ? '' : 's'}',
                     style: context.text.bodySmall?.copyWith(
-                      color: atLimit ? context.colors.error : context.tokens.muted,
+                      color: atLimit
+                          ? context.colors.error
+                          : context.tokens.muted,
                     ),
                   ),
                 ),
@@ -935,7 +1026,9 @@ class _ProfessionalFormsGroupsPageState
                     children: [
                       Switch(
                         value: leadForm.isActive,
-                        onChanged: _togglingStatus ? null : _toggleLeadFormActive,
+                        onChanged: _togglingStatus
+                            ? null
+                            : _toggleLeadFormActive,
                       ),
                       Text(
                         leadForm.isActive ? 'Enabled' : 'Disabled',
@@ -984,8 +1077,10 @@ class _ProfessionalFormsGroupsPageState
         children: [
           Text(
             'Public Form Link',
-            style: context.text.labelSmall
-                ?.copyWith(color: context.tokens.muted, fontWeight: FontWeight.w700),
+            style: context.text.labelSmall?.copyWith(
+              color: context.tokens.muted,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Row(
@@ -993,7 +1088,9 @@ class _ProfessionalFormsGroupsPageState
               Expanded(
                 child: Text(
                   leadForm.publicLink,
-                  style: context.text.bodySmall?.copyWith(color: context.colors.primary),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.colors.primary,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1003,7 +1100,9 @@ class _ProfessionalFormsGroupsPageState
                 onPressed: leadForm.publicLink.isEmpty
                     ? null
                     : () async {
-                        await Clipboard.setData(ClipboardData(text: leadForm.publicLink));
+                        await Clipboard.setData(
+                          ClipboardData(text: leadForm.publicLink),
+                        );
                         _toast('Link copied.');
                       },
                 style: OutlinedButton.styleFrom(
@@ -1022,12 +1121,18 @@ class _ProfessionalFormsGroupsPageState
   /// (a useful mobile refinement; the web sums across every form).
   Widget _statsGrid(LeadForm leadForm) {
     final overview = _overview;
-    final pending =
-        _submissionsForForm(overview?.pendingForms ?? const [], leadForm.id).length;
-    final approved =
-        _submissionsForForm(overview?.approvedForms ?? const [], leadForm.id).length;
-    final deleted =
-        _submissionsForForm(overview?.deletedForms ?? const [], leadForm.id).length;
+    final pending = _submissionsForForm(
+      overview?.pendingForms ?? const [],
+      leadForm.id,
+    ).length;
+    final approved = _submissionsForForm(
+      overview?.approvedForms ?? const [],
+      leadForm.id,
+    ).length;
+    final deleted = _submissionsForForm(
+      overview?.deletedForms ?? const [],
+      leadForm.id,
+    ).length;
     final total = pending + approved + deleted;
 
     return KpiGrid(
@@ -1040,9 +1145,14 @@ class _ProfessionalFormsGroupsPageState
     );
   }
 
-  List<LeadSubmission> _submissionsForForm(List<LeadSubmission> submissions, int? formId) {
+  List<LeadSubmission> _submissionsForForm(
+    List<LeadSubmission> submissions,
+    int? formId,
+  ) {
     if (formId == null) return submissions;
-    return submissions.where((submission) => submission.leadForm == formId).toList();
+    return submissions
+        .where((submission) => submission.leadForm == formId)
+        .toList();
   }
 
   /// Compact **read-only** fields summary — first 3 field names with a
@@ -1064,10 +1174,14 @@ class _ProfessionalFormsGroupsPageState
         children: [
           Row(
             children: [
-              Expanded(child: Text('Form Fields', style: context.text.titleSmall)),
+              Expanded(
+                child: Text('Form Fields', style: context.text.titleSmall),
+              ),
               Text(
                 '${fields.where((field) => field.required).length} required',
-                style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               ),
             ],
           ),
@@ -1086,7 +1200,9 @@ class _ProfessionalFormsGroupsPageState
           if (remaining > 0)
             Text(
               '$remaining more field${remaining == 1 ? '' : 's'}',
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
         ],
       ),
@@ -1100,7 +1216,9 @@ class _ProfessionalFormsGroupsPageState
   Widget _meetingSettingsSection(LeadForm leadForm) {
     final enabled = leadForm.introductoryMeetingEnabled;
     final requests = _meetingRequestsFor(leadForm);
-    final pendingRequests = requests.where((request) => request.isPending).toList();
+    final pendingRequests = requests
+        .where((request) => request.isPending)
+        .toList();
     final upcoming = _upcomingMeetingsOf(requests);
     final overdue = _overdueMeetingsOf(requests);
 
@@ -1124,15 +1242,18 @@ class _ProfessionalFormsGroupsPageState
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text('Introductory Meeting Settings', style: context.text.titleSmall),
+                    Text(
+                      'Introductory Meeting Settings',
+                      style: context.text.titleSmall,
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       enabled
                           ? 'Applicants can request '
-                              '${leadForm.introductoryMeetingTitle.isNotEmpty ? leadForm.introductoryMeetingTitle : 'an introductory meeting'}. '
-                              'Every request requires your approval.'
+                                '${leadForm.introductoryMeetingTitle.isNotEmpty ? leadForm.introductoryMeetingTitle : 'an introductory meeting'}. '
+                                'Every request requires your approval.'
                           : 'Applicants currently submit the form without receiving an '
-                              'introductory-meeting option.',
+                                'introductory-meeting option.',
                       style: context.text.bodySmall,
                     ),
                   ],
@@ -1145,11 +1266,15 @@ class _ProfessionalFormsGroupsPageState
                 children: [
                   Switch(
                     value: enabled,
-                    onChanged: _togglingMeeting || (!enabled && !_hasAvailability)
+                    onChanged:
+                        _togglingMeeting || (!enabled && !_hasAvailability)
                         ? null
                         : _toggleIntroMeeting,
                   ),
-                  Text(enabled ? 'Enabled' : 'Disabled', style: context.text.labelSmall),
+                  Text(
+                    enabled ? 'Enabled' : 'Disabled',
+                    style: context.text.labelSmall,
+                  ),
                 ],
               ),
             ],
@@ -1159,7 +1284,9 @@ class _ProfessionalFormsGroupsPageState
             Text(
               'Set your weekly availability first. You can skip this for now '
               'and enable it later.',
-              style: context.text.bodySmall?.copyWith(color: context.colors.error),
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
             const SizedBox(height: 2),
             TextButton(
@@ -1176,10 +1303,13 @@ class _ProfessionalFormsGroupsPageState
           if (enabled) ...[
             if (pendingRequests.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
-              Text('Meeting requests (${pendingRequests.length})',
-                  style: context.text.labelMedium),
+              Text(
+                'Meeting requests (${pendingRequests.length})',
+                style: context.text.labelMedium,
+              ),
               const SizedBox(height: AppSpacing.xs),
-              for (final request in pendingRequests) _meetingRequestRow(request),
+              for (final request in pendingRequests)
+                _meetingRequestRow(request),
             ],
             const SizedBox(height: AppSpacing.md),
             _meetingRuleGrid(leadForm),
@@ -1200,8 +1330,14 @@ class _ProfessionalFormsGroupsPageState
           const SizedBox(height: AppSpacing.md),
           OutlinedButton(
             onPressed: () => _editMeetingSettings(leadForm),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
-            child: Text(enabled ? 'Edit meeting settings' : 'Set up introductory meetings'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
+            child: Text(
+              enabled
+                  ? 'Edit meeting settings'
+                  : 'Set up introductory meetings',
+            ),
           ),
         ],
       ),
@@ -1222,19 +1358,26 @@ class _ProfessionalFormsGroupsPageState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(request.applicantName, style: context.text.titleSmall),
+                      Text(
+                        request.applicantName,
+                        style: context.text.titleSmall,
+                      ),
                       Text(
                         request.requestedStart.isNotEmpty
                             ? dateTimeLabel(request.requestedStart)
                             : '—',
                         style: context.text.bodySmall,
                       ),
-                      if (request.referenceId.isNotEmpty || request.contactEmail.isNotEmpty)
+                      if (request.referenceId.isNotEmpty ||
+                          request.contactEmail.isNotEmpty)
                         Text(
-                          [request.referenceId, request.contactEmail]
-                              .where((value) => value.isNotEmpty)
-                              .join(' · '),
-                          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                          [
+                            request.referenceId,
+                            request.contactEmail,
+                          ].where((value) => value.isNotEmpty).join(' · '),
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.tokens.muted,
+                          ),
                         ),
                     ],
                   ),
@@ -1255,16 +1398,20 @@ class _ProfessionalFormsGroupsPageState
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: busy ? null : () => _reviewMeetingRequest(request, 'accept'),
+                    onPressed: busy
+                        ? null
+                        : () => _reviewMeetingRequest(request, 'accept'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, AppSize.buttonHeightSm),
                     ),
-                    child: Text(busy ? 'Working…' : 'Accept & send invite'),
+                    child: Text(busy ? 'Working…' : 'Accept and send invite'),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 OutlinedButton(
-                  onPressed: busy ? null : () => _reviewMeetingRequest(request, 'decline'),
+                  onPressed: busy
+                      ? null
+                      : () => _reviewMeetingRequest(request, 'decline'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: context.colors.error,
                     side: BorderSide(color: context.colors.error),
@@ -1283,7 +1430,10 @@ class _ProfessionalFormsGroupsPageState
   Widget _meetingRuleGrid(LeadForm leadForm) {
     return KpiGrid(
       children: [
-        KpiTile(label: 'Duration', value: '${leadForm.introductoryMeetingDurationMinutes} min'),
+        KpiTile(
+          label: 'Duration',
+          value: '${leadForm.introductoryMeetingDurationMinutes} min',
+        ),
         KpiTile(
           label: 'Minimum notice',
           value: '${leadForm.introductoryMeetingMinNoticeHours} hrs',
@@ -1292,7 +1442,10 @@ class _ProfessionalFormsGroupsPageState
           label: 'Booking window',
           value: '${leadForm.introductoryMeetingMaxAdvanceDays} days',
         ),
-        KpiTile(label: 'Buffer', value: '${leadForm.introductoryMeetingBufferMinutes} min'),
+        KpiTile(
+          label: 'Buffer',
+          value: '${leadForm.introductoryMeetingBufferMinutes} min',
+        ),
       ],
     );
   }
@@ -1300,7 +1453,9 @@ class _ProfessionalFormsGroupsPageState
   Widget _upcomingMeetingRow(LeadMeetingRequest meeting) {
     return RowItem(
       title: meeting.applicantName,
-      subtitle: meeting.requestedStart.isNotEmpty ? dateTimeLabel(meeting.requestedStart) : null,
+      subtitle: meeting.requestedStart.isNotEmpty
+          ? dateTimeLabel(meeting.requestedStart)
+          : null,
       trailing: meeting.meetingUrl.isEmpty
           ? null
           : TextButton(
@@ -1322,7 +1477,8 @@ class _ProfessionalFormsGroupsPageState
             Text(meeting.applicantName, style: context.text.titleSmall),
             Text(
               [
-                if (meeting.requestedStart.isNotEmpty) dateTimeLabel(meeting.requestedStart),
+                if (meeting.requestedStart.isNotEmpty)
+                  dateTimeLabel(meeting.requestedStart),
                 if (meeting.contactEmail.isNotEmpty) meeting.contactEmail,
               ].join(' · '),
               style: context.text.bodySmall,
@@ -1335,7 +1491,8 @@ class _ProfessionalFormsGroupsPageState
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 labelText: 'Follow-up message',
-                hintText: 'Sorry we missed our meeting. Please reply with a suitable '
+                hintText:
+                    'Sorry we missed our meeting. Please reply with a suitable '
                     'time so we can reschedule.',
               ),
             ),
@@ -1412,7 +1569,8 @@ class _ProfessionalFormsGroupsPageState
               ],
               selected: {_submissionView},
               showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _submissionView = s.first),
+              onSelectionChanged: (s) =>
+                  setState(() => _submissionView = s.first),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1427,7 +1585,10 @@ class _ProfessionalFormsGroupsPageState
   }
 
   /// [formId] null means "every form" (the "All forms" dropdown mode).
-  List<LeadSubmission> _requestSubmissionsFor(SubmissionView view, int? formId) {
+  List<LeadSubmission> _requestSubmissionsFor(
+    SubmissionView view,
+    int? formId,
+  ) {
     final overview = _overview;
     if (overview == null) return const [];
     final all = switch (view) {
@@ -1438,13 +1599,22 @@ class _ProfessionalFormsGroupsPageState
     final scoped = _submissionsForForm(all, formId);
 
     if (_monthFilter.isEmpty) {
-      final accessibleMonths = _monthOptions.map((month) => month.value).toSet();
+      final accessibleMonths = _monthOptions
+          .map((month) => month.value)
+          .toSet();
       return scoped
-          .where((submission) => accessibleMonths
-              .contains(submission.submittedAt.length >= 7 ? submission.submittedAt.substring(0, 7) : ''))
+          .where(
+            (submission) => accessibleMonths.contains(
+              submission.submittedAt.length >= 7
+                  ? submission.submittedAt.substring(0, 7)
+                  : '',
+            ),
+          )
           .toList();
     }
-    return scoped.where((submission) => submission.submittedAt.startsWith(_monthFilter)).toList();
+    return scoped
+        .where((submission) => submission.submittedAt.startsWith(_monthFilter))
+        .toList();
   }
 
   /// One request row: applicant, email, submitted date, reference id, the
@@ -1461,8 +1631,14 @@ class _ProfessionalFormsGroupsPageState
           children: [
             Row(
               children: [
-                Expanded(child: Text(submission.applicantName, style: context.text.titleSmall)),
-                if (submission.referenceId.isNotEmpty) StatusPill(label: submission.referenceId),
+                Expanded(
+                  child: Text(
+                    submission.applicantName,
+                    style: context.text.titleSmall,
+                  ),
+                ),
+                if (submission.referenceId.isNotEmpty)
+                  StatusPill(label: submission.referenceId),
               ],
             ),
             const SizedBox(height: 2),
@@ -1470,7 +1646,9 @@ class _ProfessionalFormsGroupsPageState
             const SizedBox(height: 4),
             Text(
               'Submitted ${shortDate(submission.submittedAt)}',
-              style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Wrap(
@@ -1478,9 +1656,14 @@ class _ProfessionalFormsGroupsPageState
               runSpacing: AppSpacing.xs,
               children: [
                 if (showFormTag && submission.leadFormTitle.isNotEmpty)
-                  StatusPill(label: submission.leadFormTitle, tone: PillTone.info),
+                  StatusPill(
+                    label: submission.leadFormTitle,
+                    tone: PillTone.info,
+                  ),
                 StatusPill(
-                  label: hasClient ? submission.clientAccess!.groupName : 'Not assigned',
+                  label: hasClient
+                      ? submission.clientAccess!.groupName
+                      : 'Not assigned',
                   tone: hasClient ? PillTone.good : PillTone.neutral,
                 ),
               ],
@@ -1492,7 +1675,9 @@ class _ProfessionalFormsGroupsPageState
                   child: OutlinedButton(
                     onPressed: () {
                       if (hasClient) {
-                        context.go('${Routes.professionalClients}/${submission.clientAccess!.id}');
+                        context.go(
+                          '${Routes.professionalClients}/${submission.clientAccess!.id}',
+                        );
                       } else if (_submissionView == SubmissionView.pending) {
                         _openRequest(submission);
                       } else {
@@ -1506,8 +1691,8 @@ class _ProfessionalFormsGroupsPageState
                       hasClient
                           ? 'View Profile'
                           : (_submissionView == SubmissionView.pending
-                              ? 'Review request'
-                              : 'View details'),
+                                ? 'Review request'
+                                : 'View details'),
                     ),
                   ),
                 ),
@@ -1535,13 +1720,16 @@ class _ProfessionalFormsGroupsPageState
   /// — the approve/reject flow in [_openRequest] only applies to pending
   /// ones, so this just shows what was submitted.
   Future<void> _viewSubmissionDetails(LeadSubmission submission) {
-    final sourceForm = _leadForms.where((form) => form.id == submission.leadForm).firstOrNull;
+    final sourceForm = _leadForms
+        .where((form) => form.id == submission.leadForm)
+        .firstOrNull;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _SubmissionDetailSheet(
         submission: submission,
-        leadFormFields: sourceForm?.fields ?? _overview?.leadForm?.fields ?? const [],
+        leadFormFields:
+            sourceForm?.fields ?? _overview?.leadForm?.fields ?? const [],
       ),
     );
   }
@@ -1581,8 +1769,9 @@ class _ProfessionalFormsGroupsPageState
                 leading: IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Cancel',
-                  onPressed:
-                      saving ? null : () => Navigator.of(dialogContext).pop(),
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                 ),
                 title: Text(creating ? 'Create lead form' : 'Edit lead form'),
                 actions: [
@@ -1599,7 +1788,9 @@ class _ProfessionalFormsGroupsPageState
                   children: [
                     TextField(
                       controller: _formTitle,
-                      decoration: const InputDecoration(labelText: 'Form title'),
+                      decoration: const InputDecoration(
+                        labelText: 'Form title',
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
@@ -1632,8 +1823,9 @@ class _ProfessionalFormsGroupsPageState
                       Text(
                         'No extra fields yet — the form will collect name, '
                         'email and phone only.',
-                        style: context.text.bodySmall
-                            ?.copyWith(color: context.tokens.muted),
+                        style: context.text.bodySmall?.copyWith(
+                          color: context.tokens.muted,
+                        ),
                       )
                     else
                       for (var i = 0; i < _customFields.length; i++)
@@ -1648,9 +1840,12 @@ class _ProfessionalFormsGroupsPageState
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('Require before adding a client'),
-                      subtitle: const Text('Clients must complete this form first'),
+                      subtitle: const Text(
+                        'Clients must complete this form first',
+                      ),
                       value: _formMandatory,
-                      onChanged: (value) => setLocal(() => _formMandatory = value),
+                      onChanged: (value) =>
+                          setLocal(() => _formMandatory = value),
                     ),
                   ],
                 ),
@@ -1694,8 +1889,10 @@ class _ProfessionalFormsGroupsPageState
                 onPressed: overview?.atGroupLimit ?? false
                     ? null
                     : () => setState(() => _showGroupForm = !_showGroupForm),
-                icon: Icon(_showGroupForm ? Icons.close : Icons.add,
-                    size: AppSize.iconRow),
+                icon: Icon(
+                  _showGroupForm ? Icons.close : Icons.add,
+                  size: AppSize.iconRow,
+                ),
                 label: Text(_showGroupForm ? 'Close' : 'New group'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -1709,7 +1906,9 @@ class _ProfessionalFormsGroupsPageState
             padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: Text(
               'Group limit reached on your plan.',
-              style: context.text.bodySmall?.copyWith(color: context.colors.error),
+              style: context.text.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
           ),
 
@@ -1742,7 +1941,8 @@ class _ProfessionalFormsGroupsPageState
 
         SectionHeader(
           title: 'Active groups',
-          infoBody: 'Active groups are live: their clients can sign in and '
+          infoBody:
+              'Active groups are live: their clients can sign in and '
               'everything inside the group works normally.\n\n'
               'Your plan sets how many groups can be active at once. Groups '
               'fill those slots from the top of this list down.\n\n'
@@ -1779,7 +1979,8 @@ class _ProfessionalFormsGroupsPageState
           if (_lockedGroups.isNotEmpty) ...[
             SectionHeader(
               title: 'Locked groups',
-              infoBody: 'These groups are past your plan\'s group limit, so '
+              infoBody:
+                  'These groups are past your plan\'s group limit, so '
                   'they are on hold.\n\n'
                   'Nothing has been deleted. Every client, form, and record '
                   'inside them is still here exactly as you left it.\n\n'
@@ -1790,7 +1991,11 @@ class _ProfessionalFormsGroupsPageState
                   'more slots. It comes back intact either way.',
             ),
             for (final group in _lockedGroups)
-              _groupRow(group, key: ValueKey('locked-${group.id}'), locked: true),
+              _groupRow(
+                group,
+                key: ValueKey('locked-${group.id}'),
+                locked: true,
+              ),
           ],
         ],
       ],
@@ -1812,8 +2017,8 @@ class _ProfessionalFormsGroupsPageState
       subtitle: group.description.isNotEmpty
           ? group.description
           : (group.hasRegistrationForm
-              ? 'Registration link active'
-              : 'No registration form'),
+                ? 'Registration link active'
+                : 'No registration form'),
       leading: dragIndex == null
           ? null
           : ReorderableDragStartListener(
@@ -1827,25 +2032,24 @@ class _ProfessionalFormsGroupsPageState
       trailing: locked
           ? const StatusPill(label: 'Locked', tone: PillTone.warn)
           : group.hasRegistrationForm
-              ? const StatusPill(label: 'Form', tone: PillTone.good)
-              : null,
+          ? const StatusPill(label: 'Form', tone: PillTone.good)
+          : null,
       onTap: locked
           ? null
           : () => context.go('${Routes.professionalGroups}/${group.id}'),
     );
   }
-
 }
 
 /// What the form-request sheet did, so the page can reload and either show the
 /// one-time credentials or run its own delete confirmation.
 class _RequestOutcome {
   const _RequestOutcome.approved(this.username, this.password)
-      : rejected = false;
+    : rejected = false;
   const _RequestOutcome.rejected()
-      : rejected = true,
-        username = '',
-        password = '';
+    : rejected = true,
+      username = '',
+      password = '';
 
   final bool rejected;
   final String username;
@@ -1907,8 +2111,10 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
   String _generatePassword() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
     final random = Random.secure();
-    final value =
-        List.generate(10, (_) => alphabet[random.nextInt(alphabet.length)]).join();
+    final value = List.generate(
+      10,
+      (_) => alphabet[random.nextInt(alphabet.length)],
+    ).join();
     return '${value.substring(0, 8)}!${value.substring(8)}';
   }
 
@@ -1929,8 +2135,9 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
     final byLabel = <String, String>{};
 
     for (final field in widget.leadFormFields) {
-      if (field.key.isNotEmpty && byKey.containsKey(field.key)) {
-        byLabel[field.label.trim().toLowerCase()] = byKey[field.key]!;
+      final matched = field.key.isEmpty ? null : byKey[field.key];
+      if (matched != null && matched.isNotEmpty) {
+        byLabel[field.label.trim().toLowerCase()] = matched;
       }
     }
 
@@ -1940,11 +2147,13 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
       'email': submission.email,
     };
 
-    for (final field in group.registrationForm?.fields ?? const <DynamicField>[]) {
+    for (final field
+        in group.registrationForm?.fields ?? const <DynamicField>[]) {
       final key = field.answerKey;
       if (answers.containsKey(key)) continue;
 
-      final matched = (field.key.isNotEmpty ? byKey[field.key] : null) ??
+      final matched =
+          (field.key.isNotEmpty ? byKey[field.key] : null) ??
           byLabel[field.label.trim().toLowerCase()];
 
       if (matched != null && matched.isNotEmpty) answers[key] = matched;
@@ -1954,8 +2163,9 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
   }
 
   Future<void> _approve() async {
-    final group =
-        widget.groups.where((item) => item.id == _groupId).firstOrNull;
+    final group = widget.groups
+        .where((item) => item.id == _groupId)
+        .firstOrNull;
 
     if (group == null) {
       setState(() => _error = 'Select a group for this client.');
@@ -1979,7 +2189,9 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
     final username = _username.text.trim();
 
     try {
-      await ref.read(formsGroupsApiProvider).createClientAccess(
+      await ref
+          .read(formsGroupsApiProvider)
+          .createClientAccess(
             widget.submission.id,
             ClientAccessPayload(
               groupId: group.id,
@@ -2037,7 +2249,10 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
               style: context.text.bodySmall,
             ),
 
-            const SectionHeader(title: 'Submitted answers', topSpace: AppSpacing.lg),
+            const SectionHeader(
+              title: 'Submitted answers',
+              topSpace: AppSpacing.lg,
+            ),
             if (submission.answers.isEmpty)
               const EmptyState(message: 'This request has no answers.')
             else
@@ -2056,14 +2271,19 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        entry.value.trim().isEmpty ? 'Not added' : entry.value.trim(),
+                        entry.value.trim().isEmpty
+                            ? 'Not added'
+                            : entry.value.trim(),
                         style: context.text.bodyMedium,
                       ),
                     ],
                   ),
                 ),
 
-            const SectionHeader(title: 'Create client access', topSpace: AppSpacing.lg),
+            const SectionHeader(
+              title: 'Create client access',
+              topSpace: AppSpacing.lg,
+            ),
             Text(
               'Matching details are auto-filled from what the applicant '
               'submitted. The client confirms the rest from their own profile.',
@@ -2075,15 +2295,17 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
               decoration: const InputDecoration(labelText: 'Group'),
               hint: const Text('Choose a group'),
               items: widget.groups
-                  .map((group) => DropdownMenuItem(
-                        value: group.id,
-                        enabled: group.hasRegistrationForm,
-                        child: Text(
-                          group.hasRegistrationForm
-                              ? group.name
-                              : '${group.name} (no registration form)',
-                        ),
-                      ))
+                  .map(
+                    (group) => DropdownMenuItem(
+                      value: group.id,
+                      enabled: group.hasRegistrationForm,
+                      child: Text(
+                        group.hasRegistrationForm
+                            ? group.name
+                            : '${group.name} (no registration form)',
+                      ),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) => setState(() => _groupId = value ?? 0),
             ),
@@ -2145,13 +2367,17 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
             const SizedBox(height: AppSpacing.md),
             FilledButton(
               onPressed: _isSaving ? null : _approve,
-              child: Text(_isSaving ? 'Creating…' : 'Approve & create client'),
+              child: Text(
+                _isSaving ? 'Creating…' : 'Approve and create client',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             OutlinedButton(
               onPressed: _isSaving
                   ? null
-                  : () => Navigator.of(context).pop(const _RequestOutcome.rejected()),
+                  : () => Navigator.of(
+                      context,
+                    ).pop(const _RequestOutcome.rejected()),
               style: OutlinedButton.styleFrom(
                 foregroundColor: context.colors.error,
                 side: BorderSide(color: context.colors.error),
@@ -2168,7 +2394,10 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
 /// Read-only viewer for an already-resolved (approved/deleted) submission —
 /// just the submitted answers and outcome, no approve/reject actions.
 class _SubmissionDetailSheet extends StatelessWidget {
-  const _SubmissionDetailSheet({required this.submission, required this.leadFormFields});
+  const _SubmissionDetailSheet({
+    required this.submission,
+    required this.leadFormFields,
+  });
 
   final LeadSubmission submission;
 
@@ -2199,7 +2428,10 @@ class _SubmissionDetailSheet extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(submission.applicantName, style: context.text.titleMedium),
+                  child: Text(
+                    submission.applicantName,
+                    style: context.text.titleMedium,
+                  ),
                 ),
                 if (submission.referenceId.isNotEmpty)
                   StatusPill(label: submission.referenceId),
@@ -2215,9 +2447,14 @@ class _SubmissionDetailSheet extends StatelessWidget {
               label: submission.clientAccess != null
                   ? 'Converted to ${submission.clientAccess!.groupName}'
                   : titleCase(submission.status),
-              tone: submission.clientAccess != null ? PillTone.good : PillTone.neutral,
+              tone: submission.clientAccess != null
+                  ? PillTone.good
+                  : PillTone.neutral,
             ),
-            const SectionHeader(title: 'Submitted answers', topSpace: AppSpacing.lg),
+            const SectionHeader(
+              title: 'Submitted answers',
+              topSpace: AppSpacing.lg,
+            ),
             if (submission.answers.isEmpty)
               const EmptyState(message: 'This request has no answers.')
             else
@@ -2236,7 +2473,9 @@ class _SubmissionDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        entry.value.trim().isEmpty ? 'Not added' : entry.value.trim(),
+                        entry.value.trim().isEmpty
+                            ? 'Not added'
+                            : entry.value.trim(),
                         style: context.text.bodyMedium,
                       ),
                     ],
@@ -2294,10 +2533,12 @@ class _FieldEditor extends StatelessWidget {
             initialValue: field.fieldType,
             decoration: const InputDecoration(labelText: 'Type'),
             items: DynamicFieldType.all
-                .map((t) => DropdownMenuItem(
-                      value: t,
-                      child: Text(DynamicFieldType.label(t)),
-                    ))
+                .map(
+                  (t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(DynamicFieldType.label(t)),
+                  ),
+                )
                 .toList(),
             onChanged: (value) {
               field.fieldType = value ?? DynamicFieldType.shortText;

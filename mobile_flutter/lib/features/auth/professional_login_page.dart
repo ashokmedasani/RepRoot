@@ -20,7 +20,8 @@ class ProfessionalLoginPage extends ConsumerStatefulWidget {
   const ProfessionalLoginPage({super.key});
 
   @override
-  ConsumerState<ProfessionalLoginPage> createState() => _ProfessionalLoginPageState();
+  ConsumerState<ProfessionalLoginPage> createState() =>
+      _ProfessionalLoginPageState();
 }
 
 class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
@@ -58,7 +59,9 @@ class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
     if (usesRendered) {
       _googleEvents = google.authEvents.listen((event) {
         final idToken = google.idTokenFrom(event);
-        if (idToken != null && idToken.isNotEmpty) _exchangeGoogleToken(idToken);
+        if (idToken != null && idToken.isNotEmpty) {
+          _exchangeGoogleToken(idToken);
+        }
       });
     }
     setState(() {
@@ -115,8 +118,8 @@ class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
       destination = status.legalAcceptanceRequired
           ? Routes.professionalLegalConsent
           : status.profileSetupCompleted
-              ? Routes.professionalDashboard
-              : Routes.professionalProfileSetup;
+          ? Routes.professionalDashboard
+          : Routes.professionalProfileSetup;
     } catch (_) {
       // Don't strand a signed-in professional on the login screen if this
       // secondary check fails — the dashboard re-checks anyway.
@@ -151,7 +154,8 @@ class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
       if (!mounted) return;
       setState(() {
         _googleSubmitting = false;
-        _message = 'Google sign-in could not be loaded. Please try again later.';
+        _message =
+            'Google sign-in could not be loaded. Please try again later.';
       });
       return;
     }
@@ -223,18 +227,21 @@ class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
                       onSubmitted: _isSubmitting ? null : _login,
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    FilledButton(
-                      onPressed: _isSubmitting ? null : _login,
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Sign in'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isSubmitting ? null : _login,
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Sign in'),
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     TextButton(
@@ -256,13 +263,16 @@ class _ProfessionalLoginPageState extends ConsumerState<ProfessionalLoginPage> {
                       // Web gets Google's own widget; GIS refuses to sign in
                       // from any other button.
                       if (_googleUsesRenderedButton)
-                        renderGoogleSignInButton()
+                        Center(child: renderGoogleSignInButton())
                       else
-                        GoogleSignInButton(
-                          variant: GoogleButtonVariant.login,
-                          enabled: !_isSubmitting,
-                          busy: _googleSubmitting,
-                          onPressed: _loginWithGoogle,
+                        SizedBox(
+                          width: double.infinity,
+                          child: GoogleSignInButton(
+                            variant: GoogleButtonVariant.login,
+                            enabled: !_isSubmitting,
+                            busy: _googleSubmitting,
+                            onPressed: _loginWithGoogle,
+                          ),
                         ),
                     ],
                     FormMessage(message: _message),

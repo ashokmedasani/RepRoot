@@ -38,20 +38,20 @@ class _DraftField {
   int? scale;
 
   TemplateField toField() => TemplateField(
-        label: label.trim(),
-        fieldType: fieldType,
-        placeholder: placeholder,
-        options: fieldType == TemplateFieldType.dropdown ? options : const [],
-        scale: fieldType == TemplateFieldType.rating ? (scale ?? 5) : null,
-      );
+    label: label.trim(),
+    fieldType: fieldType,
+    placeholder: placeholder,
+    options: fieldType == TemplateFieldType.dropdown ? options : const [],
+    scale: fieldType == TemplateFieldType.rating ? (scale ?? 5) : null,
+  );
 
   static _DraftField from(TemplateField field) => _DraftField(
-        label: field.label,
-        fieldType: field.fieldType,
-        placeholder: field.placeholder,
-        options: [...field.options],
-        scale: field.scale,
-      );
+    label: field.label,
+    fieldType: field.fieldType,
+    placeholder: field.placeholder,
+    options: [...field.options],
+    scale: field.scale,
+  );
 }
 
 /// Copy for the Tracking Library `i` popup. Kept out of the page body so the
@@ -83,7 +83,8 @@ const _lockedInfo =
     'slot ahead of another template, delete a template you no longer need, '
     'or upgrade your plan for more slots.';
 
-class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplatesPage> {
+class _ProfessionalTemplatesPageState
+    extends ConsumerState<ProfessionalTemplatesPage> {
   List<TrackingTemplateRecord> _templates = [];
   List<StandardTemplateRecord> _standards = [];
   PlanLockStatus _lockStatus = const PlanLockStatus();
@@ -111,9 +112,6 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
     _purpose.dispose();
     super.dispose();
   }
-
-  int get _assignedTotal =>
-      _templates.fold(0, (sum, item) => sum + item.assignedCount);
 
   List<StandardTemplateRecord> get _unAdoptedStandards =>
       _standards.where((standard) => !standard.adopted).toList();
@@ -145,7 +143,9 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
   List<TrackingTemplateRecord> get _lockedTemplates {
     if (!_lockStatusLoaded) return const [];
     final lockedIds = _lock.lockedIds.toSet();
-    return _templates.where((template) => lockedIds.contains(template.id)).toList();
+    return _templates
+        .where((template) => lockedIds.contains(template.id))
+        .toList();
   }
 
   bool get _canReorder => _lockStatusLoaded && _activeTemplates.length > 1;
@@ -168,7 +168,9 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
       });
     }
     try {
-      final standards = await ref.read(templatesApiProvider).getStandardTemplates();
+      final standards = await ref
+          .read(templatesApiProvider)
+          .getStandardTemplates();
       if (mounted) setState(() => _standards = standards);
     } catch (_) {
       if (mounted) setState(() => _standards = []);
@@ -180,7 +182,11 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
     try {
       final status = await ref.read(planLockApiProvider).getLockStatus();
       if (mounted) setState(() => _lockStatus = status);
-    } catch (_) {/* the library just renders flat, without lock badges */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Template lock status load failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   /// Sets the professional's own priority order among their ACTIVE templates.
@@ -213,7 +219,9 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
     } catch (error) {
       if (!mounted) return;
       setState(() => _lockStatus = previous);
-      _toast(error is ApiException ? error.message : 'Could not reorder templates.');
+      _toast(
+        error is ApiException ? error.message : 'Could not reorder templates.',
+      );
     }
   }
 
@@ -262,7 +270,9 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
       _editingId = template.id;
       _name.text = template.name;
       _purpose.text = template.purpose;
-      _cadence = template.cadence.isEmpty ? TemplateCadence.daily : template.cadence;
+      _cadence = template.cadence.isEmpty
+          ? TemplateCadence.daily
+          : template.cadence;
       _accent = TemplateAccent.normalize(template.accent);
       _fields = template.fields.map(_DraftField.from).toList();
     });
@@ -299,8 +309,9 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
                 leading: IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Cancel',
-                  onPressed:
-                      saving ? null : () => Navigator.of(dialogContext).pop(),
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
                 ),
                 title: Text(_editingId > 0 ? 'Edit template' : 'New template'),
                 actions: [
@@ -446,7 +457,10 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
 
   void _toast(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), duration: const Duration(milliseconds: 1800)),
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(milliseconds: 1800),
+      ),
     );
   }
 
@@ -518,8 +532,31 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
     return Scaffold(
       appBar: AppBar(
         title: const Text('Templates'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalManage),
+        ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Tooltip(
+              message: 'Templates used',
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: context.tokens.primarySoft,
+                  borderRadius: AppRadius.pillAll,
+                ),
+                child: Text(
+                  '${_templates.length} / ${_maxTemplates > 0 ? _maxTemplates : '—'}',
+                  style: context.text.labelMedium?.copyWith(
+                    color: context.tokens.primaryStrong,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
           IconButton(
             onPressed: _startCreate,
             icon: const Icon(Icons.add),
@@ -530,29 +567,18 @@ class _ProfessionalTemplatesPageState extends ConsumerState<ProfessionalTemplate
       body: PagePad(
         onRefresh: _load,
         children: [
-          KpiGrid(
-            children: [
-              KpiTile(
-                label: 'Templates used',
-                value: '${_templates.length} / ${_maxTemplates > 0 ? _maxTemplates : '—'}',
-              ),
-              KpiTile(label: 'Assigned clients', value: '$_assignedTotal'),
-            ],
-          ),
           if (_message.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
             ErrorNote(message: _message, onRetry: _load),
+            const SizedBox(height: AppSpacing.md),
           ],
 
-          SectionHeader(
-            title: 'Tracking Library',
-            infoBody: _libraryInfo,
-          ),
+          SectionHeader(title: 'Tracking Library', infoBody: _libraryInfo),
           if (_loading)
             for (var i = 0; i < 3; i++) const SkeletonBox(height: 66)
           else if (_templates.isEmpty)
             const EmptyState(
-              message: 'No templates yet. Create one or adopt a standard below.',
+              message:
+                  'No templates yet. Create one or adopt a standard below.',
             )
           else ...[
             if (_canReorder) ...[
@@ -662,129 +688,134 @@ class _Editor extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          TextField(
-            controller: name,
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              hintText: 'e.g. Daily Nutrition Log',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: purpose,
-            decoration: const InputDecoration(
-              labelText: 'Purpose',
-              hintText: 'What does this track?',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          DropdownButtonFormField<String>(
-            initialValue: cadence,
-            decoration: const InputDecoration(labelText: 'Cadence'),
-            items: TemplateCadence.all
-                .map((c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(TemplateCadence.label(c)),
-                    ))
-                .toList(),
-            onChanged: (value) => onCadence(value ?? TemplateCadence.daily),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'ACCENT COLOR',
-            style: context.text.labelSmall?.copyWith(
-              color: tokens.muted,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Exactly the four accents the web can render. The old picker
-          // offered eight arbitrary swatches and saved them as hex, so half
-          // of them had no meaning on the website at all.
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final name in TemplateAccent.all)
-                InkWell(
-                  onTap: () => onAccent(name),
-                  borderRadius: AppRadius.pillAll,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: name == accent
-                          ? TemplateAccent.of(context, name)
-                              .withValues(alpha: 0.12)
-                          : tokens.surfaceSoft,
+              TextField(
+                controller: name,
+                onChanged: (_) => onChanged(),
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  hintText: 'e.g. Daily Nutrition Log',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: purpose,
+                decoration: const InputDecoration(
+                  labelText: 'Purpose',
+                  hintText: 'What does this track?',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              DropdownButtonFormField<String>(
+                initialValue: cadence,
+                decoration: const InputDecoration(labelText: 'Cadence'),
+                items: TemplateCadence.all
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(TemplateCadence.label(c)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => onCadence(value ?? TemplateCadence.daily),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'ACCENT COLOR',
+                style: context.text.labelSmall?.copyWith(
+                  color: tokens.muted,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              // Exactly the four accents the web can render. The old picker
+              // offered eight arbitrary swatches and saved them as hex, so half
+              // of them had no meaning on the website at all.
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final name in TemplateAccent.all)
+                    InkWell(
+                      onTap: () => onAccent(name),
                       borderRadius: AppRadius.pillAll,
-                      border: Border.all(
-                        color: name == accent
-                            ? TemplateAccent.of(context, name)
-                            : Colors.transparent,
-                        width: 1.5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: name == accent
+                              ? TemplateAccent.of(
+                                  context,
+                                  name,
+                                ).withValues(alpha: 0.12)
+                              : tokens.surfaceSoft,
+                          borderRadius: AppRadius.pillAll,
+                          border: Border.all(
+                            color: name == accent
+                                ? TemplateAccent.of(context, name)
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: TemplateAccent.of(context, name),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              TemplateAccent.label(name),
+                              style: context.text.labelMedium?.copyWith(
+                                fontWeight: name == accent
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: TemplateAccent.of(context, name),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          TemplateAccent.label(name),
-                          style: context.text.labelMedium?.copyWith(
-                            fontWeight:
-                                name == accent ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
+                ],
+              ),
             ],
           ),
         ),
-          SectionHeader(
-            title: 'Fields',
-            topSpace: AppSpacing.xl,
-            infoBody: 'Each field is one question the client answers every '
-                'time they log against this template.\n\n'
-                'The answer type decides the input they get — a number pad, '
-                'a dropdown, a rating scale — so pick the one that makes '
-                'logging quickest for them.\n\n'
-                'Changing a field does not alter entries already submitted; '
-                'past entries keep the answers they were saved with.',
+        SectionHeader(
+          title: 'Fields',
+          topSpace: AppSpacing.xl,
+          infoBody:
+              'Each field is one question the client answers every '
+              'time they log against this template.\n\n'
+              'The answer type decides the input they get — a number pad, '
+              'a dropdown, a rating scale — so pick the one that makes '
+              'logging quickest for them.\n\n'
+              'Changing a field does not alter entries already submitted; '
+              'past entries keep the answers they were saved with.',
+        ),
+        for (var i = 0; i < fields.length; i++)
+          _FieldEditor(
+            index: i,
+            field: fields[i],
+            onChanged: onChanged,
+            onRemove: fields.length > 1 ? () => onRemoveField(i) : null,
           ),
-          for (var i = 0; i < fields.length; i++)
-            _FieldEditor(
-              index: i,
-              field: fields[i],
-              onChanged: onChanged,
-              onRemove: fields.length > 1 ? () => onRemoveField(i) : null,
-            ),
-          const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: onAddField,
-            icon: const Icon(Icons.add, size: AppSize.iconRow),
-            label: const Text('Add field'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, AppSize.buttonHeight),
-            ),
+        const SizedBox(height: AppSpacing.md),
+        OutlinedButton.icon(
+          onPressed: onAddField,
+          icon: const Icon(Icons.add, size: AppSize.iconRow),
+          label: const Text('Add field'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, AppSize.buttonHeight),
           ),
+        ),
       ],
     );
   }
@@ -813,7 +844,8 @@ class _FieldEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final hasSettings = field.fieldType == TemplateFieldType.dropdown ||
+    final hasSettings =
+        field.fieldType == TemplateFieldType.dropdown ||
         field.fieldType == TemplateFieldType.rating;
 
     return Container(
@@ -882,15 +914,29 @@ class _FieldEditor extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                TextFormField(
+                  initialValue: field.placeholder,
+                  onChanged: (value) {
+                    field.placeholder = value;
+                    onChanged();
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Placeholder (optional)',
+                    hintText: 'Example answer shown before typing',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   initialValue: field.fieldType,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Answer type'),
                   items: TemplateFieldType.all
-                      .map((t) => DropdownMenuItem(
-                            value: t,
-                            child: Text(TemplateFieldType.label(t)),
-                          ))
+                      .map(
+                        (t) => DropdownMenuItem(
+                          value: t,
+                          child: Text(TemplateFieldType.label(t)),
+                        ),
+                      )
                       .toList(),
                   onChanged: (value) {
                     field.fieldType = value ?? TemplateFieldType.number;

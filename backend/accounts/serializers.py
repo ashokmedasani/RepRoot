@@ -658,7 +658,7 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
   middle_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
   last_name = serializers.CharField(source='user.last_name', max_length=150)
   email = serializers.EmailField(source='user.email', read_only=True)
-  username = serializers.CharField(source='user.username', read_only=True)
+  username = serializers.CharField(source='user.username', max_length=30)
   profile_photo_url = serializers.SerializerMethodField()
   certification_file_url = serializers.SerializerMethodField()
   transformation_photo_url = serializers.SerializerMethodField()
@@ -792,6 +792,18 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       )
     return country
 
+  def validate_username(self, value: str) -> str:
+    username = value.strip().lower()
+    if len(username) < 5:
+      raise serializers.ValidationError('Username must be at least 5 characters.')
+    validate_username_charset(username)
+    query = User.objects.filter(username__iexact=username)
+    if self.instance:
+      query = query.exclude(pk=self.instance.user_id)
+    if query.exists():
+      raise serializers.ValidationError('Username is already taken.')
+    return username
+
   def validate_profile_photo(self, value):
     return self.validate_image_upload(value)
 
@@ -878,7 +890,10 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     if 'last_name' in user_data:
       user.last_name = user_data['last_name'].strip()
 
-    user.save(update_fields=['first_name', 'last_name'])
+    if 'username' in user_data:
+      user.username = user_data['username'].strip().lower()
+
+    user.save(update_fields=['first_name', 'last_name', 'username'])
 
     for field, value in validated_data.items():
       if isinstance(value, str):

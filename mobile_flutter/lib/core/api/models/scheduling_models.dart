@@ -21,8 +21,10 @@ class SchedulingSettingsRecord {
   factory SchedulingSettingsRecord.fromJson(Map<String, dynamic> json) =>
       SchedulingSettingsRecord(
         timezone: json['timezone'] as String? ?? 'UTC',
-        defaultDurationMinutes: (json['default_duration_minutes'] as num?)?.toInt() ?? 30,
-        slotIntervalMinutes: (json['slot_interval_minutes'] as num?)?.toInt() ?? 30,
+        defaultDurationMinutes:
+            (json['default_duration_minutes'] as num?)?.toInt() ?? 30,
+        slotIntervalMinutes:
+            (json['slot_interval_minutes'] as num?)?.toInt() ?? 30,
         bufferMinutes: (json['buffer_minutes'] as num?)?.toInt() ?? 0,
         updatedAt: json['updated_at'] as String? ?? '',
       );
@@ -46,11 +48,18 @@ class AvailabilityWindowRecord {
   final bool isActive;
 
   static const weekdayLabels = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
-  String get weekdayLabel =>
-      weekday >= 0 && weekday < weekdayLabels.length ? weekdayLabels[weekday] : 'Day $weekday';
+  String get weekdayLabel => weekday >= 0 && weekday < weekdayLabels.length
+      ? weekdayLabels[weekday]
+      : 'Day $weekday';
 
   factory AvailabilityWindowRecord.fromJson(Map<String, dynamic> json) =>
       AvailabilityWindowRecord(
@@ -63,7 +72,10 @@ class AvailabilityWindowRecord {
 }
 
 class SchedulingSettingsResponse {
-  const SchedulingSettingsResponse({required this.settings, required this.availabilityWindows});
+  const SchedulingSettingsResponse({
+    required this.settings,
+    required this.availabilityWindows,
+  });
 
   final SchedulingSettingsRecord settings;
   final List<AvailabilityWindowRecord> availabilityWindows;
@@ -73,10 +85,11 @@ class SchedulingSettingsResponse {
         settings: SchedulingSettingsRecord.fromJson(
           json['settings'] as Map<String, dynamic>? ?? {},
         ),
-        availabilityWindows: (json['availability_windows'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(AvailabilityWindowRecord.fromJson)
-            .toList(),
+        availabilityWindows:
+            (json['availability_windows'] as List<dynamic>? ?? [])
+                .whereType<Map<String, dynamic>>()
+                .map(AvailabilityWindowRecord.fromJson)
+                .toList(),
       );
 }
 
@@ -171,7 +184,8 @@ class ScheduledMeetingRecord {
       status == MeetingStatus.pendingApproval &&
       requestedBy == MeetingRequestedBy.client;
 
-  factory ScheduledMeetingRecord.fromJson(Map<String, dynamic> json) => ScheduledMeetingRecord(
+  factory ScheduledMeetingRecord.fromJson(Map<String, dynamic> json) =>
+      ScheduledMeetingRecord(
         id: (json['id'] as num?)?.toInt() ?? 0,
         client: (json['client'] as num?)?.toInt() ?? 0,
         clientName: json['client_name'] as String? ?? '',
@@ -183,7 +197,8 @@ class ScheduledMeetingRecord {
         status: json['status'] as String? ?? MeetingStatus.scheduled,
         cancellationReason: json['cancellation_reason'] as String? ?? '',
         clientResponseStatus:
-            json['client_response_status'] as String? ?? MeetingResponseStatus.pending,
+            json['client_response_status'] as String? ??
+            MeetingResponseStatus.pending,
         isGroupMeeting: json['is_group_meeting'] as bool? ?? false,
         requestedBy:
             json['requested_by'] as String? ?? MeetingRequestedBy.professional,
@@ -206,9 +221,9 @@ class DateOffRecord {
   final String date;
 
   factory DateOffRecord.fromJson(Map<String, dynamic> json) => DateOffRecord(
-        id: (json['id'] as num?)?.toInt() ?? 0,
-        date: json['date'] as String? ?? '',
-      );
+    id: (json['id'] as num?)?.toInt() ?? 0,
+    date: json['date'] as String? ?? '',
+  );
 }
 
 /// A recurring weekly day off ("every Monday off"), repeating until removed.
@@ -219,7 +234,8 @@ class WeekdayOffRecord {
   final int id;
   final int weekday;
 
-  factory WeekdayOffRecord.fromJson(Map<String, dynamic> json) => WeekdayOffRecord(
+  factory WeekdayOffRecord.fromJson(Map<String, dynamic> json) =>
+      WeekdayOffRecord(
         id: (json['id'] as num?)?.toInt() ?? 0,
         weekday: (json['weekday'] as num?)?.toInt() ?? 0,
       );
@@ -242,12 +258,17 @@ class LeadFormMeetingRecord {
   final DateTime? requestedEnd;
   final String meetingUrl;
 
-  factory LeadFormMeetingRecord.fromJson(Map<String, dynamic> json) => LeadFormMeetingRecord(
+  factory LeadFormMeetingRecord.fromJson(Map<String, dynamic> json) =>
+      LeadFormMeetingRecord(
         id: (json['id'] as num?)?.toInt() ?? 0,
         referenceId: json['reference_id'] as String? ?? '',
         applicantName: json['applicant_name'] as String? ?? '',
-        requestedStart: DateTime.tryParse(json['requested_start']?.toString() ?? ''),
-        requestedEnd: DateTime.tryParse(json['requested_end']?.toString() ?? ''),
+        requestedStart: DateTime.tryParse(
+          json['requested_start']?.toString() ?? '',
+        ),
+        requestedEnd: DateTime.tryParse(
+          json['requested_end']?.toString() ?? '',
+        ),
         meetingUrl: json['meeting_url'] as String? ?? '',
       );
 }
@@ -258,7 +279,8 @@ class MeetingsResponse {
   final List<ScheduledMeetingRecord> meetings;
   final List<LeadFormMeetingRecord> leadMeetings;
 
-  factory MeetingsResponse.fromJson(Map<String, dynamic> json) => MeetingsResponse(
+  factory MeetingsResponse.fromJson(Map<String, dynamic> json) =>
+      MeetingsResponse(
         meetings: (json['meetings'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .map(ScheduledMeetingRecord.fromJson)
@@ -287,21 +309,25 @@ class ClientSlotsResponse {
   final String timezone;
   final bool availabilityConfigured;
 
-  factory ClientSlotsResponse.fromJson(Map<String, dynamic> json) => ClientSlotsResponse(
+  factory ClientSlotsResponse.fromJson(Map<String, dynamic> json) =>
+      ClientSlotsResponse(
         slots: parseSlots(json['slots'] as Map<String, dynamic>?),
         timezone: json['timezone'] as String? ?? '',
-        availabilityConfigured: json['availability_configured'] as bool? ?? true,
+        availabilityConfigured:
+            json['availability_configured'] as bool? ?? true,
       );
 }
 
 SlotsByDate parseSlots(Map<String, dynamic>? json) {
   if (json == null) return {};
-  return json.map((date, entries) => MapEntry(
-        date,
-        (entries as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map((e) => e['start']?.toString() ?? '')
-            .where((s) => s.isNotEmpty)
-            .toList(),
-      ));
+  return json.map(
+    (date, entries) => MapEntry(
+      date,
+      (entries as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((e) => e['start']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList(),
+    ),
+  );
 }

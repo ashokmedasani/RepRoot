@@ -4,11 +4,7 @@ import '../../core/theme/app_tokens.dart';
 
 /// One destination in [AppBottomNavBar].
 class AppNavItem {
-  const AppNavItem({
-    required this.icon,
-    required this.label,
-    this.badgeCount,
-  });
+  const AppNavItem({required this.icon, required this.label, this.badgeCount});
 
   final IconData icon;
   final String label;
@@ -108,7 +104,10 @@ class _NavTapTarget extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _withBadge(Icon(item.icon, color: color, size: AppSize.iconNav), badge),
+            _withBadge(
+              Icon(item.icon, color: color, size: AppSize.iconNav),
+              badge,
+            ),
             const SizedBox(height: 2),
             Text(
               item.label,

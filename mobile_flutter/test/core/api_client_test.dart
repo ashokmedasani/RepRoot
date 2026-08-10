@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:reproot/core/api/api_client.dart';
 import 'package:reproot/core/api/models/client_models.dart';
+import 'package:reproot/core/api/models/forms_groups_models.dart';
 import 'package:reproot/core/api/models/professional_models.dart';
 import 'package:reproot/core/config/env.dart';
 import 'package:reproot/core/session/session_store.dart';
@@ -364,6 +365,19 @@ void main() {
       final response = ClientLoginResponse.fromJson(const {'token': 't'});
       expect(response.token, 't');
       expect(response.client, isNull);
+    });
+
+    test('ClientAccessPayload supports a record without portal access', () {
+      const payload = ClientAccessPayload(
+        groupId: 7,
+        username: '',
+        password: '',
+        confirmPassword: '',
+        hasPortalAccess: false,
+      );
+
+      expect(payload.toJson(), containsPair('has_portal_access', false));
+      expect(payload.toJson(), containsPair('group_id', 7));
     });
   });
 

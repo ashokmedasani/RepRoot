@@ -41,7 +41,8 @@ class PlanLockSection {
         lockedIds: lockedIds ?? this.lockedIds,
       );
 
-  factory PlanLockSection.fromJson(Map<String, dynamic> json) => PlanLockSection(
+  factory PlanLockSection.fromJson(Map<String, dynamic> json) =>
+      PlanLockSection(
         activeIds: (json['active_ids'] as List<dynamic>? ?? [])
             .map((id) => (id as num).toInt())
             .toList(),
@@ -66,15 +67,15 @@ class PlanLockStatus {
       PlanLockStatus(sections: {...sections, modelKey: section});
 
   factory PlanLockStatus.fromJson(Map<String, dynamic> json) => PlanLockStatus(
-        sections: json.map(
-          (key, value) => MapEntry(
-            key.toString(),
-            PlanLockSection.fromJson(
-              (value as Map<dynamic, dynamic>? ?? {}).cast<String, dynamic>(),
-            ),
-          ),
+    sections: json.map(
+      (key, value) => MapEntry(
+        key.toString(),
+        PlanLockSection.fromJson(
+          (value as Map<dynamic, dynamic>? ?? {}).cast<String, dynamic>(),
         ),
-      );
+      ),
+    ),
+  );
 }
 
 class PlanLockApi {
@@ -115,5 +116,6 @@ class PlanLockApi {
   }
 }
 
-final planLockApiProvider =
-    Provider<PlanLockApi>((ref) => PlanLockApi(ref.watch(dioProvider)));
+final planLockApiProvider = Provider<PlanLockApi>(
+  (ref) => PlanLockApi(ref.watch(dioProvider)),
+);

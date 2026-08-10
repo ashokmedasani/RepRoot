@@ -466,8 +466,7 @@ class _ProfessionalForgotPasswordPageState
                       Expanded(
                         child: TextField(
                           controller: _email,
-                          enabled:
-                              !busy && _status != ResetOtpStatus.verified,
+                          enabled: !busy && _status != ResetOtpStatus.verified,
                           autocorrect: false,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
@@ -805,7 +804,10 @@ class _StepChip extends StatelessWidget {
           ),
           child: complete
               ? Icon(Icons.check, size: 14, color: tint)
-              : Text('$index', style: context.text.labelSmall?.copyWith(color: tint)),
+              : Text(
+                  '$index',
+                  style: context.text.labelSmall?.copyWith(color: tint),
+                ),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(

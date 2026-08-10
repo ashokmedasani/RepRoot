@@ -14,7 +14,9 @@ void main() {
 
     test('watch URL with extra query params', () {
       expect(
-        youtubeVideoId('https://www.youtube.com/watch?v=$id&list=PL123&index=2'),
+        youtubeVideoId(
+          'https://www.youtube.com/watch?v=$id&list=PL123&index=2',
+        ),
         id,
       );
     });
@@ -75,8 +77,14 @@ void main() {
     });
 
     test('a host merely containing "youtube.com" is refused', () {
-      expect(youtubeVideoId('https://youtube.com.evil.example/watch?v=x'), isNull);
-      expect(youtubeVideoId('https://notyoutube.com/watch?v=dQw4w9WgXcQ'), isNull);
+      expect(
+        youtubeVideoId('https://youtube.com.evil.example/watch?v=x'),
+        isNull,
+      );
+      expect(
+        youtubeVideoId('https://notyoutube.com/watch?v=dQw4w9WgXcQ'),
+        isNull,
+      );
     });
 
     test('music.youtube.com — the backend rejects it, so the app does too', () {

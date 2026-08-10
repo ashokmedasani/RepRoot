@@ -23,10 +23,12 @@ class ProfessionalClientsPage extends ConsumerStatefulWidget {
   const ProfessionalClientsPage({super.key});
 
   @override
-  ConsumerState<ProfessionalClientsPage> createState() => _ProfessionalClientsPageState();
+  ConsumerState<ProfessionalClientsPage> createState() =>
+      _ProfessionalClientsPageState();
 }
 
-class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPage> {
+class _ProfessionalClientsPageState
+    extends ConsumerState<ProfessionalClientsPage> {
   final _search = TextEditingController();
 
   List<ClientAccessRecord> _clients = [];
@@ -55,13 +57,10 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
     _loadNotificationCount();
     _loadLockStatus();
     // Same 5s cadence as the Ionic page.
-    _unreadPoll = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) {
-        _loadUnread();
-        _loadNotificationCount();
-      },
-    );
+    _unreadPoll = Timer.periodic(const Duration(seconds: 5), (_) {
+      _loadUnread();
+      _loadNotificationCount();
+    });
   }
 
   /// Header badge only — fetched once on open rather than polled, since the
@@ -71,10 +70,16 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
   /// by the tab shell, so a one-off fetch would leave the bell frozen.
   Future<void> _loadNotificationCount() async {
     try {
-      final inbox =
-          await ref.read(professionalAuthApiProvider).getNotifications(limit: 1);
+      final inbox = await ref
+          .read(professionalAuthApiProvider)
+          .getNotifications(limit: 1);
       if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
-    } catch (_) {/* the badge just stays at zero */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client list notification badge failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   @override
@@ -89,8 +94,10 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
       final status = await ref.read(planLockApiProvider).getLockStatus();
       if (!mounted) return;
       setState(() {
-        _lockedGroupIds =
-            status.section(PlanLockModelKey.groups).lockedIds.toSet();
+        _lockedGroupIds = status
+            .section(PlanLockModelKey.groups)
+            .lockedIds
+            .toSet();
       });
     } catch (_) {
       // Unknown lock state shows everything rather than hiding real clients —
@@ -104,8 +111,8 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
   List<ClientAccessRecord> get _visibleClients => _lockedGroupIds.isEmpty
       ? _clients
       : _clients
-          .where((c) => c.group == null || !_lockedGroupIds.contains(c.group))
-          .toList();
+            .where((c) => c.group == null || !_lockedGroupIds.contains(c.group))
+            .toList();
 
   int _clientCountForGroup(int groupId) =>
       _visibleClients.where((c) => c.group == groupId).length;
@@ -116,14 +123,17 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
   /// it's a dead end here. Both stay visible and manageable under
   /// Manage → Groups; they just aren't offered as a way to slice this roster.
   List<ProfessionalGroup> get _filterableGroups => _groups
-      .where((g) =>
-          !_lockedGroupIds.contains(g.id) && _clientCountForGroup(g.id) > 0)
+      .where(
+        (g) =>
+            !_lockedGroupIds.contains(g.id) && _clientCountForGroup(g.id) > 0,
+      )
       .toList();
 
   List<ClientAccessRecord> get _filteredClients {
     final term = _search.text.trim().toLowerCase();
     final matches = _visibleClients.where((client) {
-      final matchesSearch = term.isEmpty ||
+      final matchesSearch =
+          term.isEmpty ||
           client.displayName.toLowerCase().contains(term) ||
           client.email.toLowerCase().contains(term) ||
           client.username.toLowerCase().contains(term) ||
@@ -234,7 +244,9 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
 
   Future<void> _loadUnread() async {
     try {
-      final summary = await ref.read(chatApiProvider).getProfessionalUnreadCounts();
+      final summary = await ref
+          .read(chatApiProvider)
+          .getProfessionalUnreadCounts();
       if (mounted) {
         setState(() {
           _unreadByClient = summary.byClient;
@@ -267,7 +279,8 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
             PageHeader(
               eyebrow: 'CLIENT WORKSPACE',
               title: 'Clients',
-              info: 'Everyone you work with, and the record you keep on '
+              info:
+                  'Everyone you work with, and the record you keep on '
                   'each of them.\n\n'
                   'Open a client to reach their workspace, assigned '
                   'templates, payments, chat, and account actions.\n\n'
@@ -277,16 +290,23 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    onPressed: () => context.go(Routes.professionalClientCreate),
+                    onPressed: () =>
+                        context.go(Routes.professionalClientCreate),
                     icon: const Icon(Icons.add),
                     tooltip: 'Add client',
+                    style: IconButton.styleFrom(
+                      backgroundColor: context.tokens.surfaceSoft,
+                      foregroundColor: context.tokens.muted,
+                      fixedSize: const Size.square(AppSize.touchTarget),
+                      shape: const CircleBorder(),
+                    ),
                   ),
                   // The bell appears on every primary tab except More (which
                   // reaches Notifications through its own menu row), so unread
                   // state is visible wherever you happen to be standing.
                   NotificationBell(
                     unread: _notificationUnread,
-                    onTap: () => context.go(Routes.professionalNotifications),
+                    onTap: () => context.push(Routes.professionalNotifications),
                   ),
                 ],
               ),
@@ -317,7 +337,8 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
                 CompactStat(
                   icon: Icons.folder_open_outlined,
                   accent: MenuAccent.purple,
-                  value: '${_groups.where((g) => !_lockedGroupIds.contains(g.id)).length}',
+                  value:
+                      '${_groups.where((g) => !_lockedGroupIds.contains(g.id)).length}',
                   label: 'Groups',
                 ),
               ],
@@ -338,74 +359,67 @@ class _ProfessionalClientsPageState extends ConsumerState<ProfessionalClientsPag
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            SegmentedButton<ClientStatusFilter>(
-            segments: const [
-              ButtonSegment(
-                value: ClientStatusFilter.all,
-                label: Text('All Clients'),
-              ),
-              ButtonSegment(
-                value: ClientStatusFilter.active,
-                label: Text('Active'),
-              ),
-              ButtonSegment(
-                value: ClientStatusFilter.inactive,
-                label: Text('Inactive'),
+            AppSegmentedFilter<ClientStatusFilter>(
+              expanded: true,
+              value: _statusFilter,
+              options: const [
+                (ClientStatusFilter.all, 'All Clients'),
+                (ClientStatusFilter.active, 'Active'),
+                (ClientStatusFilter.inactive, 'Inactive'),
+              ],
+              onChanged: (value) => setState(() => _statusFilter = value),
+            ),
+            if (_filterableGroups.length > 1) ...[
+              const SizedBox(height: AppSpacing.md),
+              _GroupFilterBar(
+                groups: _filterableGroups,
+                selected: _groupFilter,
+                countFor: _clientCountForGroup,
+                onSelect: (value) => setState(() => _groupFilter = value),
               ),
             ],
-            selected: {_statusFilter},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) =>
-                setState(() => _statusFilter = selection.first),
-          ),
-          if (_filterableGroups.length > 1) ...[
+            if (_message.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              ErrorNote(message: _message, onRetry: _load),
+            ],
             const SizedBox(height: AppSpacing.md),
-            _GroupFilterBar(
-              groups: _filterableGroups,
-              selected: _groupFilter,
-              countFor: _clientCountForGroup,
-              onSelect: (value) => setState(() => _groupFilter = value),
-            ),
-          ],
-          if (_message.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            ErrorNote(message: _message, onRetry: _load),
-          ],
-          const SizedBox(height: AppSpacing.md),
 
-          if (_isLoading)
-            for (var i = 0; i < 6; i++) const SkeletonBox(height: 68)
-          else if (filtered.isEmpty)
-            EmptyState(
-              compact: false,
-              icon: Icons.people_outline,
-              message: _clients.isEmpty
-                  ? 'No clients yet.'
-                  : 'No clients match your filters.',
-              actionLabel: _clients.isEmpty ? 'Add your first client' : null,
-              onAction: _clients.isEmpty
-                  ? () => context.go(Routes.professionalClientCreate)
-                  : null,
-            )
-          else
-            for (final client in filtered)
-              RowItem(
-                title: client.displayName.isEmpty
-                    ? client.username
-                    : client.displayName,
-                subtitle: client.groupName.isEmpty ? 'No group' : client.groupName,
-                leading: AppAvatar(
-                  initials: _initials(client),
-                  imageUrl: Env.mediaUrl(client.photo),
-                  size: 40,
+            if (_isLoading)
+              for (var i = 0; i < 6; i++) const SkeletonBox(height: 68)
+            else if (filtered.isEmpty)
+              EmptyState(
+                compact: false,
+                icon: Icons.people_outline,
+                message: _clients.isEmpty
+                    ? 'No clients yet.'
+                    : 'No clients match your filters.',
+                actionLabel: _clients.isEmpty ? 'Add your first client' : null,
+                onAction: _clients.isEmpty
+                    ? () => context.go(Routes.professionalClientCreate)
+                    : null,
+              )
+            else
+              for (final client in filtered)
+                RowItem(
+                  title: client.displayName.isEmpty
+                      ? client.username
+                      : client.displayName,
+                  subtitle: client.groupName.isEmpty
+                      ? 'No group'
+                      : client.groupName,
+                  leading: AppAvatar(
+                    initials: _initials(client),
+                    imageUrl: Env.mediaUrl(client.photo),
+                    size: 40,
+                  ),
+                  trailing: _unreadFor(client.id) > 0
+                      ? _UnreadBadge(label: _badgeLabel(_unreadFor(client.id)))
+                      : (client.isActive
+                            ? null
+                            : const StatusPill(label: 'Inactive')),
+                  onTap: () =>
+                      context.go('${Routes.professionalClients}/${client.id}'),
                 ),
-                trailing: _unreadFor(client.id) > 0
-                    ? _UnreadBadge(label: _badgeLabel(_unreadFor(client.id)))
-                    : (client.isActive
-                        ? null
-                        : const StatusPill(label: 'Inactive')),
-                onTap: () => context.go('${Routes.professionalClients}/${client.id}'),
-              ),
           ],
         ),
       ),
@@ -547,8 +561,8 @@ class _GroupPickerSheetState extends State<_GroupPickerSheet> {
     final visible = term.isEmpty
         ? widget.groups
         : widget.groups
-            .where((g) => g.name.toLowerCase().contains(term))
-            .toList();
+              .where((g) => g.name.toLowerCase().contains(term))
+              .toList();
 
     return SafeArea(
       child: Padding(
@@ -614,7 +628,9 @@ class _GroupPickerSheetState extends State<_GroupPickerSheet> {
                   if (visible.isEmpty && term.isNotEmpty)
                     const Padding(
                       padding: EdgeInsets.all(AppSpacing.screen),
-                      child: EmptyState(message: 'No groups match that search.'),
+                      child: EmptyState(
+                        message: 'No groups match that search.',
+                      ),
                     ),
                 ],
               ),

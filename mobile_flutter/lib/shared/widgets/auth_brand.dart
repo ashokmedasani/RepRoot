@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
+import 'reproot_logo.dart';
 
 /// RepRoot brand mark and heading used across authentication screens.
 class AuthBrand extends StatelessWidget {
@@ -15,14 +16,7 @@ class AuthBrand extends StatelessWidget {
 
     return Column(
       children: [
-        SizedBox(
-          width: 56,
-          height: 56,
-          child: Image.asset(
-            'assets/icon/icon.png',
-            fit: BoxFit.contain,
-          ),
-        ),
+        const RepRootLogo(),
         const SizedBox(height: AppSpacing.md),
         Text(title, style: context.text.displaySmall),
         const SizedBox(height: AppSpacing.xs),

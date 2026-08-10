@@ -13,11 +13,7 @@ import 'branded_share.dart';
 /// pixel-identical to Chart.js — per the migration plan the target is data
 /// correctness and equivalent readability, not identical rendering.
 class ChartCard extends StatefulWidget {
-  const ChartCard({
-    super.key,
-    required this.spec,
-    this.shareContext = '',
-  });
+  const ChartCard({super.key, required this.spec, this.shareContext = ''});
 
   final ChartSpec spec;
 
@@ -58,7 +54,9 @@ class _ChartCardState extends State<ChartCard> {
       final shared = await BrandedShare.shareChart(
         boundaryKey: _chartKey,
         title: widget.spec.title,
-        subtitle: widget.shareContext.isNotEmpty ? widget.shareContext : _subtitle,
+        subtitle: widget.shareContext.isNotEmpty
+            ? widget.shareContext
+            : _subtitle,
         brightness: Theme.of(context).brightness,
       );
       if (!shared) {
@@ -254,8 +252,8 @@ class _Summary extends StatelessWidget {
             tone: delta > 0
                 ? PillTone.good
                 : delta < 0
-                    ? PillTone.bad
-                    : PillTone.neutral,
+                ? PillTone.bad
+                : PillTone.neutral,
           ),
       ],
     );
@@ -365,7 +363,9 @@ class _LineChart extends StatelessWidget {
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: Text(
                     points[index].label,
-                    style: context.text.labelSmall?.copyWith(color: tokens.muted),
+                    style: context.text.labelSmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 );
               },
@@ -405,7 +405,8 @@ class _LineChart extends StatelessWidget {
   }
 
   /// Keeps the x-axis readable on a phone by thinning labels on long series.
-  double _labelInterval(int count) => count <= 8 ? 1 : (count / 6).ceilToDouble();
+  double _labelInterval(int count) =>
+      count <= 8 ? 1 : (count / 6).ceilToDouble();
 
   /// fl_chart fits the y-axis exactly to the data, which puts the highest point
   /// on the top edge — and since the line is curved, the spline overshoots that
@@ -426,8 +427,8 @@ class _LineChart extends StatelessWidget {
     final pad = span > 0
         ? span * 0.12
         : high.abs() > 0
-            ? high.abs() * 0.1
-            : 1.0;
+        ? high.abs() * 0.1
+        : 1.0;
 
     return (
       // Counts and durations are never negative; don't invent an axis that says
@@ -539,10 +540,7 @@ class _HBarChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final points = spec.data;
     final palette = _palette(context);
-    final max = points.fold<double>(
-      0,
-      (m, p) => p.value > m ? p.value : m,
-    );
+    final max = points.fold<double>(0, (m, p) => p.value > m ? p.value : m);
 
     return SingleChildScrollView(
       child: Column(

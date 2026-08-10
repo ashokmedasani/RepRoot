@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_tokens.dart';
@@ -48,6 +50,7 @@ class SectionHeader extends StatelessWidget {
     this.onAction,
     this.infoBody,
     this.infoTitle,
+    this.actionIcon,
     this.topSpace = AppSpacing.xl,
     this.subheading = false,
   });
@@ -55,6 +58,7 @@ class SectionHeader extends StatelessWidget {
   final String title;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final IconData? actionIcon;
 
   /// Body of the `i` popup. Null hides the icon entirely.
   final String? infoBody;
@@ -94,11 +98,7 @@ class SectionHeader extends StatelessWidget {
                         ? context.text.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           )
-                        : context.text.titleLarge?.copyWith(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                          ),
+                        : context.text.titleLarge,
                   ),
                 ),
                 if (infoBody != null)
@@ -107,25 +107,42 @@ class SectionHeader extends StatelessWidget {
             ),
           ),
           if (actionLabel != null && onAction != null)
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                minimumSize: const Size(0, 34),
-                shape: const RoundedRectangleBorder(
-                  borderRadius: AppRadius.pillAll,
-                ),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(actionLabel!, style: context.text.labelMedium),
-            ),
+            actionIcon == null
+                ? TextButton(
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      minimumSize: const Size(0, 34),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: AppRadius.pillAll,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(actionLabel!, style: context.text.labelMedium),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: onAction,
+                    icon: Icon(actionIcon, size: 16),
+                    label: Text(actionLabel!),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      side: BorderSide(color: context.tokens.border),
+                      foregroundColor: context.colors.onSurface,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
         ],
       ),
     );
   }
 }
 
-/// The eyebrow + title block at the top of every tab.
+/// The page title block at the top of every tab.
 ///
 /// Replaces the eyebrow/title/**subtitle** trio. The subtitle was a full
 /// sentence describing the page, permanently occupying two lines near the top
@@ -142,6 +159,7 @@ class PageHeader extends StatelessWidget {
     this.trailing,
   });
 
+  /// Small contextual label such as "PROFESSIONAL WORKSPACE".
   final String eyebrow;
   final String title;
 
@@ -160,20 +178,32 @@ class PageHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  eyebrow,
-                  style: context.text.labelSmall?.copyWith(
-                    color: context.colors.primary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
+                if (eyebrow.trim().isNotEmpty) ...[
+                  Text(
+                    eyebrow.toUpperCase(),
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.colors.primary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.05,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.xs),
+                ],
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(
-                      child: Text(title, style: context.text.displaySmall),
+                      child: Text(
+                        title,
+                        style: context.text.displaySmall?.copyWith(
+                          // Keep mobile page names subordinate to the content
+                          // and consistent across all primary screens.
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
                     ),
                     InfoDot(title: title, body: info),
                   ],
@@ -184,6 +214,47 @@ class PageHeader extends StatelessWidget {
           ?trailing,
         ],
       ),
+    );
+  }
+}
+
+/// Standard mutually-exclusive page filter.
+///
+/// Fixed, short option sets use this control throughout the app. It scrolls on
+/// narrow phones instead of wrapping into an uneven collection of chips.
+/// Dynamic or long option lists should continue to use a dropdown or sheet.
+class AppSegmentedFilter<T> extends StatelessWidget {
+  const AppSegmentedFilter({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    this.expanded = false,
+  });
+
+  final T value;
+  final List<(T, String)> options;
+  final ValueChanged<T> onChanged;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final control = SegmentedButton<T>(
+      expandedInsets: expanded ? EdgeInsets.zero : null,
+      showSelectedIcon: false,
+      segments: [
+        for (final option in options)
+          ButtonSegment<T>(value: option.$1, label: Text(option.$2)),
+      ],
+      selected: {value},
+      onSelectionChanged: (selection) {
+        if (selection.isNotEmpty) onChanged(selection.first);
+      },
+    );
+    if (expanded) return SizedBox(width: double.infinity, child: control);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: control,
     );
   }
 }
@@ -208,9 +279,7 @@ class InfoDot extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
-        content: SingleChildScrollView(
-          child: Text(body, style: Theme.of(dialogContext).textTheme.bodyMedium),
-        ),
+        content: SingleChildScrollView(child: _formattedBody(dialogContext)),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -218,6 +287,53 @@ class InfoDot extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _formattedBody(BuildContext context) {
+    final blocks = body
+        .split(RegExp(r'\n\s*\n'))
+        .map((block) => block.trim())
+        .where((block) => block.isNotEmpty);
+    final children = <Widget>[];
+
+    for (final block in blocks) {
+      final lines = block.split('\n');
+      final first = lines.first.trim();
+      final isHeading =
+          first.length <= 40 &&
+          first.contains(RegExp('[A-Z]')) &&
+          first == first.toUpperCase();
+      if (children.isNotEmpty) {
+        children.add(const SizedBox(height: AppSpacing.md));
+      }
+      if (isHeading) {
+        children.add(
+          Text(
+            first,
+            style: context.text.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        );
+        if (lines.length > 1) {
+          children.add(const SizedBox(height: AppSpacing.xs));
+          children.add(
+            Text(
+              lines.skip(1).join('\n').trim(),
+              style: context.text.bodyMedium,
+            ),
+          );
+        }
+      } else {
+        children.add(Text(block, style: context.text.bodyMedium));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
     );
   }
 
@@ -319,11 +435,7 @@ class AppCard extends StatelessWidget {
       // clipBehavior keeps the ripple inside the rounded corners; without it
       // the splash paints square and spills past a 24pt radius.
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: borderRadius,
-        child: content,
-      ),
+      child: InkWell(onTap: onTap, borderRadius: borderRadius, child: content),
     );
   }
 }
@@ -345,6 +457,7 @@ class KpiTile extends StatelessWidget {
   final String value;
   final String? caption;
   final IconData? icon;
+
   /// Tints the icon and gives it a soft matching background chip. Null keeps
   /// the plain muted icon — existing call sites are unaffected.
   final Color? iconColor;
@@ -356,6 +469,7 @@ class KpiTile extends StatelessWidget {
     final tokens = context.tokens;
     return AppCard(
       onTap: onTap,
+      color: tokens.surfaceSoft,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -372,7 +486,11 @@ class KpiTile extends StatelessWidget {
                       color: iconColor!.withValues(alpha: 0.14),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: AppSize.iconRow - 7, color: iconColor),
+                    child: Icon(
+                      icon,
+                      size: AppSize.iconRow - 7,
+                      color: iconColor,
+                    ),
                   )
                 else
                   Icon(icon, size: AppSize.iconRow, color: tokens.muted),
@@ -503,6 +621,7 @@ class CompactStat extends StatelessWidget {
   final ({Color fg, Color bg})? accent;
   final Color? valueColor;
   final VoidCallback? onTap;
+
   /// Optional third line under the label — the website's tiles often carry a
   /// second bit of context under the value ("This month", a template name,
   /// "Keep it up!"/"No current streak"). Null by default so existing call
@@ -514,13 +633,9 @@ class CompactStat extends StatelessWidget {
     final tokens = context.tokens;
     final effectiveValueColor = valueColor ?? accent?.fg;
 
-    // A KPI tile is read, not acted on, so it takes the tinted/flat treatment:
-    // washed in its own accent at low alpha when it has one, otherwise the
-    // neutral soft surface. Four white shadowed boxes in a row looked busy —
-    // the wash groups them as one band of numbers instead.
-    final tint = accent == null
-        ? tokens.surfaceSoft
-        : Color.alphaBlend(accent!.bg.withValues(alpha: 0.55), tokens.surfaceSoft);
+    // Keep every KPI on the same neutral surface. Semantic accents remain on
+    // the value and icon instead of changing the card treatment by page.
+    final tint = tokens.surfaceSoft;
 
     // Icon sits beside the text, not above it. Stacking it added a whole row
     // of height to every tile for no extra information — the same tiles on the
@@ -667,49 +782,53 @@ class RowItem extends StatelessWidget {
         child: _withAccent(
           context,
           Row(
-          children: [
-            if (leading != null) ...[
-              leading!,
-              const SizedBox(width: AppSpacing.md),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: context.text.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (subtitle != null && subtitle!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+            children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: AppSpacing.md),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      subtitle!,
-                      style: context.text.bodySmall,
-                      maxLines: 2,
+                      title,
+                      style: context.text.titleSmall,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (subtitle != null && subtitle!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: context.text.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            if (trailing != null)
-              trailing!
-            else if (trailingValue != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(trailingValue!, style: context.text.titleSmall),
-                  if (trailingCaption != null && trailingCaption!.isNotEmpty)
-                    Text(trailingCaption!, style: context.text.bodySmall),
-                ],
-              ),
-            if (onTap != null && trailing == null && trailingValue == null)
-              Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
-          ],
+              if (trailing != null)
+                trailing!
+              else if (trailingValue != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(trailingValue!, style: context.text.titleSmall),
+                    if (trailingCaption != null && trailingCaption!.isNotEmpty)
+                      Text(trailingCaption!, style: context.text.bodySmall),
+                  ],
+                ),
+              if (onTap != null && trailing == null && trailingValue == null)
+                Icon(
+                  Icons.chevron_right,
+                  size: AppSize.iconRow,
+                  color: tokens.muted,
+                ),
+            ],
           ),
         ),
       ),
@@ -721,7 +840,11 @@ enum PillTone { neutral, info, good, warn, bad }
 
 /// Small status chip — the .pill rule.
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.label, this.tone = PillTone.neutral});
+  const StatusPill({
+    super.key,
+    required this.label,
+    this.tone = PillTone.neutral,
+  });
 
   final String label;
   final PillTone tone;
@@ -845,12 +968,18 @@ class ErrorNote extends StatelessWidget {
         color: context.colors.error.withValues(alpha: 0.06),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: context.colors.error, size: AppSize.iconRow),
+            Icon(
+              Icons.error_outline,
+              color: context.colors.error,
+              size: AppSize.iconRow,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 message,
-                style: context.text.bodySmall?.copyWith(color: context.colors.error),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.colors.error,
+                ),
               ),
             ),
             if (onRetry != null)
@@ -917,11 +1046,13 @@ class AppAvatar extends StatelessWidget {
     super.key,
     required this.initials,
     this.imageUrl = '',
+    this.imageBytes,
     this.size = 44,
   });
 
   final String initials;
   final String imageUrl;
+  final Uint8List? imageBytes;
   final double size;
 
   @override
@@ -954,6 +1085,18 @@ class AppAvatar extends StatelessWidget {
         ),
       ),
     );
+
+    if (imageBytes != null && imageBytes!.isNotEmpty) {
+      return ClipOval(
+        child: Image.memory(
+          imageBytes!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
+      );
+    }
 
     if (imageUrl.isEmpty) return fallback;
 

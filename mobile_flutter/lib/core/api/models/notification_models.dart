@@ -46,31 +46,42 @@ class NotificationInbox {
 class NotificationCategory {
   const NotificationCategory._();
   static const all = [
-    'chat', 'forms', 'meetings', 'clients', 'templates', 'progress',
-    'reminders', 'resources', 'payments', 'support', 'account',
-    'storage', 'security', 'system',
+    'chat',
+    'forms',
+    'meetings',
+    'clients',
+    'templates',
+    'progress',
+    'reminders',
+    'resources',
+    'payments',
+    'support',
+    'account',
+    'storage',
+    'security',
+    'system',
   ];
 
   /// Categories that can never be muted in-app (account/security/storage/system).
   static const mandatoryInApp = {'account', 'security', 'storage', 'system'};
 
   static String label(String category) => switch (category) {
-        'chat' => 'Chat',
-        'forms' => 'Forms & leads',
-        'meetings' => 'Meetings',
-        'clients' => 'Clients',
-        'templates' => 'Templates',
-        'progress' => 'Progress',
-        'reminders' => 'Reminders',
-        'resources' => 'Resources',
-        'payments' => 'Payments',
-        'support' => 'Support',
-        'account' => 'Account',
-        'storage' => 'Storage',
-        'security' => 'Security',
-        'system' => 'System',
-        _ => category,
-      };
+    'chat' => 'Chat',
+    'forms' => 'Forms and leads',
+    'meetings' => 'Meetings',
+    'clients' => 'Clients',
+    'templates' => 'Templates',
+    'progress' => 'Progress',
+    'reminders' => 'Reminders',
+    'resources' => 'Resources',
+    'payments' => 'Payments',
+    'support' => 'Support',
+    'account' => 'Account',
+    'storage' => 'Storage',
+    'security' => 'Security',
+    'system' => 'System',
+    _ => category,
+  };
 }
 
 /// 'immediate' | 'daily' | 'weekly' | 'monthly' | 'none'
@@ -78,13 +89,13 @@ class DigestFrequency {
   const DigestFrequency._();
   static const all = ['immediate', 'daily', 'weekly', 'monthly', 'none'];
   static String label(String value) => switch (value) {
-        'immediate' => 'Immediate',
-        'daily' => 'Daily digest',
-        'weekly' => 'Weekly digest',
-        'monthly' => 'Monthly digest',
-        'none' => 'Off',
-        _ => value,
-      };
+    'immediate' => 'Immediate',
+    'daily' => 'Daily digest',
+    'weekly' => 'Weekly digest',
+    'monthly' => 'Monthly digest',
+    'none' => 'Off',
+    _ => value,
+  };
 }
 
 class NotificationPreferenceRow {

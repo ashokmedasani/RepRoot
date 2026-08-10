@@ -39,7 +39,9 @@ class _NotificationPreferencesPageState
     });
     try {
       final rows = widget.professional
-          ? await ref.read(professionalAuthApiProvider).getNotificationPreferences()
+          ? await ref
+                .read(professionalAuthApiProvider)
+                .getNotificationPreferences()
           : await ref.read(clientApiProvider).getNotificationPreferences();
       // Guarantee every known category has a row, even if the backend hasn't
       // written a preference record for it yet (defaults apply server-side).
@@ -53,10 +55,17 @@ class _NotificationPreferencesPageState
                 emailEnabled: false,
                 pushEnabled: true,
                 digestFrequency: 'immediate',
-                mandatoryInApp: NotificationCategory.mandatoryInApp.contains(category),
+                mandatoryInApp: NotificationCategory.mandatoryInApp.contains(
+                  category,
+                ),
               ),
       ];
-      if (mounted) setState(() { _rows = merged; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _rows = merged;
+          _loading = false;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -77,24 +86,36 @@ class _NotificationPreferencesPageState
     setState(() => _saving.add(row.category));
     try {
       final updated = widget.professional
-          ? await ref.read(professionalAuthApiProvider).updateNotificationPreference(
-                row.category,
-                inAppEnabled: inAppEnabled,
-                emailEnabled: emailEnabled,
-                digestFrequency: digestFrequency,
-              )
-          : await ref.read(clientApiProvider).updateNotificationPreference(
-                row.category,
-                inAppEnabled: inAppEnabled,
-                emailEnabled: emailEnabled,
-                digestFrequency: digestFrequency,
-              );
+          ? await ref
+                .read(professionalAuthApiProvider)
+                .updateNotificationPreference(
+                  row.category,
+                  inAppEnabled: inAppEnabled,
+                  emailEnabled: emailEnabled,
+                  digestFrequency: digestFrequency,
+                )
+          : await ref
+                .read(clientApiProvider)
+                .updateNotificationPreference(
+                  row.category,
+                  inAppEnabled: inAppEnabled,
+                  emailEnabled: emailEnabled,
+                  digestFrequency: digestFrequency,
+                );
       if (mounted) {
-        setState(() =>
-            _rows = _rows.map((r) => r.category == row.category ? updated : r).toList());
+        setState(
+          () => _rows = _rows
+              .map((r) => r.category == row.category ? updated : r)
+              .toList(),
+        );
       }
     } catch (_) {
-      if (mounted) setState(() => _message = 'Could not update ${NotificationCategory.label(row.category)}.');
+      if (mounted) {
+        setState(
+          () => _message =
+              'Could not update ${NotificationCategory.label(row.category)}.',
+        );
+      }
     }
     if (mounted) setState(() => _saving.remove(row.category));
   }
@@ -104,7 +125,11 @@ class _NotificationPreferencesPageState
   Future<void> _setAll({bool? inAppEnabled, bool? emailEnabled}) async {
     for (final row in _rows) {
       if (row.mandatoryInApp && inAppEnabled == false) continue;
-      await _update(row, inAppEnabled: inAppEnabled, emailEnabled: emailEnabled);
+      await _update(
+        row,
+        inAppEnabled: inAppEnabled,
+        emailEnabled: emailEnabled,
+      );
     }
   }
 
@@ -127,8 +152,14 @@ class _NotificationPreferencesPageState
             },
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'all_on', child: Text('Enable everything')),
-              PopupMenuItem(value: 'email_off', child: Text('Turn off all email')),
-              PopupMenuItem(value: 'app_off', child: Text('Turn off optional in-app')),
+              PopupMenuItem(
+                value: 'email_off',
+                child: Text('Turn off all email'),
+              ),
+              PopupMenuItem(
+                value: 'app_off',
+                child: Text('Turn off optional in-app'),
+              ),
             ],
           ),
         ],
@@ -138,22 +169,26 @@ class _NotificationPreferencesPageState
           : PagePad(
               onRefresh: _load,
               children: [
-                if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
+                if (_message.isNotEmpty)
+                  ErrorNote(message: _message, onRetry: _load),
                 Text(
                   'Choose how you\'re notified for each category. Account, '
                   'security, storage, and system alerts always stay on in-app.',
                   style: context.text.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.md),
-                for (final row in _rows) _PreferenceCard(
-                  row: row,
-                  saving: _saving.contains(row.category),
-                  onInAppChanged: row.mandatoryInApp
-                      ? null
-                      : (value) => _update(row, inAppEnabled: value),
-                  onEmailChanged: (value) => _update(row, emailEnabled: value),
-                  onDigestChanged: (value) => _update(row, digestFrequency: value),
-                ),
+                for (final row in _rows)
+                  _PreferenceCard(
+                    row: row,
+                    saving: _saving.contains(row.category),
+                    onInAppChanged: row.mandatoryInApp
+                        ? null
+                        : (value) => _update(row, inAppEnabled: value),
+                    onEmailChanged: (value) =>
+                        _update(row, emailEnabled: value),
+                    onDigestChanged: (value) =>
+                        _update(row, digestFrequency: value),
+                  ),
               ],
             ),
     );
@@ -211,7 +246,9 @@ class _PreferenceCard extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               dense: true,
               title: const Text('In-App'),
-              subtitle: const Text('Your notification inbox, on web and mobile'),
+              subtitle: const Text(
+                'Your notification inbox, on web and mobile',
+              ),
               value: row.inAppEnabled,
               onChanged: saving ? null : onInAppChanged,
             ),
@@ -231,11 +268,16 @@ class _PreferenceCard extends StatelessWidget {
                 decoration: const InputDecoration(labelText: 'Email frequency'),
                 items: [
                   for (final freq in DigestFrequency.all)
-                    DropdownMenuItem(value: freq, child: Text(DigestFrequency.label(freq))),
+                    DropdownMenuItem(
+                      value: freq,
+                      child: Text(DigestFrequency.label(freq)),
+                    ),
                 ],
-                onChanged: saving ? null : (value) {
-                  if (value != null) onDigestChanged(value);
-                },
+                onChanged: saving
+                    ? null
+                    : (value) {
+                        if (value != null) onDigestChanged(value);
+                      },
               ),
             ],
           ],

@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +13,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/models/professional_models.dart';
 import '../../core/api/professional_auth_api.dart';
 import '../../core/config/env.dart';
+import '../../core/constants/location_options.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 
@@ -19,18 +24,69 @@ class ProfessionalProfilePage extends ConsumerStatefulWidget {
   const ProfessionalProfilePage({super.key});
 
   @override
-  ConsumerState<ProfessionalProfilePage> createState() => _ProfessionalProfilePageState();
+  ConsumerState<ProfessionalProfilePage> createState() =>
+      _ProfessionalProfilePageState();
 }
 
 /// The six Private/Public sections the web professional profile exposes.
 /// The keys are the backend's, and `certification` is singular on purpose —
 /// sending `certifications` silently does nothing.
 const _months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePage> {
+DioMediaType _profileImageMediaType(String filename) {
+  final extension = filename.split('.').last.toLowerCase();
+  return switch (extension) {
+    'png' => DioMediaType('image', 'png'),
+    'webp' => DioMediaType('image', 'webp'),
+    'gif' => DioMediaType('image', 'gif'),
+    'heic' || 'heif' => DioMediaType('image', 'heic'),
+    _ => DioMediaType('image', 'jpeg'),
+  };
+}
+
+class _ProfileLinkEditor {
+  _ProfileLinkEditor({String title = '', String url = ''})
+    : title = TextEditingController(text: title),
+      url = TextEditingController(text: url);
+
+  final TextEditingController title;
+  final TextEditingController url;
+
+  void dispose() {
+    title.dispose();
+    url.dispose();
+  }
+}
+
+class _ProfileImageEditor {
+  _ProfileImageEditor({
+    this.category = 'Certificates',
+    String title = '',
+    this.url = '',
+  }) : title = TextEditingController(text: title);
+
+  String category;
+  final TextEditingController title;
+  String url;
+
+  void dispose() => title.dispose();
+}
+
+class _ProfessionalProfilePageState
+    extends ConsumerState<ProfessionalProfilePage> {
   ProfessionalProfile? _profile;
   Map<String, bool> _visibility = {};
   bool _isEditing = false;
@@ -39,12 +95,16 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
   String _message = '';
   bool _messageIsError = false;
   XFile? _photoFile;
+  Uint8List? _photoPreviewBytes;
   bool _isRemovingPhoto = false;
+  String? _certificationFilePath;
+  String _certificationFileName = '';
 
   // Edit fields
   final _firstName = TextEditingController();
   final _middleName = TextEditingController();
   final _lastName = TextEditingController();
+  final _username = TextEditingController();
   final _professionalCode = TextEditingController();
   final _phone = TextEditingController();
   final _country = TextEditingController();
@@ -62,11 +122,20 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
   final _instagram = TextEditingController();
   final _youtube = TextEditingController();
   final _website = TextEditingController();
+  final List<_ProfileLinkEditor> _profileLinks = [];
+  final List<_ProfileImageEditor> _profileImages = [];
   String _gender = '';
   int? _birthMonth;
   int? _birthYear;
 
   static const _genders = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  static const _imageCategories = [
+    'Certificates',
+    'Transformation Photos',
+    'Achievements',
+    'Body Physique',
+    'Other Images',
+  ];
 
   @override
   void initState() {
@@ -77,12 +146,35 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
   @override
   void dispose() {
     for (final c in [
-      _firstName, _middleName, _lastName, _professionalCode, _phone, _country,
-      _state, _headline, _aboutMe, _professionalType, _specializations,
-      _trainingStyle, _languages, _yearsExperience, _certName, _certIssuedBy,
-      _certYear, _instagram, _youtube, _website,
+      _firstName,
+      _middleName,
+      _lastName,
+      _username,
+      _professionalCode,
+      _phone,
+      _country,
+      _state,
+      _headline,
+      _aboutMe,
+      _professionalType,
+      _specializations,
+      _trainingStyle,
+      _languages,
+      _yearsExperience,
+      _certName,
+      _certIssuedBy,
+      _certYear,
+      _instagram,
+      _youtube,
+      _website,
     ]) {
       c.dispose();
+    }
+    for (final link in _profileLinks) {
+      link.dispose();
+    }
+    for (final image in _profileImages) {
+      image.dispose();
     }
     super.dispose();
   }
@@ -125,9 +217,19 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
     _firstName.text = p.firstName;
     _middleName.text = p.middleName;
     _lastName.text = p.lastName;
-    _professionalCode.text = p.professionalId.isNotEmpty ? p.professionalId : p.professionalCode;
+    _username.text = p.username;
+    _professionalCode.text = p.professionalId.isNotEmpty
+        ? p.professionalId
+        : p.professionalCode;
     _phone.text = p.phone;
-    _country.text = p.country;
+    final country = p.country.trim().toUpperCase();
+    _country.text = country == 'IN' || country == 'INDIA'
+        ? 'India'
+        : country == 'US' ||
+              country == 'USA' ||
+              country.startsWith('UNITED STATES')
+        ? 'United States'
+        : p.country;
     _state.text = p.state;
     _headline.text = p.professionalHeadline;
     _aboutMe.text = p.aboutMe;
@@ -142,6 +244,32 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
     _instagram.text = p.instagramUrl;
     _youtube.text = p.youtubeUrl;
     _website.text = p.websiteUrl;
+    for (final link in _profileLinks) {
+      link.dispose();
+    }
+    _profileLinks
+      ..clear()
+      ..addAll(
+        p.profileLinks.map(
+          (link) => _ProfileLinkEditor(title: link.title, url: link.url),
+        ),
+      );
+    for (final image in _profileImages) {
+      image.dispose();
+    }
+    _profileImages
+      ..clear()
+      ..addAll(
+        p.profileImages.map(
+          (image) => _ProfileImageEditor(
+            category: _imageCategories.contains(image.category)
+                ? image.category
+                : 'Other Images',
+            title: image.title,
+            url: image.url,
+          ),
+        ),
+      );
     _gender = _genders.contains(p.gender) ? p.gender : '';
     _birthMonth = p.birthMonth;
     _birthYear = p.birthYear;
@@ -163,7 +291,45 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       maxWidth: 1200,
       imageQuality: 85,
     );
-    if (picked != null) setState(() => _photoFile = picked);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _photoFile = picked;
+      _photoPreviewBytes = bytes;
+    });
+  }
+
+  void _discardPickedPhoto() {
+    if (_photoFile == null && _photoPreviewBytes == null) return;
+    setState(() {
+      _photoFile = null;
+      _photoPreviewBytes = null;
+    });
+  }
+
+  Future<void> _pickProfileImage(int index) async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 82,
+    );
+    if (picked == null || index >= _profileImages.length) return;
+
+    final bytes = await picked.readAsBytes();
+    final extension = picked.name.split('.').last.toLowerCase();
+    final mime = switch (extension) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      _ => 'image/jpeg',
+    };
+    if (!mounted) return;
+    setState(() {
+      final image = _profileImages[index];
+      image.url = 'data:$mime;base64,${base64Encode(bytes)}';
+      if (image.title.text.trim().isEmpty) image.title.text = picked.name;
+    });
   }
 
   /// Deletes the saved photo immediately rather than on Save — it's its own
@@ -199,12 +365,14 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
 
     setState(() => _isRemovingPhoto = true);
     try {
-      final updated =
-          await ref.read(professionalAuthApiProvider).removeProfilePhoto();
+      final updated = await ref
+          .read(professionalAuthApiProvider)
+          .removeProfilePhoto();
       if (!mounted) return;
       setState(() {
         _profile = updated;
         _photoFile = null;
+        _photoPreviewBytes = null;
         _isRemovingPhoto = false;
       });
     } catch (_) {
@@ -216,6 +384,20 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
     }
   }
 
+  Future<void> _pickCertificationFile() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+      allowMultiple: false,
+    );
+    final file = result?.files.single;
+    if (!mounted || file?.path == null) return;
+    setState(() {
+      _certificationFilePath = file!.path;
+      _certificationFileName = file.name;
+    });
+  }
+
   Future<void> _save() async {
     final profile = _profile;
     if (profile == null) return;
@@ -224,6 +406,7 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
     final missing = <String>[
       if (_firstName.text.trim().isEmpty) 'first name',
       if (_lastName.text.trim().isEmpty) 'last name',
+      if (_username.text.trim().isEmpty) 'username',
       if (_professionalCode.text.trim().isEmpty) 'professional code',
       if (_gender.isEmpty) 'gender',
       if (_birthMonth == null) 'birth month',
@@ -240,6 +423,7 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
 
     final map = <String, dynamic>{
       'professional_id': _professionalCode.text.trim(),
+      'username': _username.text.trim().toLowerCase(),
       'first_name': _firstName.text.trim(),
       'middle_name': _middleName.text.trim(),
       'last_name': _lastName.text.trim(),
@@ -259,6 +443,21 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       'instagram_url': _instagram.text.trim(),
       'youtube_url': _youtube.text.trim(),
       'website_url': _website.text.trim(),
+      'profile_links': jsonEncode([
+        for (final link in _profileLinks)
+          if (link.title.text.trim().isNotEmpty &&
+              link.url.text.trim().isNotEmpty)
+            {'title': link.title.text.trim(), 'url': link.url.text.trim()},
+      ]),
+      'profile_images': jsonEncode([
+        for (final image in _profileImages)
+          if (image.title.text.trim().isNotEmpty && image.url.isNotEmpty)
+            {
+              'category': image.category,
+              'title': image.title.text.trim(),
+              'url': image.url,
+            },
+      ]),
       'birth_month': '$_birthMonth',
       'birth_year': '$_birthYear',
     };
@@ -271,9 +470,16 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       map['certification_year'] = _certYear.text.trim();
     }
     if (_photoFile != null) {
-      map['profile_photo'] = await MultipartFile.fromFile(
-        _photoFile!.path,
+      map['profile_photo'] = MultipartFile.fromBytes(
+        await _photoFile!.readAsBytes(),
         filename: _photoFile!.name,
+        contentType: _profileImageMediaType(_photoFile!.name),
+      );
+    }
+    if (_certificationFilePath != null) {
+      map['certification_file'] = await MultipartFile.fromFile(
+        _certificationFilePath!,
+        filename: _certificationFileName,
       );
     }
 
@@ -290,6 +496,9 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
         _isSaving = false;
         _isEditing = false;
         _photoFile = null;
+        _photoPreviewBytes = null;
+        _certificationFilePath = null;
+        _certificationFileName = '';
         _fillControllers(saved);
       });
       _setMessage('Profile saved.', false);
@@ -321,7 +530,7 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Professional Profile')),
+        appBar: AppBar(title: const Text('My Account')),
         body: const PagePad(
           children: [SkeletonBox(height: 110), SkeletonBox(height: 200)],
         ),
@@ -330,8 +539,16 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Professional Profile'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalMore)),
+        title: const Text('My Account'),
+        leading: BackButton(
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go(Routes.professionalMore);
+            }
+          },
+        ),
         actions: [
           if (!_isEditing)
             IconButton(
@@ -348,8 +565,11 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: AppCard(
-                color: (_messageIsError ? context.colors.error : context.tokens.success)
-                    .withValues(alpha: 0.08),
+                color:
+                    (_messageIsError
+                            ? context.colors.error
+                            : context.tokens.success)
+                        .withValues(alpha: 0.08),
                 child: Text(
                   _message,
                   style: context.text.bodySmall?.copyWith(
@@ -397,7 +617,8 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     StatusPill(
-                      label: 'Code: ${p.professionalId.isNotEmpty ? p.professionalId : p.professionalCode}',
+                      label:
+                          'Code: ${p.professionalId.isNotEmpty ? p.professionalId : p.professionalCode}',
                       tone: PillTone.info,
                     ),
                   ],
@@ -424,8 +645,10 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                     ? '${_months[p.birthMonth! - 1]} ${p.birthYear}'
                     : '',
               ),
-              _kv('Location',
-                  [p.state, p.country].where((s) => s.isNotEmpty).join(', ')),
+              _kv(
+                'Location',
+                [p.state, p.country].where((s) => s.isNotEmpty).join(', '),
+              ),
             ],
           ),
         ),
@@ -486,7 +709,96 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
               _kv('Year', p.certificationYear?.toString() ?? ''),
             ],
           ),
+
+        if (p.profileImages.isNotEmpty)
+          _visibilitySection(
+            title: 'Images',
+            visibilityKey: 'images',
+            children: [
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final image in p.profileImages)
+                    SizedBox(
+                      width: 132,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: AppRadius.controlAll,
+                            child: SizedBox(
+                              width: 132,
+                              height: 96,
+                              child: _profileImage(image.url),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            image.title,
+                            style: context.text.titleSmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (image.category.isNotEmpty)
+                            Text(
+                              image.category,
+                              style: context.text.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+
+        if (p.profileLinks.isNotEmpty)
+          _visibilitySection(
+            title: 'Links',
+            visibilityKey: 'links',
+            children: [
+              for (final link in p.profileLinks) _kv(link.title, link.url),
+            ],
+          ),
       ],
+    );
+  }
+
+  Widget _profileImage(String source) {
+    final fallback = ColoredBox(
+      color: context.tokens.surfaceSoft,
+      child: Center(
+        child: Icon(
+          Icons.image_outlined,
+          color: context.tokens.muted,
+          size: AppSize.iconRow,
+        ),
+      ),
+    );
+    if (source.startsWith('data:image/')) {
+      try {
+        final comma = source.indexOf(',');
+        if (comma < 0) return fallback;
+        return Image.memory(
+          base64Decode(source.substring(comma + 1)),
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      } catch (_) {
+        return fallback;
+      }
+    }
+    final url = Env.mediaUrl(source);
+    if (url.isEmpty) return fallback;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+      loadingBuilder: (context, child, progress) =>
+          progress == null ? child : fallback,
     );
   }
 
@@ -558,6 +870,7 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                     imageUrl: _photoFile == null
                         ? Env.mediaUrl(_profile?.profilePhotoUrl ?? '')
                         : '',
+                    imageBytes: _photoPreviewBytes,
                     size: 56,
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -567,8 +880,10 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                       children: [
                         OutlinedButton.icon(
                           onPressed: _pickPhoto,
-                          icon: const Icon(Icons.photo_camera_outlined,
-                              size: AppSize.iconRow),
+                          icon: const Icon(
+                            Icons.photo_camera_outlined,
+                            size: AppSize.iconRow,
+                          ),
                           label: const Text('Change photo'),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -584,6 +899,22 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                        if (_photoFile != null)
+                          TextButton.icon(
+                            onPressed: _discardPickedPhoto,
+                            icon: const Icon(
+                              Icons.close,
+                              size: AppSize.iconRow,
+                            ),
+                            label: const Text('Discard new photo'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: context.colors.error,
+                              minimumSize: const Size(
+                                0,
+                                AppSize.buttonHeightSm,
+                              ),
+                            ),
+                          ),
                         // Only offered when there is a saved photo to remove —
                         // an unsaved pick is cleared with Cancel instead.
                         if (_photoFile == null &&
@@ -592,14 +923,19 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
                             padding: const EdgeInsets.only(top: AppSpacing.xs),
                             child: TextButton.icon(
                               onPressed: _isRemovingPhoto ? null : _removePhoto,
-                              icon: const Icon(Icons.delete_outline,
-                                  size: AppSize.iconRow),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: AppSize.iconRow,
+                              ),
                               label: Text(
                                 _isRemovingPhoto ? 'Removing…' : 'Remove photo',
                               ),
                               style: TextButton.styleFrom(
                                 foregroundColor: context.colors.error,
-                                minimumSize: const Size(0, AppSize.buttonHeightSm),
+                                minimumSize: const Size(
+                                  0,
+                                  AppSize.buttonHeightSm,
+                                ),
                               ),
                             ),
                           ),
@@ -613,11 +949,15 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
         ),
         const SizedBox(height: AppSpacing.md),
 
-        _editSection('Identity', [
+        _editSection('Basic Profile', [
           _field(_firstName, 'First name', capitalize: true),
           _field(_middleName, 'Middle name (optional)', capitalize: true),
           _field(_lastName, 'Last name', capitalize: true),
-          _field(_professionalCode, 'Professional code', helper: 'Clients log in with this'),
+          _field(
+            _username,
+            'Username',
+            helper: 'Used with your email when signing in',
+          ),
           _field(_phone, 'Phone', keyboard: TextInputType.phone),
           DropdownButtonFormField<String>(
             initialValue: _gender.isEmpty ? null : _gender,
@@ -655,31 +995,214 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
               ),
             ],
           ),
-          _field(_country, 'Country', capitalize: true),
-          _field(_state, 'State', capitalize: true),
+          DropdownButtonFormField<String>(
+            initialValue: professionalCountries.contains(_country.text)
+                ? _country.text
+                : null,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Country'),
+            items: professionalCountries
+                .map(
+                  (country) =>
+                      DropdownMenuItem(value: country, child: Text(country)),
+                )
+                .toList(),
+            onChanged: (value) => setState(() {
+              _country.text = value ?? '';
+              if (!(professionalStates[value] ?? const <String>[]).contains(
+                _state.text,
+              )) {
+                _state.clear();
+              }
+            }),
+          ),
+          DropdownButtonFormField<String>(
+            key: ValueKey('${_country.text}:${_state.text}'),
+            initialValue:
+                (professionalStates[_country.text] ?? const <String>[])
+                    .contains(_state.text)
+                ? _state.text
+                : null,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'State'),
+            items: (professionalStates[_country.text] ?? const <String>[])
+                .map(
+                  (state) => DropdownMenuItem(value: state, child: Text(state)),
+                )
+                .toList(),
+            onChanged: _country.text.isEmpty
+                ? null
+                : (value) => setState(() => _state.text = value ?? ''),
+          ),
+          _field(_headline, 'Professional headline'),
+          _field(_aboutMe, 'About me', lines: 4),
         ]),
 
-        _editSection('Professional', [
-          _field(_headline, 'Professional headline'),
+        _editSection('Professional Details', [
           _field(_professionalType, 'Professional type'),
-          _field(_yearsExperience, 'Years of experience',
-              keyboard: TextInputType.number),
+          _field(
+            _yearsExperience,
+            'Years of experience',
+            keyboard: TextInputType.number,
+          ),
           _field(_specializations, 'Specializations'),
           _field(_languages, 'Languages known'),
-          _field(_aboutMe, 'About me', lines: 4),
           _field(_trainingStyle, 'Training style', lines: 3),
         ]),
 
-        _editSection('Certification', [
+        _editSection('Certifications', [
           _field(_certName, 'Certification name'),
           _field(_certIssuedBy, 'Issued by'),
           _field(_certYear, 'Year', keyboard: TextInputType.number),
+          AppCard(
+            color: context.tokens.surfaceSoft,
+            elevated: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Certification document', style: context.text.titleSmall),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  _certificationFileName.isNotEmpty
+                      ? _certificationFileName
+                      : (_profile?.certificationFileUrl ?? '').isNotEmpty
+                      ? 'A certification document is already saved.'
+                      : 'Add a PDF or image, up to 10 MB.',
+                  style: context.text.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed: _pickCertificationFile,
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: Text(
+                    (_profile?.certificationFileUrl ?? '').isNotEmpty ||
+                            _certificationFileName.isNotEmpty
+                        ? 'Replace document'
+                        : 'Choose document',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ]),
+
+        _editSection('Images', [
+          for (var index = 0; index < _profileImages.length; index++)
+            AppCard(
+              color: context.tokens.surfaceSoft,
+              elevated: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Image ${index + 1}',
+                          style: context.text.titleSmall,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(() {
+                          final removed = _profileImages.removeAt(index);
+                          removed.dispose();
+                        }),
+                        tooltip: 'Remove image',
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                  ClipRRect(
+                    borderRadius: AppRadius.controlAll,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 150,
+                      child: _profileImage(_profileImages[index].url),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: _profileImages[index].category,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    items: _imageCategories
+                        .map(
+                          (category) => DropdownMenuItem(
+                            value: category,
+                            child: Text(category),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(
+                      () => _profileImages[index].category =
+                          value ?? 'Other Images',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _field(_profileImages[index].title, 'Title'),
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    onPressed: () => _pickProfileImage(index),
+                    icon: const Icon(Icons.image_outlined),
+                    label: Text(
+                      _profileImages[index].url.isEmpty
+                          ? 'Choose image'
+                          : 'Replace image',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: () =>
+                setState(() => _profileImages.add(_ProfileImageEditor())),
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: const Text('Add image'),
+          ),
         ]),
 
         _editSection('Links', [
-          _field(_instagram, 'Instagram URL', keyboard: TextInputType.url),
-          _field(_youtube, 'YouTube URL', keyboard: TextInputType.url),
-          _field(_website, 'Website URL', keyboard: TextInputType.url),
+          for (var index = 0; index < _profileLinks.length; index++)
+            AppCard(
+              color: context.tokens.surfaceSoft,
+              elevated: false,
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Link ${index + 1}',
+                          style: context.text.titleSmall,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(() {
+                          final removed = _profileLinks.removeAt(index);
+                          removed.dispose();
+                        }),
+                        tooltip: 'Remove link',
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _field(_profileLinks[index].title, 'Link name'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _field(
+                    _profileLinks[index].url,
+                    'URL',
+                    keyboard: TextInputType.url,
+                  ),
+                ],
+              ),
+            ),
+          OutlinedButton.icon(
+            onPressed: () =>
+                setState(() => _profileLinks.add(_ProfileLinkEditor())),
+            icon: const Icon(Icons.add_link),
+            label: const Text('Add profile link'),
+          ),
         ]),
 
         const SizedBox(height: AppSpacing.md),
@@ -696,10 +1219,11 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
               onPressed: _isSaving
                   ? null
                   : () => setState(() {
-                        _isEditing = false;
-                        _photoFile = null;
-                        if (_profile != null) _fillControllers(_profile!);
-                      }),
+                      _isEditing = false;
+                      _photoFile = null;
+                      _photoPreviewBytes = null;
+                      if (_profile != null) _fillControllers(_profile!);
+                    }),
               child: const Text('Cancel'),
             ),
           ],
@@ -741,8 +1265,9 @@ class _ProfessionalProfilePageState extends ConsumerState<ProfessionalProfilePag
       maxLines: lines,
       keyboardType: keyboard,
       autocorrect: !capitalize,
-      textCapitalization:
-          capitalize ? TextCapitalization.words : TextCapitalization.sentences,
+      textCapitalization: capitalize
+          ? TextCapitalization.words
+          : TextCapitalization.sentences,
       decoration: InputDecoration(labelText: label, helperText: helper),
     );
   }

@@ -19,14 +19,14 @@ class TemplateFieldType {
   static const all = [number, shortText, longText, yesNo, dropdown, rating];
 
   static String label(String type) => switch (type) {
-        number => 'Number',
-        shortText => 'Short text',
-        longText => 'Long text',
-        yesNo => 'Yes / No',
-        dropdown => 'Dropdown',
-        rating => 'Rating',
-        _ => type,
-      };
+    number => 'Number',
+    shortText => 'Short text',
+    longText => 'Long text',
+    yesNo => 'Yes / No',
+    dropdown => 'Dropdown',
+    rating => 'Rating',
+    _ => type,
+  };
 }
 
 /// 'daily' | 'weekly' | 'monthly'
@@ -65,12 +65,12 @@ class TemplateField {
 
   /// Bridges to the graph engine's field shape.
   FieldLike toFieldLike() => FieldLike(
-        key: key,
-        label: label,
-        fieldType: fieldType,
-        options: options,
-        scale: scale,
-      );
+    key: key,
+    label: label,
+    fieldType: fieldType,
+    options: options,
+    scale: scale,
+  );
 
   TemplateField copyWith({
     String? key,
@@ -80,35 +80,34 @@ class TemplateField {
     List<String>? options,
     int? scale,
     bool clearScale = false,
-  }) =>
-      TemplateField(
-        key: key ?? this.key,
-        label: label ?? this.label,
-        fieldType: fieldType ?? this.fieldType,
-        placeholder: placeholder ?? this.placeholder,
-        options: options ?? this.options,
-        scale: clearScale ? null : (scale ?? this.scale),
-      );
+  }) => TemplateField(
+    key: key ?? this.key,
+    label: label ?? this.label,
+    fieldType: fieldType ?? this.fieldType,
+    placeholder: placeholder ?? this.placeholder,
+    options: options ?? this.options,
+    scale: clearScale ? null : (scale ?? this.scale),
+  );
 
   factory TemplateField.fromJson(Map<String, dynamic> json) => TemplateField(
-        key: json['key'] as String? ?? '',
-        label: json['label'] as String? ?? '',
-        fieldType: json['field_type'] as String? ?? '',
-        placeholder: json['placeholder'] as String? ?? '',
-        options: (json['options'] as List<dynamic>? ?? [])
-            .map((o) => o.toString())
-            .toList(),
-        scale: (json['scale'] as num?)?.toInt(),
-      );
+    key: json['key'] as String? ?? '',
+    label: json['label'] as String? ?? '',
+    fieldType: json['field_type'] as String? ?? '',
+    placeholder: json['placeholder'] as String? ?? '',
+    options: (json['options'] as List<dynamic>? ?? [])
+        .map((o) => o.toString())
+        .toList(),
+    scale: (json['scale'] as num?)?.toInt(),
+  );
 
   Map<String, dynamic> toJson() => {
-        if (key.isNotEmpty) 'key': key,
-        'label': label,
-        'field_type': fieldType,
-        'placeholder': placeholder,
-        if (options.isNotEmpty) 'options': options,
-        if (scale != null) 'scale': scale,
-      };
+    if (key.isNotEmpty) 'key': key,
+    'label': label,
+    'field_type': fieldType,
+    'placeholder': placeholder,
+    if (options.isNotEmpty) 'options': options,
+    if (scale != null) 'scale': scale,
+  };
 }
 
 class TemplateResource {
@@ -144,7 +143,9 @@ class TemplateResource {
         description: json['description'] as String? ?? '',
         link: json['link'] as String? ?? '',
         fileUrl: json['file_url'] as String? ?? '',
-        tags: (json['tags'] as List<dynamic>? ?? []).map((t) => t.toString()).toList(),
+        tags: (json['tags'] as List<dynamic>? ?? [])
+            .map((t) => t.toString())
+            .toList(),
       );
 }
 
@@ -253,12 +254,12 @@ class TemplatePayload {
   final List<TemplateField> customFields;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'purpose': purpose,
-        'cadence': cadence,
-        'accent': accent,
-        'custom_fields': customFields.map((f) => f.toJson()).toList(),
-      };
+    'name': name,
+    'purpose': purpose,
+    'cadence': cadence,
+    'accent': accent,
+    'custom_fields': customFields.map((f) => f.toJson()).toList(),
+  };
 }
 
 /// 'private' | 'view_only' | 'editable' — whether the client can see/edit
@@ -271,11 +272,11 @@ class TemplateClientAccessLevel {
   static const all = [private, viewOnly, editable];
 
   static String label(String value) => switch (value) {
-        'private' => 'Private (hidden)',
-        'view_only' => 'View only',
-        'editable' => 'Editable',
-        _ => value,
-      };
+    'private' => 'Private (hidden)',
+    'view_only' => 'View only',
+    'editable' => 'Editable',
+    _ => value,
+  };
 }
 
 class TemplateAssignmentRecord {
@@ -344,11 +345,11 @@ class TrackingEntryRecord {
 
   /// Bridges to the graph engine's entry shape.
   EntryLike toEntryLike() => EntryLike(
-        entryDate: entryDate,
-        entryTime: entryTime,
-        answers: answers,
-        createdAt: createdAt,
-      );
+    entryDate: entryDate,
+    entryTime: entryTime,
+    answers: answers,
+    createdAt: createdAt,
+  );
 
   factory TrackingEntryRecord.fromJson(Map<String, dynamic> json) =>
       TrackingEntryRecord(

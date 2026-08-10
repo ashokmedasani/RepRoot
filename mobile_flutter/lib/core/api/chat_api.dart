@@ -61,20 +61,21 @@ class ProfessionalUnreadSummary {
 
   DateTime? lastUnreadFor(int clientId) => lastUnreadAt['$clientId'];
 
-  factory ProfessionalUnreadSummary.fromJson(Map<String, dynamic> json) =>
-      ProfessionalUnreadSummary(
-        unreadCount: json['unread_count'] as int? ?? 0,
-        byClient: (json['by_client'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(key.toString(), (value as num?)?.toInt() ?? 0),
-        ),
-        lastUnreadAt: {
-          for (final entry
-              in (json['last_unread_at'] as Map<dynamic, dynamic>? ?? {}).entries)
-            // The `?` drops the entry when the timestamp won't parse, so one bad
-            // row can't take the whole ordering down with it.
-            entry.key.toString(): ?DateTime.tryParse('${entry.value}'),
-        },
-      );
+  factory ProfessionalUnreadSummary.fromJson(
+    Map<String, dynamic> json,
+  ) => ProfessionalUnreadSummary(
+    unreadCount: json['unread_count'] as int? ?? 0,
+    byClient: (json['by_client'] as Map<dynamic, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(key.toString(), (value as num?)?.toInt() ?? 0),
+    ),
+    lastUnreadAt: {
+      for (final entry
+          in (json['last_unread_at'] as Map<dynamic, dynamic>? ?? {}).entries)
+        // The `?` drops the entry when the timestamp won't parse, so one bad
+        // row can't take the whole ordering down with it.
+        entry.key.toString(): ?DateTime.tryParse('${entry.value}'),
+    },
+  );
 }
 
 class ChatApi {
@@ -92,7 +93,9 @@ class ChatApi {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/clients/$clientId/chat/',
-        queryParameters: afterId != null && afterId > 0 ? {'after': '$afterId'} : null,
+        queryParameters: afterId != null && afterId > 0
+            ? {'after': '$afterId'}
+            : null,
         options: _auth,
       );
       return (res.data?['messages'] as List<dynamic>? ?? [])
@@ -146,4 +149,6 @@ class ChatApi {
   }
 }
 
-final chatApiProvider = Provider<ChatApi>((ref) => ChatApi(ref.watch(dioProvider)));
+final chatApiProvider = Provider<ChatApi>(
+  (ref) => ChatApi(ref.watch(dioProvider)),
+);

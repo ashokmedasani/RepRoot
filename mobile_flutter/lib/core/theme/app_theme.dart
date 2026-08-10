@@ -5,9 +5,8 @@ import 'app_tokens.dart';
 
 /// Material 3 themes built from the RepRoot tokens.
 ///
-/// Font: Roboto, Android's system font. Chosen over the web/Ionic brand font
-/// (Manrope) so the app feels native on Android and needs no font download —
-/// this is a deliberate divergence from the other two apps.
+/// Font: Inter, matching the public website and authenticated web workspace.
+/// The family is bundled with the app so every platform renders it consistently.
 ///
 /// Type scale is much tighter than the Ionic app by design (see AppSize docs):
 /// display 22 / title 16 / body 13.5 / label 11.5 / caption 10.5.
@@ -15,56 +14,56 @@ class AppTheme {
   const AppTheme._();
 
   static ThemeData get light => _build(
-        brightness: Brightness.light,
-        tokens: AppTokens.light,
-        scheme: const ColorScheme.light(
-          primary: AppColors.lightPrimary,
-          onPrimary: AppColors.onPrimary,
-          primaryContainer: AppColors.lightPrimarySoft,
-          onPrimaryContainer: AppColors.lightPrimaryStrong,
-          secondary: AppColors.lightAccent,
-          onSecondary: AppColors.onPrimary,
-          tertiary: AppColors.lightSuccess,
-          onTertiary: AppColors.onPrimary,
-          error: AppColors.danger,
-          onError: AppColors.onPrimary,
-          surface: AppColors.lightSurface,
-          onSurface: AppColors.lightText,
-          surfaceContainerLowest: AppColors.lightSurface,
-          surfaceContainerLow: AppColors.lightBg,
-          surfaceContainer: AppColors.lightSurfaceSoft,
-          onSurfaceVariant: AppColors.lightMuted,
-          outline: AppColors.lightBorder,
-          outlineVariant: AppColors.lightBorder,
-        ),
-        scaffoldBg: AppColors.lightBg,
-      );
+    brightness: Brightness.light,
+    tokens: AppTokens.light,
+    scheme: const ColorScheme.light(
+      primary: AppColors.lightPrimary,
+      onPrimary: AppColors.onPrimary,
+      primaryContainer: AppColors.lightPrimarySoft,
+      onPrimaryContainer: AppColors.lightPrimaryStrong,
+      secondary: AppColors.lightAccent,
+      onSecondary: AppColors.onPrimary,
+      tertiary: AppColors.lightSuccess,
+      onTertiary: AppColors.onPrimary,
+      error: AppColors.danger,
+      onError: AppColors.onPrimary,
+      surface: AppColors.lightSurface,
+      onSurface: AppColors.lightText,
+      surfaceContainerLowest: AppColors.lightSurface,
+      surfaceContainerLow: AppColors.lightBg,
+      surfaceContainer: AppColors.lightSurfaceSoft,
+      onSurfaceVariant: AppColors.lightMuted,
+      outline: AppColors.lightBorder,
+      outlineVariant: AppColors.lightBorder,
+    ),
+    scaffoldBg: AppColors.lightBg,
+  );
 
   static ThemeData get dark => _build(
-        brightness: Brightness.dark,
-        tokens: AppTokens.dark,
-        scheme: const ColorScheme.dark(
-          primary: AppColors.darkPrimary,
-          onPrimary: AppColors.darkBg,
-          primaryContainer: AppColors.darkPrimarySoft,
-          onPrimaryContainer: AppColors.darkPrimaryStrong,
-          secondary: AppColors.darkAccent,
-          onSecondary: AppColors.darkBg,
-          tertiary: AppColors.darkSuccess,
-          onTertiary: AppColors.darkBg,
-          error: AppColors.danger,
-          onError: AppColors.onPrimary,
-          surface: AppColors.darkSurface,
-          onSurface: AppColors.darkText,
-          surfaceContainerLowest: AppColors.darkBg,
-          surfaceContainerLow: AppColors.darkBg,
-          surfaceContainer: AppColors.darkSurfaceSoft,
-          onSurfaceVariant: AppColors.darkMuted,
-          outline: AppColors.darkBorder,
-          outlineVariant: AppColors.darkBorder,
-        ),
-        scaffoldBg: AppColors.darkBg,
-      );
+    brightness: Brightness.dark,
+    tokens: AppTokens.dark,
+    scheme: const ColorScheme.dark(
+      primary: AppColors.darkPrimary,
+      onPrimary: AppColors.darkBg,
+      primaryContainer: AppColors.darkPrimarySoft,
+      onPrimaryContainer: AppColors.darkPrimaryStrong,
+      secondary: AppColors.darkAccent,
+      onSecondary: AppColors.darkBg,
+      tertiary: AppColors.darkSuccess,
+      onTertiary: AppColors.darkBg,
+      error: AppColors.danger,
+      onError: AppColors.onPrimary,
+      surface: AppColors.darkSurface,
+      onSurface: AppColors.darkText,
+      surfaceContainerLowest: AppColors.darkBg,
+      surfaceContainerLow: AppColors.darkBg,
+      surfaceContainer: AppColors.darkSurfaceSoft,
+      onSurfaceVariant: AppColors.darkMuted,
+      outline: AppColors.darkBorder,
+      outlineVariant: AppColors.darkBorder,
+    ),
+    scaffoldBg: AppColors.darkBg,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -77,6 +76,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      fontFamily: 'Inter',
       colorScheme: scheme,
       scaffoldBackgroundColor: scaffoldBg,
       textTheme: textTheme,
@@ -90,7 +90,10 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge,
-        iconTheme: IconThemeData(color: scheme.onSurface, size: AppSize.iconNav),
+        iconTheme: IconThemeData(
+          color: scheme.onSurface,
+          size: AppSize.iconNav,
+        ),
       ),
       // Borderless: the card's own shadow separates it from the page. Adding a
       // hairline on top of that reads as belt-and-braces at this radius.
@@ -158,7 +161,9 @@ class AppTheme {
         ),
         hintStyle: textTheme.bodyMedium?.copyWith(color: tokens.muted),
         labelStyle: textTheme.bodyMedium?.copyWith(color: tokens.muted),
-        floatingLabelStyle: textTheme.labelMedium?.copyWith(color: scheme.primary),
+        floatingLabelStyle: textTheme.labelMedium?.copyWith(
+          color: scheme.primary,
+        ),
         border: _fieldBorder(Colors.transparent),
         enabledBorder: _fieldBorder(Colors.transparent),
         focusedBorder: _fieldBorder(scheme.primary, width: 1.6),
@@ -179,12 +184,16 @@ class AppTheme {
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: AppSize.iconNav,
-            color: states.contains(WidgetState.selected) ? scheme.primary : tokens.muted,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : tokens.muted,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => textTheme.labelSmall?.copyWith(
-            color: states.contains(WidgetState.selected) ? scheme.primary : tokens.muted,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : tokens.muted,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w600
                 : FontWeight.w500,
@@ -223,7 +232,11 @@ class AppTheme {
           ),
         ),
       ),
-      dividerTheme: DividerThemeData(color: tokens.border, thickness: 1, space: 1),
+      dividerTheme: DividerThemeData(
+        color: tokens.border,
+        thickness: 1,
+        space: 1,
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: tokens.surfaceSoft,
         // Material selects chips with secondaryContainer, which is the teal
@@ -304,12 +317,17 @@ class AppTheme {
     );
   }
 
-  static TextTheme _textTheme(Color onSurface, Color muted, Brightness brightness) {
-    // Roboto comes from Typography's Mountain View faces — Android's system
-    // font, so nothing is downloaded at runtime.
-    final base = brightness == Brightness.dark
+  static TextTheme _textTheme(
+    Color onSurface,
+    Color muted,
+    Brightness brightness,
+  ) {
+    // Start from Material's platform-aware metrics, then apply the same Inter
+    // family used by the website so headings do not look like a separate app.
+    final materialBase = brightness == Brightness.dark
         ? Typography.material2021().white
         : Typography.material2021().black;
+    final base = materialBase.apply(fontFamily: 'Inter');
 
     // Two moves carry the "considered" feel, and they pull in opposite
     // directions on purpose:
@@ -341,32 +359,68 @@ class AppTheme {
           // 12pt tab label read as two unrelated designs. Body came down from
           // 14 to 13 so lower sections stop out-shouting the header.
           displaySmall: base.displaySmall?.copyWith(
-              fontSize: 20, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -0.4),
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.16,
+            letterSpacing: -0.55,
+          ),
           headlineSmall: base.headlineSmall?.copyWith(
-              fontSize: 17, fontWeight: FontWeight.w700, height: 1.25, letterSpacing: -0.3),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            height: 1.2,
+            letterSpacing: -0.35,
+          ),
           titleLarge: base.titleLarge?.copyWith(
-              fontSize: 15, fontWeight: FontWeight.w600, height: 1.3, letterSpacing: -0.1),
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+            letterSpacing: -0.18,
+          ),
           titleMedium: base.titleMedium?.copyWith(
-              fontSize: 14, fontWeight: FontWeight.w600, height: 1.3),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            height: 1.3,
+          ),
           titleSmall: base.titleSmall?.copyWith(
-              fontSize: 13, fontWeight: FontWeight.w600, height: 1.3),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            height: 1.3,
+          ),
           bodyLarge: base.bodyLarge?.copyWith(
-              fontSize: 13, fontWeight: FontWeight.w500, height: 1.45),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.45,
+          ),
           bodyMedium: base.bodyMedium?.copyWith(
-              fontSize: 13, fontWeight: FontWeight.w400, height: 1.5),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w400,
+            height: 1.5,
+          ),
           bodySmall: base.bodySmall?.copyWith(
-              fontSize: 11, fontWeight: FontWeight.w400, height: 1.45, color: muted),
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            height: 1.45,
+            color: muted,
+          ),
           labelLarge: base.labelLarge?.copyWith(
-              fontSize: 13, fontWeight: FontWeight.w600, height: 1.2, letterSpacing: 0.1),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+            letterSpacing: 0.1,
+          ),
           labelMedium: base.labelMedium?.copyWith(
-              fontSize: 12, fontWeight: FontWeight.w500, height: 1.2, letterSpacing: 0.2),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            height: 1.2,
+            letterSpacing: 0.2,
+          ),
           labelSmall: base.labelSmall?.copyWith(
-              fontSize: 11, fontWeight: FontWeight.w500, height: 1.2, letterSpacing: 0.4),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            height: 1.2,
+            letterSpacing: 0.4,
+          ),
         )
-        .apply(
-          fontFamily: 'Roboto',
-          bodyColor: onSurface,
-          displayColor: onSurface,
-        );
+        .apply(bodyColor: onSurface, displayColor: onSurface);
   }
 }

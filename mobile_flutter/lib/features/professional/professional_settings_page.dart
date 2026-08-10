@@ -11,10 +11,8 @@ import '../../shared/widgets/app_widgets.dart';
 /// professional-account-settings component. Each row pushes a dedicated page
 /// that owns its own state/logic, rather than one giant single-scroll page.
 ///
-/// "My Account" was removed as a separate destination: it only ever showed
-/// read-only name/username/email, which the real Profile page already covers
-/// with edit support, so this menu points straight at Profile instead of a
-/// thin duplicate (see the now-deleted professional_settings_account_page.dart).
+/// "My Account" points to the full profile viewer/editor so account identity
+/// and professional details live in one place on mobile, as they do on web.
 /// "Recycle Bin" and "Privacy & Legal" also moved off this landing page — the
 /// former now lives inside Data Usage, the latter inside More ▸ About & Legal.
 class ProfessionalSettingsPage extends StatelessWidget {
@@ -25,7 +23,9 @@ class ProfessionalSettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalMore)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalMore),
+        ),
       ),
       body: PagePad(
         children: [
@@ -40,7 +40,7 @@ class ProfessionalSettingsPage extends StatelessWidget {
               ColorfulMenuItem(
                 icon: Icons.person_outline,
                 accent: MenuAccent.blue,
-                label: 'My Profile',
+                label: 'My Account',
                 onTap: () => context.go(Routes.professionalProfile),
               ),
               ColorfulMenuItem(
@@ -53,8 +53,9 @@ class ProfessionalSettingsPage extends StatelessWidget {
                 icon: Icons.notifications_outlined,
                 accent: MenuAccent.purple,
                 label: 'Notifications',
-                onTap: () =>
-                    context.push('${Routes.professionalNotifications}/preferences'),
+                onTap: () => context.push(
+                  '${Routes.professionalNotifications}/preferences',
+                ),
               ),
               ColorfulMenuItem(
                 icon: Icons.payments_outlined,
@@ -65,14 +66,15 @@ class ProfessionalSettingsPage extends StatelessWidget {
               ColorfulMenuItem(
                 icon: Icons.credit_card_outlined,
                 accent: MenuAccent.teal,
-                label: 'Plan & Billing',
+                label: 'Plan and Billing',
                 onTap: () => context.push(Routes.professionalSettingsBilling),
               ),
               ColorfulMenuItem(
                 icon: Icons.storage_outlined,
                 accent: MenuAccent.pink,
                 label: 'Data Usage',
-                onTap: () => context.push(Routes.professionalSettingsPlanStorage),
+                onTap: () =>
+                    context.push(Routes.professionalSettingsPlanStorage),
               ),
             ],
           ),

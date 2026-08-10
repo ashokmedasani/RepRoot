@@ -62,7 +62,8 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
 
   bool get _canCreate => _activeCount < _activeLimit;
 
-  Future<SupportListResponse> _fetch() => widget.role == SupportRole.professional
+  Future<SupportListResponse> _fetch() =>
+      widget.role == SupportRole.professional
       ? ref.read(professionalAuthApiProvider).getSupportIncidents()
       : ref.read(clientApiProvider).getSupportIncidents();
 
@@ -112,7 +113,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
     setState(() => _isSubmitting = true);
     try {
       if (widget.role == SupportRole.professional) {
-        await ref.read(professionalAuthApiProvider).createSupportIncident(
+        await ref
+            .read(professionalAuthApiProvider)
+            .createSupportIncident(
               category: _category,
               subject: _subject.text.trim(),
               description: _description.text.trim(),
@@ -120,7 +123,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
               screenshotName: _screenshot?.name,
             );
       } else {
-        await ref.read(clientApiProvider).createSupportIncident(
+        await ref
+            .read(clientApiProvider)
+            .createSupportIncident(
               category: _category,
               subject: _subject.text.trim(),
               description: _description.text.trim(),
@@ -145,7 +150,11 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
     }
   }
 
-  Future<void> _act(SupportIncident incident, String action, {String body = ''}) async {
+  Future<void> _act(
+    SupportIncident incident,
+    String action, {
+    String body = '',
+  }) async {
     try {
       if (widget.role == SupportRole.professional) {
         await ref
@@ -176,14 +185,16 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Help & Support')),
-        body: const PagePad(children: [SkeletonBox(height: 200), SkeletonBox(height: 100)]),
+        appBar: AppBar(title: const Text('Help and Support')),
+        body: const PagePad(
+          children: [SkeletonBox(height: 200), SkeletonBox(height: 100)],
+        ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Support'),
+        title: const Text('Help and Support'),
         leading: BackButton(onPressed: () => context.go(backRoute)),
       ),
       body: PagePad(
@@ -198,7 +209,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                 child: Text(
                   _message,
                   style: context.text.bodySmall?.copyWith(
-                    color: _messageIsError ? context.colors.error : tokens.success,
+                    color: _messageIsError
+                        ? context.colors.error
+                        : tokens.success,
                   ),
                 ),
               ),
@@ -208,7 +221,10 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Report a bug or send feedback', style: context.text.titleSmall),
+                Text(
+                  'Report a bug or send feedback',
+                  style: context.text.titleSmall,
+                ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Support requests are tracked here. You can have up to '
@@ -226,7 +242,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                     child: Text(
                       'You have reached the $_activeLimit-request limit. New '
                       'requests are available after one is resolved or closed.',
-                      style: context.text.bodySmall?.copyWith(color: tokens.accent),
+                      style: context.text.bodySmall?.copyWith(
+                        color: tokens.accent,
+                      ),
                     ),
                   ),
                 ],
@@ -235,13 +253,17 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                   initialValue: _category,
                   decoration: const InputDecoration(labelText: 'Request type'),
                   items: SupportCategory.all
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(SupportCategory.label(c)),
-                          ))
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(SupportCategory.label(c)),
+                        ),
+                      )
                       .toList(),
                   onChanged: _canCreate
-                      ? (v) => setState(() => _category = v ?? SupportCategory.feedback)
+                      ? (v) => setState(
+                          () => _category = v ?? SupportCategory.feedback,
+                        )
                       : null,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -264,7 +286,10 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: _canCreate ? _pickScreenshot : null,
-                      icon: const Icon(Icons.image_outlined, size: AppSize.iconRow),
+                      icon: const Icon(
+                        Icons.image_outlined,
+                        size: AppSize.iconRow,
+                      ),
                       label: const Text('Screenshot'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -329,7 +354,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                 Expanded(
                   child: Text(
                     incident.incidentId,
-                    style: context.text.labelMedium?.copyWith(color: tokens.muted),
+                    style: context.text.labelMedium?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ),
                 StatusPill(
@@ -337,8 +364,8 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
                   tone: incident.needsReply
                       ? PillTone.warn
                       : incident.isFinished
-                          ? PillTone.good
-                          : PillTone.info,
+                      ? PillTone.good
+                      : PillTone.info,
                 ),
               ],
             ),
@@ -396,7 +423,9 @@ class _SupportIncidentsPageState extends ConsumerState<SupportIncidentsPage> {
               TextField(
                 controller: _followUps[incident.incidentId],
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Reply to support'),
+                decoration: const InputDecoration(
+                  labelText: 'Reply to support',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               FilledButton(

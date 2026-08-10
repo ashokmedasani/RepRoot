@@ -6,14 +6,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/models/account_models.dart';
 import '../../core/api/professional_auth_api.dart';
+import '../../core/config/env.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'professional_format.dart';
 
-/// Billing & Plans — current plan, upgrade buttons, billing portal / cancel
-/// membership, and the plan-tier comparison table.
-/// Split out of the former single-scroll professional_settings_page.dart
-/// (was the "Billing" + "Compare plans" cards).
+/// Plan comparison and membership management. Plan limits and prices are read
+/// from the backend billing response so this screen never becomes a second
+/// source of truth.
 class ProfessionalSettingsBillingPage extends ConsumerStatefulWidget {
   const ProfessionalSettingsBillingPage({super.key});
 
@@ -25,7 +25,8 @@ class ProfessionalSettingsBillingPage extends ConsumerStatefulWidget {
 class _ProfessionalSettingsBillingPageState
     extends ConsumerState<ProfessionalSettingsBillingPage> {
   ProfessionalBillingStatus? _billing;
-  bool _billingBusy = false;
+  String _loadError = '';
+  String _selectedCycle = 'monthly';
 
   @override
   void initState() {
@@ -34,11 +35,20 @@ class _ProfessionalSettingsBillingPageState
   }
 
   Future<void> _load() async {
-    final api = ref.read(professionalAuthApiProvider);
+    if (mounted) setState(() => _loadError = '');
     try {
-      final billing = await api.getBillingStatus();
+      final billing = await ref
+          .read(professionalAuthApiProvider)
+          .getBillingStatus();
       if (mounted) setState(() => _billing = billing);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Could not load billing details (${error.runtimeType}).\n$stackTrace',
+      );
+      if (mounted) {
+        setState(() => _loadError = 'Billing details could not be loaded.');
+      }
+    }
   }
 
   void _toast(String text) {
@@ -46,73 +56,14 @@ class _ProfessionalSettingsBillingPageState
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _changePlan(
-    String tier, {
-    String billingCycle = 'monthly',
-    String currency = 'INR',
-  }) async {
-    if (_billingBusy) return;
-    setState(() => _billingBusy = true);
-    try {
-      final url = await ref.read(professionalAuthApiProvider).createBillingCheckout(
-            tier,
-            billingCycle: billingCycle,
-            currency: currency,
-          );
-      if (url.isNotEmpty) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      } else {
-        _toast('Plan updated.');
-      }
-      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
-      if (mounted) setState(() => _billing = billing);
-    } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update the plan.');
-    }
-    if (mounted) setState(() => _billingBusy = false);
-  }
-
-  Future<void> _choosePlan(String tier) async {
-    var cycle = 'monthly';
-    final currency = _billing?.billingCurrency ?? 'USD';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Choose ${ProfessionalUpgradeTier.label(tier)} billing'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: cycle,
-                decoration: const InputDecoration(labelText: 'Billing period'),
-                items: const [
-                  DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                  DropdownMenuItem(value: 'six_months', child: Text('6 Months · pay for 5')),
-                  DropdownMenuItem(value: 'yearly', child: Text('Yearly · pay for 10')),
-                ],
-                onChanged: (value) => setDialogState(() => cycle = value ?? cycle),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${_billing?.billingRegion ?? 'International'} · $currency',
-                  style: context.text.labelLarge,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => context.pop(true), child: const Text('Continue to checkout')),
-          ],
-        ),
+  Future<void> _choosePlan(String _) async {
+    final opened = await launchUrl(
+      Uri.parse(
+        Env.studioUrl('/professional/account-settings?section=billing'),
       ),
+      mode: LaunchMode.externalApplication,
     );
-    if (confirmed == true) {
-      await _changePlan(tier, billingCycle: cycle, currency: currency);
-    }
+    if (!opened) _toast('Could not open Plan and Billing on the website.');
   }
 
   Future<void> _cancelPlan() async {
@@ -120,16 +71,13 @@ class _ProfessionalSettingsBillingPageState
     if (billing == null) return;
     if (!billing.storageDowngradeEligible) {
       _toast(
-        'Cancellation is blocked because storage is ${billing.freeStoragePercent}% of the Free allowance. '
-        'Contact ${billing.supportEmail.isNotEmpty ? billing.supportEmail : 'support'}.',
+        'Cancellation is blocked because storage is '
+        '${billing.freeStoragePercent}% of the Free allowance. Contact '
+        '${billing.supportEmail.isNotEmpty ? billing.supportEmail : 'support'}.',
       );
       return;
     }
-    // Nothing here is ever deleted -- anything over the Free plan's limits
-    // simply locks (in priority order) and unlocks automatically the moment
-    // you upgrade again. The dialog spells out exactly what would lock, by
-    // name, plus the category-cascade rule and which clients would lose
-    // portal access -- no generic "may be deleted" copy, nothing to type.
+
     final lockLines = <String>[];
     const labels = {
       'lead_forms': 'lead form',
@@ -141,40 +89,57 @@ class _ProfessionalSettingsBillingPageState
     for (final entry in billing.downgradeLocks.entries) {
       final lockedCount = (entry.value['locked_count'] as num?)?.toInt() ?? 0;
       if (lockedCount == 0) continue;
-      final names = (entry.value['locked_names'] as List<dynamic>? ?? []).take(5).join(', ');
+      final names = (entry.value['locked_names'] as List<dynamic>? ?? [])
+          .take(5)
+          .join(', ');
       final label = labels[entry.key] ?? entry.key;
-      lockLines.add('$lockedCount $label${lockedCount == 1 ? '' : 's'} would lock ($names)');
+      lockLines.add(
+        '$lockedCount $label${lockedCount == 1 ? '' : 's'} would lock'
+        '${names.isEmpty ? '' : ' ($names)'}.',
+      );
     }
     if (billing.categoryCascadeResourceCount > 0) {
       lockLines.add(
-        '${billing.categoryCascadeResourceCount} resource(s) would lock because their category would lock, regardless of how many resources it contains',
+        '${billing.categoryCascadeResourceCount} resource(s) would lock '
+        'because their category would lock.',
       );
     }
     if (billing.clientsLosingAccess.isNotEmpty) {
       final names = billing.clientsLosingAccess
           .take(5)
-          .map((c) => '${c['client_name']} (${c['group_name']})')
+          .map((client) => '${client['client_name']} (${client['group_name']})')
           .join(', ');
-      lockLines.add('${billing.clientsLosingAccess.length} client(s) would lose portal access until you upgrade again: $names');
+      lockLines.add(
+        '${billing.clientsLosingAccess.length} client(s) would lose portal '
+        'access until you upgrade again: $names.',
+      );
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel plan?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Paid access remains active until expiry, then the account moves to Free. Nothing is ever deleted.'),
-            for (final line in lockLines) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(line),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Paid access remains active until expiry, then the account '
+                'moves to Free. Nothing is deleted.',
+              ),
+              for (final line in lockLines) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(line),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Keep plan')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Keep plan'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -188,263 +153,623 @@ class _ProfessionalSettingsBillingPageState
     );
     if (confirmed != true) return;
     try {
-      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan();
+      final message = await ref
+          .read(professionalAuthApiProvider)
+          .cancelBillingPlan();
       _toast(message.isNotEmpty ? message : 'Cancellation scheduled.');
-      final refreshed = await ref.read(professionalAuthApiProvider).getBillingStatus();
-      if (mounted) setState(() => _billing = refreshed);
+      await _load();
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not cancel the plan.');
+      _toast(
+        error is ApiException ? error.message : 'Could not cancel the plan.',
+      );
     }
   }
 
   Future<void> _openBillingPortal() async {
     try {
-      final url = await ref.read(professionalAuthApiProvider).createBillingPortal();
-      if (url.isNotEmpty) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      } else {
+      final url = await ref
+          .read(professionalAuthApiProvider)
+          .createBillingPortal();
+      if (url.isEmpty) {
         _toast('Billing portal is not available yet.');
+        return;
       }
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not open billing portal.');
+      _toast(
+        error is ApiException
+            ? error.message
+            : 'Could not open billing portal.',
+      );
     }
   }
 
-  /// Monthly price for a tier from the same `catalog` the checkout dialog
-  /// already reads (`catalog.trainer[code][cycle][currency]`) — Free has no
-  /// catalog entry and is always free.
-  String _planPrice(ProfessionalPlanTier tier) {
-    if (tier.code == 'starter_free' || tier.code == 'starter') return 'Free';
+  List<String> _availableCycles(ProfessionalBillingStatus billing) {
+    final trainer = billing.catalog['trainer'] as Map<dynamic, dynamic>? ?? {};
+    const supported = ['monthly', 'six_months', 'yearly'];
+    final cycles = supported.where((cycle) {
+      return trainer.values.any(
+        (prices) => prices is Map && prices.containsKey(cycle),
+      );
+    }).toList();
+    return cycles.isEmpty ? const ['monthly'] : cycles;
+  }
+
+  String _priceFor(ProfessionalPlanTier tier) {
     final billing = _billing;
     if (billing == null) return '—';
-    final currency = billing.billingCurrency.isNotEmpty ? billing.billingCurrency : 'USD';
+    final currency = billing.billingCurrency.isEmpty
+        ? 'USD'
+        : billing.billingCurrency;
+    final symbol = currency == 'INR' ? '₹' : r'$';
+    if (tier.code == 'starter_free' || tier.code == 'starter') {
+      return '${symbol}0.00';
+    }
     final trainer = billing.catalog['trainer'] as Map<dynamic, dynamic>?;
-    final tierPrices = trainer?[tier.code] as Map<dynamic, dynamic>?;
-    final monthly = tierPrices?['monthly'] as Map<dynamic, dynamic>?;
-    final value = monthly?[currency];
-    if (value == null) return '—';
-    return '$currency ${value.toString()}/mo';
+    final prices = trainer?[tier.code] as Map<dynamic, dynamic>?;
+    final cycle = prices?[_selectedCycle] as Map<dynamic, dynamic>?;
+    final value = cycle?[currency];
+    return value == null ? '—' : '$symbol$value';
   }
+
+  String _cycleLabel(String cycle) => switch (cycle) {
+    'six_months' => '6 Months',
+    'yearly' => 'Yearly',
+    _ => 'Monthly',
+  };
+
+  String _cycleSuffix() => switch (_selectedCycle) {
+    'six_months' => '/6 months',
+    'yearly' => '/year',
+    _ => '/month',
+  };
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
+    final billing = _billing;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Billing & Plans'),
+        title: const Text('Plan and Billing'),
         leading: BackButton(onPressed: () => context.pop()),
       ),
       body: PagePad(
         onRefresh: _load,
         children: [
-          const SettingsHeroCard(
-            icon: Icons.credit_card_outlined,
-            title: 'Billing & Plans',
-            subtitle: 'View plans, usage and billing history.',
+          Text(
+            'Compare and choose the plan that fits your work.',
+            style: context.text.bodyMedium?.copyWith(
+              color: context.tokens.muted,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (_billing != null) ...[
-            _Card(
-              title: 'Billing',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _KvList(
-                    rows: [
-                      ('Current plan', _billing!.planName.isNotEmpty ? _billing!.planName : '—'),
-                      if (_billing!.planRenewsAt != null)
-                        ('Expires / renews', shortDate(_billing!.planRenewsAt!)),
-                      if (_billing!.cancellationEffectiveAt != null)
-                        ('Cancellation effective', shortDate(_billing!.cancellationEffectiveAt!)),
-                      ('Free storage usage', '${_billing!.freeStoragePercent}%'),
-                    ],
-                  ),
-                  if (_billing!.testMode) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Text('Test mode — plan changes apply instantly with no charge.',
-                        style: context.text.bodySmall?.copyWith(color: tokens.muted)),
-                  ],
-                  const SizedBox(height: AppSpacing.sm),
-                  for (final tier in _billing!.upgradeTiers)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _billingBusy ? null : () => _choosePlan(tier),
-                          child: Text('Switch to ${ProfessionalUpgradeTier.label(tier)}'),
-                        ),
-                      ),
-                    ),
-                  Row(
-                    children: [
-                      if (_billing!.billingConfigured)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _openBillingPortal,
-                            child: const Text('Billing portal'),
-                          ),
-                        ),
-                      if (_billing!.planCode != 'starter_free' &&
-                          _billing!.planCode != 'starter') ...[
-                        if (_billing!.billingConfigured) const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _billing!.cancellationEffectiveAt == null ? _cancelPlan : null,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: context.colors.error,
-                            ),
-                            child: Text(
-                              _billing!.cancellationEffectiveAt == null
-                                  ? 'Cancel membership'
-                                  : 'Cancellation scheduled',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
+          if (_loadError.isNotEmpty) ...[
+            ErrorNote(message: _loadError, onRetry: _load),
+          ] else if (billing == null) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ] else ...[
+            _BillingControls(
+              cycles: _availableCycles(billing),
+              selectedCycle: _selectedCycle,
+              region: billing.billingRegion,
+              currency: billing.billingCurrency,
+              onCycleChanged: (cycle) {
+                setState(() => _selectedCycle = cycle);
+              },
+              cycleLabel: _cycleLabel,
             ),
             const SizedBox(height: AppSpacing.md),
-          ],
-
-          if (_billing != null && _billing!.plans.isNotEmpty) ...[
-            _Card(
-              title: 'Compare plans',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < _billing!.plans.length; i++) ...[
-                    if (i > 0) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      Divider(color: tokens.border),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                    _PlanTierRow(
-                      tier: _billing!.plans[i],
-                      isCurrent: _billing!.plans[i].code == _billing!.planCode,
-                      price: _planPrice(_billing!.plans[i]),
-                    ),
-                  ],
-                ],
-              ),
+            _PlanComparison(
+              plans: billing.plans,
+              currentPlanCode: billing.planCode,
+              priceFor: _priceFor,
+              cycleSuffix: _cycleSuffix(),
+              onChoosePlan: _choosePlan,
             ),
+            if (_showsMembershipManagement(billing)) ...[
+              const SizedBox(height: AppSpacing.md),
+              _MembershipCard(
+                billing: billing,
+                onOpenPortal: _openBillingPortal,
+                onCancel: _cancelPlan,
+              ),
+            ],
           ],
         ],
       ),
     );
   }
-}
 
-/// Titled surface — the .card rule.
-class _Card extends StatelessWidget {
-  const _Card({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: context.text.titleSmall),
-          const SizedBox(height: AppSpacing.md),
-          child,
-        ],
-      ),
-    );
+  bool _showsMembershipManagement(ProfessionalBillingStatus billing) {
+    final isPaid =
+        billing.planCode != 'starter_free' && billing.planCode != 'starter';
+    return isPaid || billing.billingConfigured;
   }
 }
 
-/// One tier in the Compare Plans card — every number comes from
-/// [ProfessionalPlanTier], which is parsed straight off the API's `plans`
-/// list (itself `settings.REPROOT_PLAN_TIERS`). Nothing here is hardcoded,
-/// so a backend limit change needs zero changes in this file.
-class _PlanTierRow extends StatelessWidget {
-  const _PlanTierRow({
-    required this.tier,
-    required this.isCurrent,
-    required this.price,
+class _BillingControls extends StatelessWidget {
+  const _BillingControls({
+    required this.cycles,
+    required this.selectedCycle,
+    required this.region,
+    required this.currency,
+    required this.onCycleChanged,
+    required this.cycleLabel,
   });
 
-  final ProfessionalPlanTier tier;
-  final bool isCurrent;
-  final String price;
+  final List<String> cycles;
+  final String selectedCycle;
+  final String region;
+  final String currency;
+  final ValueChanged<String> onCycleChanged;
+  final String Function(String) cycleLabel;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final value = cycles.contains(selectedCycle) ? selectedCycle : cycles.first;
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                tier.name.isNotEmpty ? tier.name : tier.code,
-                style: context.text.titleMedium,
-              ),
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            initialValue: value,
+            decoration: const InputDecoration(
+              labelText: 'Billing period',
+              prefixIcon: Icon(Icons.calendar_month_outlined),
             ),
-            Text(price, style: context.text.titleSmall),
-          ],
+            items: cycles
+                .map(
+                  (cycle) => DropdownMenuItem(
+                    value: cycle,
+                    child: Text(cycleLabel(cycle)),
+                  ),
+                )
+                .toList(),
+            onChanged: (cycle) {
+              if (cycle != null) onCycleChanged(cycle);
+            },
+          ),
         ),
-        if (isCurrent) ...[
-          const SizedBox(height: AppSpacing.xs),
-          StatusPill(label: 'Current plan', tone: PillTone.good),
-        ],
-        const SizedBox(height: AppSpacing.sm),
-        _KvList(
-          rows: [
-            ('Lead forms', '${tier.leadForms}'),
-            ('Clients', tier.clients == null ? 'Unlimited' : '${tier.clients}'),
-            ('Storage', formatBytes(tier.storageBytes)),
-            ('Groups', '${tier.groups}'),
-            ('Resources', '${tier.resources}'),
-            ('Categories', '${tier.categories}'),
-            ('Client history', '${tier.clientDataRetentionDays} days'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Label/value rows — the .kv-list rule.
-class _KvList extends StatelessWidget {
-  const _KvList({required this.rows});
-
-  final List<(String, String)> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (final (label, value) in rows)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Container(
+            height: AppSize.fieldHeight,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            decoration: BoxDecoration(
+              color: context.tokens.surfaceSoft,
+              borderRadius: AppRadius.controlAll,
+              border: Border.all(color: context.tokens.border),
+            ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(label, style: context.text.bodySmall),
+                Icon(
+                  Icons.public_outlined,
+                  size: AppSize.iconRow,
+                  color: context.tokens.muted,
                 ),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  flex: 3,
                   child: Text(
-                    value.trim().isEmpty ? '—' : value,
-                    style: context.text.titleSmall,
-                    textAlign: TextAlign.right,
+                    '${region.isEmpty ? 'International' : region} · '
+                    '${currency.isEmpty ? 'USD' : currency}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.labelLarge,
                   ),
                 ),
               ],
             ),
           ),
+        ),
       ],
+    );
+  }
+}
+
+class _PlanComparison extends StatelessWidget {
+  const _PlanComparison({
+    required this.plans,
+    required this.currentPlanCode,
+    required this.priceFor,
+    required this.cycleSuffix,
+    required this.onChoosePlan,
+  });
+
+  final List<ProfessionalPlanTier> plans;
+  final String currentPlanCode;
+  final String Function(ProfessionalPlanTier) priceFor;
+  final String cycleSuffix;
+  final ValueChanged<String> onChoosePlan;
+
+  @override
+  Widget build(BuildContext context) {
+    if (plans.isEmpty) {
+      return const AppCard(child: Text('Plan information is not available.'));
+    }
+    final rows = <(IconData, String, String Function(ProfessionalPlanTier))>[
+      (Icons.view_module_outlined, 'Templates', (tier) => '${tier.templates}'),
+      (Icons.description_outlined, 'Lead forms', (tier) => '${tier.leadForms}'),
+      (
+        Icons.people_outline,
+        'Clients',
+        (tier) => tier.clients == null ? 'Unlimited' : '${tier.clients}',
+      ),
+      (
+        Icons.storage_outlined,
+        'Storage',
+        (tier) => formatBytes(tier.storageBytes),
+      ),
+      (Icons.groups_outlined, 'Groups', (tier) => '${tier.groups}'),
+      (Icons.folder_copy_outlined, 'Resources', (tier) => '${tier.resources}'),
+      (Icons.category_outlined, 'Categories', (tier) => '${tier.categories}'),
+      (
+        Icons.account_tree_outlined,
+        'Subcategories',
+        (tier) => '${tier.subcategoriesPerCategory}/category',
+      ),
+      (
+        Icons.history_outlined,
+        'Client history',
+        (tier) => '${tier.clientDataRetentionDays} days',
+      ),
+    ];
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: AppRadius.cardAll,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Keep the complete comparison visible on a phone. The previous
+            // fixed 486 px table forced horizontal scrolling on every common
+            // mobile width and hid Premium values off-screen.
+            final featureWidth = (constraints.maxWidth * 0.29).clamp(
+              88.0,
+              124.0,
+            );
+            final planWidth =
+                (constraints.maxWidth - featureWidth) / plans.length;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _ComparisonLabelCell(
+                        width: featureWidth,
+                        label: 'Features',
+                        header: true,
+                      ),
+                      for (final plan in plans)
+                        _PlanHeaderCell(
+                          width: planWidth,
+                          tier: plan,
+                          price: priceFor(plan),
+                          cycleSuffix: cycleSuffix,
+                          isCurrent: plan.code == currentPlanCode,
+                          onChoose: () => onChoosePlan(plan.code),
+                        ),
+                    ],
+                  ),
+                ),
+                for (var index = 0; index < rows.length; index++)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _ComparisonLabelCell(
+                          width: featureWidth,
+                          icon: rows[index].$1,
+                          label: rows[index].$2,
+                          shaded: index.isEven,
+                        ),
+                        for (final plan in plans)
+                          _ComparisonValueCell(
+                            width: planWidth,
+                            value: rows[index].$3(plan),
+                            shaded: index.isEven,
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanHeaderCell extends StatelessWidget {
+  const _PlanHeaderCell({
+    required this.width,
+    required this.tier,
+    required this.price,
+    required this.cycleSuffix,
+    required this.isCurrent,
+    required this.onChoose,
+  });
+
+  final double width;
+  final ProfessionalPlanTier tier;
+  final String price;
+  final String cycleSuffix;
+  final bool isCurrent;
+  final VoidCallback onChoose;
+
+  bool get _isFree => tier.code == 'starter_free' || tier.code == 'starter';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: isCurrent ? context.tokens.primarySoft : context.colors.surface,
+        border: Border(
+          left: BorderSide(color: context.tokens.border),
+          bottom: BorderSide(color: context.tokens.border),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _isFree
+                ? Icons.play_arrow_rounded
+                : tier.code == 'pro'
+                ? Icons.star_outline_rounded
+                : Icons.workspace_premium_outlined,
+            size: AppSize.iconRow,
+            color: tier.code == 'premium_unlimited'
+                ? context.tokens.warningStrong
+                : context.colors.primary,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            tier.name.isEmpty ? tier.code : tier.name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.text.labelLarge,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(price, style: context.text.titleSmall),
+          ),
+          Text(
+            cycleSuffix,
+            style: context.text.bodySmall?.copyWith(
+              color: context.tokens.muted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: isCurrent
+                ? FilledButton.tonal(
+                    onPressed: null,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, AppSize.buttonHeightSm),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                      ),
+                      textStyle: context.text.labelSmall,
+                    ),
+                    child: const Text('Current'),
+                  )
+                : _isFree
+                ? const SizedBox(height: AppSize.buttonHeightSm)
+                : OutlinedButton(
+                    onPressed: onChoose,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, AppSize.buttonHeightSm),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                      ),
+                      textStyle: context.text.labelSmall,
+                    ),
+                    child: const Text('Choose'),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComparisonLabelCell extends StatelessWidget {
+  const _ComparisonLabelCell({
+    required this.width,
+    required this.label,
+    this.icon,
+    this.header = false,
+    this.shaded = false,
+  });
+
+  final double width;
+  final String label;
+  final IconData? icon;
+  final bool header;
+  final bool shaded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(minHeight: 46),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: header || shaded
+            ? context.tokens.surfaceSoft
+            : context.colors.surface,
+        border: Border(bottom: BorderSide(color: context.tokens.border)),
+      ),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: context.tokens.muted),
+            const SizedBox(width: AppSpacing.xs),
+          ],
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: header ? context.text.labelLarge : context.text.labelSmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComparisonValueCell extends StatelessWidget {
+  const _ComparisonValueCell({
+    required this.width,
+    required this.value,
+    required this.shaded,
+  });
+
+  final double width;
+  final String value;
+  final bool shaded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      constraints: const BoxConstraints(minHeight: 46),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 2,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: shaded ? context.tokens.surfaceSoft : context.colors.surface,
+        border: Border(
+          left: BorderSide(color: context.tokens.border),
+          bottom: BorderSide(color: context.tokens.border),
+        ),
+      ),
+      child: Text(
+        value,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: context.text.labelSmall,
+      ),
+    );
+  }
+}
+
+class _MembershipCard extends StatelessWidget {
+  const _MembershipCard({
+    required this.billing,
+    required this.onOpenPortal,
+    required this.onCancel,
+  });
+
+  final ProfessionalBillingStatus billing;
+  final VoidCallback onOpenPortal;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPaid =
+        billing.planCode != 'starter_free' && billing.planCode != 'starter';
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Membership', style: context.text.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          _MembershipRow(label: 'Current plan', value: billing.planName),
+          if (billing.planRenewsAt != null)
+            _MembershipRow(
+              label: 'Expires or renews',
+              value: shortDate(billing.planRenewsAt!),
+            ),
+          if (billing.cancellationEffectiveAt != null)
+            _MembershipRow(
+              label: 'Cancellation effective',
+              value: shortDate(billing.cancellationEffectiveAt!),
+            ),
+          if (billing.billingConfigured || isPaid) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                if (billing.billingConfigured)
+                  OutlinedButton(
+                    onPressed: onOpenPortal,
+                    child: const Text('Billing portal'),
+                  ),
+                if (isPaid)
+                  OutlinedButton(
+                    onPressed: billing.cancellationEffectiveAt == null
+                        ? onCancel
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.colors.error,
+                    ),
+                    child: Text(
+                      billing.cancellationEffectiveAt == null
+                          ? 'Cancel membership'
+                          : 'Cancellation scheduled',
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MembershipRow extends StatelessWidget {
+  const _MembershipRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: context.text.bodySmall?.copyWith(
+                color: context.tokens.muted,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              value.isEmpty ? '—' : value,
+              textAlign: TextAlign.right,
+              style: context.text.titleSmall,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,4 +1,3 @@
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,7 +46,9 @@ class FormsGroupsApi {
         },
         options: _auth,
       );
-      return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+      return LeadForm.fromJson(
+        res.data?['lead_form'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
@@ -61,7 +62,9 @@ class FormsGroupsApi {
         data: {'is_active': isActive, 'form_id': ?formId},
         options: _auth,
       );
-      return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+      return LeadForm.fromJson(
+        res.data?['lead_form'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
@@ -83,16 +86,23 @@ class FormsGroupsApi {
         data: {
           'introductory_meeting_enabled': ?introductoryMeetingEnabled,
           'introductory_meeting_title': ?introductoryMeetingTitle,
-          'introductory_meeting_duration_minutes': ?introductoryMeetingDurationMinutes,
-          'introductory_meeting_min_notice_hours': ?introductoryMeetingMinNoticeHours,
-          'introductory_meeting_max_advance_days': ?introductoryMeetingMaxAdvanceDays,
-          'introductory_meeting_buffer_minutes': ?introductoryMeetingBufferMinutes,
-          'introductory_meeting_requires_approval': ?introductoryMeetingRequiresApproval,
+          'introductory_meeting_duration_minutes':
+              ?introductoryMeetingDurationMinutes,
+          'introductory_meeting_min_notice_hours':
+              ?introductoryMeetingMinNoticeHours,
+          'introductory_meeting_max_advance_days':
+              ?introductoryMeetingMaxAdvanceDays,
+          'introductory_meeting_buffer_minutes':
+              ?introductoryMeetingBufferMinutes,
+          'introductory_meeting_requires_approval':
+              ?introductoryMeetingRequiresApproval,
           'form_id': ?formId,
         },
         options: _auth,
       );
-      return LeadForm.fromJson(res.data?['lead_form'] as Map<String, dynamic>? ?? {});
+      return LeadForm.fromJson(
+        res.data?['lead_form'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
@@ -117,7 +127,8 @@ class FormsGroupsApi {
   /// [action] is 'accept', 'decline', or 'send_followup'. [trainerNote] is
   /// the review note for accept/decline, or the follow-up email body for
   /// send_followup.
-  Future<({LeadMeetingRequest request, String message})> reviewLeadMeetingRequest(
+  Future<({LeadMeetingRequest request, String message})>
+  reviewLeadMeetingRequest(
     int requestId,
     String action, {
     String trainerNote = '',
@@ -144,18 +155,26 @@ class FormsGroupsApi {
         data: {'name': name, 'description': description},
         options: _auth,
       );
-      return ProfessionalGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
+      return ProfessionalGroup.fromJson(
+        res.data?['group'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
-  Future<ProfessionalGroup> updateGroup(int groupId, String name, String description) {
+  Future<ProfessionalGroup> updateGroup(
+    int groupId,
+    String name,
+    String description,
+  ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
         '/professional/forms-groups/groups/$groupId/',
         data: {'name': name, 'description': description},
         options: _auth,
       );
-      return ProfessionalGroup.fromJson(res.data?['group'] as Map<String, dynamic>? ?? {});
+      return ProfessionalGroup.fromJson(
+        res.data?['group'] as Map<String, dynamic>? ?? {},
+      );
     });
   }
 
@@ -191,7 +210,10 @@ class FormsGroupsApi {
 
   // ----- client access -----
 
-  Future<String> createClientAccess(int submissionId, ClientAccessPayload payload) {
+  Future<String> createClientAccess(
+    int submissionId,
+    ClientAccessPayload payload,
+  ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/pending/$submissionId/create-client-access/',
@@ -247,10 +269,7 @@ class FormsGroupsApi {
   ///
   /// The counterpart to approving one; without it a submission the professional
   /// doesn't want could only be cleared from the website.
-  Future<String> declineRegistrationSubmission(
-    int groupId,
-    int submissionId,
-  ) {
+  Future<String> declineRegistrationSubmission(int groupId, int submissionId) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/forms-groups/groups/$groupId/'
@@ -285,7 +304,7 @@ class FormsGroupsApi {
   }
 
   Future<({ClientDetailChangeRequest request, ClientAccessRecord client})>
-      reviewChangeRequest(
+  reviewChangeRequest(
     int clientId,
     int requestId,
     String action, {
@@ -678,8 +697,8 @@ class FormsGroupsApi {
       );
     });
   }
-
 }
 
-final formsGroupsApiProvider =
-    Provider<FormsGroupsApi>((ref) => FormsGroupsApi(ref.watch(dioProvider)));
+final formsGroupsApiProvider = Provider<FormsGroupsApi>(
+  (ref) => FormsGroupsApi(ref.watch(dioProvider)),
+);

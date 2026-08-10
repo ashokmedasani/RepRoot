@@ -59,7 +59,8 @@ class BrandedShare {
     required Brightness brightness,
   }) async {
     final boundary =
-        boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+        boundaryKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
     if (boundary == null) return false;
 
     final ui.Image chart = await boundary.toImage(pixelRatio: _exportScale);
@@ -119,7 +120,9 @@ class BrandedShare {
     // whole canvas up at the end so every number below reads as a real size.
     final chartWidth = chart.width / _exportScale;
     final chartHeight = chart.height / _exportScale;
-    final contentWidth = chartWidth < _minContentWidth ? _minContentWidth : chartWidth;
+    final contentWidth = chartWidth < _minContentWidth
+        ? _minContentWidth
+        : chartWidth;
     final width = contentWidth + _pad * 2;
     final height = _headerHeight + chartHeight + _footerHeight;
 
@@ -127,10 +130,7 @@ class BrandedShare {
     final canvas = Canvas(recorder);
     canvas.scale(_exportScale);
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, width, height),
-      Paint()..color = bg,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, width, height), Paint()..color = bg);
 
     _drawMark(canvas, const Offset(_pad, _pad), primary);
 
@@ -143,7 +143,7 @@ class BrandedShare {
     );
     _drawText(
       canvas,
-      'Professional & Client Management Platform',
+      'Professional and Client Management Platform',
       const Offset(brandX, _pad + 22),
       TextStyle(color: muted, fontSize: 10, fontWeight: FontWeight.w600),
     );
@@ -246,11 +246,11 @@ class BrandedShare {
     double? maxWidth,
   }) {
     TextPainter(
-      text: TextSpan(text: text, style: style.copyWith(fontFamily: 'Roboto')),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-      ellipsis: '…',
-    )
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )
       ..layout(maxWidth: maxWidth ?? double.infinity)
       ..paint(canvas, offset);
   }

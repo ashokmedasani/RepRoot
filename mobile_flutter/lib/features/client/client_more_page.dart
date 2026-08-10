@@ -81,7 +81,12 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
     // Best effort: a failed server logout must still clear the local session.
     try {
       await api.logout();
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client logout request failed; clearing the local session '
+        '(${error.runtimeType}).\n$stackTrace',
+      );
+    }
     await api.clearSession();
     if (mounted) context.go(Routes.roleChooser);
   }
@@ -147,7 +152,7 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
               ),
               _MenuItem(
                 icon: Icons.help_outline,
-                label: 'Help & Support',
+                label: 'Help and Support',
                 onTap: () => context.go(Routes.clientSupport),
               ),
               _MenuItem(
@@ -163,7 +168,7 @@ class _ClientMorePageState extends ConsumerState<ClientMorePage> {
               _MenuItem(
                 icon: Icons.notifications_outlined,
                 label: 'Notifications',
-                onTap: () => context.go(Routes.clientNotifications),
+                onTap: () => context.push(Routes.clientNotifications),
               ),
             ],
           ),

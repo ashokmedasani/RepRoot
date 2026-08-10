@@ -13,7 +13,8 @@ import 'analytics_types.dart';
 /// below; everything else matches its behaviour exactly, including JS rounding
 /// semantics and the `Number('') === 0` quirk.
 
-String fieldKey(FieldLike field) => field.key.isNotEmpty ? field.key : field.label;
+String fieldKey(FieldLike field) =>
+    field.key.isNotEmpty ? field.key : field.label;
 
 String extractUnit(String label) {
   final match = RegExp(r'\(([^)]+)\)').firstMatch(label);
@@ -63,8 +64,10 @@ DateTime? _parseDate(String iso) {
 List<EntryLike> sortByTime(List<EntryLike> entries) {
   final sorted = [...entries];
   sorted.sort((a, b) {
-    final left = '${a.entryDate} ${a.entryTime.isEmpty ? '00:00' : a.entryTime}';
-    final right = '${b.entryDate} ${b.entryTime.isEmpty ? '00:00' : b.entryTime}';
+    final left =
+        '${a.entryDate} ${a.entryTime.isEmpty ? '00:00' : a.entryTime}';
+    final right =
+        '${b.entryDate} ${b.entryTime.isEmpty ? '00:00' : b.entryTime}';
     return left.compareTo(right);
   });
   return sorted;
@@ -74,8 +77,11 @@ List<EntryLike> withinRange(List<EntryLike> entries, int range) {
   if (range == 0) return entries;
 
   final now = DateTime.now();
-  final cutoff = DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: range - 1));
+  final cutoff = DateTime(
+    now.year,
+    now.month,
+    now.day,
+  ).subtract(Duration(days: range - 1));
 
   return entries.where((entry) {
     final date = _parseDate(entry.entryDate);
@@ -91,7 +97,11 @@ String _shortDate(String iso) {
 // ----- per-field aggregations -----
 
 class DailySum {
-  const DailySum({required this.date, required this.value, required this.times});
+  const DailySum({
+    required this.date,
+    required this.value,
+    required this.times,
+  });
 
   final String date;
   final double value;
@@ -122,11 +132,13 @@ List<DailySum> dailySums(FieldLike field, List<EntryLike> entries) {
   }
 
   final result = sums.entries
-      .map((e) => DailySum(
-            date: e.key,
-            value: _jsRound(e.value * 100) / 100,
-            times: times[e.key] ?? const [],
-          ))
+      .map(
+        (e) => DailySum(
+          date: e.key,
+          value: _jsRound(e.value * 100) / 100,
+          times: times[e.key] ?? const [],
+        ),
+      )
       .toList();
   result.sort((a, b) => a.date.compareTo(b.date));
   return result;
@@ -134,12 +146,14 @@ List<DailySum> dailySums(FieldLike field, List<EntryLike> entries) {
 
 List<DataPoint> timeSeries(FieldLike field, List<EntryLike> entries) {
   return dailySums(field, entries)
-      .map((point) => DataPoint(
-            label: _shortDate(point.date),
-            value: point.value,
-            tooltip:
-                '${point.date}${point.times.isNotEmpty ? ' at ${point.times.join(', ')}' : ''}',
-          ))
+      .map(
+        (point) => DataPoint(
+          label: _shortDate(point.date),
+          value: point.value,
+          tooltip:
+              '${point.date}${point.times.isNotEmpty ? ' at ${point.times.join(', ')}' : ''}',
+        ),
+      )
       .toList();
 }
 
@@ -154,8 +168,9 @@ List<DataPoint> frequency(FieldLike field, List<EntryLike> entries) {
     }
   }
 
-  final result =
-      counts.entries.map((e) => DataPoint(label: e.key, value: e.value)).toList();
+  final result = counts.entries
+      .map((e) => DataPoint(label: e.key, value: e.value))
+      .toList();
   result.sort((a, b) => b.value.compareTo(a.value));
   return result;
 }

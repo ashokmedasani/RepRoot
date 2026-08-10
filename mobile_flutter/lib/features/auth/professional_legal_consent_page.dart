@@ -43,16 +43,19 @@ class _ProfessionalLegalConsentPageState
 
   Future<void> _loadConfiguration() async {
     try {
-      final configuration =
-          await ref.read(professionalAuthApiProvider).getLegalConfiguration();
+      final configuration = await ref
+          .read(professionalAuthApiProvider)
+          .getLegalConfiguration();
       if (!mounted) return;
       setState(() {
         _version = configuration.professionalVersion;
         _effectiveDate = configuration.effectiveDate;
       });
-    } catch (_) {
-      // The version banner is informational; the accept action does not need it
-      // (the web component also ignores this failure).
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Professional legal configuration load failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
   }
 
@@ -88,8 +91,11 @@ class _ProfessionalLegalConsentPageState
     final api = ref.read(professionalAuthApiProvider);
     try {
       await api.logout();
-    } catch (_) {
-      // Signing out locally matters more than the server round-trip.
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Professional server logout failed; clearing local session '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
     await api.clearSession();
     if (!mounted) return;

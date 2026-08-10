@@ -72,7 +72,9 @@ class _ProfessionalSettingsPaymentPageState
     try {
       // Same call the Billing page already uses — only needed here for its
       // supportEmail, for the "contact support" copy below.
-      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      final billing = await ref
+          .read(professionalAuthApiProvider)
+          .getBillingStatus();
       if (mounted) setState(() => _billing = billing);
     } catch (_) {
       /* falls back to the word "support" with no address */
@@ -174,7 +176,9 @@ class _ProfessionalSettingsPaymentPageState
                     'Contact '
                     '${(_billing?.supportEmail.isNotEmpty ?? false) ? _billing!.supportEmail : 'support'} '
                     'if a correction requires an audited change.',
-                    style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   )
                 else ...[
                   DropdownButtonFormField<String>(
@@ -182,8 +186,9 @@ class _ProfessionalSettingsPaymentPageState
                         ? _currencyDraft
                         : null,
                     isExpanded: true,
-                    decoration:
-                        const InputDecoration(labelText: 'Reporting currency'),
+                    decoration: const InputDecoration(
+                      labelText: 'Reporting currency',
+                    ),
                     items: [
                       for (final code in _currencyOptions)
                         DropdownMenuItem(value: code, child: Text(code)),
@@ -191,7 +196,7 @@ class _ProfessionalSettingsPaymentPageState
                     onChanged: _savingCurrency
                         ? null
                         : (value) =>
-                            setState(() => _currencyDraft = value ?? ''),
+                              setState(() => _currencyDraft = value ?? ''),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
@@ -200,17 +205,20 @@ class _ProfessionalSettingsPaymentPageState
                       onPressed: _savingCurrency || _currencyDraft.isEmpty
                           ? null
                           : _saveReportingCurrency,
-                      child: Text(_savingCurrency
-                          ? 'Saving…'
-                          : 'Confirm & Lock Currency'),
+                      child: Text(
+                        _savingCurrency
+                            ? 'Saving…'
+                            : 'Confirm and Lock Currency',
+                      ),
                     ),
                   ),
                   if (_currencyMessage.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       _currencyMessage,
-                      style: context.text.bodySmall
-                          ?.copyWith(color: context.colors.error),
+                      style: context.text.bodySmall?.copyWith(
+                        color: context.colors.error,
+                      ),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.sm),
@@ -218,7 +226,9 @@ class _ProfessionalSettingsPaymentPageState
                     'Currency conversion values are used for reporting '
                     'purposes only. They do not represent settlement, '
                     'banking, or payment-provider exchange rates.',
-                    style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ],
               ],
@@ -251,7 +261,10 @@ class _ProfessionalSettingsPaymentPageState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(method.name, style: context.text.titleSmall),
+                                Text(
+                                  method.name,
+                                  style: context.text.titleSmall,
+                                ),
                                 Text(
                                   ManualPaymentCategory.label(method.category),
                                   style: context.text.bodySmall?.copyWith(
@@ -263,7 +276,9 @@ class _ProfessionalSettingsPaymentPageState
                           ),
                           StatusPill(
                             label: method.isActive ? 'Active' : 'Inactive',
-                            tone: method.isActive ? PillTone.good : PillTone.neutral,
+                            tone: method.isActive
+                                ? PillTone.good
+                                : PillTone.neutral,
                           ),
                         ],
                       ),

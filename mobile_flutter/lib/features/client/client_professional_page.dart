@@ -27,10 +27,12 @@ class ClientProfessionalPage extends ConsumerStatefulWidget {
   const ClientProfessionalPage({super.key});
 
   @override
-  ConsumerState<ClientProfessionalPage> createState() => _ClientProfessionalPageState();
+  ConsumerState<ClientProfessionalPage> createState() =>
+      _ClientProfessionalPageState();
 }
 
-class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage> {
+class _ClientProfessionalPageState
+    extends ConsumerState<ClientProfessionalPage> {
   _ProfessionalTab _tab = _ProfessionalTab.profile;
 
   // --- profile ---
@@ -54,7 +56,10 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
     // Same 8s cadence as the Ionic chat page. Kept running for as long as
     // this tab is mounted, regardless of which segment is showing, so
     // messages (and the unread badge) stay fresh even while on Profile.
-    _chatPoll = Timer.periodic(const Duration(seconds: 8), (_) => _loadMessages());
+    _chatPoll = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => _loadMessages(),
+    );
   }
 
   @override
@@ -88,14 +93,20 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
   Future<void> _loadMessages() async {
     try {
       final lastId = _messages.isNotEmpty ? _messages.last.id : null;
-      final messages =
-          await ref.read(clientApiProvider).getChatMessages(afterId: lastId);
+      final messages = await ref
+          .read(clientApiProvider)
+          .getChatMessages(afterId: lastId);
       if (!mounted) return;
       if (messages.isNotEmpty) {
         setState(() => _messages = [..._messages, ...messages]);
         _scrollToEnd();
       }
-    } catch (_) {/* a failed poll must not disturb the screen */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client professional unread poll failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
     if (mounted && _chatLoading) setState(() => _chatLoading = false);
   }
 
@@ -159,8 +170,14 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
             ),
             child: SegmentedButton<_ProfessionalTab>(
               segments: const [
-                ButtonSegment(value: _ProfessionalTab.profile, label: Text('Profile')),
-                ButtonSegment(value: _ProfessionalTab.chat, label: Text('Chat')),
+                ButtonSegment(
+                  value: _ProfessionalTab.profile,
+                  label: Text('Profile'),
+                ),
+                ButtonSegment(
+                  value: _ProfessionalTab.chat,
+                  label: Text('Chat'),
+                ),
               ],
               selected: {_tab},
               showSelectedIcon: false,
@@ -172,10 +189,7 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
             // scroll position survive switching back and forth.
             child: IndexedStack(
               index: _tab == _ProfessionalTab.profile ? 0 : 1,
-              children: [
-                _profileBody(),
-                _chatBody(),
-              ],
+              children: [_profileBody(), _chatBody()],
             ),
           ),
         ],
@@ -194,7 +208,8 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
     return PagePad(
       onRefresh: _loadProfile,
       children: [
-        if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _loadProfile),
+        if (_message.isNotEmpty)
+          ErrorNote(message: _message, onRetry: _loadProfile),
 
         if (professional == null)
           const EmptyState(
@@ -216,7 +231,10 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(professional.professionalName, style: context.text.titleMedium),
+                      Text(
+                        professional.professionalName,
+                        style: context.text.titleMedium,
+                      ),
                       if (professional.professionalHeadline.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
@@ -228,10 +246,16 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
                         const SizedBox(height: AppSpacing.xs),
                         Row(
                           children: [
-                            Icon(Icons.place_outlined,
-                                size: 14, color: context.tokens.muted),
+                            Icon(
+                              Icons.place_outlined,
+                              size: 14,
+                              color: context.tokens.muted,
+                            ),
                             const SizedBox(width: 2),
-                            Text(professional.location, style: context.text.bodySmall),
+                            Text(
+                              professional.location,
+                              style: context.text.bodySmall,
+                            ),
                           ],
                         ),
                       ],
@@ -244,7 +268,9 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
 
           if (professional.aboutMe.isNotEmpty) ...[
             const SectionHeader(title: 'About'),
-            AppCard(child: Text(professional.aboutMe, style: context.text.bodyMedium)),
+            AppCard(
+              child: Text(professional.aboutMe, style: context.text.bodyMedium),
+            ),
           ],
 
           if (professional.professionalSummary != null) ...[
@@ -252,16 +278,24 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
             AppCard(
               child: Column(
                 children: [
-                  _kv('Type', professional.professionalSummary!.professionalType),
+                  _kv(
+                    'Type',
+                    professional.professionalSummary!.professionalType,
+                  ),
                   _kv(
                     'Experience',
                     professional.professionalSummary!.yearsExperience != null
                         ? '${professional.professionalSummary!.yearsExperience} years'
                         : '',
                   ),
-                  _kv('Specializations',
-                      professional.professionalSummary!.specializations),
-                  _kv('Languages', professional.professionalSummary!.languagesKnown),
+                  _kv(
+                    'Specializations',
+                    professional.professionalSummary!.specializations,
+                  ),
+                  _kv(
+                    'Languages',
+                    professional.professionalSummary!.languagesKnown,
+                  ),
                 ],
               ),
             ),
@@ -270,7 +304,10 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
           if (professional.trainingStyle.isNotEmpty) ...[
             const SectionHeader(title: 'Training style'),
             AppCard(
-              child: Text(professional.trainingStyle, style: context.text.bodyMedium),
+              child: Text(
+                professional.trainingStyle,
+                style: context.text.bodyMedium,
+              ),
             ),
           ],
 
@@ -281,13 +318,20 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
                 children: [
                   _kv('Name', professional.certification!.name),
                   _kv('Issued by', professional.certification!.issuedBy),
-                  _kv('Year', professional.certification!.year?.toString() ?? ''),
+                  _kv(
+                    'Year',
+                    professional.certification!.year?.toString() ?? '',
+                  ),
                   if (professional.certification!.fileUrl.isNotEmpty)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () => _open(professional.certification!.fileUrl),
-                        icon: const Icon(Icons.open_in_new, size: AppSize.iconRow),
+                        onPressed: () =>
+                            _open(professional.certification!.fileUrl),
+                        icon: const Icon(
+                          Icons.open_in_new,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('View certificate'),
                         style: TextButton.styleFrom(
                           minimumSize: const Size(0, 32),
@@ -324,8 +368,10 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
                               width: 132,
                               height: 132,
                               color: context.tokens.surfaceSoft,
-                              child: Icon(Icons.broken_image_outlined,
-                                  color: context.tokens.muted),
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: context.tokens.muted,
+                              ),
                             ),
                           ),
                         ),
@@ -342,7 +388,11 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
               RowItem(
                 title: link.title.isEmpty ? link.url : link.title,
                 subtitle: link.title.isEmpty ? null : link.url,
-                leading: Icon(Icons.link, size: 20, color: context.colors.primary),
+                leading: Icon(
+                  Icons.link,
+                  size: 20,
+                  color: context.colors.primary,
+                ),
                 trailing: const Icon(Icons.open_in_new, size: AppSize.iconRow),
                 onTap: () => _open(link.url, title: link.title),
               ),
@@ -403,18 +453,18 @@ class _ClientProfessionalPageState extends ConsumerState<ClientProfessionalPage>
                   children: [SkeletonBox(height: 60), SkeletonBox(height: 60)],
                 )
               : _messages.isEmpty
-                  ? const EmptyState(
-                      compact: false,
-                      icon: Icons.chat_bubble_outline,
-                      message: 'No messages yet.\nSay hello to your professional.',
-                    )
-                  : ListView.builder(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(AppSpacing.screen),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) =>
-                          _Bubble(message: _messages[index]),
-                    ),
+              ? const EmptyState(
+                  compact: false,
+                  icon: Icons.chat_bubble_outline,
+                  message: 'No messages yet.\nSay hello to your professional.',
+                )
+              : ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(AppSpacing.screen),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) =>
+                      _Bubble(message: _messages[index]),
+                ),
         ),
         SafeArea(
           top: false,
@@ -483,13 +533,16 @@ class _Bubble extends StatelessWidget {
           ),
         ),
         child: Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: mine
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             Text(
               message.text,
               style: context.text.bodyMedium?.copyWith(
-                color: mine ? context.colors.onPrimary : context.colors.onSurface,
+                color: mine
+                    ? context.colors.onPrimary
+                    : context.colors.onSurface,
               ),
             ),
             const SizedBox(height: 2),

@@ -19,7 +19,12 @@ enum TransactionView { manual, integrated }
 /// Active for the professional (owes them attention / money), used by the
 /// Summary tab's request-count tiles — mirrors the web's `ACTIVE_STATUSES`.
 const _activeRequestStatuses = {
-  'sent', 'viewed', 'proof_submitted', 'under_review', 'overdue', 'partially_paid',
+  'sent',
+  'viewed',
+  'proof_submitted',
+  'under_review',
+  'overdue',
+  'partially_paid',
 };
 
 /// The full per-client payments experience — Summary / Methods / Requests /
@@ -38,7 +43,8 @@ class ClientPaymentsPanel extends ConsumerStatefulWidget {
   final String clientName;
 
   @override
-  ConsumerState<ClientPaymentsPanel> createState() => _ClientPaymentsPanelState();
+  ConsumerState<ClientPaymentsPanel> createState() =>
+      _ClientPaymentsPanelState();
 }
 
 class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
@@ -65,7 +71,10 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _message = ''; });
+    setState(() {
+      _loading = true;
+      _message = '';
+    });
     try {
       final api = ref.read(paymentsApiProvider);
       final requests = await api.getClientPaymentRequests(widget.clientId);
@@ -83,17 +92,28 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
         _loading = false;
       });
     } catch (_) {
-      if (mounted) setState(() { _message = 'Could not load payments.'; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _message = 'Could not load payments.';
+          _loading = false;
+        });
+      }
     }
   }
 
   Future<void> _loadActivity() async {
     setState(() => _activityError = '');
     try {
-      final items = await ref.read(paymentsApiProvider).getProfessionalPaymentActivity(widget.clientId);
+      final items = await ref
+          .read(paymentsApiProvider)
+          .getProfessionalPaymentActivity(widget.clientId);
       if (mounted) setState(() => _activity = items);
     } catch (_) {
-      if (mounted) setState(() => _activityError = 'Payment activity could not be loaded.');
+      if (mounted) {
+        setState(
+          () => _activityError = 'Payment activity could not be loaded.',
+        );
+      }
     }
   }
 
@@ -104,34 +124,47 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
 
   // ----- methods sharing -----
 
-  Future<void> _toggleMethodShared(ManualPaymentMethodRecord method, bool shared) async {
+  Future<void> _toggleMethodShared(
+    ManualPaymentMethodRecord method,
+    bool shared,
+  ) async {
     final nextShared = _clientMethods
         .where((m) => m.id == method.id ? shared : m.shared)
         .map((m) => m.id)
         .toList();
     // Optimistic local update.
-    setState(() => _clientMethods = _clientMethods
-        .map((m) => m.id == method.id
-            ? ManualPaymentMethodRecord(
-                id: m.id,
-                name: m.name,
-                category: m.category,
-                displayLabel: m.displayLabel,
-                supportedCurrencies: m.supportedCurrencies,
-                country: m.country,
-                clientVisibleFields: m.clientVisibleFields,
-                qrCode: m.qrCode,
-                internalNotes: m.internalNotes,
-                clientInstructions: m.clientInstructions,
-                status: m.status,
-                shared: shared,
-              )
-            : m)
-        .toList());
+    setState(
+      () => _clientMethods = _clientMethods
+          .map(
+            (m) => m.id == method.id
+                ? ManualPaymentMethodRecord(
+                    id: m.id,
+                    name: m.name,
+                    category: m.category,
+                    displayLabel: m.displayLabel,
+                    supportedCurrencies: m.supportedCurrencies,
+                    country: m.country,
+                    clientVisibleFields: m.clientVisibleFields,
+                    qrCode: m.qrCode,
+                    internalNotes: m.internalNotes,
+                    clientInstructions: m.clientInstructions,
+                    status: m.status,
+                    shared: shared,
+                  )
+                : m,
+          )
+          .toList(),
+    );
     try {
-      await ref.read(paymentsApiProvider).updateClientMethodAccess(widget.clientId, nextShared);
+      await ref
+          .read(paymentsApiProvider)
+          .updateClientMethodAccess(widget.clientId, nextShared);
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update method access.');
+      _toast(
+        error is ApiException
+            ? error.message
+            : 'Could not update method access.',
+      );
       _load();
     }
   }
@@ -161,7 +194,10 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
         title: const Text('Cancel request?'),
         content: Text('"${request.title}" will be cancelled.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Back')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Back'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -175,10 +211,14 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
     );
     if (confirmed != true) return;
     try {
-      await ref.read(paymentsApiProvider).cancelPaymentRequest(request.requestId);
+      await ref
+          .read(paymentsApiProvider)
+          .cancelPaymentRequest(request.requestId);
       _load();
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not cancel the request.');
+      _toast(
+        error is ApiException ? error.message : 'Could not cancel the request.',
+      );
     }
   }
 
@@ -215,8 +255,14 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
   double get _manualLoggedTotal {
     final currency = _settings?.reportingCurrency ?? '';
     return _records
-        .where((r) => r.recordType == 'manual_log' && r.reportingCurrency == currency)
-        .fold<double>(0, (sum, r) => sum + (double.tryParse(r.reportingAmount) ?? 0));
+        .where(
+          (r) =>
+              r.recordType == 'manual_log' && r.reportingCurrency == currency,
+        )
+        .fold<double>(
+          0,
+          (sum, r) => sum + (double.tryParse(r.reportingAmount) ?? 0),
+        );
   }
 
   // Integrated payment collection isn't built yet — this stays hardcoded to
@@ -225,17 +271,21 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
 
   double get _totalLoggedAmount => _manualLoggedTotal + _integratedTotal;
 
-  int get _awaitingAckCount =>
-      _requests.where((r) => r.status == 'proof_submitted' || r.status == 'under_review').length;
+  int get _awaitingAckCount => _requests
+      .where((r) => r.status == 'proof_submitted' || r.status == 'under_review')
+      .length;
 
   int get _overdueCount => _requests.where((r) => r.status == 'overdue').length;
 
-  String _fmtAmount(double value, String currency) => '${value.toStringAsFixed(2)} $currency';
+  String _fmtAmount(double value, String currency) =>
+      '${value.toStringAsFixed(2)} $currency';
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const PagePad(children: [SkeletonBox(height: 80), SkeletonBox(height: 80)]);
+      return const PagePad(
+        children: [SkeletonBox(height: 80), SkeletonBox(height: 80)],
+      );
     }
     final settings = _settings;
     if (settings == null || !settings.reportingCurrencyLocked) {
@@ -395,7 +445,10 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
           Expanded(
             child: FilledButton.icon(
               onPressed: _createRequest,
-              icon: const Icon(Icons.request_quote_outlined, size: AppSize.iconRow),
+              icon: const Icon(
+                Icons.request_quote_outlined,
+                size: AppSize.iconRow,
+              ),
               label: const Text('Request'),
             ),
           ),
@@ -461,16 +514,22 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
         subtitle: _clientMethods.where((m) => m.shared).isEmpty
             ? 'Nothing shared with this client yet'
             : '${_clientMethods.where((m) => m.shared).length} shared with this client',
-        leading: Icon(Icons.account_balance_wallet_outlined,
-            size: AppSize.iconButton, color: context.colors.primary),
+        leading: Icon(
+          Icons.account_balance_wallet_outlined,
+          size: AppSize.iconButton,
+          color: context.colors.primary,
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _openReferenceSheet('Payment methods', _methodsTab()),
       ),
       RowItem(
         title: 'Activity log',
         subtitle: 'Every change to this client\'s payments',
-        leading: Icon(Icons.history,
-            size: AppSize.iconButton, color: context.tokens.muted),
+        leading: Icon(
+          Icons.history,
+          size: AppSize.iconButton,
+          color: context.tokens.muted,
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _openReferenceSheet('Activity log', _activityTab()),
       ),
@@ -501,10 +560,7 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
   Widget _moneyCard(String currency) {
     final tokens = context.tokens;
     return AppCard(
-      color: Color.alphaBlend(
-        MenuAccent.green.bg.withValues(alpha: 0.55),
-        tokens.surfaceSoft,
-      ),
+      color: tokens.surfaceSoft,
       child: Row(
         children: [
           Expanded(
@@ -533,14 +589,19 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                   Text(
                     'Manual ${_fmtAmount(_manualLoggedTotal, currency)} · '
                     'Integrated ${_fmtAmount(_integratedTotal, currency)}',
-                    style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-          Icon(Icons.payments_outlined,
-              size: AppSize.iconButton, color: tokens.success),
+          Icon(
+            Icons.payments_outlined,
+            size: AppSize.iconButton,
+            color: tokens.success,
+          ),
         ],
       ),
     );
@@ -561,14 +622,18 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline,
-              size: AppSize.iconButton, color: MenuAccent.orange.fg),
+          Icon(
+            Icons.error_outline,
+            size: AppSize.iconButton,
+            color: MenuAccent.orange.fg,
+          ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               parts.join(' · '),
-              style: context.text.titleSmall
-                  ?.copyWith(color: MenuAccent.orange.fg),
+              style: context.text.titleSmall?.copyWith(
+                color: MenuAccent.orange.fg,
+              ),
             ),
           ),
         ],
@@ -608,7 +673,6 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
     if (mounted) _load();
   }
 
-
   /// Shown until a reporting currency is confirmed — every figure on this
   /// panel is denominated in it, so there is nothing meaningful to render
   /// before it exists. Lifted out of the old Summary tab unchanged.
@@ -621,12 +685,16 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
           const SizedBox(height: AppSpacing.sm),
           Text('1. Open Settings → Payments.', style: context.text.bodySmall),
           const SizedBox(height: 4),
-          Text('2. Choose and confirm your reporting currency.',
-              style: context.text.bodySmall),
+          Text(
+            '2. Choose and confirm your reporting currency.',
+            style: context.text.bodySmall,
+          ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'This setup message disappears after confirmation.',
-            style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
+            style: context.text.labelSmall?.copyWith(
+              color: context.tokens.muted,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           SizedBox(
@@ -669,8 +737,9 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                     Text(
                       'Paid ${request.acceptedAmount} ${request.requestedCurrency} · '
                       'Remaining ${request.remainingAmount} ${request.requestedCurrency}',
-                      style: context.text.labelSmall
-                          ?.copyWith(color: context.tokens.muted),
+                      style: context.text.labelSmall?.copyWith(
+                        color: context.tokens.muted,
+                      ),
                     ),
                     if (overpaid > 0)
                       Text(
@@ -686,14 +755,20 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
             ),
             StatusPill(
               label: PaymentRequestStatus.label(request.status),
-              tone: PaymentRequestStatus.openForProfessional.contains(request.status)
+              tone:
+                  PaymentRequestStatus.openForProfessional.contains(
+                    request.status,
+                  )
                   ? PillTone.warn
                   : request.status == 'completed'
-                      ? PillTone.good
-                      : PillTone.neutral,
+                  ? PillTone.good
+                  : PillTone.neutral,
             ),
-            if (!const {'completed', 'cancelled', 'refunded'}
-                .contains(request.status))
+            if (!const {
+              'completed',
+              'cancelled',
+              'refunded',
+            }.contains(request.status))
               IconButton(
                 onPressed: () => _cancelRequest(request),
                 icon: const Icon(Icons.cancel_outlined),
@@ -732,7 +807,9 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     title: Text(method.name),
-                    subtitle: Text(ManualPaymentCategory.label(method.category)),
+                    subtitle: Text(
+                      ManualPaymentCategory.label(method.category),
+                    ),
                     value: method.shared,
                     onChanged: (value) => _toggleMethodShared(method, value),
                   ),
@@ -746,7 +823,9 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
   // ----- Transactions -----
 
   Widget _transactionsTab() {
-    final manualRecords = _records.where((r) => r.recordType == 'manual_log').toList();
+    final manualRecords = _records
+        .where((r) => r.recordType == 'manual_log')
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -754,12 +833,19 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
           width: double.infinity,
           child: SegmentedButton<TransactionView>(
             segments: const [
-              ButtonSegment(value: TransactionView.manual, label: Text('Manual Payment Log')),
-              ButtonSegment(value: TransactionView.integrated, label: Text('Integrated Payments')),
+              ButtonSegment(
+                value: TransactionView.manual,
+                label: Text('Manual Payment Log'),
+              ),
+              ButtonSegment(
+                value: TransactionView.integrated,
+                label: Text('Integrated Payments'),
+              ),
             ],
             selected: {_transactionView},
             showSelectedIcon: false,
-            onSelectionChanged: (selection) => setState(() => _transactionView = selection.first),
+            onSelectionChanged: (selection) =>
+                setState(() => _transactionView = selection.first),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -806,22 +892,32 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                             style: context.text.titleSmall,
                           ),
                           if (record.paymentMethodLabel.isNotEmpty)
-                            Text(record.paymentMethodLabel, style: context.text.bodySmall),
+                            Text(
+                              record.paymentMethodLabel,
+                              style: context.text.bodySmall,
+                            ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               Text(
                                 record.paymentRecordId,
-                                style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: context.text.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               if (record.requestReference.isNotEmpty)
-                                Text(' · ${record.requestReference}', style: context.text.bodySmall),
+                                Text(
+                                  ' · ${record.requestReference}',
+                                  style: context.text.bodySmall,
+                                ),
                             ],
                           ),
                           if (record.receivedDate.isNotEmpty)
                             Text(
                               shortDate(record.receivedDate),
-                              style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
+                              style: context.text.labelSmall?.copyWith(
+                                color: context.tokens.muted,
+                              ),
                             ),
                         ],
                       ),
@@ -866,7 +962,9 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
             'Provider-collected transactions will appear here after payment '
             'processing is configured. Manual logs and client-submitted '
             'payment proofs remain separate.',
-            style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+            style: context.text.bodySmall?.copyWith(
+              color: context.tokens.muted,
+            ),
           ),
         ],
       ),
@@ -905,7 +1003,10 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                     Container(
                       width: 8,
                       height: 8,
-                      margin: const EdgeInsets.only(top: 6, right: AppSpacing.sm),
+                      margin: const EdgeInsets.only(
+                        top: 6,
+                        right: AppSpacing.sm,
+                      ),
                       decoration: BoxDecoration(
                         color: context.colors.primary,
                         shape: BoxShape.circle,
@@ -915,20 +1016,27 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.actionLabel, style: context.text.titleSmall),
+                          Text(
+                            item.actionLabel,
+                            style: context.text.titleSmall,
+                          ),
                           const SizedBox(height: 2),
                           Text(
                             [
                               if (item.requestId.isNotEmpty) item.requestId,
                               dateTimeLabel(item.createdAt),
                             ].join(' · '),
-                            style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                            style: context.text.bodySmall?.copyWith(
+                              color: context.tokens.muted,
+                            ),
                           ),
                           if (item.reason.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
                               item.reason,
-                              style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
+                              style: context.text.labelSmall?.copyWith(
+                                color: context.tokens.muted,
+                              ),
                             ),
                           ],
                         ],
@@ -957,7 +1065,8 @@ class _CreateRequestSheet extends ConsumerStatefulWidget {
   final List<ManualPaymentMethodRecord> methods;
 
   @override
-  ConsumerState<_CreateRequestSheet> createState() => _CreateRequestSheetState();
+  ConsumerState<_CreateRequestSheet> createState() =>
+      _CreateRequestSheetState();
 }
 
 class _CreateRequestSheetState extends ConsumerState<_CreateRequestSheet> {
@@ -997,9 +1106,14 @@ class _CreateRequestSheetState extends ConsumerState<_CreateRequestSheet> {
       setState(() => _error = 'Enter a title and amount.');
       return;
     }
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     try {
-      await ref.read(paymentsApiProvider).createPaymentRequest(
+      await ref
+          .read(paymentsApiProvider)
+          .createPaymentRequest(
             widget.clientId,
             CreatePaymentRequestPayload(
               title: _title.text.trim(),
@@ -1015,7 +1129,9 @@ class _CreateRequestSheetState extends ConsumerState<_CreateRequestSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not send the request.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not send the request.';
         });
       }
     }
@@ -1048,7 +1164,9 @@ class _CreateRequestSheetState extends ConsumerState<_CreateRequestSheet> {
                   flex: 2,
                   child: TextField(
                     controller: _amount,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Amount'),
                   ),
                 ),
@@ -1075,15 +1193,19 @@ class _CreateRequestSheetState extends ConsumerState<_CreateRequestSheet> {
                 if (picked != null) setState(() => _dueDate = picked);
               },
               icon: const Icon(Icons.calendar_today_outlined, size: 18),
-              label: Text(_dueDate == null
-                  ? 'Due date (optional)'
-                  : 'Due ${isoDate(_dueDate!)}'),
+              label: Text(
+                _dueDate == null
+                    ? 'Due date (optional)'
+                    : 'Due ${isoDate(_dueDate!)}',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _description,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Description (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Description (optional)',
+              ),
             ),
             if (widget.methods.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sm),
@@ -1132,7 +1254,8 @@ class _RequestReviewSheet extends ConsumerStatefulWidget {
   final String requestId;
 
   @override
-  ConsumerState<_RequestReviewSheet> createState() => _RequestReviewSheetState();
+  ConsumerState<_RequestReviewSheet> createState() =>
+      _RequestReviewSheetState();
 }
 
 class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
@@ -1164,8 +1287,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final detail =
-          await ref.read(paymentsApiProvider).getPaymentRequestDetail(widget.requestId);
+      final detail = await ref
+          .read(paymentsApiProvider)
+          .getPaymentRequestDetail(widget.requestId);
       if (!mounted) return;
       setState(() {
         _detail = detail;
@@ -1198,8 +1322,11 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
     final proof = _selectedProof;
     if (detail == null || proof == null) return 0;
     final accepted = double.tryParse(detail.request.acceptedAmount) ?? 0;
-    final sameCurrency = proof.reportedCurrency == detail.request.requestedCurrency;
-    final reported = sameCurrency ? (double.tryParse(proof.reportedAmount) ?? 0) : 0;
+    final sameCurrency =
+        proof.reportedCurrency == detail.request.requestedCurrency;
+    final reported = sameCurrency
+        ? (double.tryParse(proof.reportedAmount) ?? 0)
+        : 0;
     return accepted + reported;
   }
 
@@ -1232,15 +1359,22 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
   Future<void> _submitAcknowledge() async {
     final proof = _selectedProof;
     if (proof == null) return;
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     try {
-      final result = await ref.read(paymentsApiProvider).acknowledgePaymentProof(
+      final result = await ref
+          .read(paymentsApiProvider)
+          .acknowledgePaymentProof(
             proof.id,
             acknowledgementNote: _ackNote.text.trim(),
             settlementStatus: _settlementStatus,
           );
       if (!mounted) return;
-      _toast(result.message.isNotEmpty ? result.message : 'Proof acknowledged.');
+      _toast(
+        result.message.isNotEmpty ? result.message : 'Proof acknowledged.',
+      );
       if (result.needsLogging && mounted) {
         await _logRecord(proof);
       }
@@ -1249,7 +1383,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Acknowledgement could not be saved.';
+          _error = error is ApiException
+              ? error.message
+              : 'Acknowledgement could not be saved.';
         });
       }
     }
@@ -1276,15 +1412,22 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: noteController,
-              decoration: const InputDecoration(labelText: 'Internal note (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Internal note (optional)',
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Later')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Later'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
             child: const Text('Log payment'),
           ),
         ],
@@ -1292,7 +1435,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
     );
     if (confirmed == true) {
       try {
-        await ref.read(paymentsApiProvider).recordReceivedPayment(
+        await ref
+            .read(paymentsApiProvider)
+            .recordReceivedPayment(
               RecordReceivedPayload(
                 client: detail.request.client,
                 paymentRequestId: detail.request.requestId,
@@ -1307,7 +1452,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
             );
         _toast('Payment logged.');
       } catch (error) {
-        _toast(error is ApiException ? error.message : 'Could not log the payment.');
+        _toast(
+          error is ApiException ? error.message : 'Could not log the payment.',
+        );
       }
     }
     noteController.dispose();
@@ -1316,9 +1463,14 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
   Future<void> _submitReject() async {
     final proof = _selectedProof;
     if (proof == null) return;
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     try {
-      await ref.read(paymentsApiProvider).rejectPaymentProof(proof.id, _rejectReason.text.trim());
+      await ref
+          .read(paymentsApiProvider)
+          .rejectPaymentProof(proof.id, _rejectReason.text.trim());
       if (!mounted) return;
       _toast('Proof rejected.');
       Navigator.of(context).pop();
@@ -1326,7 +1478,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not reject this proof.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not reject this proof.';
         });
       }
     }
@@ -1335,9 +1489,14 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
   Future<void> _submitInfo() async {
     final proof = _selectedProof;
     if (proof == null) return;
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     try {
-      await ref.read(paymentsApiProvider).requestProofInfo(proof.id, _infoNote.text.trim());
+      await ref
+          .read(paymentsApiProvider)
+          .requestProofInfo(proof.id, _infoNote.text.trim());
       if (!mounted) return;
       _toast('Requested more info.');
       Navigator.of(context).pop();
@@ -1345,30 +1504,44 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not send the request.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not send the request.';
         });
       }
     }
   }
 
   Widget _kv(String label, String value) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: context.text.labelSmall?.copyWith(color: context.tokens.muted)),
-            Text(value, style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-          ],
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
         ),
-      );
+        Text(
+          value,
+          style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    ),
+  );
 
-  Widget _comparisonColumns(PaymentRequestDetailResponse detail, PaymentProofRecord proof) {
+  Widget _comparisonColumns(
+    PaymentRequestDetailResponse detail,
+    PaymentProofRecord proof,
+  ) {
     final requestColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Requested', style: context.text.titleSmall),
         const SizedBox(height: AppSpacing.xs),
-        _kv('Amount', '${detail.request.requestedAmount} ${detail.request.requestedCurrency}'),
+        _kv(
+          'Amount',
+          '${detail.request.requestedAmount} ${detail.request.requestedCurrency}',
+        ),
         if (detail.request.dueDate != null) _kv('Due', detail.request.dueDate!),
       ],
     );
@@ -1379,8 +1552,10 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
         const SizedBox(height: AppSpacing.xs),
         _kv('Amount', '${proof.reportedAmount} ${proof.reportedCurrency}'),
         _kv('Date', proof.reportedPaymentDate),
-        if (proof.transactionReference.isNotEmpty) _kv('Txn', proof.transactionReference),
-        if (proof.paymentMethodLabel.isNotEmpty) _kv('Method', proof.paymentMethodLabel),
+        if (proof.transactionReference.isNotEmpty)
+          _kv('Txn', proof.transactionReference),
+        if (proof.paymentMethodLabel.isNotEmpty)
+          _kv('Method', proof.paymentMethodLabel),
         if (proof.note.isNotEmpty) _kv('Note', proof.note),
         if (proof.hasFile) _kv('Proof', 'File attached'),
       ],
@@ -1397,21 +1572,40 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
 
   Widget _installmentSummary(PaymentRequestDetailResponse detail) {
     Widget block(String label, String value) => Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: context.text.labelSmall?.copyWith(color: context.tokens.muted)),
-              const SizedBox(height: 2),
-              Text(value, style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: context.text.labelSmall?.copyWith(
+              color: context.tokens.muted,
+            ),
           ),
-        );
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: context.text.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
     return AppCard(
       child: Row(
         children: [
-          block('Requested', '${detail.request.requestedAmount} ${detail.request.requestedCurrency}'),
-          block('Accepted so far', '${detail.request.acceptedAmount} ${detail.request.requestedCurrency}'),
-          block('Remaining', '${detail.request.remainingAmount} ${detail.request.requestedCurrency}'),
+          block(
+            'Requested',
+            '${detail.request.requestedAmount} ${detail.request.requestedCurrency}',
+          ),
+          block(
+            'Accepted so far',
+            '${detail.request.acceptedAmount} ${detail.request.requestedCurrency}',
+          ),
+          block(
+            'Remaining',
+            '${detail.request.remainingAmount} ${detail.request.requestedCurrency}',
+          ),
         ],
       ),
     );
@@ -1433,7 +1627,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton(
           onPressed: () => setState(() => _mode = _ReviewMode.reject),
-          style: OutlinedButton.styleFrom(foregroundColor: context.colors.error),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: context.colors.error,
+          ),
           child: const Text('Reject Proof'),
         ),
       ],
@@ -1482,7 +1678,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
             children: [
               Text(
                 'Accepted after this proof',
-                style: context.text.labelSmall?.copyWith(color: context.tokens.muted),
+                style: context.text.labelSmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -1501,7 +1699,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
               else
                 Text(
                   'Remaining ${_remainingAfterCurrentProof.toStringAsFixed(2)} $currency',
-                  style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.tokens.muted,
+                  ),
                 ),
             ],
           ),
@@ -1521,7 +1721,9 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: _saving ? null : () => setState(() => _mode = _ReviewMode.review),
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _mode = _ReviewMode.review),
                 child: const Text('Back'),
               ),
             ),
@@ -1562,15 +1764,21 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: _saving ? null : () => setState(() => _mode = _ReviewMode.review),
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _mode = _ReviewMode.review),
                 child: const Text('Back'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: FilledButton(
-                onPressed: (_saving || _rejectReason.text.trim().isEmpty) ? null : _submitReject,
-                style: FilledButton.styleFrom(backgroundColor: context.colors.error),
+                onPressed: (_saving || _rejectReason.text.trim().isEmpty)
+                    ? null
+                    : _submitReject,
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.colors.error,
+                ),
                 child: Text(_saving ? 'Rejecting…' : 'Reject Proof'),
               ),
             ),
@@ -1602,14 +1810,18 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: _saving ? null : () => setState(() => _mode = _ReviewMode.review),
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _mode = _ReviewMode.review),
                 child: const Text('Back'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: FilledButton(
-                onPressed: (_saving || _infoNote.text.trim().isEmpty) ? null : _submitInfo,
+                onPressed: (_saving || _infoNote.text.trim().isEmpty)
+                    ? null
+                    : _submitInfo,
                 child: Text(_saving ? 'Sending…' : 'Send Request'),
               ),
             ),
@@ -1655,35 +1867,43 @@ class _RequestReviewSheetState extends ConsumerState<_RequestReviewSheet> {
         bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.md,
       ),
       child: _loading
-          ? const SizedBox(height: 160, child: Center(child: CircularProgressIndicator()))
+          ? const SizedBox(
+              height: 160,
+              child: Center(child: CircularProgressIndicator()),
+            )
           : detail == null
-              ? const SizedBox(height: 120, child: Center(child: Text('Could not load.')))
-              : SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'REVIEW PAYMENT',
-                        style: context.text.labelSmall?.copyWith(
-                          color: context.colors.primary,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(detail.request.title, style: context.text.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${detail.request.requestId} · requested '
-                        '${detail.request.requestedAmount} ${detail.request.requestedCurrency}',
-                        style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      _body(detail),
-                    ],
+          ? const SizedBox(
+              height: 120,
+              child: Center(child: Text('Could not load.')),
+            )
+          : SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'REVIEW PAYMENT',
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.colors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Text(detail.request.title, style: context.text.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${detail.request.requestId} · requested '
+                    '${detail.request.requestedAmount} ${detail.request.requestedCurrency}',
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.tokens.muted,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _body(detail),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -1700,10 +1920,12 @@ class _LogReceivedPaymentSheet extends ConsumerStatefulWidget {
   final String defaultCurrency;
 
   @override
-  ConsumerState<_LogReceivedPaymentSheet> createState() => _LogReceivedPaymentSheetState();
+  ConsumerState<_LogReceivedPaymentSheet> createState() =>
+      _LogReceivedPaymentSheetState();
 }
 
-class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentSheet> {
+class _LogReceivedPaymentSheetState
+    extends ConsumerState<_LogReceivedPaymentSheet> {
   final _amount = TextEditingController();
   final _reference = TextEditingController();
   final _note = TextEditingController();
@@ -1726,18 +1948,22 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
     super.dispose();
   }
 
-
   Future<void> _save() async {
     if (_amount.text.trim().isEmpty) {
       setState(() => _error = 'Enter an amount.');
       return;
     }
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     try {
       // No currency-conversion UI exists in this port, so the reporting
       // fields simply mirror the original amount/currency the professional
       // entered, per the ported spec.
-      await ref.read(paymentsApiProvider).recordReceivedPayment(
+      await ref
+          .read(paymentsApiProvider)
+          .recordReceivedPayment(
             RecordReceivedPayload(
               client: widget.clientId,
               originalAmount: _amount.text.trim(),
@@ -1754,7 +1980,9 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not log the payment.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not log the payment.';
         });
       }
     }
@@ -1782,8 +2010,12 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
                   flex: 2,
                   child: TextField(
                     controller: _amount,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Original amount'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Original amount',
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -1799,7 +2031,9 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _reference,
-              decoration: const InputDecoration(labelText: 'Transaction reference (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Transaction reference (optional)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
@@ -1807,7 +2041,9 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
                 final picked = await showDatePicker(
                   context: context,
                   initialDate: _receivedDate,
-                  firstDate: DateTime.now().subtract(const Duration(days: 365 * 3)),
+                  firstDate: DateTime.now().subtract(
+                    const Duration(days: 365 * 3),
+                  ),
                   lastDate: DateTime.now(),
                 );
                 if (picked != null) setState(() => _receivedDate = picked);
@@ -1819,7 +2055,9 @@ class _LogReceivedPaymentSheetState extends ConsumerState<_LogReceivedPaymentShe
             TextField(
               controller: _note,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Internal note (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Internal note (optional)',
+              ),
             ),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sm),

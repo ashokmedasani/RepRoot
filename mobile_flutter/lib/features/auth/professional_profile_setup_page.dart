@@ -9,8 +9,20 @@ import 'package:image_picker/image_picker.dart';
 import '../../app/router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/professional_auth_api.dart';
+import '../../core/constants/location_options.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../shared/widgets/auth_brand.dart';
+
+DioMediaType _setupImageMediaType(String filename) {
+  final extension = filename.split('.').last.toLowerCase();
+  return switch (extension) {
+    'png' => DioMediaType('image', 'png'),
+    'webp' => DioMediaType('image', 'webp'),
+    'gif' => DioMediaType('image', 'gif'),
+    'heic' || 'heif' => DioMediaType('image', 'heic'),
+    _ => DioMediaType('image', 'jpeg'),
+  };
+}
 
 /// Required first-login step, matching the web portal and the setup mode added
 /// to the Ionic profile page (`/professional/tabs/more/profile?setup=1`).
@@ -48,8 +60,18 @@ class _ProfessionalProfileSetupPageState
 
   static const _genders = ['Male', 'Female', 'Other', 'Prefer not to say'];
   static const _months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   List<int> get _years {
@@ -83,9 +105,17 @@ class _ProfessionalProfileSetupPageState
         _firstName.text = profile.firstName;
         _middleName.text = profile.middleName;
         _lastName.text = profile.lastName;
-        _professionalCode.text =
-            profile.professionalId.isNotEmpty ? profile.professionalId : profile.professionalCode;
-        _country.text = profile.country;
+        _professionalCode.text = profile.professionalId.isNotEmpty
+            ? profile.professionalId
+            : profile.professionalCode;
+        final country = profile.country.trim().toUpperCase();
+        _country.text = country == 'IN' || country == 'INDIA'
+            ? 'India'
+            : country == 'US' ||
+                  country == 'USA' ||
+                  country.startsWith('UNITED STATES')
+            ? 'United States'
+            : profile.country;
         _state.text = profile.state;
         _gender = _genders.contains(profile.gender) ? profile.gender : '';
         _birthMonth = profile.birthMonth;
@@ -111,7 +141,9 @@ class _ProfessionalProfileSetupPageState
       return;
     }
     try {
-      final available = await ref.read(professionalAuthApiProvider).checkProfessionalCode(code);
+      final available = await ref
+          .read(professionalAuthApiProvider)
+          .checkProfessionalCode(code);
       if (!mounted) return;
       setState(() {
         _codeAvailable = available;
@@ -172,9 +204,10 @@ class _ProfessionalProfileSetupPageState
       form.files.add(
         MapEntry(
           'profile_photo',
-          await MultipartFile.fromFile(
-            _profilePhoto!.path,
+          MultipartFile.fromBytes(
+            await _profilePhoto!.readAsBytes(),
             filename: _profilePhoto!.name,
+            contentType: _setupImageMediaType(_profilePhoto!.name),
           ),
         ),
       );
@@ -215,9 +248,7 @@ class _ProfessionalProfileSetupPageState
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -249,7 +280,11 @@ class _ProfessionalProfileSetupPageState
                           ? null
                           : FileImage(File(_profilePhoto!.path)),
                       child: _profilePhoto == null
-                          ? Icon(Icons.person_outline, size: 42, color: context.colors.primary)
+                          ? Icon(
+                              Icons.person_outline,
+                              size: 42,
+                              color: context.colors.primary,
+                            )
                           : null,
                     ),
                   ),
@@ -259,18 +294,26 @@ class _ProfessionalProfileSetupPageState
                     spacing: AppSpacing.sm,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _isSubmitting ? null : () => _pickPhoto(ImageSource.camera),
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _pickPhoto(ImageSource.camera),
                         icon: const Icon(Icons.photo_camera_outlined),
                         label: const Text('Camera'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _isSubmitting ? null : () => _pickPhoto(ImageSource.gallery),
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _pickPhoto(ImageSource.gallery),
                         icon: const Icon(Icons.photo_library_outlined),
-                        label: Text(_profilePhoto == null ? 'Gallery' : 'Replace'),
+                        label: Text(
+                          _profilePhoto == null ? 'Gallery' : 'Replace',
+                        ),
                       ),
                       if (_profilePhoto != null)
                         TextButton(
-                          onPressed: _isSubmitting ? null : () => setState(() => _profilePhoto = null),
+                          onPressed: _isSubmitting
+                              ? null
+                              : () => setState(() => _profilePhoto = null),
                           child: const Text('Remove'),
                         ),
                     ],
@@ -278,7 +321,9 @@ class _ProfessionalProfileSetupPageState
                   Text(
                     'Optional · JPG, PNG, or supported phone image · maximum 5 MB',
                     textAlign: TextAlign.center,
-                    style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.tokens.muted,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   TextField(
@@ -292,8 +337,9 @@ class _ProfessionalProfileSetupPageState
                     controller: _middleName,
                     enabled: !_isSubmitting,
                     textCapitalization: TextCapitalization.words,
-                    decoration:
-                        const InputDecoration(labelText: 'Middle name (optional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Middle name (optional)',
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
@@ -364,8 +410,9 @@ class _ProfessionalProfileSetupPageState
                         child: DropdownButtonFormField<int>(
                           initialValue: _birthMonth,
                           isExpanded: true,
-                          decoration:
-                              const InputDecoration(labelText: 'Birth month'),
+                          decoration: const InputDecoration(
+                            labelText: 'Birth month',
+                          ),
                           items: [
                             for (var i = 0; i < _months.length; i++)
                               DropdownMenuItem(
@@ -383,13 +430,16 @@ class _ProfessionalProfileSetupPageState
                         child: DropdownButtonFormField<int>(
                           initialValue: _birthYear,
                           isExpanded: true,
-                          decoration:
-                              const InputDecoration(labelText: 'Birth year'),
+                          decoration: const InputDecoration(
+                            labelText: 'Birth year',
+                          ),
                           items: _years
-                              .map((y) => DropdownMenuItem(
-                                    value: y,
-                                    child: Text('$y'),
-                                  ))
+                              .map(
+                                (y) => DropdownMenuItem(
+                                  value: y,
+                                  child: Text('$y'),
+                                ),
+                              )
                               .toList(),
                           onChanged: _isSubmitting
                               ? null
@@ -399,18 +449,52 @@ class _ProfessionalProfileSetupPageState
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: _country,
-                    enabled: !_isSubmitting,
-                    textCapitalization: TextCapitalization.words,
+                  DropdownButtonFormField<String>(
+                    initialValue: professionalCountries.contains(_country.text)
+                        ? _country.text
+                        : null,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Country'),
+                    items: professionalCountries
+                        .map(
+                          (country) => DropdownMenuItem(
+                            value: country,
+                            child: Text(country),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _isSubmitting
+                        ? null
+                        : (value) => setState(() {
+                            _country.text = value ?? '';
+                            if (!(professionalStates[value] ?? const <String>[])
+                                .contains(_state.text)) {
+                              _state.clear();
+                            }
+                          }),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: _state,
-                    enabled: !_isSubmitting,
-                    textCapitalization: TextCapitalization.words,
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('${_country.text}:${_state.text}'),
+                    initialValue:
+                        (professionalStates[_country.text] ?? const <String>[])
+                            .contains(_state.text)
+                        ? _state.text
+                        : null,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'State'),
+                    items:
+                        (professionalStates[_country.text] ?? const <String>[])
+                            .map(
+                              (state) => DropdownMenuItem(
+                                value: state,
+                                child: Text(state),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: _isSubmitting || _country.text.isEmpty
+                        ? null
+                        : (value) => setState(() => _state.text = value ?? ''),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   FilledButton(

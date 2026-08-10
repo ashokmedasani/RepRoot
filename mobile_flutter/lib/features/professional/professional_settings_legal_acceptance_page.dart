@@ -38,7 +38,12 @@ class _ProfessionalSettingsLegalAcceptancePageState
     try {
       final profile = await api.getProfile();
       if (mounted) setState(() => _profile = profile);
-    } catch (_) {/* the legal card just shows fallbacks */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Legal acceptance details load failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   /// Newest acceptance record, falling back to `terms_accepted_at` for accounts
@@ -139,7 +144,7 @@ class _ProfessionalSettingsLegalAcceptancePageState
             title: 'Account deletion',
             child: Text(
               'Professional accounts are deleted through support so your client data '
-              'is handled safely. Open Help & Support from the More tab to '
+              'is handled safely. Open Help and Support from the More tab to '
               'request deletion.',
               style: context.text.bodySmall,
             ),

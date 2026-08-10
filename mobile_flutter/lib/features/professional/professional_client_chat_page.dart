@@ -104,7 +104,9 @@ class _ProfessionalClientChatPageState
     setState(() => _isSending = true);
     _draft.clear();
     try {
-      final sent = await ref.read(chatApiProvider).sendProfessionalMessage(
+      final sent = await ref
+          .read(chatApiProvider)
+          .sendProfessionalMessage(
             widget.clientId,
             text,
             imagePath: image?.path,
@@ -120,9 +122,9 @@ class _ProfessionalClientChatPageState
     } catch (_) {
       if (!mounted) return;
       setState(() => _isSending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message failed to send.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Message failed to send.')));
     }
   }
 
@@ -130,9 +132,7 @@ class _ProfessionalClientChatPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.clientName.isNotEmpty ? widget.clientName : 'Chat',
-        ),
+        title: Text(widget.clientName.isNotEmpty ? widget.clientName : 'Chat'),
       ),
       body: SafeArea(
         child: Column(
@@ -141,19 +141,19 @@ class _ProfessionalClientChatPageState
               child: _loading && _messages.isEmpty
                   ? const PagePad(children: [SkeletonBox(height: 60)])
                   : _messages.isEmpty
-                      ? const EmptyState(
-                          compact: false,
-                          icon: Icons.chat_bubble_outline,
-                          message:
-                              'No messages yet.\nSay hello to start the conversation.',
-                        )
-                      : ListView.builder(
-                          controller: _scroll,
-                          padding: const EdgeInsets.all(AppSpacing.screen),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) =>
-                              ChatBubble(message: _messages[index]),
-                        ),
+                  ? const EmptyState(
+                      compact: false,
+                      icon: Icons.chat_bubble_outline,
+                      message:
+                          'No messages yet.\nSay hello to start the conversation.',
+                    )
+                  : ListView.builder(
+                      controller: _scroll,
+                      padding: const EdgeInsets.all(AppSpacing.screen),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) =>
+                          ChatBubble(message: _messages[index]),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -170,9 +170,11 @@ class _ProfessionalClientChatPageState
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: Row(
                         children: [
-                          Icon(Icons.image_outlined,
-                              size: AppSize.iconRow,
-                              color: context.colors.primary),
+                          Icon(
+                            Icons.image_outlined,
+                            size: AppSize.iconRow,
+                            color: context.colors.primary,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
@@ -206,8 +208,9 @@ class _ProfessionalClientChatPageState
                           controller: _draft,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _send(),
-                          decoration:
-                              const InputDecoration(hintText: 'Message…'),
+                          decoration: const InputDecoration(
+                            hintText: 'Message…',
+                          ),
                         ),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -262,8 +265,9 @@ class ChatBubble extends StatelessWidget {
           ),
         ),
         child: Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: mine
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             // A message may be an image, text, or both — the backend allows
             // blank text when an image is attached.
@@ -279,23 +283,31 @@ class ChatBubble extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.broken_image_outlined,
-                            size: AppSize.iconRow, color: tokens.muted),
+                        Icon(
+                          Icons.broken_image_outlined,
+                          size: AppSize.iconRow,
+                          color: tokens.muted,
+                        ),
                         const SizedBox(width: AppSpacing.sm),
-                        Text('Image unavailable', style: context.text.bodySmall),
+                        Text(
+                          'Image unavailable',
+                          style: context.text.bodySmall,
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
-              if (message.text.isNotEmpty) const SizedBox(height: AppSpacing.sm),
+              if (message.text.isNotEmpty)
+                const SizedBox(height: AppSpacing.sm),
             ],
             if (message.text.isNotEmpty)
               Text(
                 message.text,
                 style: context.text.bodyMedium?.copyWith(
-                  color:
-                      mine ? context.colors.onPrimary : context.colors.onSurface,
+                  color: mine
+                      ? context.colors.onPrimary
+                      : context.colors.onSurface,
                 ),
               ),
             const SizedBox(height: 2),

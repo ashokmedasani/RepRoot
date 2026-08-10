@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   testWidgets('MaterialApp builds', (WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: Center(child: Text('RepRoot')))),
+      const MaterialApp(
+        home: Scaffold(body: Center(child: Text('RepRoot'))),
+      ),
     );
     expect(find.text('RepRoot'), findsOneWidget);
   });

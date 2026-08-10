@@ -10,6 +10,7 @@ import 'core/api/error_report_api.dart';
 import 'core/config/env.dart';
 import 'core/session/session_store.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,9 +62,7 @@ class RepRootApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      // Follows the OS setting, matching the Ionic app's
-      // @media (prefers-color-scheme: dark).
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
     );
   }

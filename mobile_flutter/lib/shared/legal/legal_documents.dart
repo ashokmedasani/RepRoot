@@ -10,11 +10,12 @@ import '../../core/theme/app_tokens.dart';
 enum LegalAudience { professional, client }
 
 extension LegalAudienceX on LegalAudience {
-  String get slug => this == LegalAudience.professional ? 'professional' : 'client';
+  String get slug =>
+      this == LegalAudience.professional ? 'professional' : 'client';
 
   String get termsTitle => this == LegalAudience.professional
-      ? 'Professional Terms & Conditions'
-      : 'Client Terms & Conditions';
+      ? 'Professional Terms and Conditions'
+      : 'Client Terms and Conditions';
 
   String get termsSummary => this == LegalAudience.professional
       ? 'Account, client-data, payment, and platform responsibilities.'
@@ -30,10 +31,10 @@ extension LegalAudienceX on LegalAudience {
 
   /// The sentence next to the accept checkbox, copied from the web templates.
   String get consentLabel => this == LegalAudience.professional
-      ? 'I have reviewed and accept the Professional Terms & Conditions and '
-          'Professional Privacy Notice.'
-      : 'I have reviewed and accept the Client Terms & Conditions and Client '
-          'Privacy Notice.';
+      ? 'I have reviewed and accept the Professional Terms and Conditions and '
+            'Professional Privacy Notice.'
+      : 'I have reviewed and accept the Client Terms and Conditions and Client '
+            'Privacy Notice.';
 
   String get termsUrl => Env.legalDocumentUrl('terms', slug);
   String get privacyUrl => Env.legalDocumentUrl('privacy', slug);
@@ -46,10 +47,13 @@ extension LegalAudienceX on LegalAudience {
 /// second copy of the text that could drift from the published version.
 Future<void> openLegalDocument(BuildContext context, String url) async {
   final uri = Uri.tryParse(url);
-  if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+  if (uri == null ||
+      !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the document. Try again.')),
+        const SnackBar(
+          content: Text('Could not open the document. Try again.'),
+        ),
       );
     }
   }
@@ -163,7 +167,9 @@ class _LegalLinkTile extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     summary,
-                    style: context.text.bodySmall?.copyWith(color: tokens.muted),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ],
               ),

@@ -39,8 +39,9 @@ class _ClientTemplateResourcesPageState
       final templates = await ref.read(clientApiProvider).getTemplates();
       if (!mounted) return;
       setState(() {
-        _template =
-            templates.where((t) => t.id == widget.templateId).firstOrNull;
+        _template = templates
+            .where((t) => t.id == widget.templateId)
+            .firstOrNull;
         _message = '';
         _loading = false;
       });
@@ -69,8 +70,9 @@ class _ClientTemplateResourcesPageState
   Widget build(BuildContext context) {
     final template = _template;
 
-    final accent =
-        template != null ? TemplateAccent.of(context, template.accent) : null;
+    final accent = template != null
+        ? TemplateAccent.of(context, template.accent)
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -120,7 +122,8 @@ class _ClientTemplateResourcesPageState
                         size: 22,
                         color: accent ?? context.colors.primary,
                       ),
-                      trailing: resource.link.isNotEmpty ||
+                      trailing:
+                          resource.link.isNotEmpty ||
                               resource.fileUrl.isNotEmpty
                           ? const Icon(Icons.open_in_new, size: AppSize.iconRow)
                           : null,

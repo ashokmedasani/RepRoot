@@ -63,16 +63,19 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
   List<TrackingEntryRecord> get _entriesForSelected {
     final template = _selectedTemplate;
     if (template == null) return [];
-    final list =
-        _entries.where((entry) => entry.template == template.id).toList();
-    list.sort((a, b) => '${b.entryDate} ${b.entryTime}'
-        .compareTo('${a.entryDate} ${a.entryTime}'));
+    final list = _entries
+        .where((entry) => entry.template == template.id)
+        .toList();
+    list.sort(
+      (a, b) => '${b.entryDate} ${b.entryTime}'.compareTo(
+        '${a.entryDate} ${a.entryTime}',
+      ),
+    );
     return list;
   }
 
   /// The Ionic page's rough progress read: 10% per entry, capped at 100.
-  int get _completionPercent =>
-      (_entriesForSelected.length * 10).clamp(0, 100);
+  int get _completionPercent => (_entriesForSelected.length * 10).clamp(0, 100);
 
   Future<void> _load() async {
     final api = ref.read(clientApiProvider);
@@ -114,8 +117,6 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     });
   }
 
-
-
   Future<void> _submitEntry() async {
     final template = _selectedTemplate;
     if (template == null || _isSaving) return;
@@ -128,7 +129,9 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
     };
 
     try {
-      await ref.read(clientApiProvider).submitEntry(
+      await ref
+          .read(clientApiProvider)
+          .submitEntry(
             templateId: template.id,
             entryDate: isoDate(_entryDate),
             entryTime: isoTime(_entryTime),
@@ -190,11 +193,19 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
             ),
             child: SegmentedButton<ProgramsTab>(
               segments: const [
-                ButtonSegment(value: ProgramsTab.progress, label: Text('Progress')),
-                ButtonSegment(value: ProgramsTab.program, label: Text('Program')),
+                ButtonSegment(
+                  value: ProgramsTab.progress,
+                  label: Text('Progress'),
+                ),
+                ButtonSegment(
+                  value: ProgramsTab.program,
+                  label: Text('Program'),
+                ),
                 ButtonSegment(value: ProgramsTab.log, label: Text('Log')),
                 ButtonSegment(
-                    value: ProgramsTab.resources, label: Text('Resources')),
+                  value: ProgramsTab.resources,
+                  label: Text('Resources'),
+                ),
               ],
               selected: {_tab},
               showSelectedIcon: false,
@@ -224,9 +235,13 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
         child: Row(
           children: [
             Icon(
-              _messageIsError ? Icons.error_outline : Icons.check_circle_outline,
+              _messageIsError
+                  ? Icons.error_outline
+                  : Icons.check_circle_outline,
               size: AppSize.iconRow,
-              color: _messageIsError ? context.colors.error : context.tokens.success,
+              color: _messageIsError
+                  ? context.colors.error
+                  : context.tokens.success,
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
@@ -335,8 +350,9 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               RowItem(
                 title: shortDate(entry.entryDate),
                 subtitle: _summary(entry),
-                trailingCaption:
-                    entry.entryTime.isNotEmpty ? hhmm(entry.entryTime) : null,
+                trailingCaption: entry.entryTime.isNotEmpty
+                    ? hhmm(entry.entryTime)
+                    : null,
                 trailingValue: entry.editedByProfessional ? 'Edited' : null,
               ),
         ],
@@ -383,8 +399,10 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
                         );
                         if (picked != null) setState(() => _entryDate = picked);
                       },
-                      icon: const Icon(Icons.calendar_today_outlined,
-                          size: AppSize.iconRow),
+                      icon: const Icon(
+                        Icons.calendar_today_outlined,
+                        size: AppSize.iconRow,
+                      ),
                       label: Text(shortDate(isoDate(_entryDate))),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -463,8 +481,11 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               title: template.name,
               subtitle:
                   '${TemplateCadence.label(template.cadence)} · ${template.resources.length} resource${template.resources.length == 1 ? '' : 's'}',
-              leading: Icon(Icons.folder_open_outlined,
-                  size: 22, color: TemplateAccent.of(context, template.accent)),
+              leading: Icon(
+                Icons.folder_open_outlined,
+                size: 22,
+                color: TemplateAccent.of(context, template.accent),
+              ),
               trailing: const Icon(Icons.chevron_right, size: AppSize.iconRow),
               onTap: () => context.go(
                 '${Routes.clientPrograms}/${template.id}/resources',
@@ -491,7 +512,8 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
               ],
               selected: {value.isEmpty ? 'no' : value},
               showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() => _answers[key] = s.first),
+              onSelectionChanged: (s) =>
+                  setState(() => _answers[key] = s.first),
             ),
           ],
         );
@@ -507,8 +529,9 @@ class _ClientProgramsPageState extends ConsumerState<ClientProgramsPage> {
         );
 
       case TemplateFieldType.rating:
-        final scale = ((field.scale == null || field.scale == 0) ? 5 : field.scale!)
-            .clamp(2, 10);
+        final scale =
+            ((field.scale == null || field.scale == 0) ? 5 : field.scale!)
+                .clamp(2, 10);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

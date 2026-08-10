@@ -96,12 +96,13 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
     return answers.entries
         .where((e) => !skip.contains(e.key) && e.value.trim().isNotEmpty)
         .map((e) {
-      final field = fields.where((f) => f.answerKey == e.key).firstOrNull;
-      return (
-        label: field?.label ?? e.key.replaceAll('_', ' '),
-        value: e.value,
-      );
-    }).toList();
+          final field = fields.where((f) => f.answerKey == e.key).firstOrNull;
+          return (
+            label: field?.label ?? e.key.replaceAll('_', ' '),
+            value: e.value,
+          );
+        })
+        .toList();
   }
 
   Future<void> _load() async {
@@ -116,14 +117,25 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
       final request = await api.getDetailChangeRequest();
       if (mounted) {
         // Only a pending request is actionable; approved/rejected are history.
-        setState(() =>
-            _pendingRequest = request?.status == 'pending' ? request : null);
+        setState(
+          () => _pendingRequest = request?.status == 'pending' ? request : null,
+        );
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Could not load the pending profile-change request '
+        '(${error.runtimeType}).\n$stackTrace',
+      );
+    }
     try {
       final deletion = await api.getAccountDeletionRequest();
       if (mounted) setState(() => _deletionRequest = deletion);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Could not load the account-deletion request '
+        '(${error.runtimeType}).\n$stackTrace',
+      );
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -281,7 +293,10 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -324,7 +339,9 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Settings')),
-        body: const PagePad(children: [SkeletonBox(height: 110), SkeletonBox(height: 200)]),
+        body: const PagePad(
+          children: [SkeletonBox(height: 110), SkeletonBox(height: 200)],
+        ),
       );
     }
 
@@ -348,7 +365,9 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                 child: Text(
                   _message,
                   style: context.text.bodySmall?.copyWith(
-                    color: _messageIsError ? context.colors.error : tokens.success,
+                    color: _messageIsError
+                        ? context.colors.error
+                        : tokens.success,
                   ),
                 ),
               ),
@@ -373,12 +392,17 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(client?.username ?? '', style: context.text.bodySmall),
+                      Text(
+                        client?.username ?? '',
+                        style: context.text.bodySmall,
+                      ),
                       const SizedBox(height: AppSpacing.xs),
                       OutlinedButton.icon(
                         onPressed: _pickPhoto,
-                        icon: const Icon(Icons.photo_camera_outlined,
-                            size: AppSize.iconRow),
+                        icon: const Icon(
+                          Icons.photo_camera_outlined,
+                          size: AppSize.iconRow,
+                        ),
                         label: const Text('Change photo'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(0, AppSize.buttonHeightSm),
@@ -397,8 +421,11 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
               color: tokens.primarySoft,
               child: Row(
                 children: [
-                  Icon(Icons.hourglass_top_outlined,
-                      size: 20, color: context.colors.primary),
+                  Icon(
+                    Icons.hourglass_top_outlined,
+                    size: 20,
+                    color: context.colors.primary,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
@@ -424,7 +451,8 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                   _kv('Email', client?.email ?? ''),
                   _kv('Username', client?.username ?? ''),
                   _kv('Group', client?.groupName ?? ''),
-                  for (final field in _answeredFields) _kv(field.label, field.value),
+                  for (final field in _answeredFields)
+                    _kv(field.label, field.value),
                 ],
               ),
             ),
@@ -519,7 +547,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
 
           // The "Privacy & Legal" tab of the web client settings page:
           // both client documents plus the latest recorded acceptance.
-          const SectionHeader(title: 'Privacy & Legal'),
+          const SectionHeader(title: 'Privacy and Legal'),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -533,7 +561,7 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                 const SizedBox(height: AppSpacing.sm),
                 _legalLink('Privacy Policy', LegalAudience.client.privacyUrl),
                 _legalLink(
-                  'Terms & Conditions',
+                  'Terms and Conditions',
                   LegalAudience.client.termsUrl,
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -551,8 +579,11 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.hourglass_top_outlined,
-                              size: 20, color: context.colors.error),
+                          Icon(
+                            Icons.hourglass_top_outlined,
+                            size: 20,
+                            color: context.colors.error,
+                          ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
@@ -581,7 +612,10 @@ class _ClientSettingsPageState extends ConsumerState<ClientSettingsPage> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Delete your account', style: context.text.titleSmall),
+                      Text(
+                        'Delete your account',
+                        style: context.text.titleSmall,
+                      ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Your professional reviews the request. Nothing is removed '

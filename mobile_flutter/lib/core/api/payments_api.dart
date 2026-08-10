@@ -50,7 +50,8 @@ class PaymentsApi {
 
   // ----- manual payment methods -----
 
-  Future<({List<ManualPaymentMethodRecord> methods, int maxActive})> getPaymentMethods() {
+  Future<({List<ManualPaymentMethodRecord> methods, int maxActive})>
+  getPaymentMethods() {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/payments/methods/',
@@ -79,7 +80,10 @@ class PaymentsApi {
     });
   }
 
-  Future<ManualPaymentMethodRecord> updatePaymentMethod(int methodId, FormData payload) {
+  Future<ManualPaymentMethodRecord> updatePaymentMethod(
+    int methodId,
+    FormData payload,
+  ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
         '/professional/payments/methods/$methodId/',
@@ -92,7 +96,10 @@ class PaymentsApi {
     });
   }
 
-  Future<ManualPaymentMethodRecord> setPaymentMethodStatus(int methodId, String status) {
+  Future<ManualPaymentMethodRecord> setPaymentMethodStatus(
+    int methodId,
+    String status,
+  ) {
     return runApi(() async {
       final res = await _dio.put<Map<String, dynamic>>(
         '/professional/payments/methods/$methodId/',
@@ -170,7 +177,10 @@ class PaymentsApi {
     });
   }
 
-  Future<PaymentRequestRecord> cancelPaymentRequest(String requestId, {String reason = ''}) {
+  Future<PaymentRequestRecord> cancelPaymentRequest(
+    String requestId, {
+    String reason = '',
+  }) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/payments/requests/$requestId/cancel/',
@@ -183,7 +193,9 @@ class PaymentsApi {
     });
   }
 
-  Future<PaymentRequestDetailResponse> getPaymentRequestDetail(String requestId) {
+  Future<PaymentRequestDetailResponse> getPaymentRequestDetail(
+    String requestId,
+  ) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/payments/requests/$requestId/',
@@ -285,6 +297,19 @@ class PaymentsApi {
 
   // ----- revenue / records / reconciliation (professional) -----
 
+  Future<List<FinancialTransactionRecord>> getTransactionLedger() {
+    return runApi(() async {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/professional/payments/transactions/',
+        options: _auth,
+      );
+      return (res.data?['transactions'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(FinancialTransactionRecord.fromJson)
+          .toList();
+    });
+  }
+
   Future<RevenueSummaryResponse> getRevenueSummary(
     String period, {
     String? customStart,
@@ -306,7 +331,9 @@ class PaymentsApi {
 
   /// Every payment action for a client, newest first — powers the client
   /// detail page's Payments → Activity sub-tab.
-  Future<List<PaymentActivityItem>> getProfessionalPaymentActivity(int clientId) {
+  Future<List<PaymentActivityItem>> getProfessionalPaymentActivity(
+    int clientId,
+  ) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/professional/payments/activity/',
@@ -344,7 +371,9 @@ class PaymentsApi {
     });
   }
 
-  Future<PaymentRecordRow> recordReceivedPayment(RecordReceivedPayload payload) {
+  Future<PaymentRecordRow> recordReceivedPayment(
+    RecordReceivedPayload payload,
+  ) {
     return runApi(() async {
       final res = await _dio.post<Map<String, dynamic>>(
         '/professional/payments/records/',
@@ -372,7 +401,9 @@ class PaymentsApi {
     });
   }
 
-  Future<ClientPaymentRequestRecord> getMyPaymentRequestDetail(String requestId) {
+  Future<ClientPaymentRequestRecord> getMyPaymentRequestDetail(
+    String requestId,
+  ) {
     return runApi(() async {
       final res = await _dio.get<Map<String, dynamic>>(
         '/client/payments/requests/$requestId/',
@@ -451,7 +482,8 @@ class PaymentActionItem {
   final String requestedCurrency;
   final String status;
 
-  factory PaymentActionItem.fromJson(Map<String, dynamic> json) => PaymentActionItem(
+  factory PaymentActionItem.fromJson(Map<String, dynamic> json) =>
+      PaymentActionItem(
         requestId: json['request_id'] as String? ?? '',
         clientId: (json['client_id'] as num?)?.toInt() ?? 0,
         clientName: json['client_name'] as String? ?? '',
@@ -487,5 +519,6 @@ class PaymentActionsResponse {
       );
 }
 
-final paymentsApiProvider =
-    Provider<PaymentsApi>((ref) => PaymentsApi(ref.watch(dioProvider)));
+final paymentsApiProvider = Provider<PaymentsApi>(
+  (ref) => PaymentsApi(ref.watch(dioProvider)),
+);

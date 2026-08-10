@@ -4,6 +4,57 @@
 /// Field names match the Django payloads exactly; do not rename them.
 library;
 
+/// Append-only transaction ledger row shared with the website payment page.
+class FinancialTransactionRecord {
+  const FinancialTransactionRecord({
+    required this.entryId,
+    required this.entryType,
+    required this.source,
+    required this.status,
+    required this.amount,
+    required this.currency,
+    required this.clientReference,
+    required this.paymentRequestReference,
+    required this.paymentRecordReference,
+    required this.externalReference,
+    required this.provider,
+    required this.description,
+    required this.occurredAt,
+  });
+
+  final String entryId;
+  final String entryType;
+  final String source;
+  final String status;
+  final String amount;
+  final String currency;
+  final String clientReference;
+  final String paymentRequestReference;
+  final String paymentRecordReference;
+  final String externalReference;
+  final String provider;
+  final String description;
+  final String occurredAt;
+
+  factory FinancialTransactionRecord.fromJson(
+    Map<String, dynamic> json,
+  ) => FinancialTransactionRecord(
+    entryId: json['entry_id'] as String? ?? '',
+    entryType: json['entry_type'] as String? ?? '',
+    source: json['source'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    amount: json['amount']?.toString() ?? '0',
+    currency: json['currency'] as String? ?? '',
+    clientReference: json['client_reference'] as String? ?? '',
+    paymentRequestReference: json['payment_request_reference'] as String? ?? '',
+    paymentRecordReference: json['payment_record_reference'] as String? ?? '',
+    externalReference: json['external_reference'] as String? ?? '',
+    provider: json['provider'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    occurredAt: json['occurred_at']?.toString() ?? '',
+  );
+}
+
 class PaymentSettingsRecord {
   const PaymentSettingsRecord({
     required this.paymentTrackingEnabled,
@@ -21,9 +72,11 @@ class PaymentSettingsRecord {
 
   factory PaymentSettingsRecord.fromJson(Map<String, dynamic> json) =>
       PaymentSettingsRecord(
-        paymentTrackingEnabled: json['payment_tracking_enabled'] as bool? ?? false,
+        paymentTrackingEnabled:
+            json['payment_tracking_enabled'] as bool? ?? false,
         reportingCurrency: json['reporting_currency'] as String? ?? 'USD',
-        reportingCurrencyLocked: json['reporting_currency_locked'] as bool? ?? false,
+        reportingCurrencyLocked:
+            json['reporting_currency_locked'] as bool? ?? false,
         clientPaymentHistoryEnabled:
             json['client_payment_history_enabled'] as bool? ?? false,
         updatedAt: json['updated_at'] as String? ?? '',
@@ -54,23 +107,32 @@ class PaymentSettingsResponse {
 class ManualPaymentCategory {
   const ManualPaymentCategory._();
   static const all = [
-    'upi', 'google_pay', 'phonepe', 'paytm', 'bank_transfer', 'zelle',
-    'venmo', 'cash_app', 'paypal_manual', 'cash', 'other',
+    'upi',
+    'google_pay',
+    'phonepe',
+    'paytm',
+    'bank_transfer',
+    'zelle',
+    'venmo',
+    'cash_app',
+    'paypal_manual',
+    'cash',
+    'other',
   ];
   static String label(String category) => switch (category) {
-        'upi' => 'UPI',
-        'google_pay' => 'Google Pay',
-        'phonepe' => 'PhonePe',
-        'paytm' => 'Paytm',
-        'bank_transfer' => 'Bank transfer',
-        'zelle' => 'Zelle',
-        'venmo' => 'Venmo',
-        'cash_app' => 'Cash App',
-        'paypal_manual' => 'PayPal (manual)',
-        'cash' => 'Cash',
-        'other' => 'Other',
-        _ => category,
-      };
+    'upi' => 'UPI',
+    'google_pay' => 'Google Pay',
+    'phonepe' => 'PhonePe',
+    'paytm' => 'Paytm',
+    'bank_transfer' => 'Bank transfer',
+    'zelle' => 'Zelle',
+    'venmo' => 'Venmo',
+    'cash_app' => 'Cash App',
+    'paypal_manual' => 'PayPal (manual)',
+    'cash' => 'Cash',
+    'other' => 'Other',
+    _ => category,
+  };
 }
 
 class ManualPaymentMethodRecord {
@@ -110,14 +172,15 @@ class ManualPaymentMethodRecord {
         name: json['name'] as String? ?? '',
         category: json['category'] as String? ?? 'other',
         displayLabel: json['display_label'] as String? ?? '',
-        supportedCurrencies: (json['supported_currencies'] as List<dynamic>? ?? [])
-            .map((c) => c.toString())
-            .toList(),
+        supportedCurrencies:
+            (json['supported_currencies'] as List<dynamic>? ?? [])
+                .map((c) => c.toString())
+                .toList(),
         country: json['country'] as String? ?? '',
         clientVisibleFields:
             (json['client_visible_fields'] as Map<dynamic, dynamic>? ?? {}).map(
-          (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
-        ),
+              (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+            ),
         qrCode: json['qr_code'] as String?,
         internalNotes: json['internal_notes'] as String? ?? '',
         clientInstructions: json['client_instructions'] as String? ?? '',
@@ -151,13 +214,14 @@ class ManualPaymentMethodClientView {
         id: (json['id'] as num?)?.toInt() ?? 0,
         category: json['category'] as String? ?? 'other',
         displayLabel: json['display_label'] as String? ?? '',
-        supportedCurrencies: (json['supported_currencies'] as List<dynamic>? ?? [])
-            .map((c) => c.toString())
-            .toList(),
+        supportedCurrencies:
+            (json['supported_currencies'] as List<dynamic>? ?? [])
+                .map((c) => c.toString())
+                .toList(),
         clientVisibleFields:
             (json['client_visible_fields'] as Map<dynamic, dynamic>? ?? {}).map(
-          (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
-        ),
+              (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+            ),
         qrCode: json['qr_code'] as String?,
         clientInstructions: json['client_instructions'] as String? ?? '',
       );
@@ -167,24 +231,26 @@ class ManualPaymentMethodClientView {
 class PaymentRequestStatus {
   const PaymentRequestStatus._();
   static String label(String status) => switch (status) {
-        'draft' => 'Draft',
-        'sent' => 'Sent',
-        'viewed' => 'Viewed',
-        'proof_submitted' => 'Proof submitted',
-        'under_review' => 'Under review',
-        'acknowledged' => 'Acknowledged',
-        'completed' => 'Completed',
-        'partially_paid' => 'Partially paid',
-        'rejected' => 'Rejected',
-        'cancelled' => 'Cancelled',
-        'overdue' => 'Overdue',
-        'refunded' => 'Refunded',
-        _ => status,
-      };
+    'draft' => 'Draft',
+    'sent' => 'Sent',
+    'viewed' => 'Viewed',
+    'proof_submitted' => 'Proof submitted',
+    'under_review' => 'Under review',
+    'acknowledged' => 'Acknowledged',
+    'completed' => 'Completed',
+    'partially_paid' => 'Partially paid',
+    'rejected' => 'Rejected',
+    'cancelled' => 'Cancelled',
+    'overdue' => 'Overdue',
+    'refunded' => 'Refunded',
+    _ => status,
+  };
 
   /// Statuses where the professional still owes an action.
   static const openForProfessional = {
-    'proof_submitted', 'under_review', 'overdue',
+    'proof_submitted',
+    'under_review',
+    'overdue',
   };
 }
 
@@ -247,9 +313,10 @@ class PaymentRequestRecord {
         status: json['status'] as String? ?? 'sent',
         clientVisibility: json['client_visibility'] as String? ?? 'visible',
         notes: json['notes'] as String? ?? '',
-        allowedMethodLabels: (json['allowed_method_labels'] as List<dynamic>? ?? [])
-            .map((l) => l.toString())
-            .toList(),
+        allowedMethodLabels:
+            (json['allowed_method_labels'] as List<dynamic>? ?? [])
+                .map((l) => l.toString())
+                .toList(),
         createdAt: json['created_at'] as String? ?? '',
       );
 }
@@ -337,7 +404,8 @@ class PaymentRecordRow {
   final String clientNote;
   final String recordType; // 'manual_log' | 'integrated'
 
-  factory PaymentRecordRow.fromJson(Map<String, dynamic> json) => PaymentRecordRow(
+  factory PaymentRecordRow.fromJson(Map<String, dynamic> json) =>
+      PaymentRecordRow(
         id: (json['id'] as num?)?.toInt() ?? 0,
         paymentRecordId: json['payment_record_id'] as String? ?? '',
         clientName: json['client_name'] as String? ?? '',
@@ -380,7 +448,8 @@ class PaymentActivityItem {
   final String reason;
   final String createdAt;
 
-  factory PaymentActivityItem.fromJson(Map<String, dynamic> json) => PaymentActivityItem(
+  factory PaymentActivityItem.fromJson(Map<String, dynamic> json) =>
+      PaymentActivityItem(
         id: (json['id'] as num?)?.toInt() ?? 0,
         action: json['action'] as String? ?? '',
         actionLabel: json['action_label'] as String? ?? '',
@@ -429,8 +498,7 @@ class PaymentNotificationItem {
   /// in which case the caller should fall back to the Payments tab.
   int? get clientId {
     final actionUrl = payload['action_url'] as String? ?? '';
-    final match =
-        RegExp(r'/professional/clients/(\d+)').firstMatch(actionUrl);
+    final match = RegExp(r'/professional/clients/(\d+)').firstMatch(actionUrl);
     return match == null ? null : int.tryParse(match.group(1)!);
   }
 
@@ -554,7 +622,8 @@ class RevenueSeriesPoint {
   final String label;
   final double total;
 
-  factory RevenueSeriesPoint.fromJson(Map<String, dynamic> json) => RevenueSeriesPoint(
+  factory RevenueSeriesPoint.fromJson(Map<String, dynamic> json) =>
+      RevenueSeriesPoint(
         label: json['label']?.toString() ?? '',
         total: double.tryParse(json['total']?.toString() ?? '') ?? 0,
       );
@@ -577,7 +646,8 @@ class RevenueTransaction {
   final String status;
   final String receivedDate;
 
-  factory RevenueTransaction.fromJson(Map<String, dynamic> json) => RevenueTransaction(
+  factory RevenueTransaction.fromJson(Map<String, dynamic> json) =>
+      RevenueTransaction(
         paymentRecordId: json['payment_record_id'] as String? ?? '',
         clientName: json['client_name'] as String? ?? '',
         amount: json['amount']?.toString() ?? '0',
@@ -617,10 +687,11 @@ class RevenueSummaryResponse {
             .whereType<Map<String, dynamic>>()
             .map(RevenueSeriesPoint.fromJson)
             .toList(),
-        recentTransactions: (json['recent_transactions'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(RevenueTransaction.fromJson)
-            .toList(),
+        recentTransactions:
+            (json['recent_transactions'] as List<dynamic>? ?? [])
+                .whereType<Map<String, dynamic>>()
+                .map(RevenueTransaction.fromJson)
+                .toList(),
       );
 }
 
@@ -667,7 +738,8 @@ class PaymentActionRef {
   final String requestedAmount;
   final String requestedCurrency;
 
-  factory PaymentActionRef.fromJson(Map<String, dynamic> json) => PaymentActionRef(
+  factory PaymentActionRef.fromJson(Map<String, dynamic> json) =>
+      PaymentActionRef(
         requestId: json['request_id'] as String? ?? '',
         clientId: (json['client_id'] as num?)?.toInt() ?? 0,
         clientName: json['client_name'] as String? ?? '',
@@ -710,20 +782,20 @@ class RecordReceivedPayload {
   final String clientNote;
 
   Map<String, dynamic> toJson() => {
-        'client': client,
-        if (paymentRequestId != null) 'payment_request_id': paymentRequestId,
-        'original_amount': originalAmount,
-        'original_currency': originalCurrency,
-        'reporting_amount': reportingAmount,
-        'reporting_currency': reportingCurrency,
-        if (paymentMethod != null) 'payment_method': paymentMethod,
-        'transaction_reference': transactionReference,
-        'received_date': receivedDate,
-        'status': status,
-        'client_visibility': clientVisibility,
-        'internal_note': internalNote,
-        'client_note': clientNote,
-      };
+    'client': client,
+    if (paymentRequestId != null) 'payment_request_id': paymentRequestId,
+    'original_amount': originalAmount,
+    'original_currency': originalCurrency,
+    'reporting_amount': reportingAmount,
+    'reporting_currency': reportingCurrency,
+    if (paymentMethod != null) 'payment_method': paymentMethod,
+    'transaction_reference': transactionReference,
+    'received_date': receivedDate,
+    'status': status,
+    'client_visibility': clientVisibility,
+    'internal_note': internalNote,
+    'client_note': clientNote,
+  };
 }
 
 /// Payload the professional sends to create a new payment request.
@@ -751,14 +823,14 @@ class CreatePaymentRequestPayload {
   final List<int> allowedMethodIds;
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'description': description,
-        'requested_amount': requestedAmount,
-        'requested_currency': requestedCurrency,
-        'due_date': dueDate,
-        'payment_type': paymentType,
-        'client_visibility': clientVisibility,
-        'notes': notes,
-        'allowed_method_ids': allowedMethodIds,
-      };
+    'title': title,
+    'description': description,
+    'requested_amount': requestedAmount,
+    'requested_currency': requestedCurrency,
+    'due_date': dueDate,
+    'payment_type': paymentType,
+    'client_visibility': clientVisibility,
+    'notes': notes,
+    'allowed_method_ids': allowedMethodIds,
+  };
 }

@@ -18,12 +18,12 @@ class ResourceType {
   static const all = [videoLink, pdf, image, textNote];
 
   static String label(String type) => switch (type) {
-        videoLink => 'Video link',
-        pdf => 'PDF',
-        image => 'Image',
-        textNote => 'Text note',
-        _ => type,
-      };
+    videoLink => 'Video link',
+    pdf => 'PDF',
+    image => 'Image',
+    textNote => 'Text note',
+    _ => type,
+  };
 }
 
 class ResourceCategoryRecord {
@@ -102,7 +102,9 @@ class ProfessionalResourceRecord {
         link: json['link'] as String? ?? '',
         fileUrl: json['file_url'] as String? ?? '',
         fileName: json['file_name'] as String? ?? '',
-        tags: (json['tags'] as List<dynamic>? ?? []).map((t) => t.toString()).toList(),
+        tags: (json['tags'] as List<dynamic>? ?? [])
+            .map((t) => t.toString())
+            .toList(),
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
       );
@@ -119,9 +121,9 @@ class ResourceUsage {
   bool get atLimit => limit != null && used >= limit!;
 
   factory ResourceUsage.fromJson(Map<String, dynamic> json) => ResourceUsage(
-        used: json['used'] as int? ?? 0,
-        limit: json['limit'] as int?,
-      );
+    used: json['used'] as int? ?? 0,
+    limit: json['limit'] as int?,
+  );
 }
 
 class ResourceListResponse {
@@ -305,5 +307,6 @@ class ResourcesApi {
   }
 }
 
-final resourcesApiProvider =
-    Provider<ResourcesApi>((ref) => ResourcesApi(ref.watch(dioProvider)));
+final resourcesApiProvider = Provider<ResourcesApi>(
+  (ref) => ResourcesApi(ref.watch(dioProvider)),
+);

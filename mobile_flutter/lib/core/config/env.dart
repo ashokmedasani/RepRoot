@@ -21,7 +21,9 @@ class Env {
 
   /// Deliberate opt-out for pointing a release build at a LAN dev backend:
   ///   flutter build apk --release --dart-define=ALLOW_INSECURE_API=true
-  static const bool _allowInsecureApi = bool.fromEnvironment('ALLOW_INSECURE_API');
+  static const bool _allowInsecureApi = bool.fromEnvironment(
+    'ALLOW_INSECURE_API',
+  );
 
   /// Refuses a plaintext base URL in a release build.
   ///
@@ -37,7 +39,9 @@ class Env {
   /// Fails at launch rather than on the first request: a plaintext base URL is
   /// a build mistake, and it should be impossible to miss.
   static void assertSecureBaseUrl() {
-    if (kReleaseMode && !_allowInsecureApi && !apiBaseUrl.startsWith('https://')) {
+    if (kReleaseMode &&
+        !_allowInsecureApi &&
+        !apiBaseUrl.startsWith('https://')) {
       throw StateError(
         'Release builds must use an https API_BASE_URL, but this one is '
         '"$apiBaseUrl". Session tokens would be sent in cleartext. Rebuild with '
@@ -60,6 +64,21 @@ class Env {
     'WEB_APP_URL',
     defaultValue: 'https://rep-root.com',
   );
+
+  /// Public RepRoot Studio application. This is intentionally public
+  /// configuration and is used when a task is safer to finish on the website,
+  /// such as purchasing or managing a subscription.
+  static const String studioWebUrl = String.fromEnvironment(
+    'STUDIO_WEB_URL',
+    defaultValue: 'https://studio.rep-root.com',
+  );
+
+  static String studioUrl(String path) {
+    final root = studioWebUrl.endsWith('/')
+        ? studioWebUrl.substring(0, studioWebUrl.length - 1)
+        : studioWebUrl;
+    return path.startsWith('/') ? '$root$path' : '$root/$path';
+  }
 
   /// Absolute URL of a published legal document.
   /// [doc] is 'terms' or 'privacy'; [audience] is 'professional' or 'client' —

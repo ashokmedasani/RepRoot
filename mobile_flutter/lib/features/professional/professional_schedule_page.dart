@@ -35,10 +35,12 @@ class ProfessionalSchedulePage extends ConsumerStatefulWidget {
   const ProfessionalSchedulePage({super.key});
 
   @override
-  ConsumerState<ProfessionalSchedulePage> createState() => _ProfessionalSchedulePageState();
+  ConsumerState<ProfessionalSchedulePage> createState() =>
+      _ProfessionalSchedulePageState();
 }
 
-class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalSchedulePage> {
+class _ProfessionalSchedulePageState
+    extends ConsumerState<ProfessionalSchedulePage> {
   _ScheduleSegment _segment = _ScheduleSegment.todo;
 
   // Reminders
@@ -87,15 +89,23 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
   /// inbox moves far more slowly than this page's meeting data.
   Future<void> _loadNotificationCount() async {
     try {
-      final inbox =
-          await ref.read(professionalAuthApiProvider).getNotifications(limit: 1);
+      final inbox = await ref
+          .read(professionalAuthApiProvider)
+          .getNotifications(limit: 1);
       if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
-    } catch (_) {/* the badge just stays at zero */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Schedule notification badge failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   Future<void> _load() async {
     try {
-      final upcoming = await ref.read(formsGroupsApiProvider).getUpcomingReminders();
+      final upcoming = await ref
+          .read(formsGroupsApiProvider)
+          .getUpcomingReminders();
       if (!mounted) return;
       setState(() {
         _reminders = upcoming.reminders;
@@ -135,7 +145,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
   Future<void> _loadAvailability() async {
     setState(() => _availabilityLoading = true);
     try {
-      final response = await ref.read(schedulingApiProvider).getSchedulingSettings();
+      final response = await ref
+          .read(schedulingApiProvider)
+          .getSchedulingSettings();
       if (!mounted) return;
       setState(() {
         _windows = response.availabilityWindows;
@@ -184,10 +196,16 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             return _BookingGroup(
               id: group.id,
               name: group.name,
-              clients: response.clients.where((client) => client.isActive).toList(),
+              clients: response.clients
+                  .where((client) => client.isActive)
+                  .toList(),
             );
           } catch (_) {
-            return _BookingGroup(id: group.id, name: group.name, clients: const []);
+            return _BookingGroup(
+              id: group.id,
+              name: group.name,
+              clients: const [],
+            );
           }
         }),
       );
@@ -227,7 +245,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete schedule?'),
-        content: Text('"${reminder.title}" for ${reminder.clientName} will be removed.'),
+        content: Text(
+          '"${reminder.title}" for ${reminder.clientName} will be removed.',
+        ),
         actions: [
           TextButton(
             onPressed: () => context.pop(false),
@@ -250,8 +270,11 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
       await ref.read(formsGroupsApiProvider).deleteReminder(reminder.id);
       if (!mounted) return;
       // Drop locally rather than refetching, matching the Ionic page.
-      setState(() => _reminders =
-          _reminders.where((item) => item.id != reminder.id).toList());
+      setState(
+        () => _reminders = _reminders
+            .where((item) => item.id != reminder.id)
+            .toList(),
+      );
     } catch (_) {
       if (mounted) setState(() => _message = 'Could not delete the schedule.');
     }
@@ -284,9 +307,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     if (booked == true) {
       await _loadMeetings();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Meeting scheduled.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Meeting scheduled.')));
       }
     }
   }
@@ -295,10 +318,8 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _DaysOffSheet(
-        dateOffs: _dateOffs,
-        weekdayOffs: _weekdayOffs,
-      ),
+      builder: (context) =>
+          _DaysOffSheet(dateOffs: _dateOffs, weekdayOffs: _weekdayOffs),
     );
     await _loadDaysOff();
   }
@@ -306,15 +327,23 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
   /// Accept or decline a time a client proposed. Accepting books it for real
   /// (video link + invites); declining is the destructive half, so only that
   /// one asks for confirmation.
-  Future<void> _reviewRequest(ScheduledMeetingRecord meeting, String action) async {
+  Future<void> _reviewRequest(
+    ScheduledMeetingRecord meeting,
+    String action,
+  ) async {
     if (action == 'decline') {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Decline this request?'),
-          content: Text('${meeting.clientName} will be told the time does not work.'),
+          content: Text(
+            '${meeting.clientName} will be told the time does not work.',
+          ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Back')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Back'),
+            ),
             FilledButton(
               onPressed: () => context.pop(true),
               style: FilledButton.styleFrom(
@@ -330,13 +359,17 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     }
 
     try {
-      await ref.read(schedulingApiProvider).reviewClientMeetingRequest(meeting.id, action);
+      await ref
+          .read(schedulingApiProvider)
+          .reviewClientMeetingRequest(meeting.id, action);
       await _loadMeetings();
     } catch (error) {
       if (mounted) {
-        setState(() => _meetingsMessage = error is ApiException
-            ? error.message
-            : 'Could not update this meeting request.');
+        setState(
+          () => _meetingsMessage = error is ApiException
+              ? error.message
+              : 'Could not update this meeting request.',
+        );
       }
     }
   }
@@ -391,7 +424,10 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           decoration: const InputDecoration(labelText: 'Reason (optional)'),
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Back')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Back'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -410,7 +446,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             .cancelMeeting(meeting.id, reason: reasonCtrl.text.trim());
         await _loadMeetings();
       } catch (_) {
-        if (mounted) setState(() => _meetingsMessage = 'Could not cancel the meeting.');
+        if (mounted) {
+          setState(() => _meetingsMessage = 'Could not cancel the meeting.');
+        }
       }
     }
     reasonCtrl.dispose();
@@ -432,7 +470,13 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           : TimeOfDay.now(),
     );
     if (time == null) return;
-    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final start = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     try {
       // Send an absolute instant (UTC, "…Z"): a naive local string would be
       // read back in the server's own default zone and land at the wrong time.
@@ -441,7 +485,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           .rescheduleMeeting(meeting.id, start.toUtc().toIso8601String());
       await _loadMeetings();
     } catch (_) {
-      if (mounted) setState(() => _meetingsMessage = 'Could not reschedule the meeting.');
+      if (mounted) {
+        setState(() => _meetingsMessage = 'Could not reschedule the meeting.');
+      }
     }
   }
 
@@ -464,10 +510,18 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                 initialValue: weekday,
                 decoration: const InputDecoration(labelText: 'Day'),
                 items: [
-                  for (var i = 0; i < AvailabilityWindowRecord.weekdayLabels.length; i++)
-                    DropdownMenuItem(value: i, child: Text(AvailabilityWindowRecord.weekdayLabels[i])),
+                  for (
+                    var i = 0;
+                    i < AvailabilityWindowRecord.weekdayLabels.length;
+                    i++
+                  )
+                    DropdownMenuItem(
+                      value: i,
+                      child: Text(AvailabilityWindowRecord.weekdayLabels[i]),
+                    ),
                 ],
-                onChanged: (value) => setDialogState(() => weekday = value ?? 0),
+                onChanged: (value) =>
+                    setDialogState(() => weekday = value ?? 0),
               ),
               const SizedBox(height: AppSpacing.sm),
               Row(
@@ -475,8 +529,13 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
-                        final picked = await showTimePicker(context: context, initialTime: start);
-                        if (picked != null) setDialogState(() => start = picked);
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: start,
+                        );
+                        if (picked != null) {
+                          setDialogState(() => start = picked);
+                        }
                       },
                       child: Text('From ${start.format(context)}'),
                     ),
@@ -485,7 +544,10 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () async {
-                        final picked = await showTimePicker(context: context, initialTime: end);
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: end,
+                        );
                         if (picked != null) setDialogState(() => end = picked);
                       },
                       child: Text('To ${end.format(context)}'),
@@ -496,10 +558,15 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             ],
           ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () => context.pop(true),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+              ),
               child: const Text('Add'),
             ),
           ],
@@ -511,14 +578,18 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
       String hhmm(TimeOfDay t) =>
           '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
       try {
-        final window = await ref.read(schedulingApiProvider).addAvailabilityWindow(
+        final window = await ref
+            .read(schedulingApiProvider)
+            .addAvailabilityWindow(
               weekday: weekday,
               startTime: hhmm(start),
               endTime: hhmm(end),
             );
         if (mounted) setState(() => _windows = [..._windows, window]);
       } catch (_) {
-        if (mounted) setState(() => _availabilityMessage = 'Could not add the window.');
+        if (mounted) {
+          setState(() => _availabilityMessage = 'Could not add the window.');
+        }
       }
     }
   }
@@ -529,9 +600,15 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           .read(schedulingApiProvider)
           .updateAvailabilityWindow(window.id, isActive: !window.isActive);
       if (!mounted) return;
-      setState(() => _windows = _windows.map((w) => w.id == window.id ? updated : w).toList());
+      setState(
+        () => _windows = _windows
+            .map((w) => w.id == window.id ? updated : w)
+            .toList(),
+      );
     } catch (_) {
-      if (mounted) setState(() => _availabilityMessage = 'Could not update the window.');
+      if (mounted) {
+        setState(() => _availabilityMessage = 'Could not update the window.');
+      }
     }
   }
 
@@ -539,9 +616,13 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     try {
       await ref.read(schedulingApiProvider).deleteAvailabilityWindow(window.id);
       if (!mounted) return;
-      setState(() => _windows = _windows.where((w) => w.id != window.id).toList());
+      setState(
+        () => _windows = _windows.where((w) => w.id != window.id).toList(),
+      );
     } catch (_) {
-      if (mounted) setState(() => _availabilityMessage = 'Could not delete the window.');
+      if (mounted) {
+        setState(() => _availabilityMessage = 'Could not delete the window.');
+      }
     }
   }
 
@@ -574,7 +655,8 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
         PageHeader(
           eyebrow: 'PROFESSIONAL WORKSPACE',
           title: 'Schedule',
-          info: 'Every upcoming meeting and follow-up across your clients, in '
+          info:
+              'Every upcoming meeting and follow-up across your clients, in '
               'one place.\n\n'
               'TO-DO\n'
               'The next three days only — reminders and meetings together, in '
@@ -588,12 +670,49 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
               'you.',
           trailing: NotificationBell(
             unread: _notificationUnread,
-            onTap: () => context.go(Routes.professionalNotifications),
+            onTap: () => context.push(Routes.professionalNotifications),
           ),
         ),
         if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
         if (_meetingsMessage.isNotEmpty)
           ErrorNote(message: _meetingsMessage, onRetry: _loadMeetings),
+        if (!_availabilityLoading &&
+            !_windows.any((window) => window.isActive)) ...[
+          AppCard(
+            color: context.tokens.warningSoft,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.schedule_outlined,
+                  color: context.tokens.warningStrong,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Set your availability',
+                        style: context.text.titleSmall,
+                      ),
+                      Text(
+                        'Clients cannot request a meeting until at least one '
+                        'availability window is active.',
+                        style: context.text.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                TextButton(
+                  onPressed: _openAvailabilitySheet,
+                  child: const Text('Set now'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
 
         _scheduleKpis(),
         const SizedBox(height: AppSpacing.md),
@@ -602,22 +721,11 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
         // people — so they share one segmented control instead of a
         // full-width button plus a loose icon. Days off stays separate: it is
         // the opposite instruction, blocking time rather than offering it.
-        Row(
-          children: [
-            Expanded(
-              child: _ScheduleActionGroup(
-                onBook: _clientsLoading ? null : _openBookingSheet,
-                onAvailability: _openAvailabilitySheet,
-                bookBusy: _clientsLoading,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            IconButton.outlined(
-              onPressed: _openDaysOffSheet,
-              icon: const Icon(Icons.event_busy_outlined, size: AppSize.iconRow),
-              tooltip: 'Day off',
-            ),
-          ],
+        _ScheduleActionGroup(
+          onBook: _clientsLoading ? null : _openBookingSheet,
+          onAvailability: _openAvailabilitySheet,
+          onDayOff: _openDaysOffSheet,
+          bookBusy: _clientsLoading,
         ),
 
         const SizedBox(height: AppSpacing.md),
@@ -627,12 +735,23 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           meetingCounts: _meetingCountsByDate,
           bookedMinutes: _bookedMinutesByDate,
           isDayOff: _isDateOff,
-          onPrevMonth: () => setState(() => _calendarMonth =
-              DateTime(_calendarMonth.year, _calendarMonth.month - 1)),
-          onNextMonth: () => setState(() => _calendarMonth =
-              DateTime(_calendarMonth.year, _calendarMonth.month + 1)),
-          onSelect: (iso) => setState(() =>
-              _selectedCalendarDate = _selectedCalendarDate == iso ? null : iso),
+          onPrevMonth: () => setState(
+            () => _calendarMonth = DateTime(
+              _calendarMonth.year,
+              _calendarMonth.month - 1,
+            ),
+          ),
+          onNextMonth: () => setState(
+            () => _calendarMonth = DateTime(
+              _calendarMonth.year,
+              _calendarMonth.month + 1,
+            ),
+          ),
+          onSelect: (iso) => setState(
+            () => _selectedCalendarDate = _selectedCalendarDate == iso
+                ? null
+                : iso,
+          ),
         ),
         if (selected != null)
           Padding(
@@ -656,28 +775,15 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           ),
 
         const SizedBox(height: AppSpacing.lg),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<_ScheduleSegment>(
-            segments: const [
-              ButtonSegment(
-                value: _ScheduleSegment.todo,
-                label: Text('To-Do', maxLines: 1),
-              ),
-              ButtonSegment(
-                value: _ScheduleSegment.reminders,
-                label: Text('Reminders', maxLines: 1),
-              ),
-              ButtonSegment(
-                value: _ScheduleSegment.meetings,
-                label: Text('Meetings', maxLines: 1),
-              ),
-            ],
-            selected: {_segment},
-            showSelectedIcon: false,
-            onSelectionChanged: (value) =>
-                setState(() => _segment = value.first),
-          ),
+        AppSegmentedFilter<_ScheduleSegment>(
+          value: _segment,
+          options: const [
+            (_ScheduleSegment.todo, 'To do'),
+            (_ScheduleSegment.reminders, 'Reminders'),
+            (_ScheduleSegment.meetings, 'Meetings'),
+          ],
+          onChanged: (value) => setState(() => _segment = value),
+          expanded: true,
         ),
         const SizedBox(height: AppSpacing.md),
         ...switch (_segment) {
@@ -753,7 +859,8 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
       SectionHeader(
         title: 'Reminders',
         topSpace: 0,
-        infoBody: 'Private follow-ups about a client — check an injury, chase '
+        infoBody:
+            'Private follow-ups about a client — check an injury, chase '
             'a missing entry, review progress before your next session.\n\n'
             'Only you see these. They are not meetings: there is no attendee '
             'and nothing is sent to the client.\n\n'
@@ -788,26 +895,31 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
         meeting.status == MeetingStatus.scheduled &&
         (meeting.startAt?.isBefore(now) == false);
 
-    final pendingRequests = _meetings
-        .where((m) => m.isPendingClientRequest)
-        .toList()
-      ..sort((a, b) => startMs(a).compareTo(startMs(b)));
+    final pendingRequests =
+        _meetings.where((m) => m.isPendingClientRequest).toList()
+          ..sort((a, b) => startMs(a).compareTo(startMs(b)));
     final upcoming = _meetings.where(isUpcoming).toList()
       ..sort((a, b) => startMs(a).compareTo(startMs(b)));
-    final past = _meetings
-        .where((m) => m.status != MeetingStatus.pendingApproval && !isUpcoming(m))
-        .toList()
-      ..sort((a, b) => startMs(b).compareTo(startMs(a)));
+    final past =
+        _meetings
+            .where(
+              (m) =>
+                  m.status != MeetingStatus.pendingApproval && !isUpcoming(m),
+            )
+            .toList()
+          ..sort((a, b) => startMs(b).compareTo(startMs(a)));
 
     // Picking a day on the calendar narrows this list to that day.
     final selected = _selectedCalendarDate;
     final displayedUpcoming = selected == null
         ? upcoming
         : upcoming
-            .where((m) =>
-                m.startAt != null &&
-                _isoDay.format(m.startAt!.toLocal()) == selected)
-            .toList();
+              .where(
+                (m) =>
+                    m.startAt != null &&
+                    _isoDay.format(m.startAt!.toLocal()) == selected,
+              )
+              .toList();
 
     return [
       if (pendingRequests.isNotEmpty) ...[
@@ -906,7 +1018,7 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           ),
 
       if (past.isNotEmpty) ...[
-        const SectionHeader(title: 'Past & cancelled', subheading: true),
+        const SectionHeader(title: 'Past and cancelled', subheading: true),
         for (final meeting in past) _meetingCard(meeting),
       ],
     ];
@@ -980,13 +1092,12 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
 
     return [
       const SectionHeader(
-        title: 'Next 3 days',
+        title: 'To do',
         topSpace: 0,
-        infoBody: 'Everything due in the next three days — reminders and '
-            'meetings together, in the order they happen.\n\n'
-            'The window is fixed at three days on purpose. This is meant to '
-            'be the short list you act on today, not a backlog. Anything '
-            'further out is in Reminders or Meetings.',
+        infoBody:
+            'Shows the next three days of to-do activities and meetings, '
+            'ordered by when they happen. Items further out remain available '
+            'in the Reminders and Meetings tabs.',
       ),
       if (items.isEmpty)
         const EmptyState(
@@ -1000,7 +1111,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
   }
 
   Widget _meetingCard(ScheduledMeetingRecord meeting, {Widget? actions}) {
-    final guestNames = meeting.guests.map((guest) => guest.clientName).join(', ');
+    final guestNames = meeting.guests
+        .map((guest) => guest.clientName)
+        .join(', ');
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: AppCard(
@@ -1020,7 +1133,8 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                       ? 'needs approval'
                       : meeting.status,
                   tone: switch (meeting.status) {
-                    MeetingStatus.cancelled || MeetingStatus.declined => PillTone.bad,
+                    MeetingStatus.cancelled ||
+                    MeetingStatus.declined => PillTone.bad,
                     MeetingStatus.completed => PillTone.neutral,
                     MeetingStatus.pendingApproval => PillTone.warn,
                     _ => PillTone.good,
@@ -1053,10 +1167,16 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
     );
   }
 
-  Future<void> _editSchedulingSettings(SchedulingSettingsRecord settings) async {
+  Future<void> _editSchedulingSettings(
+    SchedulingSettingsRecord settings,
+  ) async {
     final timezoneCtrl = TextEditingController(text: settings.timezone);
-    final durationCtrl = TextEditingController(text: '${settings.defaultDurationMinutes}');
-    final intervalCtrl = TextEditingController(text: '${settings.slotIntervalMinutes}');
+    final durationCtrl = TextEditingController(
+      text: '${settings.defaultDurationMinutes}',
+    );
+    final intervalCtrl = TextEditingController(
+      text: '${settings.slotIntervalMinutes}',
+    );
     final bufferCtrl = TextEditingController(text: '${settings.bufferMinutes}');
 
     final saved = await showDialog<bool>(
@@ -1069,34 +1189,47 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             children: [
               TextField(
                 controller: timezoneCtrl,
-                decoration: const InputDecoration(labelText: 'Timezone (e.g. America/New_York)'),
+                decoration: const InputDecoration(
+                  labelText: 'Timezone (e.g. America/New_York)',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: durationCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Default duration (min)'),
+                decoration: const InputDecoration(
+                  labelText: 'Default duration (min)',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: intervalCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Slot interval (min)'),
+                decoration: const InputDecoration(
+                  labelText: 'Slot interval (min)',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: bufferCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Buffer between meetings (min)'),
+                decoration: const InputDecoration(
+                  labelText: 'Buffer between meetings (min)',
+                ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
             child: const Text('Save'),
           ),
         ],
@@ -1105,7 +1238,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
 
     if (saved == true) {
       try {
-        final updated = await ref.read(schedulingApiProvider).saveSchedulingSettings(
+        final updated = await ref
+            .read(schedulingApiProvider)
+            .saveSchedulingSettings(
               timezone: timezoneCtrl.text.trim(),
               defaultDurationMinutes: int.tryParse(durationCtrl.text.trim()),
               slotIntervalMinutes: int.tryParse(intervalCtrl.text.trim()),
@@ -1113,7 +1248,9 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
             );
         if (mounted) setState(() => _settings = updated);
       } catch (_) {
-        if (mounted) setState(() => _availabilityMessage = 'Could not save settings.');
+        if (mounted) {
+          setState(() => _availabilityMessage = 'Could not save settings.');
+        }
       }
     }
     timezoneCtrl.dispose();
@@ -1137,7 +1274,10 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                 Row(
                   children: [
                     Expanded(
-                      child: Text('Scheduling settings', style: context.text.titleSmall),
+                      child: Text(
+                        'Scheduling settings',
+                        style: context.text.titleSmall,
+                      ),
                     ),
                     IconButton(
                       onPressed: () => _editSchedulingSettings(settings),
@@ -1148,7 +1288,10 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
                     ),
                   ],
                 ),
-                Text('Timezone: ${settings.timezone}', style: context.text.bodySmall),
+                Text(
+                  'Timezone: ${settings.timezone}',
+                  style: context.text.bodySmall,
+                ),
                 Text(
                   'Default duration: ${settings.defaultDurationMinutes} min · '
                   'Slot interval: ${settings.slotIntervalMinutes} min · '
@@ -1169,12 +1312,14 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
           const EmptyState(
             compact: false,
             icon: Icons.calendar_month_outlined,
-            message: 'No availability windows yet.\nAdd one so clients can request meetings.',
+            message:
+                'No availability windows yet.\nAdd one so clients can request meetings.',
           )
         else
           for (final window in _windows)
             RowItem(
-              title: '${window.weekdayLabel} · ${window.startTime}–${window.endTime}',
+              title:
+                  '${window.weekdayLabel} · ${window.startTime}–${window.endTime}',
               subtitle: window.isActive ? 'Active' : 'Inactive',
               leading: Switch(
                 value: window.isActive,
@@ -1196,7 +1341,11 @@ class _ProfessionalSchedulePageState extends ConsumerState<ProfessionalScheduleP
 /// One group plus its active clients, as the booking sheet needs them — the
 /// mobile shape of the web's `clientGroups` array.
 class _BookingGroup {
-  const _BookingGroup({required this.id, required this.name, required this.clients});
+  const _BookingGroup({
+    required this.id,
+    required this.name,
+    required this.clients,
+  });
 
   final int id;
   final String name;
@@ -1227,7 +1376,15 @@ class _MonthCalendar extends StatelessWidget {
   final VoidCallback onNextMonth;
   final ValueChanged<String> onSelect;
 
-  static const _weekdayHeadings = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  static const _weekdayHeadings = [
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1235,7 +1392,11 @@ class _MonthCalendar extends StatelessWidget {
     // Dart weekday: Mon=1 .. Sun=7, so `weekday % 7` is how many days back the
     // Sunday before the 1st is (Sunday itself gives 0).
     final first = DateTime(month.year, month.month);
-    final gridStart = DateTime(first.year, first.month, 1 - (first.weekday % 7));
+    final gridStart = DateTime(
+      first.year,
+      first.month,
+      1 - (first.weekday % 7),
+    );
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -1273,7 +1434,9 @@ class _MonthCalendar extends StatelessWidget {
                   child: Text(
                     heading,
                     textAlign: TextAlign.center,
-                    style: context.text.labelSmall?.copyWith(color: tokens.muted),
+                    style: context.text.labelSmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ),
             ],
@@ -1321,7 +1484,9 @@ class _MonthCalendar extends StatelessWidget {
 
     final background = dayOff
         ? tokens.surfaceSoft
-        : colors.primary.withValues(alpha: _occupancyAlpha(bookedMinutes[iso] ?? 0));
+        : colors.primary.withValues(
+            alpha: _occupancyAlpha(bookedMinutes[iso] ?? 0),
+          );
 
     return Expanded(
       child: Padding(
@@ -1329,7 +1494,8 @@ class _MonthCalendar extends StatelessWidget {
         child: Semantics(
           button: true,
           selected: isSelected,
-          label: '$iso: ${dayOff ? 'day off, ' : ''}'
+          label:
+              '$iso: ${dayOff ? 'day off, ' : ''}'
               '${count > 0 ? '$count meeting(s)' : 'open'}',
           child: InkWell(
             onTap: () => onSelect(iso),
@@ -1343,8 +1509,8 @@ class _MonthCalendar extends StatelessWidget {
                   color: isSelected
                       ? colors.primary
                       : iso == today
-                          ? tokens.border
-                          : Colors.transparent,
+                      ? tokens.border
+                      : Colors.transparent,
                   width: isSelected ? 2 : 1,
                 ),
               ),
@@ -1389,7 +1555,9 @@ class _MonthCalendar extends StatelessWidget {
           width: 10,
           height: 10,
           decoration: BoxDecoration(
-            color: context.colors.primary.withValues(alpha: _occupancyAlpha(minutes)),
+            color: context.colors.primary.withValues(
+              alpha: _occupancyAlpha(minutes),
+            ),
             borderRadius: BorderRadius.circular(3),
             border: Border.all(color: context.tokens.border),
           ),
@@ -1483,9 +1651,11 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
     final query = _searchCtrl.text.trim().toLowerCase();
     if (query.isEmpty) return _allClients;
     return _allClients
-        .where((client) =>
-            client.displayName.toLowerCase().contains(query) ||
-            client.username.toLowerCase().contains(query))
+        .where(
+          (client) =>
+              client.displayName.toLowerCase().contains(query) ||
+              client.username.toLowerCase().contains(query),
+        )
         .toList();
   }
 
@@ -1496,7 +1666,9 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
     });
     final end = DateTime(_weekStart.year, _weekStart.month, _weekStart.day + 6);
     try {
-      final slots = await ref.read(schedulingApiProvider).getSlots(
+      final slots = await ref
+          .read(schedulingApiProvider)
+          .getSlots(
             _isoDay.format(_weekStart),
             _isoDay.format(end),
             durationMinutes: _duration,
@@ -1538,9 +1710,18 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
       lastDate: DateTime(now.year + 2),
     );
     if (date == null || !mounted) return;
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
     if (time == null) return;
-    final start = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final start = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     // Send an absolute instant so the server never has to guess a zone.
     setState(() => _selectedSlot = start.toUtc().toIso8601String());
   }
@@ -1564,10 +1745,15 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
           'invite to everyone invited.',
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, AppSize.buttonHeightSm)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, AppSize.buttonHeightSm),
+            ),
             child: const Text('Schedule'),
           ),
         ],
@@ -1580,7 +1766,9 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
       _error = '';
     });
     try {
-      await ref.read(schedulingApiProvider).createMeeting(
+      await ref
+          .read(schedulingApiProvider)
+          .createMeeting(
             client: ids.first,
             guestClientIds: ids.skip(1).toList(),
             start: _selectedSlot,
@@ -1634,11 +1822,14 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
                   for (final group in widget.groups)
                     FilterChip(
                       label: Text('${group.name} (${group.clients.length})'),
-                      selected: group.clients.isNotEmpty &&
-                          group.clients
-                              .every((c) => _selectedClientIds.contains(c.id)),
-                      onSelected:
-                          group.clients.isEmpty ? null : (_) => _toggleGroup(group),
+                      selected:
+                          group.clients.isNotEmpty &&
+                          group.clients.every(
+                            (c) => _selectedClientIds.contains(c.id),
+                          ),
+                      onSelected: group.clients.isEmpty
+                          ? null
+                          : (_) => _toggleGroup(group),
                     ),
                 ],
               ),
@@ -1665,7 +1856,10 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
                             dense: true,
                             controlAffinity: ListTileControlAffinity.leading,
                             value: _selectedClientIds.contains(client.id),
-                            title: Text(client.displayName, style: context.text.bodyMedium),
+                            title: Text(
+                              client.displayName,
+                              style: context.text.bodyMedium,
+                            ),
                             onChanged: (checked) => setState(() {
                               if (checked == true) {
                                 _selectedClientIds.add(client.id);
@@ -1686,14 +1880,11 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
             const SizedBox(height: AppSpacing.sm),
             Text('Length', style: context.text.labelMedium),
             const SizedBox(height: AppSpacing.xs),
-            SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 15, label: Text('15 min')),
-                ButtonSegment(value: 30, label: Text('30 min')),
-              ],
-              selected: {_duration},
-              onSelectionChanged: (value) {
-                setState(() => _duration = value.first);
+            AppSegmentedFilter<int>(
+              value: _duration,
+              options: const [(15, '15 min'), (30, '30 min')],
+              onChanged: (value) {
+                setState(() => _duration = value);
                 _loadSlots();
               },
             ),
@@ -1757,7 +1948,9 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
                   child: Text(
                     DateFormat('EEE, MMM d').format(DateTime.parse(day)),
-                    style: context.text.labelSmall?.copyWith(color: tokens.muted),
+                    style: context.text.labelSmall?.copyWith(
+                      color: tokens.muted,
+                    ),
                   ),
                 ),
                 Wrap(
@@ -1767,7 +1960,9 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
                     for (final slot in _slots[day] ?? const <String>[])
                       ChoiceChip(
                         label: Text(
-                          DateFormat.jm().format(DateTime.parse(slot).toLocal()),
+                          DateFormat.jm().format(
+                            DateTime.parse(slot).toLocal(),
+                          ),
                         ),
                         selected: _selectedSlot == slot,
                         onSelected: (_) => setState(() => _selectedSlot = slot),
@@ -1780,7 +1975,7 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
             OutlinedButton.icon(
               onPressed: _pickExactTime,
               icon: const Icon(Icons.schedule, size: AppSize.iconRow),
-              label: const Text('Or pick an exact date & time'),
+              label: const Text('Or pick an exact date and time'),
             ),
             if (selectedTime != null)
               Padding(
@@ -1797,7 +1992,8 @@ class _BookMeetingSheetState extends ConsumerState<_BookMeetingSheet> {
             ],
             const SizedBox(height: AppSpacing.md),
             FilledButton(
-              onPressed: _saving || _selectedClientIds.isEmpty || _selectedSlot.isEmpty
+              onPressed:
+                  _saving || _selectedClientIds.isEmpty || _selectedSlot.isEmpty
                   ? null
                   : _book,
               child: Text(_saving ? 'Scheduling…' : 'Schedule meeting'),
@@ -1838,7 +2034,9 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
   }
 
   Future<void> _toggleWeekday(int weekday) async {
-    final existing = _weekdayOffs.where((off) => off.weekday == weekday).firstOrNull;
+    final existing = _weekdayOffs
+        .where((off) => off.weekday == weekday)
+        .firstOrNull;
     setState(() {
       _savingWeekday = weekday;
       _error = '';
@@ -1848,19 +2046,27 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
       if (existing != null) {
         await api.deleteWeekdayOff(existing.id);
         if (!mounted) return;
-        setState(() => _weekdayOffs =
-            _weekdayOffs.where((off) => off.id != existing.id).toList());
+        setState(
+          () => _weekdayOffs = _weekdayOffs
+              .where((off) => off.id != existing.id)
+              .toList(),
+        );
       } else {
         final added = await api.addWeekdayOff(weekday);
         if (!mounted) return;
-        setState(() => _weekdayOffs = [..._weekdayOffs, added]
-          ..sort((a, b) => a.weekday.compareTo(b.weekday)));
+        setState(
+          () =>
+              _weekdayOffs = [..._weekdayOffs, added]
+                ..sort((a, b) => a.weekday.compareTo(b.weekday)),
+        );
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error is ApiException
-          ? error.message
-          : 'Could not update that recurring day off.');
+      setState(
+        () => _error = error is ApiException
+            ? error.message
+            : 'Could not update that recurring day off.',
+      );
     } finally {
       if (mounted) setState(() => _savingWeekday = null);
     }
@@ -1882,12 +2088,13 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
       _error = '';
     });
     try {
-      final added = await ref.read(schedulingApiProvider).addDateOff(
-            _isoDay.format(picked),
-          );
+      final added = await ref
+          .read(schedulingApiProvider)
+          .addDateOff(_isoDay.format(picked));
       if (!mounted) return;
       setState(() {
-        _dateOffs = [..._dateOffs, added]..sort((a, b) => a.date.compareTo(b.date));
+        _dateOffs = [..._dateOffs, added]
+          ..sort((a, b) => a.date.compareTo(b.date));
         _savingDate = false;
       });
     } catch (error) {
@@ -1905,12 +2112,17 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
     try {
       await ref.read(schedulingApiProvider).deleteDateOff(dateOff.id);
       if (!mounted) return;
-      setState(() =>
-          _dateOffs = _dateOffs.where((off) => off.id != dateOff.id).toList());
+      setState(
+        () =>
+            _dateOffs = _dateOffs.where((off) => off.id != dateOff.id).toList(),
+      );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error =
-          error is ApiException ? error.message : 'Could not remove that day off.');
+      setState(
+        () => _error = error is ApiException
+            ? error.message
+            : 'Could not remove that day off.',
+      );
     }
   }
 
@@ -1942,11 +2154,15 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.xs,
               children: [
-                for (var weekday = 0;
-                    weekday < AvailabilityWindowRecord.weekdayLabels.length;
-                    weekday++)
+                for (
+                  var weekday = 0;
+                  weekday < AvailabilityWindowRecord.weekdayLabels.length;
+                  weekday++
+                )
                   FilterChip(
-                    label: Text(AvailabilityWindowRecord.weekdayLabels[weekday]),
+                    label: Text(
+                      AvailabilityWindowRecord.weekdayLabels[weekday],
+                    ),
                     selected: _weekdayOffs.any((off) => off.weekday == weekday),
                     onSelected: _savingWeekday == weekday
                         ? null
@@ -1958,7 +2174,9 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
             const SizedBox(height: AppSpacing.lg),
             Row(
               children: [
-                Expanded(child: Text('Specific dates', style: context.text.titleSmall)),
+                Expanded(
+                  child: Text('Specific dates', style: context.text.titleSmall),
+                ),
                 TextButton.icon(
                   onPressed: _savingDate ? null : _addDate,
                   icon: const Icon(Icons.add, size: AppSize.iconRow),
@@ -1976,8 +2194,9 @@ class _DaysOffSheetState extends ConsumerState<_DaysOffSheet> {
             else
               for (final dateOff in _dateOffs)
                 RowItem(
-                  title: DateFormat('EEE, MMM d, y')
-                      .format(DateTime.parse(dateOff.date)),
+                  title: DateFormat(
+                    'EEE, MMM d, y',
+                  ).format(DateTime.parse(dateOff.date)),
                   trailing: IconButton(
                     onPressed: () => _removeDate(dateOff),
                     icon: const Icon(Icons.close),
@@ -2103,22 +2322,19 @@ class _ScheduleActionGroup extends StatelessWidget {
   const _ScheduleActionGroup({
     required this.onBook,
     required this.onAvailability,
+    required this.onDayOff,
     required this.bookBusy,
   });
 
   final VoidCallback? onBook;
   final VoidCallback onAvailability;
+  final VoidCallback onDayOff;
   final bool bookBusy;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: tokens.surfaceSoft,
-        borderRadius: AppRadius.pillAll,
-      ),
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.xs),
       child: Row(
         children: [
           Expanded(
@@ -2128,18 +2344,36 @@ class _ScheduleActionGroup extends StatelessWidget {
               label: Text(bookBusy ? 'Loading…' : 'Book meeting'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, AppSize.buttonHeightSm),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
               ),
             ),
           ),
-          TextButton.icon(
-            onPressed: onAvailability,
-            icon: const Icon(Icons.schedule_outlined, size: AppSize.iconRow),
-            label: const Text('Availability'),
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, AppSize.buttonHeightSm),
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onAvailability,
+              icon: const Icon(Icons.schedule_outlined, size: AppSize.iconRow),
+              label: const Text('Availability'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onDayOff,
+              icon: const Icon(
+                Icons.event_busy_outlined,
+                size: AppSize.iconRow,
+              ),
+              label: const Text('Day off'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, AppSize.buttonHeightSm),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ),
         ],

@@ -15,11 +15,20 @@ import 'package:flutter_test/flutter_test.dart';
 /// real entry data.
 ///
 /// Read-only by design: it never creates, updates, or deletes anything in the
-/// dev database. Skipped unless LIVE=true. See test/live/live_auth_test.dart.
+/// configured safe test account. Protected credentials are supplied only at
+/// runtime. See test/live/live_auth_test.dart.
 ///
 ///   flutter test test/live --dart-define=LIVE=true \
 ///     --dart-define=API_BASE_URL=http://localhost:8000
-const bool _live = bool.fromEnvironment('LIVE');
+const bool _liveRequested = bool.fromEnvironment('LIVE');
+const String _professionalLogin = String.fromEnvironment(
+  'LIVE_PROFESSIONAL_LOGIN',
+);
+const String _professionalPassword = String.fromEnvironment(
+  'LIVE_PROFESSIONAL_PASSWORD',
+);
+const bool _live =
+    _liveRequested && _professionalLogin != '' && _professionalPassword != '';
 
 void main() {
   group(
@@ -37,8 +46,8 @@ void main() {
         final auth = ProfessionalAuthApi(dio, session);
 
         final login = await auth.login(
-          'nolan.performance@example.com',
-          'ProfessionalScale!2026',
+          _professionalLogin,
+          _professionalPassword,
         );
         session.seed({SessionKeys.professionalToken: login.token});
 
@@ -138,7 +147,9 @@ void main() {
           return;
         }
 
-        final detail = await formsGroups.getClientProfile(users.clients.first.id);
+        final detail = await formsGroups.getClientProfile(
+          users.clients.first.id,
+        );
         expect(detail.client.id, users.clients.first.id);
         expect(detail.group.id, greaterThan(0));
       });
@@ -163,7 +174,9 @@ void main() {
           return;
         }
 
-        final template = await templates.getTemplate(assignments.first.templateId);
+        final template = await templates.getTemplate(
+          assignments.first.templateId,
+        );
         final fields = template.fields.map((f) => f.toFieldLike()).toList();
         final entryLikes = entries
             .where((e) => e.template == template.id)
@@ -181,7 +194,11 @@ void main() {
         for (final chart in charts) {
           expect(chart.title, isNotEmpty);
           if (chart.kind != ChartKind.ring && chart.kind != ChartKind.summary) {
-            expect(chart.data, isNotEmpty, reason: '${chart.kind} needs points');
+            expect(
+              chart.data,
+              isNotEmpty,
+              reason: '${chart.kind} needs points',
+            );
           }
         }
 
@@ -193,7 +210,9 @@ void main() {
         }
       });
     },
-    skip: _live ? false : 'live backend test — run with --dart-define=LIVE=true',
+    skip: _live
+        ? false
+        : 'live backend test — run with --dart-define=LIVE=true',
   );
 }
 

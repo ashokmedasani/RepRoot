@@ -19,11 +19,30 @@ import 'package:flutter_test/flutter_test.dart';
 late final Map<String, dynamic> ts;
 
 // Mirrors the fixture inputs in gen.js exactly.
-const weight = FieldLike(key: 'weight', label: 'Body weight (kg)', fieldType: 'number');
+const weight = FieldLike(
+  key: 'weight',
+  label: 'Body weight (kg)',
+  fieldType: 'number',
+);
 const reps = FieldLike(key: 'reps', label: 'Reps', fieldType: 'number');
-const mood = FieldLike(key: 'mood', label: 'Mood', fieldType: 'rating', scale: 5);
-const moodBig = FieldLike(key: 'moodBig', label: 'Mood big', fieldType: 'rating', scale: 99);
-const moodZero = FieldLike(key: 'moodZero', label: 'Mood zero', fieldType: 'rating', scale: 0);
+const mood = FieldLike(
+  key: 'mood',
+  label: 'Mood',
+  fieldType: 'rating',
+  scale: 5,
+);
+const moodBig = FieldLike(
+  key: 'moodBig',
+  label: 'Mood big',
+  fieldType: 'rating',
+  scale: 99,
+);
+const moodZero = FieldLike(
+  key: 'moodZero',
+  label: 'Mood zero',
+  fieldType: 'rating',
+  scale: 0,
+);
 const done = FieldLike(key: 'done', label: 'Workout done', fieldType: 'yes_no');
 const meal = FieldLike(key: 'meal', label: 'Meal type', fieldType: 'dropdown');
 const meal6 = FieldLike(key: 'meal6', label: 'Meal six', fieldType: 'dropdown');
@@ -32,24 +51,78 @@ const essay = FieldLike(key: 'essay', label: 'Essay', fieldType: 'long_text');
 const noKey = FieldLike(label: 'No key field', fieldType: 'number');
 
 final entries = <EntryLike>[
-  const EntryLike(entryDate: '2026-07-10', entryTime: '08:30:00', answers: {
-    'weight': '80', 'mood': '4', 'done': 'yes', 'meal': 'Breakfast', 'note': 'good', 'reps': '10',
-  }),
-  const EntryLike(entryDate: '2026-07-10', entryTime: '18:00:00', answers: {
-    'weight': '0.5', 'mood': '2', 'done': 'no', 'meal': 'Dinner', 'note': 'good', 'reps': '5',
-  }),
-  const EntryLike(entryDate: '2026-07-11', entryTime: '09:00:00', answers: {
-    'weight': '79.456', 'mood': '5', 'done': 'yes', 'meal': 'Breakfast', 'note': 'ok', 'reps': '8',
-  }),
-  const EntryLike(entryDate: '2026-07-12', entryTime: '07:15:00', answers: {
-    'weight': '79', 'mood': '1', 'done': 'true', 'meal': 'Lunch', 'note': 'bad', 'reps': '12',
-  }),
-  const EntryLike(entryDate: '2026-07-13', entryTime: '', answers: {
-    'weight': '', 'mood': '', 'done': '', 'meal': '', 'note': '', 'reps': 'abc',
-  }),
-  const EntryLike(entryDate: '2026-07-14', entryTime: '10:00:00', answers: {
-    'weight': '78.5', 'mood': '3', 'done': '1', 'meal': 'Snack', 'note': 'ok', 'reps': '9',
-  }),
+  const EntryLike(
+    entryDate: '2026-07-10',
+    entryTime: '08:30:00',
+    answers: {
+      'weight': '80',
+      'mood': '4',
+      'done': 'yes',
+      'meal': 'Breakfast',
+      'note': 'good',
+      'reps': '10',
+    },
+  ),
+  const EntryLike(
+    entryDate: '2026-07-10',
+    entryTime: '18:00:00',
+    answers: {
+      'weight': '0.5',
+      'mood': '2',
+      'done': 'no',
+      'meal': 'Dinner',
+      'note': 'good',
+      'reps': '5',
+    },
+  ),
+  const EntryLike(
+    entryDate: '2026-07-11',
+    entryTime: '09:00:00',
+    answers: {
+      'weight': '79.456',
+      'mood': '5',
+      'done': 'yes',
+      'meal': 'Breakfast',
+      'note': 'ok',
+      'reps': '8',
+    },
+  ),
+  const EntryLike(
+    entryDate: '2026-07-12',
+    entryTime: '07:15:00',
+    answers: {
+      'weight': '79',
+      'mood': '1',
+      'done': 'true',
+      'meal': 'Lunch',
+      'note': 'bad',
+      'reps': '12',
+    },
+  ),
+  const EntryLike(
+    entryDate: '2026-07-13',
+    entryTime: '',
+    answers: {
+      'weight': '',
+      'mood': '',
+      'done': '',
+      'meal': '',
+      'note': '',
+      'reps': 'abc',
+    },
+  ),
+  const EntryLike(
+    entryDate: '2026-07-14',
+    entryTime: '10:00:00',
+    answers: {
+      'weight': '78.5',
+      'mood': '3',
+      'done': '1',
+      'meal': 'Snack',
+      'note': 'ok',
+      'reps': '9',
+    },
+  ),
 ];
 
 final longEntries = [
@@ -66,7 +139,9 @@ final dropdownEntries = [
     EntryLike(
       entryDate: '2026-06-0${i + 1}',
       entryTime: '08:00:00',
-      answers: {'meal6': ['A', 'B', 'C', 'D', 'E', 'F'][i]},
+      answers: {
+        'meal6': ['A', 'B', 'C', 'D', 'E', 'F'][i],
+      },
     ),
 ];
 
@@ -96,9 +171,9 @@ void main() {
     });
 
     test('sortByTime', () {
-      final actual = sortByTime(entries)
-          .map((e) => '${e.entryDate} ${e.entryTime}')
-          .toList();
+      final actual = sortByTime(
+        entries,
+      ).map((e) => '${e.entryDate} ${e.entryTime}').toList();
       expect(actual, (ts['sortByTime'] as List).cast<String>());
     });
 
@@ -119,53 +194,92 @@ void main() {
     });
 
     test('ratingDistribution', () {
-      _expectPoints(ratingDistribution(mood, entries), ts['ratingDistribution']);
+      _expectPoints(
+        ratingDistribution(mood, entries),
+        ts['ratingDistribution'],
+      );
     });
 
     test('ratingDistribution clamps scale 99 -> 10', () {
-      expect(ratingDistribution(moodBig, entries).length,
-          (ts['ratingDistributionClampHigh'] as List).length);
+      expect(
+        ratingDistribution(moodBig, entries).length,
+        (ts['ratingDistributionClampHigh'] as List).length,
+      );
     });
 
     test('ratingDistribution treats scale 0 as 5', () {
-      expect(ratingDistribution(moodZero, entries).length,
-          (ts['ratingDistributionScaleZero'] as List).length);
+      expect(
+        ratingDistribution(moodZero, entries).length,
+        (ts['ratingDistributionScaleZero'] as List).length,
+      );
     });
 
     test('completionPercent', () {
       expect(completionPercent(done, entries), ts['completionPercent']);
     });
 
-    test('decideChartForField picks the same chart kind for every field type', () {
-      final decide = ts['decide'] as Map<String, dynamic>;
-      String? kindOf(ChartSpec? spec) => spec?.kind.name;
+    test(
+      'decideChartForField picks the same chart kind for every field type',
+      () {
+        final decide = ts['decide'] as Map<String, dynamic>;
+        String? kindOf(ChartSpec? spec) => spec?.kind.name;
 
-      expect(kindOf(decideChartForField(weight, entries, all)), decide['numberShort']['kind']);
-      expect(kindOf(decideChartForField(weight, longEntries, all)), decide['numberLong']['kind']);
-      expect(kindOf(decideChartForField(mood, entries, all)), decide['rating']['kind']);
-      expect(kindOf(decideChartForField(done, entries, all)), decide['yesNo']['kind']);
-      expect(kindOf(decideChartForField(meal, entries, all)), decide['dropdownSmall']['kind']);
-      expect(kindOf(decideChartForField(meal6, dropdownEntries, all)), decide['dropdownBig']['kind']);
-      expect(kindOf(decideChartForField(note, entries, all)), decide['shortText']['kind']);
-      expect(decideChartForField(essay, entries, all), isNull);
-      expect(decide['longText'], isNull);
-      expect(decideChartForField(weight, const [], all), isNull);
-      expect(decide['numberEmpty'], isNull);
-    });
+        expect(
+          kindOf(decideChartForField(weight, entries, all)),
+          decide['numberShort']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(weight, longEntries, all)),
+          decide['numberLong']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(mood, entries, all)),
+          decide['rating']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(done, entries, all)),
+          decide['yesNo']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(meal, entries, all)),
+          decide['dropdownSmall']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(meal6, dropdownEntries, all)),
+          decide['dropdownBig']['kind'],
+        );
+        expect(
+          kindOf(decideChartForField(note, entries, all)),
+          decide['shortText']['kind'],
+        );
+        expect(decideChartForField(essay, entries, all), isNull);
+        expect(decide['longText'], isNull);
+        expect(decideChartForField(weight, const [], all), isNull);
+        expect(decide['numberEmpty'], isNull);
+      },
+    );
 
     test('number series flips bar -> line above 8 points', () {
-      expect(decideChartForField(weight, longEntries, all)!.kind, ChartKind.line);
+      expect(
+        decideChartForField(weight, longEntries, all)!.kind,
+        ChartKind.line,
+      );
       expect(longEntries.length, greaterThan(8));
     });
 
     test('dropdown flips pie -> hbar above 4 slices', () {
-      expect(decideChartForField(meal6, dropdownEntries, all)!.kind, ChartKind.hbar);
+      expect(
+        decideChartForField(meal6, dropdownEntries, all)!.kind,
+        ChartKind.hbar,
+      );
     });
 
     test('buildFieldCharts drops fields with no chart', () {
-      final actual = buildFieldCharts([weight, mood, done, meal, essay], entries, all)
-          .map((s) => s.kind.name)
-          .toList();
+      final actual = buildFieldCharts(
+        [weight, mood, done, meal, essay],
+        entries,
+        all,
+      ).map((s) => s.kind.name).toList();
       final expected = (ts['buildFieldCharts'] as List)
           .map((s) => s['kind'] as String)
           .toList();
@@ -181,10 +295,21 @@ void main() {
 
     test('JS Math.round half-up is preserved on negative deltas', () {
       // Dart's .round() would give -0.3 here; JS Math.round gives -0.2.
-      final cards = buildOverviewCards([weight], [
-        const EntryLike(entryDate: '2026-07-01', entryTime: '08:00:00', answers: {'weight': '80'}),
-        const EntryLike(entryDate: '2026-07-02', entryTime: '08:00:00', answers: {'weight': '79.75'}),
-      ]);
+      final cards = buildOverviewCards(
+        [weight],
+        [
+          const EntryLike(
+            entryDate: '2026-07-01',
+            entryTime: '08:00:00',
+            answers: {'weight': '80'},
+          ),
+          const EntryLike(
+            entryDate: '2026-07-02',
+            entryTime: '08:00:00',
+            answers: {'weight': '79.75'},
+          ),
+        ],
+      );
       final tsMeta = (ts['negativeDelta'] as List)[0]['meta'];
       expect(cards.single.meta!.delta, tsMeta['delta']);
       expect(cards.single.meta!.deltaText, tsMeta['deltaText']);
@@ -194,8 +319,9 @@ void main() {
   group('FIX #1: a blank answer is skipped, not plotted as zero', () {
     test('TS plotted a phantom 0 for the blank day', () {
       // Pin the old behaviour so this stays a deliberate divergence.
-      final tsDay = (ts['dailySums'] as List)
-          .firstWhere((d) => d['date'] == '2026-07-13');
+      final tsDay = (ts['dailySums'] as List).firstWhere(
+        (d) => d['date'] == '2026-07-13',
+      );
       expect(tsDay['value'], 0, reason: 'TS aggregated blank weight as 0');
     });
 
@@ -215,7 +341,9 @@ void main() {
       // 'abc' was already skipped by the TS; only blanks were mishandled.
       final days = dailySums(reps, entries).map((d) => d.date).toList();
       expect(days, isNot(contains('2026-07-13')));
-      final tsDays = (ts['dailySumsReps'] as List).map((d) => d['date']).toList();
+      final tsDays = (ts['dailySumsReps'] as List)
+          .map((d) => d['date'])
+          .toList();
       expect(days, tsDays);
     });
 
@@ -232,7 +360,10 @@ void main() {
     test('average ignores blanks instead of dragging toward zero', () {
       // TS averaged in the blank as 0 across 6 entries; Dart averages the 5 real ones.
       expect(ts['average'], lessThan(average(weight, entries)));
-      expect(average(weight, entries), 63.5); // (80+0.5+79.456+79+78.5)/5, JS-rounded
+      expect(
+        average(weight, entries),
+        63.5,
+      ); // (80+0.5+79.456+79+78.5)/5, JS-rounded
     });
 
     test('rating average is not dragged down by an unanswered day', () {
@@ -301,14 +432,17 @@ void main() {
       String iso(DateTime d) =>
           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       EntryLike at(int daysAgo) => EntryLike(
-            entryDate: iso(today.subtract(Duration(days: daysAgo))),
-            answers: const {'weight': '1'},
-          );
+        entryDate: iso(today.subtract(Duration(days: daysAgo))),
+        answers: const {'weight': '1'},
+      );
 
       final recent = [at(0), at(3), at(29), at(30)];
 
       expect(withinRange(recent, DateRange.week).length, 2); // today, -3
-      expect(withinRange(recent, DateRange.month).length, 3); // + -29, but not -30
+      expect(
+        withinRange(recent, DateRange.month).length,
+        3,
+      ); // + -29, but not -30
       expect(withinRange(recent, DateRange.quarter).length, 4);
     });
 
@@ -326,7 +460,9 @@ void main() {
     });
 
     test('ignores unparseable dates', () {
-      final bad = [const EntryLike(entryDate: 'not-a-date', answers: {'weight': '1'})];
+      final bad = [
+        const EntryLike(entryDate: 'not-a-date', answers: {'weight': '1'}),
+      ];
       expect(withinRange(bad, DateRange.week), isEmpty);
     });
   });

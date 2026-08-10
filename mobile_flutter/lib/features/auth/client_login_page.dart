@@ -49,9 +49,11 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     final term = _directorySearch.text.trim().toLowerCase();
     if (term.isEmpty) return _directory;
     return _directory
-        .where((t) =>
-            t.professionalName.toLowerCase().contains(term) ||
-            t.professionalId.toLowerCase().contains(term))
+        .where(
+          (t) =>
+              t.professionalName.toLowerCase().contains(term) ||
+              t.professionalId.toLowerCase().contains(term),
+        )
         .toList();
   }
 
@@ -60,7 +62,9 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     if (!_showDirectory || _directoryLoaded) return;
 
     try {
-      final professionals = await ref.read(clientApiProvider).getProfessionalDirectory();
+      final professionals = await ref
+          .read(clientApiProvider)
+          .getProfessionalDirectory();
       if (!mounted) return;
       setState(() {
         _directory = professionals;
@@ -83,8 +87,10 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
     if (_professionalCode.text.trim().isEmpty ||
         _username.text.trim().isEmpty ||
         _password.text.isEmpty) {
-      setState(() =>
-          _message = 'Professional code, username, and password are all required.');
+      setState(
+        () => _message =
+            'Professional code, username, and password are all required.',
+      );
       return;
     }
 
@@ -119,8 +125,8 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
         client.mustChangePassword
             ? Routes.clientChangePassword
             : !client.legalAccepted
-                ? Routes.clientLegalConsent
-                : Routes.clientDashboard,
+            ? Routes.clientLegalConsent
+            : Routes.clientDashboard,
       );
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -148,7 +154,8 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
                     const SizedBox(height: AppSpacing.lg),
                     const AuthBrand(
                       title: 'Client sign in',
-                      subtitle: 'Use the details your professional shared with you',
+                      subtitle:
+                          'Use the details your professional shared with you',
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     TextField(
@@ -265,8 +272,10 @@ class _ClientLoginPageState extends ConsumerState<ClientLoginPage> {
                   final professional = _filteredProfessionals[index];
                   return ListTile(
                     dense: true,
-                    title: Text(professional.professionalName,
-                        style: context.text.titleSmall),
+                    title: Text(
+                      professional.professionalName,
+                      style: context.text.titleSmall,
+                    ),
                     subtitle: Text(
                       professional.professionalHeadline.isEmpty
                           ? professional.professionalId

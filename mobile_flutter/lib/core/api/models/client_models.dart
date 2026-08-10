@@ -57,15 +57,15 @@ class AdditionalInfoItem {
       );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'type': type,
-        'visibility': visibility,
-        if (text.isNotEmpty) 'text': text,
-        if (link.isNotEmpty) 'link': link,
-        if (referenceId != null) 'reference_id': referenceId,
-        if (referenceTitle.isNotEmpty) 'reference_title': referenceTitle,
-      };
+    'id': id,
+    'title': title,
+    'type': type,
+    'visibility': visibility,
+    if (text.isNotEmpty) 'text': text,
+    if (link.isNotEmpty) 'link': link,
+    if (referenceId != null) 'reference_id': referenceId,
+    if (referenceTitle.isNotEmpty) 'reference_title': referenceTitle,
+  };
 }
 
 class ClientAccessRecord {
@@ -172,8 +172,8 @@ class ClientAccessRecord {
         photo: json['photo'] as String? ?? '',
         registrationAnswers:
             (json['registration_answers'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
-        ),
+              (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+            ),
         additionalInfo: (json['additional_info'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .map(AdditionalInfoItem.fromJson)
@@ -184,54 +184,57 @@ class ClientAccessRecord {
         registrationSubmission: json['registration_submission'] as int?,
         mustChangePassword: json['must_change_password'] as bool? ?? false,
         termsAccepted: json['terms_accepted'] as bool? ?? false,
-        privacyPolicyAccepted: json['privacy_policy_accepted'] as bool? ?? false,
+        privacyPolicyAccepted:
+            json['privacy_policy_accepted'] as bool? ?? false,
         termsAcceptedAt: json['terms_accepted_at']?.toString() ?? '',
         privacyPolicyAcceptedAt:
             json['privacy_policy_accepted_at']?.toString() ?? '',
         legalDocumentVersion: json['legal_document_version'] as String? ?? '',
         currentLegalDocumentVersion:
             json['current_legal_document_version'] as String? ?? '',
-        legalAcceptanceHistory:
-            LegalAcceptanceEntry.listFrom(json['legal_acceptance_history']),
+        legalAcceptanceHistory: LegalAcceptanceEntry.listFrom(
+          json['legal_acceptance_history'],
+        ),
         isActive: json['is_active'] as bool? ?? true,
         createdAt: json['created_at'] as String? ?? '',
         updatedAt: json['updated_at'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'group': group,
-        'group_name': groupName,
-        'professional_name': professionalName,
-        'reference_id': referenceId,
-        'onboarding_method': onboardingMethod,
-        'first_name': firstName,
-        'last_name': lastName,
-        'email': email,
-        'username': username,
-        'photo': photo,
-        'registration_answers': registrationAnswers,
-        'additional_info': additionalInfo.map((i) => i.toJson()).toList(),
-        'additional_info_shared': additionalInfoShared,
-        'has_portal_access': hasPortalAccess,
-        'must_change_password': mustChangePassword,
-        // Persisted with the session so the router's consent gate can read it
-        // without a network round-trip, the way the web guard reads
-        // sessionStorage 'client-access'.
-        'terms_accepted': termsAccepted,
-        'privacy_policy_accepted': privacyPolicyAccepted,
-        'terms_accepted_at': termsAcceptedAt,
-        'privacy_policy_accepted_at': privacyPolicyAcceptedAt,
-        'legal_document_version': legalDocumentVersion,
-        'current_legal_document_version': currentLegalDocumentVersion,
-        'legal_acceptance_history':
-            legalAcceptanceHistory.map((entry) => entry.toJson()).toList(),
-        'is_active': isActive,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-        'lead_submission': leadSubmission,
-        'registration_submission': registrationSubmission,
-      };
+    'id': id,
+    'group': group,
+    'group_name': groupName,
+    'professional_name': professionalName,
+    'reference_id': referenceId,
+    'onboarding_method': onboardingMethod,
+    'first_name': firstName,
+    'last_name': lastName,
+    'email': email,
+    'username': username,
+    'photo': photo,
+    'registration_answers': registrationAnswers,
+    'additional_info': additionalInfo.map((i) => i.toJson()).toList(),
+    'additional_info_shared': additionalInfoShared,
+    'has_portal_access': hasPortalAccess,
+    'must_change_password': mustChangePassword,
+    // Persisted with the session so the router's consent gate can read it
+    // without a network round-trip, the way the web guard reads
+    // sessionStorage 'client-access'.
+    'terms_accepted': termsAccepted,
+    'privacy_policy_accepted': privacyPolicyAccepted,
+    'terms_accepted_at': termsAcceptedAt,
+    'privacy_policy_accepted_at': privacyPolicyAcceptedAt,
+    'legal_document_version': legalDocumentVersion,
+    'current_legal_document_version': currentLegalDocumentVersion,
+    'legal_acceptance_history': legalAcceptanceHistory
+        .map((entry) => entry.toJson())
+        .toList(),
+    'is_active': isActive,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+    'lead_submission': leadSubmission,
+    'registration_submission': registrationSubmission,
+  };
 }
 
 class ClientLoginResponse {

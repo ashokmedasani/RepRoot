@@ -43,9 +43,16 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
 
   Future<void> _loadNotificationCount() async {
     try {
-      final inbox = await ref.read(clientApiProvider).getNotifications(limit: 1);
+      final inbox = await ref
+          .read(clientApiProvider)
+          .getNotifications(limit: 1);
       if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
-    } catch (_) {/* the badge just stays at zero */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Client dashboard notification badge failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   String get _greeting {
@@ -97,8 +104,9 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
           });
         } catch (_) {
           if (mounted) {
-            setState(() =>
-                _message = 'Could not load your dashboard. Pull to retry.');
+            setState(
+              () => _message = 'Could not load your dashboard. Pull to retry.',
+            );
           }
         }
       }(),
@@ -139,10 +147,12 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
           .map((e) => e.toEntryLike())
           .toList();
       if (templateEntries.isEmpty) continue;
-      cards.addAll(buildOverviewCards(
-        template.fields.map((f) => f.toFieldLike()).toList(),
-        templateEntries,
-      ));
+      cards.addAll(
+        buildOverviewCards(
+          template.fields.map((f) => f.toFieldLike()).toList(),
+          templateEntries,
+        ),
+      );
     }
     setState(() => _statCards = cards.take(3).toList());
   }
@@ -156,7 +166,11 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
       return Scaffold(
         appBar: AppBar(title: const Text('Dashboard')),
         body: const PagePad(
-          children: [SkeletonBox(height: 56), SkeletonBox(height: 150), SkeletonBox(height: 150)],
+          children: [
+            SkeletonBox(height: 56),
+            SkeletonBox(height: 150),
+            SkeletonBox(height: 150),
+          ],
         ),
       );
     }
@@ -200,7 +214,7 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
                 // the screen they land on.
                 NotificationBell(
                   unread: _notificationUnread,
-                  onTap: () => context.go(Routes.clientNotifications),
+                  onTap: () => context.push(Routes.clientNotifications),
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 AppAvatar(
@@ -223,8 +237,11 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
               color: context.colors.primary.withValues(alpha: 0.08),
               child: Row(
                 children: [
-                  Icon(Icons.notifications_active_outlined,
-                      color: context.colors.primary, size: 22),
+                  Icon(
+                    Icons.notifications_active_outlined,
+                    color: context.colors.primary,
+                    size: 22,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
@@ -237,7 +254,10 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
             ),
           ],
 
-          const SectionHeader(title: 'Your consistency', topSpace: AppSpacing.lg),
+          const SectionHeader(
+            title: 'Your consistency',
+            topSpace: AppSpacing.lg,
+          ),
           // The last place still on the old white KpiTile. These four numbers
           // are the client's whole reason for opening the app each day, so
           // they get the same tinted treatment as everywhere else — and a
@@ -305,13 +325,15 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
                 trailing: item.isDone
                     ? const StatusPill(label: 'Done', tone: PillTone.good)
                     : (item.date.compareTo(todayIso()) <= 0
-                        ? const StatusPill(label: 'Due', tone: PillTone.warn)
-                        : null),
+                          ? const StatusPill(label: 'Due', tone: PillTone.warn)
+                          : null),
               ),
 
           const SectionHeader(title: 'Your templates'),
           if (_templates.isEmpty)
-            const EmptyState(message: 'Your professional has not assigned any yet.')
+            const EmptyState(
+              message: 'Your professional has not assigned any yet.',
+            )
           else
             for (final template in _templates.take(4))
               RowItem(
@@ -332,5 +354,4 @@ class _ClientDashboardPageState extends ConsumerState<ClientDashboardPage> {
       ),
     );
   }
-
 }

@@ -33,7 +33,9 @@ class ProfessionalSupportLegalPage extends StatelessWidget {
               // content there is.
               Text(
                 'Version 1.0.0 (1)',
-                style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                style: context.text.bodySmall?.copyWith(
+                  color: context.tokens.muted,
+                ),
               ),
             ],
           ),
@@ -46,14 +48,14 @@ class ProfessionalSupportLegalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Support & Legal'),
+        title: const Text('More'),
         leading: BackButton(onPressed: () => context.pop()),
       ),
       body: PagePad(
         children: [
           const SettingsHeroCard(
             icon: Icons.gavel_outlined,
-            title: 'Support & Legal',
+            title: 'Support and Legal',
             subtitle: 'Get help and review your legal documents.',
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -74,16 +76,20 @@ class ProfessionalSupportLegalPage extends StatelessWidget {
               ColorfulMenuItem(
                 icon: Icons.description_outlined,
                 accent: MenuAccent.purple,
-                label: 'Terms & Conditions',
-                onTap: () =>
-                    openLegalDocument(context, LegalAudience.professional.termsUrl),
+                label: 'Terms and Conditions',
+                onTap: () => openLegalDocument(
+                  context,
+                  LegalAudience.professional.termsUrl,
+                ),
               ),
               ColorfulMenuItem(
                 icon: Icons.privacy_tip_outlined,
                 accent: MenuAccent.green,
                 label: 'Privacy Policy',
-                onTap: () =>
-                    openLegalDocument(context, LegalAudience.professional.privacyUrl),
+                onTap: () => openLegalDocument(
+                  context,
+                  LegalAudience.professional.privacyUrl,
+                ),
               ),
               ColorfulMenuItem(
                 icon: Icons.fact_check_outlined,

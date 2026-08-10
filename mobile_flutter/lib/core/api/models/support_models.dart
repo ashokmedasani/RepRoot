@@ -15,18 +15,23 @@ class SupportCategory {
   static const other = 'other';
 
   static const all = [
-    feedback, bugReport, accountIssue, featureRequest, technicalProblem, other,
+    feedback,
+    bugReport,
+    accountIssue,
+    featureRequest,
+    technicalProblem,
+    other,
   ];
 
   static String label(String value) => switch (value) {
-        feedback => 'Feedback',
-        bugReport => 'Report a bug',
-        accountIssue => 'Account issue',
-        featureRequest => 'Feature request',
-        technicalProblem => 'Technical problem',
-        other => 'Other issue',
-        _ => value,
-      };
+    feedback => 'Feedback',
+    bugReport => 'Report a bug',
+    accountIssue => 'Account issue',
+    featureRequest => 'Feature request',
+    technicalProblem => 'Technical problem',
+    other => 'Other issue',
+    _ => value,
+  };
 }
 
 class SupportStatus {
@@ -39,7 +44,10 @@ class SupportStatus {
   /// 'waiting_for_user' -> 'Waiting For User'
   static String label(String value) => value
       .split('_')
-      .map((word) => word.isEmpty ? word : word[0].toUpperCase() + word.substring(1))
+      .map(
+        (word) =>
+            word.isEmpty ? word : word[0].toUpperCase() + word.substring(1),
+      )
       .join(' ');
 
   static bool needsReply(String value) => value == waitingForUser;
@@ -66,12 +74,12 @@ class SupportMessage {
   bool get isSupport => authorType == 'support';
 
   factory SupportMessage.fromJson(Map<String, dynamic> json) => SupportMessage(
-        id: json['id'] as int? ?? 0,
-        authorType: json['author_type'] as String? ?? '',
-        authorName: json['author_name'] as String? ?? '',
-        body: json['body'] as String? ?? '',
-        createdAt: json['created_at'] as String? ?? '',
-      );
+    id: json['id'] as int? ?? 0,
+    authorType: json['author_type'] as String? ?? '',
+    authorName: json['author_name'] as String? ?? '',
+    body: json['body'] as String? ?? '',
+    createdAt: json['created_at'] as String? ?? '',
+  );
 }
 
 class SupportIncident {
@@ -116,7 +124,8 @@ class SupportIncident {
   bool get needsReply => SupportStatus.needsReply(status);
   bool get isFinished => SupportStatus.isFinished(status);
 
-  factory SupportIncident.fromJson(Map<String, dynamic> json) => SupportIncident(
+  factory SupportIncident.fromJson(Map<String, dynamic> json) =>
+      SupportIncident(
         id: json['id'] as int? ?? 0,
         incidentId: json['incident_id'] as String? ?? '',
         reporterRole: json['reporter_role'] as String? ?? '',

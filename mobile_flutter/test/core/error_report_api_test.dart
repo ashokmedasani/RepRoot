@@ -39,7 +39,10 @@ class _ThrowingAdapter implements HttpClientAdapter {
     Stream<List<int>>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    throw DioException.connectionError(requestOptions: options, reason: 'offline');
+    throw DioException.connectionError(
+      requestOptions: options,
+      reason: 'offline',
+    );
   }
 
   @override
@@ -60,7 +63,10 @@ void main() {
       final adapter = _MockAdapter();
       dio.httpClientAdapter = adapter;
 
-      await ErrorReportApi(dio, session).report('Something broke', stackTrace: 'at foo.dart:1');
+      await ErrorReportApi(
+        dio,
+        session,
+      ).report('Something broke', stackTrace: 'at foo.dart:1');
 
       expect(adapter.captured!.path, '/errors/report/');
       final body = adapter.captured!.data as Map<String, dynamic>;
@@ -70,32 +76,46 @@ void main() {
       expect(body['level'], 'fatal');
     });
 
-    test('prefers ClientToken when both a professional and client session exist', () async {
-      // A device can carry both sessions; a crash inside the client shell
-      // must not be misattributed to the professional.
-      final session = _storeWith({
-        SessionKeys.professionalToken: 'professional-abc',
-        SessionKeys.clientToken: 'client-xyz',
-      });
-      final dio = buildDio(session);
-      final adapter = _MockAdapter();
-      dio.httpClientAdapter = adapter;
+    test(
+      'prefers ClientToken when both a professional and client session exist',
+      () async {
+        // A device can carry both sessions; a crash inside the client shell
+        // must not be misattributed to the professional.
+        final session = _storeWith({
+          SessionKeys.professionalToken: 'professional-abc',
+          SessionKeys.clientToken: 'client-xyz',
+        });
+        final dio = buildDio(session);
+        final adapter = _MockAdapter();
+        dio.httpClientAdapter = adapter;
 
-      await ErrorReportApi(dio, session).report('boom');
+        await ErrorReportApi(dio, session).report('boom');
 
-      expect(adapter.captured!.headers['Authorization'], 'ClientToken client-xyz');
-    });
+        expect(
+          adapter.captured!.headers['Authorization'],
+          'ClientToken client-xyz',
+        );
+      },
+    );
 
-    test('falls back to Token when only a professional session exists', () async {
-      final session = _storeWith({SessionKeys.professionalToken: 'professional-abc'});
-      final dio = buildDio(session);
-      final adapter = _MockAdapter();
-      dio.httpClientAdapter = adapter;
+    test(
+      'falls back to Token when only a professional session exists',
+      () async {
+        final session = _storeWith({
+          SessionKeys.professionalToken: 'professional-abc',
+        });
+        final dio = buildDio(session);
+        final adapter = _MockAdapter();
+        dio.httpClientAdapter = adapter;
 
-      await ErrorReportApi(dio, session).report('boom');
+        await ErrorReportApi(dio, session).report('boom');
 
-      expect(adapter.captured!.headers['Authorization'], 'Token professional-abc');
-    });
+        expect(
+          adapter.captured!.headers['Authorization'],
+          'Token professional-abc',
+        );
+      },
+    );
 
     test('sends no Authorization header when signed out', () async {
       // A crash on the role-chooser or login screen still gets reported.
@@ -115,7 +135,10 @@ void main() {
       final adapter = _MockAdapter();
       dio.httpClientAdapter = adapter;
 
-      await ErrorReportApi(dio, session).report('m' * 900, stackTrace: 's' * 25000);
+      await ErrorReportApi(
+        dio,
+        session,
+      ).report('m' * 900, stackTrace: 's' * 25000);
 
       final body = adapter.captured!.data as Map<String, dynamic>;
       expect((body['message'] as String).length, 500);

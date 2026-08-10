@@ -31,7 +31,8 @@ class ProfessionalDashboardPage extends ConsumerStatefulWidget {
       _ProfessionalDashboardPageState();
 }
 
-class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboardPage> {
+class _ProfessionalDashboardPageState
+    extends ConsumerState<ProfessionalDashboardPage> {
   FormsGroupsOverview? _overview;
   List<ClientReminder> _reminders = [];
   List<ClientProfileEditActivity> _profileEdits = [];
@@ -81,7 +82,10 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
     super.initState();
     _load();
     _loadUnread();
-    _unreadPoll = Timer.periodic(const Duration(seconds: 5), (_) => _loadUnread());
+    _unreadPoll = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadUnread(),
+    );
     _welcomeTimer = Timer(_welcomeDuration, () {
       if (mounted) setState(() => _showWelcome = false);
     });
@@ -108,8 +112,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
 
   Future<void> _loadPaymentNotifications() async {
     try {
-      final response =
-          await ref.read(paymentsApiProvider).getProfessionalPaymentNotifications();
+      final response = await ref
+          .read(paymentsApiProvider)
+          .getProfessionalPaymentNotifications();
       if (!mounted) return;
       setState(() {
         _paymentNotifications = response.items;
@@ -126,9 +131,14 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
 
   Future<void> _markAllPaymentsRead() async {
     try {
-      await ref.read(paymentsApiProvider).markProfessionalPaymentNotificationsRead();
-    } catch (_) {
-      // Fall through to the reload either way — it re-reads the real state.
+      await ref
+          .read(paymentsApiProvider)
+          .markProfessionalPaymentNotificationsRead();
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Marking payment notifications read failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
     await _loadPaymentNotifications();
   }
@@ -164,17 +174,29 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
 
   Future<void> _loadUnread() async {
     try {
-      final summary = await ref.read(chatApiProvider).getProfessionalUnreadCounts();
+      final summary = await ref
+          .read(chatApiProvider)
+          .getProfessionalUnreadCounts();
       if (mounted) setState(() => _unread = summary);
-    } catch (_) {/* a failed poll must not disturb the dashboard */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Dashboard unread poll failed (${error.runtimeType})\n$stackTrace',
+      );
+    }
     // Refreshed on the same tick as chat unread. This page is kept alive by
     // the tab shell, so a one-off fetch in initState would leave the bell
     // frozen at its sign-in value for the whole session.
     try {
-      final inbox =
-          await ref.read(professionalAuthApiProvider).getNotifications(limit: 1);
+      final inbox = await ref
+          .read(professionalAuthApiProvider)
+          .getNotifications(limit: 1);
       if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
-    } catch (_) {/* leave the badge as-is */}
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Dashboard notification poll failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
+    }
   }
 
   int get _unreadTotal => _unread?.unreadCount ?? 0;
@@ -185,7 +207,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
       _unreadTotal + _pendingRequestCount + _profileEdits.length;
 
   int get _paymentsActionCount =>
-      (_paymentActions?.reviewCount ?? 0) + (_paymentActions?.overdueCount ?? 0);
+      (_paymentActions?.reviewCount ?? 0) +
+      (_paymentActions?.overdueCount ?? 0);
 
   int get _scheduleActionCount =>
       (_summary?.overdue ?? 0) + (_summary?.due24Hours ?? 0);
@@ -196,11 +219,13 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
     if (unread == null) return [];
     final rows = unread.byClient.entries
         .where((e) => e.value > 0)
-        .map((e) => (
-              clientId: int.tryParse(e.key) ?? 0,
-              name: _clientNameById[int.tryParse(e.key) ?? 0] ?? 'Client',
-              count: e.value,
-            ))
+        .map(
+          (e) => (
+            clientId: int.tryParse(e.key) ?? 0,
+            name: _clientNameById[int.tryParse(e.key) ?? 0] ?? 'Client',
+            count: e.value,
+          ),
+        )
         .toList();
     rows.sort((a, b) {
       final at = unread.lastUnreadFor(a.clientId)?.millisecondsSinceEpoch ?? 0;
@@ -242,7 +267,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
         if (mounted) setState(() => _notificationUnread = inbox.unreadCount);
       }),
       _guard(() async {
-        final settings = await ref.read(paymentsApiProvider).getPaymentSettings();
+        final settings = await ref
+            .read(paymentsApiProvider)
+            .getPaymentSettings();
         if (!mounted) return;
         setState(() {
           _paymentsEnabled = settings.settings.paymentTrackingEnabled;
@@ -250,48 +277,61 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
         });
         if (_paymentsEnabled) {
           _guard(() async {
-            final actions = await ref.read(paymentsApiProvider).getPaymentActions();
+            final actions = await ref
+                .read(paymentsApiProvider)
+                .getPaymentActions();
             if (mounted) setState(() => _paymentActions = actions);
           });
           _startPaymentNotificationPoll();
           if (_revenueUnlocked) _loadRevenue();
         }
       }),
-      _guard(() async {
-        final overview = await formsGroups.getOverview();
-        if (!mounted) return;
-        setState(() {
-          _overview = overview;
-          _message = '';
-          _countClients(overview);
-        });
-      }, onError: () {
-        if (mounted) {
-          setState(() => _message = 'Could not load the dashboard. Pull to retry.');
-        }
-      }),
-      _guard(() async {
-        final upcoming = await formsGroups.getUpcomingReminders();
-        if (!mounted) return;
-        setState(() {
-          _reminders = upcoming.reminders;
-          _summary = upcoming.summary;
-          _profileEdits = upcoming.profileEdits;
-        });
-      }, onError: () {
-        if (mounted) {
+      _guard(
+        () async {
+          final overview = await formsGroups.getOverview();
+          if (!mounted) return;
           setState(() {
-            _reminders = [];
-            _profileEdits = [];
+            _overview = overview;
+            _message = '';
+            _countClients(overview);
           });
-        }
-      }),
+        },
+        onError: () {
+          if (mounted) {
+            setState(
+              () => _message = 'Could not load the dashboard. Pull to retry.',
+            );
+          }
+        },
+      ),
+      _guard(
+        () async {
+          final upcoming = await formsGroups.getUpcomingReminders();
+          if (!mounted) return;
+          setState(() {
+            _reminders = upcoming.reminders;
+            _summary = upcoming.summary;
+            _profileEdits = upcoming.profileEdits;
+          });
+        },
+        onError: () {
+          if (mounted) {
+            setState(() {
+              _reminders = [];
+              _profileEdits = [];
+            });
+          }
+        },
+      ),
     ]);
 
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _guard(Future<void> Function() run, {VoidCallback? onError}) async {
+  Future<void> _guard(
+    Future<void> Function() run, {
+    VoidCallback? onError,
+  }) async {
     try {
       await run();
     } catch (_) {
@@ -300,8 +340,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
   }
 
   void _countClients(FormsGroupsOverview overview) {
-    final converted =
-        overview.approvedForms.where((item) => item.clientAccess != null).toList();
+    final converted = overview.approvedForms
+        .where((item) => item.clientAccess != null)
+        .toList();
     _clientCount = converted.length;
     _activeClientCount = converted.where((item) => item.isActive).length;
     // Map client id -> name so the Activity tab's message rows can be labelled,
@@ -379,7 +420,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
         context: context,
         firstDate: DateTime(now.year - 5),
         lastDate: now,
-        initialDateRange: _revenueCustomRange ??
+        initialDateRange:
+            _revenueCustomRange ??
             DateTimeRange(
               start: now.subtract(const Duration(days: 30)),
               end: now,
@@ -404,7 +446,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
   Future<void> _loadRevenue() async {
     try {
       final range = _revenueCustomRange;
-      final revenue = await ref.read(paymentsApiProvider).getRevenueSummary(
+      final revenue = await ref
+          .read(paymentsApiProvider)
+          .getRevenueSummary(
             _revenuePeriod,
             customStart: range == null ? null : isoDate(range.start),
             customEnd: range == null ? null : isoDate(range.end),
@@ -420,8 +464,14 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
   ChartSpec? get _activityChart {
     final data = [
       DataPoint(label: 'Unread messages', value: _unreadTotal.toDouble()),
-      DataPoint(label: 'Pending requests', value: _pendingRequestCount.toDouble()),
-      DataPoint(label: 'Account requests', value: _profileEdits.length.toDouble()),
+      DataPoint(
+        label: 'Pending requests',
+        value: _pendingRequestCount.toDouble(),
+      ),
+      DataPoint(
+        label: 'Account requests',
+        value: _profileEdits.length.toDouble(),
+      ),
     ];
     if (!data.any((p) => p.value > 0)) return null;
     return ChartSpec(
@@ -474,8 +524,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
           .reviewChangeRequest(activity.client, activity.id, action);
       if (mounted) {
         setState(() {
-          _profileEdits =
-              _profileEdits.where((item) => item.id != activity.id).toList();
+          _profileEdits = _profileEdits
+              .where((item) => item.id != activity.id)
+              .toList();
         });
       }
       _toast(action == 'approve' ? 'Request approved.' : 'Request declined.');
@@ -491,8 +542,11 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
           .read(formsGroupsApiProvider)
           .updateReminder(reminder.id, status: ReminderStatus.done);
       if (mounted) {
-        setState(() =>
-            _reminders = _reminders.where((r) => r.id != reminder.id).toList());
+        setState(
+          () => _reminders = _reminders
+              .where((r) => r.id != reminder.id)
+              .toList(),
+        );
       }
       _toast('Schedule marked complete.');
     } catch (_) {
@@ -502,8 +556,7 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
 
   void _toast(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   /// 1:1 port of professional-dashboard.component.ts's `scheduleChart` getter
@@ -518,7 +571,10 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
       DataPoint(label: 'Overdue', value: summary.overdue.toDouble()),
       DataPoint(label: 'Due in 24 hrs', value: summary.due24Hours.toDouble()),
       DataPoint(label: 'Due in 7 days', value: summary.due7Days.toDouble()),
-      DataPoint(label: 'Completed in last 7 days', value: summary.completedLast7Days.toDouble()),
+      DataPoint(
+        label: 'Completed in last 7 days',
+        value: summary.completedLast7Days.toDouble(),
+      ),
     ];
     if (!data.any((point) => point.value > 0)) return null;
     return ChartSpec(
@@ -526,7 +582,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
       title: 'Schedule status',
       data: data,
       meta: ChartMeta(
-        subtitle: '${summary.totalPending} pending, ${summary.totalCompleted} completed overall',
+        subtitle:
+            '${summary.totalPending} pending, ${summary.totalCompleted} completed overall',
       ),
     );
   }
@@ -563,7 +620,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
             PageHeader(
               eyebrow: 'PROFESSIONAL DASHBOARD',
               title: 'Dashboard',
-              info: 'Everything that needs your attention today, in one '
+              info:
+                  'Everything that needs your attention today, in one '
                   'place.\n\n'
                   'ACTIVITY\n'
                   'New sign-ups, client entries, and messages since you last '
@@ -575,42 +633,42 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
                   'Meetings and follow-ups coming up across all your clients.',
               trailing: NotificationBell(
                 unread: _notificationUnread,
-                onTap: () => context.go(Routes.professionalNotifications),
+                onTap: () => context.push(Routes.professionalNotifications),
               ),
             ),
-          // "Welcome back" is a greeting, not information — it earned a
-          // permanent line on the page while saying nothing after the first
-          // read. It now appears once per sign-in and retires itself.
-          if (_showWelcome) ...[
+            // "Welcome back" is a greeting, not information — it earned a
+            // permanent line on the page while saying nothing after the first
+            // read. It now appears once per sign-in and retires itself.
+            if (_showWelcome) ...[
+              const SizedBox(height: AppSpacing.md),
+              _WelcomeBanner(
+                name: _professionalName,
+                onDismiss: () => setState(() => _showWelcome = false),
+              ),
+            ],
+            if (_message.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              ErrorNote(message: _message, onRetry: _load),
+            ],
+            if (_onboarding != null && _onboarding!.hasPendingSetup) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ActionRequiredBanner(status: _onboarding!),
+            ],
             const SizedBox(height: AppSpacing.md),
-            _WelcomeBanner(
-              name: _professionalName,
-              onDismiss: () => setState(() => _showWelcome = false),
+            _PlanUsageCard(
+              usage: _usage,
+              clientCount: _clientCount,
+              activeClientCount: _activeClientCount,
             ),
-          ],
-          if (_message.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            ErrorNote(message: _message, onRetry: _load),
-          ],
-          if (_onboarding != null && _onboarding!.hasPendingSetup) ...[
-            const SizedBox(height: AppSpacing.md),
-            _ActionRequiredBanner(status: _onboarding!),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          _PlanUsageCard(
-            usage: _usage,
-            clientCount: _clientCount,
-            activeClientCount: _activeClientCount,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _DashboardTabBar(
-            tab: _tab,
-            paymentsEnabled: _paymentsEnabled,
-            activityCount: _activityActionCount,
-            paymentsCount: _paymentsActionCount,
-            scheduleCount: _scheduleActionCount,
-            onSelect: (tab) => setState(() => _tab = tab),
-          ),
+            _DashboardTabBar(
+              tab: _tab,
+              paymentsEnabled: _paymentsEnabled,
+              activityCount: _activityActionCount,
+              paymentsCount: _paymentsActionCount,
+              scheduleCount: _scheduleActionCount,
+              onSelect: (tab) => setState(() => _tab = tab),
+            ),
             const SizedBox(height: AppSpacing.sm),
             ..._tabContent(summary),
           ],
@@ -622,15 +680,17 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
   List<Widget> _tabContent(ScheduleSummary? summary) {
     return switch (_tab) {
       _DashboardTab.activity => _activityTab(),
-      _DashboardTab.payments => _paymentsEnabled
-          ? _paymentsTab()
-          : [
-              const EmptyState(
-                compact: false,
-                icon: Icons.payments_outlined,
-                message: 'Payment tracking is off.\nEnable it from Manage → Payments.',
-              ),
-            ],
+      _DashboardTab.payments =>
+        _paymentsEnabled
+            ? _paymentsTab()
+            : [
+                const EmptyState(
+                  compact: false,
+                  icon: Icons.payments_outlined,
+                  message:
+                      'Payment tracking is off.\nEnable it from Manage → Payments.',
+                ),
+              ],
       _DashboardTab.schedules => _schedulesTab(summary),
     };
   }
@@ -655,7 +715,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
             label: 'Pending\nRequests',
             icon: Icons.assignment_outlined,
             accent: MenuAccent.green,
-            onTap: () => context.go('${Routes.professionalFormsGroups}?tab=requests'),
+            onTap: () =>
+                context.go('${Routes.professionalFormsGroups}?tab=requests'),
           ),
           _CompactStat(
             value: '${_profileEdits.length}',
@@ -686,9 +747,13 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
           RowItem(
             title: submission.applicantName,
             subtitle: 'Submitted ${_shortDate(submission.submittedAt)}',
-            leading: AppAvatar(initials: _initialsFor(submission.applicantName), size: 38),
+            leading: AppAvatar(
+              initials: _initialsFor(submission.applicantName),
+              size: 38,
+            ),
             trailing: const StatusPill(label: 'Review', tone: PillTone.warn),
-            onTap: () => context.go('${Routes.professionalFormsGroups}?tab=requests'),
+            onTap: () =>
+                context.go('${Routes.professionalFormsGroups}?tab=requests'),
           ),
 
       const SectionHeader(title: 'Unread messages'),
@@ -701,7 +766,8 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
             subtitle: '${row.count} unread message${row.count == 1 ? '' : 's'}',
             leading: AppAvatar(initials: _initialsFor(row.name), size: 38),
             trailing: StatusPill(label: '${row.count}', tone: PillTone.info),
-            onTap: () => context.go('${Routes.professionalClients}/${row.clientId}'),
+            onTap: () =>
+                context.go('${Routes.professionalClients}/${row.clientId}'),
           ),
 
       const SectionHeader(title: 'Account requests'),
@@ -718,11 +784,18 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
                   Row(
                     children: [
                       Expanded(
-                        child: Text(activity.clientName, style: context.text.titleSmall),
+                        child: Text(
+                          activity.clientName,
+                          style: context.text.titleSmall,
+                        ),
                       ),
                       StatusPill(
-                        label: activity.isDeletion ? 'Deletion' : 'Profile edit',
-                        tone: activity.isDeletion ? PillTone.bad : PillTone.info,
+                        label: activity.isDeletion
+                            ? 'Deletion'
+                            : 'Profile edit',
+                        tone: activity.isDeletion
+                            ? PillTone.bad
+                            : PillTone.info,
                       ),
                     ],
                   ),
@@ -790,7 +863,10 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
             label: 'Overdue',
             icon: Icons.error_outline,
             accent: (_paymentActions?.overdueCount ?? 0) > 0
-                ? (fg: context.colors.error, bg: context.colors.error.withValues(alpha: 0.12))
+                ? (
+                    fg: context.colors.error,
+                    bg: context.colors.error.withValues(alpha: 0.12),
+                  )
                 : (fg: context.tokens.muted, bg: context.tokens.surfaceSoft),
           ),
         ],
@@ -819,7 +895,9 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
                   ? Icons.notifications_none
                   : Icons.notifications_active_outlined,
               size: AppSize.iconRow,
-              color: item.isRead ? context.tokens.muted : context.colors.primary,
+              color: item.isRead
+                  ? context.tokens.muted
+                  : context.colors.primary,
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _openPaymentNotification(item),
@@ -835,6 +913,7 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
         SectionHeader(
           title: 'Revenue Overview',
           actionLabel: _revenueRangeLabel,
+          actionIcon: Icons.filter_list,
           onAction: _pickRevenueRange,
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -899,7 +978,10 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
             label: 'Overdue',
             icon: Icons.warning_amber_outlined,
             accent: (summary?.overdue ?? 0) > 0
-                ? (fg: context.colors.error, bg: context.colors.error.withValues(alpha: 0.12))
+                ? (
+                    fg: context.colors.error,
+                    bg: context.colors.error.withValues(alpha: 0.12),
+                  )
                 : (fg: context.tokens.muted, bg: context.tokens.surfaceSoft),
           ),
           _CompactStat(
@@ -929,8 +1011,7 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
 
       if (overdue.isNotEmpty) ...[
         SectionHeader(title: 'Overdue schedules (${overdue.length})'),
-        for (final reminder in overdue)
-          _scheduleRow(reminder, overdue: true),
+        for (final reminder in overdue) _scheduleRow(reminder, overdue: true),
       ],
       SectionHeader(
         title: 'Upcoming schedules (${upcoming.length})',
@@ -968,17 +1049,21 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
       trailingCaption: overdue
           ? 'Overdue'
           : reminder.time.isNotEmpty
-              ? reminder.time.substring(0, 5)
-              : 'Any time',
-      onTap: () => context.go('${Routes.professionalClients}/${reminder.client}'),
+          ? reminder.time.substring(0, 5)
+          : 'Any time',
+      onTap: () =>
+          context.go('${Routes.professionalClients}/${reminder.client}'),
     );
   }
 
   String _initialsFor(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return 'C';
-    final letters =
-        parts.map((p) => p[0]).take(2).join().toUpperCase();
+    final letters = parts.map((p) => p[0]).take(2).join().toUpperCase();
     return letters.isEmpty ? 'C' : letters;
   }
 
@@ -987,8 +1072,18 @@ class _ProfessionalDashboardPageState extends ConsumerState<ProfessionalDashboar
     final date = DateTime.tryParse(iso);
     if (date == null) return iso;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]}';
   }
@@ -1041,7 +1136,9 @@ class _DashboardTabBar extends StatelessWidget {
                     Text(
                       count > 99 ? '99+' : '$count',
                       style: context.text.labelSmall?.copyWith(
-                        color: tab == value ? context.colors.onPrimary : context.colors.error,
+                        color: tab == value
+                            ? context.colors.onPrimary
+                            : context.colors.error,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1068,6 +1165,9 @@ class _ActionRequiredBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = isDark ? context.colors.onSurface : Colors.white;
+    final mutedForeground = foreground.withValues(alpha: 0.78);
     final items = <(String, bool, VoidCallback, IconData)>[
       (
         'Lead Form',
@@ -1104,28 +1204,34 @@ class _ActionRequiredBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.card),
       decoration: BoxDecoration(
-        color: context.colors.primary,
+        color: isDark ? context.colors.surface : context.colors.primary,
         borderRadius: AppRadius.lgAll,
+        border: isDark
+            ? Border.all(color: context.colors.primary.withValues(alpha: 0.32))
+            : null,
+        boxShadow: isDark ? context.tokens.shadowSm : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white, size: 20),
+              Icon(Icons.info_outline, color: foreground, size: 20),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
                   'Action Required',
                   style: context.text.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: foreground,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               Text(
                 '${status.completedCount} of ${ProfessionalOnboardingStatus.totalChecks} completed',
-                style: context.text.labelSmall?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+                style: context.text.labelSmall?.copyWith(
+                  color: mutedForeground,
+                ),
               ),
             ],
           ),
@@ -1133,7 +1239,7 @@ class _ActionRequiredBanner extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               status.message,
-              style: context.text.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.9)),
+              style: context.text.bodySmall?.copyWith(color: mutedForeground),
             ),
           ],
           const SizedBox(height: AppSpacing.md),
@@ -1171,6 +1277,15 @@ class _ChecklistIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark ? context.colors.onSurface : Colors.white;
+    final circleColor = isDark
+        ? (done ? context.tokens.primarySoft : context.tokens.surfaceSoft)
+        : Colors.white.withValues(alpha: done ? 0.95 : 0.22);
+    final iconColor = done
+        ? context.colors.primary
+        : (isDark ? context.tokens.warningStrong : const Color(0xFFFFDDAA));
+
     return InkWell(
       onTap: done ? null : onTap,
       borderRadius: AppRadius.mdAll,
@@ -1187,14 +1302,17 @@ class _ChecklistIcon extends StatelessWidget {
                 // slightly more visible tint so it reads as "needs attention"
                 // rather than the plain translucent-white it used to share
                 // with every other unchecked state on this banner.
-                color: Colors.white.withValues(alpha: done ? 0.95 : 0.22),
+                color: circleColor,
                 shape: BoxShape.circle,
+                border: isDark
+                    ? Border.all(color: context.tokens.border)
+                    : null,
               ),
               child: Icon(
                 done ? Icons.check : icon,
                 // Warm amber/white mix — distinct from the done state's
                 // brand-primary check, still readable on the blue banner.
-                color: done ? context.colors.primary : const Color(0xFFFFDDAA),
+                color: iconColor,
                 size: 20,
               ),
             ),
@@ -1204,7 +1322,7 @@ class _ChecklistIcon extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: context.text.labelSmall?.copyWith(color: Colors.white),
+              style: context.text.labelSmall?.copyWith(color: labelColor),
             ),
           ],
         ),
@@ -1238,10 +1356,15 @@ class _PlanUsageCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Plan & Usage', style: context.text.titleMedium)),
+              Expanded(
+                child: Text('Plan and Usage', style: context.text.titleMedium),
+              ),
               GestureDetector(
                 onTap: () => context.go(Routes.professionalSettings),
-                child: StatusPill(label: u?.planName ?? '—', tone: PillTone.info),
+                child: StatusPill(
+                  label: u?.planName ?? '—',
+                  tone: PillTone.info,
+                ),
               ),
             ],
           ),
@@ -1298,8 +1421,8 @@ class _PlanUsageCard extends StatelessWidget {
               final storageColor = (u?.isDanger ?? false)
                   ? context.colors.error
                   : (u?.isWarning ?? false)
-                      ? tokens.accent
-                      : tokens.success;
+                  ? tokens.accent
+                  : tokens.success;
               final percent = (u?.usagePercent ?? 0).clamp(0, 100);
 
               return Column(
@@ -1308,11 +1431,17 @@ class _PlanUsageCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Storage used',
-                          style: context.text.bodySmall?.copyWith(color: tokens.muted)),
+                      Text(
+                        'Storage used',
+                        style: context.text.bodySmall?.copyWith(
+                          color: tokens.muted,
+                        ),
+                      ),
                       Text(
                         '${percent.toStringAsFixed(0)}%',
-                        style: context.text.labelMedium?.copyWith(color: storageColor),
+                        style: context.text.labelMedium?.copyWith(
+                          color: storageColor,
+                        ),
                       ),
                     ],
                   ),
@@ -1340,7 +1469,8 @@ class _PlanUsageCard extends StatelessWidget {
               // Straight to Plan & Storage, which is the report this card
               // summarises. It used to land on the Settings index, leaving you
               // to find the right row yourself.
-              onPressed: () => context.go(Routes.professionalSettingsPlanStorage),
+              onPressed: () =>
+                  context.go(Routes.professionalSettingsPlanStorage),
               style: TextButton.styleFrom(
                 minimumSize: const Size(0, AppSize.buttonHeightSm),
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -1378,13 +1508,18 @@ class _WelcomeBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.waving_hand_outlined,
-              size: AppSize.iconRow, color: tokens.primaryStrong),
+          Icon(
+            Icons.waving_hand_outlined,
+            size: AppSize.iconRow,
+            color: tokens.primaryStrong,
+          ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Text(
               'Welcome back, $name',
-              style: context.text.bodyLarge?.copyWith(color: tokens.primaryStrong),
+              style: context.text.bodyLarge?.copyWith(
+                color: tokens.primaryStrong,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1454,12 +1589,14 @@ class _CompactStat extends StatelessWidget {
 
   final String value;
   final String label;
+
   /// When set (together with [accent]), a small tinted icon chip renders
   /// above the value — the same [MenuAccent] treatment as [ColorfulMenuCard].
   /// Both are optional so any call site that skips them still gets the
   /// original plain value/label rendering.
   final IconData? icon;
   final ({Color fg, Color bg})? accent;
+
   /// Explicit override for the value text color. When null, falls back to
   /// [accent]'s fg color if an accent was passed, else the theme default.
   final Color? valueColor;
@@ -1470,10 +1607,9 @@ class _CompactStat extends StatelessWidget {
     final tokens = context.tokens;
     final effectiveValueColor = valueColor ?? accent?.fg;
 
-    // Tinted and flat, matching the theme's "a number you read" surface.
-    final tint = accent == null
-        ? tokens.surfaceSoft
-        : Color.alphaBlend(accent!.bg.withValues(alpha: 0.55), tokens.surfaceSoft);
+    // Keep every KPI on the same surface. Accent colors remain on the value
+    // and icon so status is still scannable without mismatched card fills.
+    final tint = tokens.surfaceSoft;
 
     // Labels arrive with hard newlines from the old four-across layout
     // ("Unread\nMessages"). At double the width they fit on one line, so the
@@ -1547,7 +1683,10 @@ class _ReportingCurrencySetupCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text('Choose your reporting currency', style: context.text.titleMedium),
+          Text(
+            'Choose your reporting currency',
+            style: context.text.titleMedium,
+          ),
           const SizedBox(height: AppSpacing.sm),
           for (final (i, step) in const [
             'Open Settings → Payments.',
@@ -1559,9 +1698,19 @@ class _ReportingCurrencySetupCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${i + 1}. ', style: context.text.bodySmall?.copyWith(color: tokens.muted)),
+                  Text(
+                    '${i + 1}. ',
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.muted,
+                    ),
+                  ),
                   Expanded(
-                    child: Text(step, style: context.text.bodySmall?.copyWith(color: tokens.muted)),
+                    child: Text(
+                      step,
+                      style: context.text.bodySmall?.copyWith(
+                        color: tokens.muted,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1624,12 +1773,12 @@ class _UsageStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: context.text.labelSmall?.copyWith(color: tokens.muted)),
-        const SizedBox(height: 2),
         Text(
-          value,
-          style: context.text.titleLarge?.copyWith(color: color),
+          label,
+          style: context.text.labelSmall?.copyWith(color: tokens.muted),
         ),
+        const SizedBox(height: 2),
+        Text(value, style: context.text.titleLarge?.copyWith(color: color)),
         Text(
           caption,
           // The caption carries the limit ("of 25"), so it takes the state
@@ -1645,4 +1794,3 @@ class _UsageStat extends StatelessWidget {
     );
   }
 }
-

@@ -27,7 +27,8 @@ class ProfessionalAccount {
   final int? birthYear;
   final bool profileSetupCompleted;
 
-  factory ProfessionalAccount.fromJson(Map<String, dynamic> json) => ProfessionalAccount(
+  factory ProfessionalAccount.fromJson(Map<String, dynamic> json) =>
+      ProfessionalAccount(
         id: json['id'] as int? ?? 0,
         email: json['email'] as String? ?? '',
         username: json['username'] as String? ?? '',
@@ -36,7 +37,8 @@ class ProfessionalAccount {
         lastName: json['last_name'] as String? ?? '',
         birthMonth: json['birth_month'] as int?,
         birthYear: json['birth_year'] as int?,
-        profileSetupCompleted: json['profile_setup_completed'] as bool? ?? false,
+        profileSetupCompleted:
+            json['profile_setup_completed'] as bool? ?? false,
       );
 }
 
@@ -91,10 +93,13 @@ class ProfessionalOnboardingStatus {
   /// backend's `checks` dict minus `profile`.
   static const int totalChecks = 5;
 
-  int get completedCount =>
-      [formCreated, groupCreated, templateCreated, resourceCreated, meetingSetupComplete]
-          .where((done) => done)
-          .length;
+  int get completedCount => [
+    formCreated,
+    groupCreated,
+    templateCreated,
+    resourceCreated,
+    meetingSetupComplete,
+  ].where((done) => done).length;
 
   bool get hasPendingSetup => completedCount < totalChecks;
 
@@ -167,14 +172,14 @@ class ProfessionalSignupPayload {
   final bool acceptPrivacy;
 
   Map<String, dynamic> toJson() => {
-        'email': email,
-        'username': username,
-        'password': password,
-        'confirm_password': confirmPassword,
-        'email_verification_token': emailVerificationToken,
-        'accept_terms': acceptTerms,
-        'accept_privacy': acceptPrivacy,
-      };
+    'email': email,
+    'username': username,
+    'password': password,
+    'confirm_password': confirmPassword,
+    'email_verification_token': emailVerificationToken,
+    'accept_terms': acceptTerms,
+    'accept_privacy': acceptPrivacy,
+  };
 }
 
 class UsernameAvailability {
@@ -234,7 +239,8 @@ class EmailOtpVerifyResult {
   factory EmailOtpVerifyResult.fromJson(Map<String, dynamic> json) =>
       EmailOtpVerifyResult(
         email: json['email'] as String? ?? '',
-        emailVerificationToken: json['email_verification_token'] as String? ?? '',
+        emailVerificationToken:
+            json['email_verification_token'] as String? ?? '',
         message: json['message'] as String? ?? '',
       );
 }
@@ -320,42 +326,46 @@ class ProfessionalDataUsage {
   final String lockReason;
   final String? gracePeriodEndsAt;
 
-  factory ProfessionalDataUsage.fromJson(Map<String, dynamic> json) => ProfessionalDataUsage(
-        planCode: json['plan_code'] as String? ?? '',
-        planName: json['plan_name'] as String? ?? '',
-        totalBytes: (json['total_bytes'] as num?)?.toInt() ?? 0,
-        quotaBytes: (json['quota_bytes'] as num?)?.toInt() ?? 0,
-        usagePercent: (json['usage_percent'] as num?)?.toDouble() ?? 0,
-        recordCount: (json['record_count'] as num?)?.toInt() ?? 0,
-        databaseBytes: (json['database_bytes'] as num?)?.toInt() ?? 0,
-        fileBytes: (json['file_bytes'] as num?)?.toInt() ?? 0,
-        planLimits: (json['plan_limits'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(key.toString(), (value as num?)?.toInt()),
-        ),
-        resourceUsage: (json['resource_usage'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(
-            key.toString(),
-            PlanResourceUsage.fromJson(value as Map<String, dynamic>? ?? {}),
-          ),
-        ),
-        sections: (json['sections'] as Map<dynamic, dynamic>? ?? {}).map(
-          (key, value) => MapEntry(
-            key.toString(),
-            ProfessionalUsageSection.fromJson(value as Map<String, dynamic>? ?? {}),
-          ),
-        ),
-        warnings: (json['warnings'] as List<dynamic>? ?? [])
-            .map((item) => (item as Map<String, dynamic>)['message']?.toString() ?? '')
-            .where((message) => message.isNotEmpty)
-            .toList(),
-        usageLabel: (json['usage_label'] as String? ?? '').replaceAll('_', ' '),
-        isWarning: json['is_warning'] as bool? ?? false,
-        isDanger: json['is_danger'] as bool? ?? false,
-        isOverQuota: json['is_over_quota'] as bool? ?? false,
-        isLocked: json['is_locked'] as bool? ?? false,
-        lockReason: json['lock_reason'] as String? ?? '',
-        gracePeriodEndsAt: json['grace_period_ends_at'] as String?,
-      );
+  factory ProfessionalDataUsage.fromJson(
+    Map<String, dynamic> json,
+  ) => ProfessionalDataUsage(
+    planCode: json['plan_code'] as String? ?? '',
+    planName: json['plan_name'] as String? ?? '',
+    totalBytes: (json['total_bytes'] as num?)?.toInt() ?? 0,
+    quotaBytes: (json['quota_bytes'] as num?)?.toInt() ?? 0,
+    usagePercent: (json['usage_percent'] as num?)?.toDouble() ?? 0,
+    recordCount: (json['record_count'] as num?)?.toInt() ?? 0,
+    databaseBytes: (json['database_bytes'] as num?)?.toInt() ?? 0,
+    fileBytes: (json['file_bytes'] as num?)?.toInt() ?? 0,
+    planLimits: (json['plan_limits'] as Map<dynamic, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(key.toString(), (value as num?)?.toInt()),
+    ),
+    resourceUsage: (json['resource_usage'] as Map<dynamic, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(
+        key.toString(),
+        PlanResourceUsage.fromJson(value as Map<String, dynamic>? ?? {}),
+      ),
+    ),
+    sections: (json['sections'] as Map<dynamic, dynamic>? ?? {}).map(
+      (key, value) => MapEntry(
+        key.toString(),
+        ProfessionalUsageSection.fromJson(value as Map<String, dynamic>? ?? {}),
+      ),
+    ),
+    warnings: (json['warnings'] as List<dynamic>? ?? [])
+        .map(
+          (item) => (item as Map<String, dynamic>)['message']?.toString() ?? '',
+        )
+        .where((message) => message.isNotEmpty)
+        .toList(),
+    usageLabel: (json['usage_label'] as String? ?? '').replaceAll('_', ' '),
+    isWarning: json['is_warning'] as bool? ?? false,
+    isDanger: json['is_danger'] as bool? ?? false,
+    isOverQuota: json['is_over_quota'] as bool? ?? false,
+    isLocked: json['is_locked'] as bool? ?? false,
+    lockReason: json['lock_reason'] as String? ?? '',
+    gracePeriodEndsAt: json['grace_period_ends_at'] as String?,
+  );
 }
 
 class PlanResourceUsage {
@@ -365,7 +375,8 @@ class PlanResourceUsage {
   final int? limit;
   final double? percentage;
 
-  factory PlanResourceUsage.fromJson(Map<String, dynamic> json) => PlanResourceUsage(
+  factory PlanResourceUsage.fromJson(Map<String, dynamic> json) =>
+      PlanResourceUsage(
         used: (json['used'] as num?)?.toInt() ?? 0,
         limit: (json['limit'] as num?)?.toInt(),
         percentage: (json['percentage'] as num?)?.toDouble(),
@@ -400,16 +411,15 @@ class ProfessionalUsageSection {
   /// (professional-account-settings.component.ts `professionalUsageLabels`).
   static const Map<String, String> labels = {
     'professional_profile': 'Professional profile',
-    'forms_groups': 'Forms & groups',
+    'forms_groups': 'Forms and groups',
     'clients': 'Client profiles',
-    'schedules_progress': 'Schedules & progress',
+    'schedules_progress': 'Schedules and progress',
     'resources': 'Resources',
-    'templates_tracking': 'Templates & tracking',
+    'templates_tracking': 'Templates and tracking',
     'messages': 'Messages',
   };
 
-  static String labelFor(String key) =>
-      labels[key] ?? key.replaceAll('_', ' ');
+  static String labelFor(String key) => labels[key] ?? key.replaceAll('_', ' ');
 }
 
 class ProfessionalProfileImage {
@@ -538,64 +548,65 @@ class ProfessionalProfile {
   /// Newest first (the backend slices `legal_acceptance_records` at 20).
   final List<LegalAcceptanceEntry> legalAcceptanceHistory;
 
-  String get displayName => [firstName, lastName]
-      .where((part) => part.isNotEmpty)
-      .join(' ')
-      .trim();
+  String get displayName =>
+      [firstName, lastName].where((part) => part.isNotEmpty).join(' ').trim();
 
-  factory ProfessionalProfile.fromJson(Map<String, dynamic> json) => ProfessionalProfile(
-        firstName: json['first_name'] as String? ?? '',
-        middleName: json['middle_name'] as String? ?? '',
-        lastName: json['last_name'] as String? ?? '',
-        email: json['email'] as String? ?? '',
-        username: json['username'] as String? ?? '',
-        professionalId: json['professional_id'] as String? ?? '',
-        professionalCode: json['professional_code'] as String? ?? '',
-        profileSetupCompleted: json['profile_setup_completed'] as bool? ?? false,
-        profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
-        professionalHeadline: json['professional_headline'] as String? ?? '',
-        phone: json['phone'] as String? ?? '',
-        gender: json['gender'] as String? ?? '',
-        birthMonth: json['birth_month'] as int?,
-        birthYear: json['birth_year'] as int?,
-        country: json['country'] as String? ?? '',
-        state: json['state'] as String? ?? '',
-        aboutMe: json['about_me'] as String? ?? '',
-        location: json['location'] as String? ?? '',
-        professionalType: json['professional_type'] as String? ?? '',
-        yearsExperience: json['years_experience'] as int?,
-        specializations: json['specializations'] as String? ?? '',
-        trainingStyle: json['training_style'] as String? ?? '',
-        languagesKnown: json['languages_known'] as String? ?? '',
-        certificationName: json['certification_name'] as String? ?? '',
-        certificationIssuedBy: json['certification_issued_by'] as String? ?? '',
-        certificationYear: json['certification_year'] as int?,
-        certificationFileUrl: json['certification_file_url'] as String? ?? '',
-        transformationPhotoUrl: json['transformation_photo_url'] as String? ?? '',
-        trainingPhotoUrl: json['training_photo_url'] as String? ?? '',
-        introVideoUrl: json['intro_video_url'] as String? ?? '',
-        instagramUrl: json['instagram_url'] as String? ?? '',
-        youtubeUrl: json['youtube_url'] as String? ?? '',
-        websiteUrl: json['website_url'] as String? ?? '',
-        profileImages: (json['profile_images'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(ProfessionalProfileImage.fromJson)
-            .toList(),
-        profileLinks: (json['profile_links'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(ProfessionalProfileLink.fromJson)
-            .toList(),
-        profileVisibility:
-            (json['profile_visibility'] as Map<dynamic, dynamic>? ?? {}).map(
+  factory ProfessionalProfile.fromJson(
+    Map<String, dynamic> json,
+  ) => ProfessionalProfile(
+    firstName: json['first_name'] as String? ?? '',
+    middleName: json['middle_name'] as String? ?? '',
+    lastName: json['last_name'] as String? ?? '',
+    email: json['email'] as String? ?? '',
+    username: json['username'] as String? ?? '',
+    professionalId: json['professional_id'] as String? ?? '',
+    professionalCode: json['professional_code'] as String? ?? '',
+    profileSetupCompleted: json['profile_setup_completed'] as bool? ?? false,
+    profilePhotoUrl: json['profile_photo_url'] as String? ?? '',
+    professionalHeadline: json['professional_headline'] as String? ?? '',
+    phone: json['phone'] as String? ?? '',
+    gender: json['gender'] as String? ?? '',
+    birthMonth: json['birth_month'] as int?,
+    birthYear: json['birth_year'] as int?,
+    country: json['country'] as String? ?? '',
+    state: json['state'] as String? ?? '',
+    aboutMe: json['about_me'] as String? ?? '',
+    location: json['location'] as String? ?? '',
+    professionalType: json['professional_type'] as String? ?? '',
+    yearsExperience: json['years_experience'] as int?,
+    specializations: json['specializations'] as String? ?? '',
+    trainingStyle: json['training_style'] as String? ?? '',
+    languagesKnown: json['languages_known'] as String? ?? '',
+    certificationName: json['certification_name'] as String? ?? '',
+    certificationIssuedBy: json['certification_issued_by'] as String? ?? '',
+    certificationYear: json['certification_year'] as int?,
+    certificationFileUrl: json['certification_file_url'] as String? ?? '',
+    transformationPhotoUrl: json['transformation_photo_url'] as String? ?? '',
+    trainingPhotoUrl: json['training_photo_url'] as String? ?? '',
+    introVideoUrl: json['intro_video_url'] as String? ?? '',
+    instagramUrl: json['instagram_url'] as String? ?? '',
+    youtubeUrl: json['youtube_url'] as String? ?? '',
+    websiteUrl: json['website_url'] as String? ?? '',
+    profileImages: (json['profile_images'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(ProfessionalProfileImage.fromJson)
+        .toList(),
+    profileLinks: (json['profile_links'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(ProfessionalProfileLink.fromJson)
+        .toList(),
+    profileVisibility:
+        (json['profile_visibility'] as Map<dynamic, dynamic>? ?? {}).map(
           (key, value) => MapEntry(key.toString(), value == true),
         ),
-        termsAccepted: json['terms_accepted'] as bool? ?? false,
-        privacyPolicyAccepted: json['privacy_policy_accepted'] as bool? ?? false,
-        termsAcceptedAt: json['terms_accepted_at']?.toString() ?? '',
-        privacyPolicyAcceptedAt:
-            json['privacy_policy_accepted_at']?.toString() ?? '',
-        legalDocumentVersion: json['legal_document_version'] as String? ?? '',
-        legalAcceptanceHistory:
-            LegalAcceptanceEntry.listFrom(json['legal_acceptance_history']),
-      );
+    termsAccepted: json['terms_accepted'] as bool? ?? false,
+    privacyPolicyAccepted: json['privacy_policy_accepted'] as bool? ?? false,
+    termsAcceptedAt: json['terms_accepted_at']?.toString() ?? '',
+    privacyPolicyAcceptedAt:
+        json['privacy_policy_accepted_at']?.toString() ?? '',
+    legalDocumentVersion: json['legal_document_version'] as String? ?? '',
+    legalAcceptanceHistory: LegalAcceptanceEntry.listFrom(
+      json['legal_acceptance_history'],
+    ),
+  );
 }

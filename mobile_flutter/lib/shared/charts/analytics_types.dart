@@ -9,7 +9,11 @@ library;
 enum ChartKind { line, bar, hbar, pie, ring, summary }
 
 class DataPoint {
-  const DataPoint({required this.label, required this.value, this.tooltip = ''});
+  const DataPoint({
+    required this.label,
+    required this.value,
+    this.tooltip = '',
+  });
 
   final String label;
   final double value;

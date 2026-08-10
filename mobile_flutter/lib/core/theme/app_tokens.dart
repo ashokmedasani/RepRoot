@@ -130,8 +130,9 @@ class AppRadius {
   static const double lg = card;
   static const double xl = sheet;
 
-  static const BorderRadius controlAll =
-      BorderRadius.all(Radius.circular(control));
+  static const BorderRadius controlAll = BorderRadius.all(
+    Radius.circular(control),
+  );
   static const BorderRadius tileAll = BorderRadius.all(Radius.circular(tile));
   static const BorderRadius cardAll = BorderRadius.all(Radius.circular(card));
   static const BorderRadius sheetAll = BorderRadius.all(Radius.circular(sheet));
@@ -216,23 +217,11 @@ class AppTokens extends ThemeExtension<AppTokens> {
     // air. These carry more weight than they would in a bordered theme because
     // here the shadow *is* the edge — there is no hairline behind it.
     shadowSm: [
-      BoxShadow(
-        color: Color(0x0F14213D),
-        blurRadius: 3,
-        offset: Offset(0, 1),
-      ),
-      BoxShadow(
-        color: Color(0x1414213D),
-        blurRadius: 20,
-        offset: Offset(0, 6),
-      ),
+      BoxShadow(color: Color(0x0F14213D), blurRadius: 3, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x1414213D), blurRadius: 20, offset: Offset(0, 6)),
     ],
     shadowMd: [
-      BoxShadow(
-        color: Color(0x1414213D),
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
+      BoxShadow(color: Color(0x1414213D), blurRadius: 6, offset: Offset(0, 2)),
       BoxShadow(
         color: Color(0x1F14213D),
         blurRadius: 40,
@@ -256,23 +245,11 @@ class AppTokens extends ThemeExtension<AppTokens> {
     // card on a dark page separates by being lighter. So these stay subtle and
     // mostly supply the contact edge; going heavier just muddies the surface.
     shadowSm: [
-      BoxShadow(
-        color: Color(0x33000000),
-        blurRadius: 2,
-        offset: Offset(0, 1),
-      ),
-      BoxShadow(
-        color: Color(0x24000000),
-        blurRadius: 24,
-        offset: Offset(0, 8),
-      ),
+      BoxShadow(color: Color(0x33000000), blurRadius: 2, offset: Offset(0, 1)),
+      BoxShadow(color: Color(0x24000000), blurRadius: 24, offset: Offset(0, 8)),
     ],
     shadowMd: [
-      BoxShadow(
-        color: Color(0x40000000),
-        blurRadius: 4,
-        offset: Offset(0, 2),
-      ),
+      BoxShadow(color: Color(0x40000000), blurRadius: 4, offset: Offset(0, 2)),
       BoxShadow(
         color: Color(0x30000000),
         blurRadius: 48,
@@ -368,12 +345,12 @@ class TemplateAccent {
   static const _purpleColor = Color(0xFF7A5AF8);
 
   static String label(String accent) => switch (accent) {
-        green => 'Green',
-        blue => 'Blue',
-        orange => 'Orange',
-        purple => 'Purple',
-        _ => 'Blue',
-      };
+    green => 'Green',
+    blue => 'Blue',
+    orange => 'Orange',
+    purple => 'Purple',
+    _ => 'Blue',
+  };
 
   /// Normalises anything already stored — including the legacy hex values
   /// mobile wrote — onto one of [all].

@@ -6,6 +6,7 @@ import '../../app/router.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/professional_auth_api.dart';
 import '../../core/theme/app_tokens.dart';
+import '../../shared/widgets/reproot_logo.dart';
 
 /// Entry screen: pick a role. Stored sessions skip straight to the right shell.
 /// Replica of mobile/src/app/pages/role-chooser/role-chooser.page.ts.
@@ -41,10 +42,13 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
         destination = status.legalAcceptanceRequired
             ? Routes.professionalLegalConsent
             : status.profileSetupCompleted
-                ? Routes.professionalDashboard
-                : Routes.professionalProfileSetup;
-      } catch (_) {
-        // Keep the optimistic destination.
+            ? Routes.professionalDashboard
+            : Routes.professionalProfileSetup;
+      } catch (error, stackTrace) {
+        debugPrint(
+          'Professional destination check failed; using session fallback '
+          '(${error.runtimeType})\n$stackTrace',
+        );
       }
       if (!mounted) return;
       context.go(destination);
@@ -63,8 +67,8 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
       stored?.mustChangePassword ?? false
           ? Routes.clientChangePassword
           : !(stored?.legalAccepted ?? false)
-              ? Routes.clientLegalConsent
-              : Routes.clientDashboard,
+          ? Routes.clientLegalConsent
+          : Routes.clientDashboard,
     );
   }
 
@@ -84,7 +88,9 @@ class _RoleChooserPageState extends ConsumerState<RoleChooserPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _Brand(text: text),
-                  const SizedBox(height: AppSpacing.xxl + AppSpacing.sm), // 2.5rem
+                  const SizedBox(
+                    height: AppSpacing.xxl + AppSpacing.sm,
+                  ), // 2.5rem
                   _Choices(tokens: tokens, text: text),
                 ],
               ),
@@ -105,19 +111,25 @@ class _Brand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SizedBox(
-          width: 64,
-          height: 64,
-          child: Image.asset(
-            'assets/icon/icon.png',
-            fit: BoxFit.contain,
-          ),
-        ),
+        const RepRootLogo(size: 64),
         const SizedBox(height: AppSpacing.md),
         // "RepRoot Studio" is the product name the website uses (its
         // `brand__text`), so the signed-out screen now says the same thing
         // both places instead of describing the product differently.
-        Text('RepRoot Studio', style: text.displaySmall),
+        Text.rich(
+          TextSpan(
+            style: text.displaySmall,
+            children: [
+              const TextSpan(text: 'Rep'),
+              TextSpan(
+                text: 'Root',
+                style: TextStyle(color: context.colors.primary),
+              ),
+              const TextSpan(text: ' Studio'),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -151,16 +163,22 @@ class _Choices extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          FilledButton.icon(
-            onPressed: () => context.push(Routes.professionalLogin),
-            icon: const Icon(Icons.fitness_center),
-            label: const Text('Professional'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.push(Routes.professionalLogin),
+              icon: const Icon(Icons.business_center_outlined),
+              label: const Text('Professional'),
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: () => context.push(Routes.clientLogin),
-            icon: const Icon(Icons.person_outline),
-            label: const Text('Client'),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push(Routes.clientLogin),
+              icon: const Icon(Icons.person_outline),
+              label: const Text('Client'),
+            ),
           ),
         ],
       ),

@@ -28,10 +28,12 @@ class ProfessionalSignupPage extends ConsumerStatefulWidget {
   const ProfessionalSignupPage({super.key});
 
   @override
-  ConsumerState<ProfessionalSignupPage> createState() => _ProfessionalSignupPageState();
+  ConsumerState<ProfessionalSignupPage> createState() =>
+      _ProfessionalSignupPageState();
 }
 
-class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage> {
+class _ProfessionalSignupPageState
+    extends ConsumerState<ProfessionalSignupPage> {
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _otp = TextEditingController();
@@ -70,7 +72,11 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
     if (!google.isConfigured) return;
     try {
       await google.ensureInitialized();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Google authentication initialization failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
       return; // The button simply stays hidden.
     }
     if (!mounted) return;
@@ -94,15 +100,19 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
   /// consent checkbox. A failure just hides the banner.
   Future<void> _loadLegalConfiguration() async {
     try {
-      final configuration =
-          await ref.read(professionalAuthApiProvider).getLegalConfiguration();
+      final configuration = await ref
+          .read(professionalAuthApiProvider)
+          .getLegalConfiguration();
       if (!mounted) return;
       setState(() {
         _legalVersion = configuration.professionalVersion;
         _legalEffectiveDate = configuration.effectiveDate;
       });
-    } catch (_) {
-      // Signup does not depend on it.
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Signup legal configuration load failed '
+        '(${error.runtimeType})\n$stackTrace',
+      );
     }
   }
 
@@ -140,11 +150,14 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
 
     setState(() => _usernameStatus = UsernameStatus.checking);
     try {
-      final result = await ref.read(professionalAuthApiProvider).checkUsername(username);
+      final result = await ref
+          .read(professionalAuthApiProvider)
+          .checkUsername(username);
       if (!mounted) return;
       setState(() {
-        _usernameStatus =
-            result.available ? UsernameStatus.available : UsernameStatus.taken;
+        _usernameStatus = result.available
+            ? UsernameStatus.available
+            : UsernameStatus.taken;
         _usernameMessage = result.message;
       });
     } on ApiException catch (error) {
@@ -171,7 +184,9 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
       _emailError = false;
     });
     try {
-      final result = await ref.read(professionalAuthApiProvider).requestEmailOtp(email);
+      final result = await ref
+          .read(professionalAuthApiProvider)
+          .requestEmailOtp(email);
       if (!mounted) return;
       setState(() {
         // available == false means the email is already registered.
@@ -232,8 +247,10 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
     }
     if (_password.text.length < 8 ||
         !RegExp(r'[^A-Za-z0-9]').hasMatch(_password.text)) {
-      setState(() => _message =
-          'Password must be at least 8 characters with one special character.');
+      setState(
+        () => _message =
+            'Password must be at least 8 characters with one special character.',
+      );
       return;
     }
     if (_password.text != _confirmPassword.text) {
@@ -284,13 +301,18 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
     } on GoogleSignInException catch (error) {
       if (!mounted) return;
       if (error.code != GoogleSignInExceptionCode.canceled) {
-        setState(() =>
-            _message = 'Google sign-in popup was blocked or dismissed. Please try again, or use email below.');
+        setState(
+          () => _message =
+              'Google sign-in popup was blocked or dismissed. Please try again, or use email below.',
+        );
       }
       return;
     } catch (_) {
       if (!mounted) return;
-      setState(() => _message = 'Google sign-in could not be loaded. Please try again later.');
+      setState(
+        () => _message =
+            'Google sign-in could not be loaded. Please try again later.',
+      );
       return;
     }
 
@@ -332,7 +354,8 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
         if (!mounted) return;
         setState(() {
           _googleSubmitting = false;
-          _message = 'An account already exists for this Google email. Please sign in.';
+          _message =
+              'An account already exists for this Google email. Please sign in.';
         });
         return;
       }
@@ -402,7 +425,9 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpacing.xs),
                         child: OutlinedButton(
-                          onPressed: busy || _isSubmitting ? null : _verifyUsername,
+                          onPressed: busy || _isSubmitting
+                              ? null
+                              : _verifyUsername,
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size(88, AppSize.buttonHeightSm),
                           ),
@@ -410,7 +435,9 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('Check'),
                         ),
@@ -431,7 +458,8 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                       Expanded(
                         child: TextField(
                           controller: _email,
-                          enabled: !_isSubmitting &&
+                          enabled:
+                              !_isSubmitting &&
                               _emailStatus != EmailStatus.verified,
                           autocorrect: false,
                           keyboardType: TextInputType.emailAddress,
@@ -448,7 +476,8 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpacing.xs),
                         child: OutlinedButton(
-                          onPressed: _emailStatus == EmailStatus.sending ||
+                          onPressed:
+                              _emailStatus == EmailStatus.sending ||
                                   _emailStatus == EmailStatus.verified ||
                                   _isSubmitting
                               ? null
@@ -460,11 +489,15 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
-                              : Text(_emailStatus == EmailStatus.sent
-                                  ? 'Resend'
-                                  : 'Send code'),
+                              : Text(
+                                  _emailStatus == EmailStatus.sent
+                                      ? 'Resend'
+                                      : 'Send code',
+                                ),
                         ),
                       ),
                     ],
@@ -479,7 +512,9 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                       padding: const EdgeInsets.only(top: AppSpacing.xs),
                       child: Text(
                         'Dev code: $_debugOtp',
-                        style: context.text.bodySmall?.copyWith(color: tokens.accent),
+                        style: context.text.bodySmall?.copyWith(
+                          color: tokens.accent,
+                        ),
                       ),
                     ),
                   if (_emailStatus == EmailStatus.sent ||
@@ -505,14 +540,18 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                                 ? null
                                 : _verifyOtp,
                             style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(88, AppSize.buttonHeightSm),
+                              minimumSize: const Size(
+                                88,
+                                AppSize.buttonHeightSm,
+                              ),
                             ),
                             child: _emailStatus == EmailStatus.verifying
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child:
-                                        CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   )
                                 : const Text('Verify'),
                           ),
@@ -564,7 +603,9 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   FilledButton(
-                    onPressed: _isSubmitting || !_agreed ? null : _createAccount,
+                    onPressed: _isSubmitting || !_agreed
+                        ? null
+                        : _createAccount,
                     child: _isSubmitting
                         ? const SizedBox(
                             width: 18,
@@ -581,7 +622,7 @@ class _ProfessionalSignupPageState extends ConsumerState<ProfessionalSignupPage>
                       _googleReady) ...[
                     const AuthOrDivider(),
                     if (_googleUsesRenderedButton)
-                      renderGoogleSignInButton()
+                      Center(child: renderGoogleSignInButton(forSignup: true))
                     else
                       GoogleSignInButton(
                         variant: GoogleButtonVariant.signup,
@@ -616,7 +657,8 @@ class _GoogleSignupReviewSheet extends StatefulWidget {
   final String legalEffectiveDate;
 
   @override
-  State<_GoogleSignupReviewSheet> createState() => _GoogleSignupReviewSheetState();
+  State<_GoogleSignupReviewSheet> createState() =>
+      _GoogleSignupReviewSheetState();
 }
 
 class _GoogleSignupReviewSheetState extends State<_GoogleSignupReviewSheet> {
@@ -643,7 +685,10 @@ class _GoogleSignupReviewSheetState extends State<_GoogleSignupReviewSheet> {
                 style: context.text.bodySmall?.copyWith(color: tokens.muted),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Text('Review how RepRoot Studio works', style: context.text.titleLarge),
+              Text(
+                'Review how RepRoot Studio works',
+                style: context.text.titleLarge,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'Before we create your professional account, review and accept the '
@@ -679,8 +724,9 @@ class _GoogleSignupReviewSheetState extends State<_GoogleSignupReviewSheet> {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: FilledButton(
-                      onPressed:
-                          _accepted ? () => Navigator.of(context).pop(true) : null,
+                      onPressed: _accepted
+                          ? () => Navigator.of(context).pop(true)
+                          : null,
                       child: const Text('Accept and Create Account'),
                     ),
                   ),
@@ -711,11 +757,14 @@ class _StatusLine extends StatelessWidget {
     final color = isError
         ? context.colors.error
         : isSuccess
-            ? context.tokens.success
-            : context.tokens.muted;
+        ? context.tokens.success
+        : context.tokens.muted;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Text(message, style: context.text.bodySmall?.copyWith(color: color)),
+      child: Text(
+        message,
+        style: context.text.bodySmall?.copyWith(color: color),
+      ),
     );
   }
 }

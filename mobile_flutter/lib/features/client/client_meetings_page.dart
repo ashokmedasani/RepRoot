@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/client_api.dart';
 import '../../core/api/models/notification_models.dart';
+import '../../shared/widgets/app_widgets.dart';
 
 /// "yyyy-MM-dd" for the slots endpoint's date params.
 final _isoDay = DateFormat('yyyy-MM-dd');
@@ -89,8 +90,9 @@ class _ClientMeetingsPageState extends ConsumerState<ClientMeetingsPage> {
 
   Future<void> addToCalendar(ClientMeetingRecord meeting) async {
     try {
-      final bytes =
-          await ref.read(clientApiProvider).downloadMeetingCalendarInvite(meeting.id);
+      final bytes = await ref
+          .read(clientApiProvider)
+          .downloadMeetingCalendarInvite(meeting.id);
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/reproot-meeting-${meeting.id}.ics');
       await file.writeAsBytes(bytes, flush: true);
@@ -105,7 +107,9 @@ class _ClientMeetingsPageState extends ConsumerState<ClientMeetingsPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The calendar invite could not be opened.')),
+        const SnackBar(
+          content: Text('The calendar invite could not be opened.'),
+        ),
       );
     }
   }
@@ -209,7 +213,8 @@ class _RequestMeetingSheet extends ConsumerStatefulWidget {
   const _RequestMeetingSheet();
 
   @override
-  ConsumerState<_RequestMeetingSheet> createState() => _RequestMeetingSheetState();
+  ConsumerState<_RequestMeetingSheet> createState() =>
+      _RequestMeetingSheetState();
 }
 
 class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
@@ -250,11 +255,9 @@ class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
     final iso = _isoDay.format(date);
     try {
       // Single-day range, matching the web: the picker asks about one date.
-      final response = await ref.read(clientApiProvider).getSchedulingSlots(
-            start: iso,
-            end: iso,
-            durationMinutes: duration,
-          );
+      final response = await ref
+          .read(clientApiProvider)
+          .getSchedulingSlots(start: iso, end: iso, durationMinutes: duration);
       if (!mounted) return;
       setState(() {
         slots = response.slots[iso] ?? [];
@@ -283,7 +286,9 @@ class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
       message = '';
     });
     try {
-      await ref.read(clientApiProvider).requestMeeting(
+      await ref
+          .read(clientApiProvider)
+          .requestMeeting(
             start: selectedSlot,
             durationMinutes: duration,
             title: titleController.text.trim().isEmpty
@@ -345,14 +350,14 @@ class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
               ],
             ),
             const SizedBox(height: 8),
-            SegmentedButton<int>(
-              segments: [
+            AppSegmentedFilter<int>(
+              value: duration,
+              options: [
                 for (final minutes in _requestDurations)
-                  ButtonSegment(value: minutes, label: Text('$minutes minutes')),
+                  (minutes, '$minutes minutes'),
               ],
-              selected: {duration},
-              onSelectionChanged: (value) {
-                setState(() => duration = value.first);
+              onChanged: (value) {
+                setState(() => duration = value);
                 loadSlots();
               },
             ),
@@ -378,7 +383,9 @@ class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
             ),
             const SizedBox(height: 12),
             Text(
-              timezone.isEmpty ? 'Available times' : 'Available times ($timezone)',
+              timezone.isEmpty
+                  ? 'Available times'
+                  : 'Available times ($timezone)',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
@@ -407,7 +414,7 @@ class _RequestMeetingSheetState extends ConsumerState<_RequestMeetingSheet> {
                 availabilityConfigured
                     ? 'No available times on this date. Try another date.'
                     : 'Your professional has not added meeting availability yet. '
-                        'Please ask them to update their availability before scheduling.',
+                          'Please ask them to update their availability before scheduling.',
               ),
             if (message.isNotEmpty) ...[
               const SizedBox(height: 8),
