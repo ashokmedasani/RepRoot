@@ -29,6 +29,7 @@ import { exportCsv, exportExcel, exportPdf, toTable } from '@studio-shared/analy
 import { ReferencesAccordionComponent } from '@studio-shared/references-accordion/references-accordion.component';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 type DetailTab = 'overview' | 'references' | 'entries' | 'progress';
 
@@ -41,7 +42,7 @@ interface EntryAnswerDraft {
 @Component({
   selector: 'app-professional-client-template',
   standalone: true,
-  imports: [ChartRendererComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink, ProfessionalPageShellComponent],
+  imports: [ChartRendererComponent, DatePipe, FormsModule, ReferencesAccordionComponent, RouterLink, ProfessionalPageShellComponent, SkeletonComponent],
   templateUrl: './professional-client-template.component.html',
   styleUrl: './professional-client-template.component.scss'
 })

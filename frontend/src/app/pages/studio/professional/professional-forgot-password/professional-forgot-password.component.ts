@@ -9,7 +9,7 @@ import { PasswordInputComponent } from '@studio-shared/password-input/password-i
 import { PasswordRequirementsComponent } from '@studio-shared/password-requirements/password-requirements.component';
 import { isPasswordStrong } from '@studio-shared/password-requirements/password-requirements.util';
 
-type ResetOtpStatus = 'idle' | 'sent' | 'verified' | 'failed';
+type ResetOtpStatus = 'idle' | 'sent' | 'verified';
 
 @Component({
   selector: 'app-professional-forgot-password',
@@ -53,10 +53,6 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
       return 'Email verified successfully.';
     }
 
-    if (this.resetOtpStatus === 'failed') {
-      return '';
-    }
-
     if (this.resetOtpStatus === 'sent') {
       return 'OTP sent to your email. Please submit your OTP and verify.';
     }
@@ -75,10 +71,6 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
 
     if (this.isVerifyingOtp) {
       return 'Verifying...';
-    }
-
-    if (this.resetOtpStatus === 'failed') {
-      return 'Not verified. Try again';
     }
 
     return 'Verify Email';
@@ -103,9 +95,6 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
   handleResetOtpChange(): void {
     this.resetFieldErrors.otp = '';
 
-    if (this.resetOtpStatus === 'failed') {
-      this.resetOtpStatus = 'sent';
-    }
   }
 
   handleResetPasswordChange(): void {
@@ -124,6 +113,20 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
       this.resetForm.confirmPassword && this.resetForm.password !== this.resetForm.confirmPassword
         ? 'Confirm password must match Password.'
         : '';
+  }
+
+  changeResetEmail(): void {
+    this.clearResendTimer();
+    this.resetForm.otp = '';
+    this.resetForm.password = '';
+    this.resetForm.confirmPassword = '';
+    this.resetToken = '';
+    this.resetOtpStatus = 'idle';
+    this.resetOtpMessage = '';
+    this.resetMessage = '';
+    this.isEmailMissing = false;
+    this.resendCountdown = 0;
+    this.clearResetFieldErrors();
   }
 
   requestOtp(isResend = false): void {
@@ -164,7 +167,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
         this.sendResetOtpToExistingEmail(email);
       },
       error: (error: unknown) => {
-        this.resetOtpStatus = 'failed';
+        this.resetOtpStatus = 'idle';
         this.resetOtpMessage = this.formatApiError(error, 'We could not check this email right now. Please try again shortly.');
         this.isRequestingOtp = false;
       }
@@ -195,7 +198,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
       },
       error: () => {
         this.resetToken = '';
-        this.resetOtpStatus = 'failed';
+        this.resetOtpStatus = 'sent';
         this.resetFieldErrors.otp = 'OTP is not verified. Please try again.';
         this.resetOtpMessage = '';
         this.isVerifyingOtp = false;
@@ -271,7 +274,7 @@ export class ProfessionalForgotPasswordComponent implements OnDestroy {
         this.isRequestingOtp = false;
       },
       error: (error: unknown) => {
-        this.resetOtpStatus = 'failed';
+        this.resetOtpStatus = 'idle';
         this.resetOtpMessage = this.formatApiError(error, 'Could not send reset code.');
         this.isRequestingOtp = false;
       }

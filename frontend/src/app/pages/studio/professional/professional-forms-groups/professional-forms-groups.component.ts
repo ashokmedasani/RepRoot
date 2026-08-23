@@ -17,6 +17,10 @@ import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.serv
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
+import { InfoHintComponent } from '@shared/info-hint/info-hint.component';
+
+/** Sentinel value for the archive option in the month dropdown. */
+const OLDER_THAN_SIX_MONTHS = 'older';
 
 type SubmissionView = 'pending' | 'approved' | 'deleted';
 type WorkspaceTab = 'forms' | 'groups';
@@ -24,7 +28,7 @@ type WorkspaceTab = 'forms' | 'groups';
 @Component({
   selector: 'app-professional-forms-groups',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, DragDropModule, ProfessionalPageShellComponent, FixedHeightListComponent],
+  imports: [DatePipe, FormsModule, RouterLink, DragDropModule, ProfessionalPageShellComponent, FixedHeightListComponent, InfoHintComponent],
   templateUrl: './professional-forms-groups.component.html',
   styleUrl: './professional-forms-groups.component.scss'
 })
@@ -209,12 +213,33 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
 
     const submissions = submissionsByView[view] || [];
 
+    // No filter means no filter. This used to clip the list to the last six
+    // months even with the dropdown on its default option, which made a
+    // seven-month-old *pending* request impossible to see, approve or delete
+    // from this screen -- and the tab badge did not count it either, so there
+    // was no clue it existed.
     if (!this.monthFilter) {
-      const accessibleMonths = new Set(this.monthOptions.map((month) => month.value));
-      return submissions.filter((submission) => accessibleMonths.has(submission.submitted_at.slice(0, 7)));
+      return submissions;
+    }
+
+    if (this.monthFilter === OLDER_THAN_SIX_MONTHS) {
+      const recentMonths = new Set(this.monthOptions.map((month) => month.value));
+      return submissions.filter((submission) => !recentMonths.has(submission.submitted_at.slice(0, 7)));
     }
 
     return submissions.filter((submission) => submission.submitted_at.startsWith(this.monthFilter));
+  }
+
+  /** Requests that predate every month offered in the dropdown. Surfaced so
+   *  the archive is reachable rather than merely un-clipped. */
+  olderThanSixMonthsCount(): number {
+    if (!this.overview) {
+      return 0;
+    }
+    const recentMonths = new Set(this.monthOptions.map((month) => month.value));
+    return [...this.overview.pending_forms, ...this.overview.approved_forms, ...this.overview.deleted_forms].filter(
+      (submission) => !recentMonths.has(submission.submitted_at.slice(0, 7))
+    ).length;
   }
 
   loadOverview(): void {
@@ -325,6 +350,24 @@ export class ProfessionalFormsGroupsComponent implements OnInit {
     void navigator.clipboard.writeText(link);
     this.messageType = 'success';
     this.message = 'Public form link copied.';
+  }
+
+  /** How long a pending request has been waiting. The Pending tab showed only
+   *  the submission date, so "is this urgent?" meant doing the arithmetic. */
+  waitingFor(submission: LeadSubmission): string {
+    const submittedAt = new Date(submission.submitted_at).getTime();
+    if (Number.isNaN(submittedAt)) {
+      return '—';
+    }
+
+    const days = Math.floor((Date.now() - submittedAt) / 86_400_000);
+    if (days <= 0) {
+      return 'Today';
+    }
+    if (days === 1) {
+      return '1 day';
+    }
+    return `${days} days`;
   }
 
   groupNameFor(submission: LeadSubmission): string {

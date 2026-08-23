@@ -240,14 +240,20 @@ def check_and_delete_data():
     purge_expired_professional_accounts()
 
 
-def move_professional_to_recycle(professional_profile, *, reason, recycled_by_reference=''):
-    """Soft-delete a complete professional graph without a lossy JSON copy."""
+def move_professional_to_recycle(professional_profile, *, reason, recycled_by_reference='', retention_days=None):
+    """Soft-delete a complete professional graph without a lossy JSON copy.
+
+    Callers that are recycling an ACCOUNT pass retention_days explicitly; the
+    default keeps the historical per-item behaviour for any existing caller.
+    """
+    if retention_days is None:
+        retention_days = settings.REPROOT_RECYCLE_BIN_DAYS
     now = timezone.now()
     with transaction.atomic():
         professional_profile.lifecycle_status = ProfessionalProfile.LIFECYCLE_RECYCLED
         professional_profile.lifecycle_reason = reason
         professional_profile.recycled_at = now
-        professional_profile.recycle_expires_at = now + timedelta(days=settings.REPROOT_RECYCLE_BIN_DAYS)
+        professional_profile.recycle_expires_at = now + timedelta(days=retention_days)
         professional_profile.recycled_by_reference = recycled_by_reference
         professional_profile.is_locked = True
         professional_profile.locked_at = professional_profile.locked_at or now
@@ -268,7 +274,7 @@ def restore_professional_from_recycle(professional_profile):
     if professional_profile.lifecycle_status != ProfessionalProfile.LIFECYCLE_RECYCLED:
         raise ValueError('Professional account is not in the Recycle Bin.')
     if professional_profile.recycle_expires_at and professional_profile.recycle_expires_at <= timezone.now():
-        raise ValueError('The 14-day restore window has expired.')
+        raise ValueError('The restore window for this account has expired.')
     reactivate_on_upgrade(professional_profile)
     professional_profile.user.set_unusable_password()
     professional_profile.user.save(update_fields=['password'])

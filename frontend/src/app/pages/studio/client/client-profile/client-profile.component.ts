@@ -108,7 +108,7 @@ export class ClientProfileComponent implements OnInit, OnDestroy {
   readonly settingsTabs: { id: SettingsTab; label: string }[] = [
     { id: 'account', label: 'Account' },
     { id: 'security', label: 'Security' },
-    { id: 'legal', label: 'Privacy & Legal' },
+    { id: 'legal', label: 'Privacy and Legal' },
     { id: 'support', label: 'Support' },
     { id: 'danger', label: 'Danger Zone' }
   ];

@@ -39,7 +39,7 @@ export class PublicGroupRegistrationComponent implements OnInit {
       },
       error: (error: unknown) => {
         this.messageType = 'error';
-        this.message = formatApiError(error, 'Group registration form could not be loaded.');
+        this.message = formatApiError(error, 'Client Information Form could not be loaded.');
         this.isLoading = false;
       }
     });

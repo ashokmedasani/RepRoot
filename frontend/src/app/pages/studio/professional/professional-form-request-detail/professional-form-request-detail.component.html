@@ -1,18 +1,18 @@
 <app-professional-page-shell
   title="Form request details"
-  eyebrow="Forms & Groups"
+  eyebrow="Forms and Groups"
   subtitle="Review the submitted enquiry and decide the next onboarding action."
   activeSection="forms-groups"
   titleId="request-detail-title"
 >
-  <a page-actions class="secondary-action" routerLink="/professional/forms-groups">&larr; Back to Forms &amp; Client Groups</a>
+  <a page-actions class="secondary-action" routerLink="/professional/forms-groups">&larr; Back to Forms and Client Groups</a>
 
   @if (message) {
     <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
   }
 
   @if (isLoading) {
-    <p class="message">Loading form request...</p>
+    <app-skeleton variant="card" [count]="2" label="Loading the form request"></app-skeleton>
   } @else if (submission) {
     <section class="panel applicant-card">
       <div class="applicant-head">

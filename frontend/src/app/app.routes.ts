@@ -2,13 +2,14 @@ import { Routes } from '@angular/router';
 
 import { clientAuthGuard, professionalAuthGuard } from './core/guards/portal-auth.guards';
 import { adminAuthGuard } from './core/guards/admin-auth.guard';
+import { unsavedChangesGuard } from './core/guards/unsaved-changes.guard';
 
 export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/home/home.component').then((module) => module.HomeComponent),
-    title: 'RepRoot | Practical Technology for Better Workflows'
+      import('./pages/studio/studio.component').then((module) => module.StudioComponent),
+    title: 'RepRoot | Professional and Client Workflow Platform'
   },
   {
     path: 'studio',
@@ -17,9 +18,8 @@ export const routes: Routes = [
   },
   {
     path: '_studio-home',
-    loadComponent: () =>
-      import('./pages/studio/studio.component').then((module) => module.StudioComponent),
-    title: 'RepRoot Studio | Professional and Client Workflow Platform'
+    redirectTo: '',
+    pathMatch: 'full'
   },
   {
     path: 'about',
@@ -28,14 +28,16 @@ export const routes: Routes = [
   },
   {
     path: 'contact',
-    redirectTo: '/',
-    pathMatch: 'full'
+    loadComponent: () =>
+      import('./pages/studio/studio.component').then((module) => module.StudioComponent),
+    data: { section: 'contact' },
+    title: 'Contact RepRoot'
   },
   {
     path: 'terms',
     loadComponent: () => import('./pages/legal/legal.component').then((module) => module.LegalPageComponent),
     data: { doc: 'terms' },
-    title: 'Terms & Conditions'
+    title: 'Terms and Conditions'
   },
   {
     path: 'privacy',
@@ -45,8 +47,8 @@ export const routes: Routes = [
   },
   {
     path: 'cookies',
-    loadComponent: () => import('./pages/legal/cookie-notice.component').then((module) => module.CookieNoticeComponent),
-    title: 'Cookie Notice | RepRoot'
+    redirectTo: 'privacy',
+    pathMatch: 'full'
   },
   {
     path: 'terms/professional',
@@ -78,7 +80,7 @@ export const routes: Routes = [
       import('./pages/studio/portal/access-entry-placeholder.component').then(
         (module) => module.AccessEntryPlaceholderComponent
       ),
-    title: 'Launch RepRoot Studio | Professional and Client Access'
+    title: 'RepRoot Portal | Professional and Client Access'
   },
   {
     path: 'professional-client-login',
@@ -186,6 +188,17 @@ export const routes: Routes = [
     pathMatch: 'full'
   },
   {
+    // Where the backend sends the browser after Google verifies the account.
+    // Public by design: the visitor is not authenticated until this page
+    // exchanges its handoff, so no auth guard may sit in front of it.
+    path: 'auth/google/complete',
+    loadComponent: () =>
+      import('./pages/studio/professional/google-callback/google-callback.component').then(
+        (module) => module.GoogleCallbackComponent
+      ),
+    title: 'Completing Google sign-in'
+  },
+  {
     path: 'professional/login',
     loadComponent: () =>
       import('./pages/studio/professional/professional-login/professional-login.component').then((module) => module.ProfessionalLoginComponent),
@@ -247,7 +260,7 @@ export const routes: Routes = [
       import('./pages/studio/professional/professional-forms-groups/professional-forms-groups.component').then(
         (module) => module.ProfessionalFormsGroupsComponent
       ),
-    title: 'Forms & Groups'
+    title: 'Forms and Groups'
   },
   {
     path: 'professional/forms-groups/requests/:submissionId',
@@ -343,7 +356,7 @@ export const routes: Routes = [
     path: 'admin-portal/team',
     canActivate: [adminAuthGuard],
     loadComponent: () => import('./pages/admin/admin-team/admin-team.component').then((module) => module.AdminTeamComponent),
-    title: 'Team & Access | RepRoot'
+    title: 'Team and Access | RepRoot'
   },
   {
     path: 'admin-portal/support',
@@ -472,6 +485,7 @@ export const routes: Routes = [
   {
     path: 'professional/account-settings',
     canActivate: [professionalAuthGuard],
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () =>
       import('./pages/studio/professional/professional-account-settings/professional-account-settings.component').then(
         (module) => module.ProfessionalAccountSettingsComponent

@@ -1,14 +1,14 @@
 <app-professional-page-shell
   title="Tracking Templates"
   eyebrow="Professional workspace"
-  subtitle="One set of templates for all your groups. Assign any template to any client, up to 5 templates total."
+  subtitle="One set of templates for all your groups. Assign any template to any client."
   activeSection="templates"
   titleId="templates-title"
 >
   @if (hasFreeSlot) {
-    <a page-actions routerLink="/professional/templates/create" class="primary-action">+ Create Template</a>
+    <a page-actions routerLink="/professional/templates/create" class="primary-action" data-tour="create-template">+ Create Template</a>
   } @else {
-    <span page-actions class="slots-full-note">All 5 template slots are used</span>
+    <span page-actions class="slots-full-note">All {{ maxTemplates }} template slots are used</span>
   }
 
   @if (message) {
@@ -17,10 +17,10 @@
 
   @if (isLoading) {
     <section class="panel">
-      <p>Loading templates...</p>
+      <app-skeleton variant="row" [count]="5" label="Loading your templates"></app-skeleton>
     </section>
   } @else {
-    <section class="panel slots-panel" aria-label="Template slots">
+    <section class="panel slots-panel" data-tour="template-slots" aria-label="Template slots">
       <div>
         <h2>Template Slots</h2>
         <p>Templates are professional-level: every group and client can use the same {{ maxTemplates }} templates.</p>
@@ -31,7 +31,7 @@
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="standard-templates-title">
+    <section class="panel" data-tour="standard-templates" aria-labelledby="standard-templates-title">
       <div class="section-heading">
         <div>
           <h2 id="standard-templates-title">Standard Templates</h2>
@@ -67,17 +67,12 @@
       </div>
     </section>
 
-    <section class="panel" aria-labelledby="my-templates-title">
+    <section class="panel" data-tour="my-templates" aria-labelledby="my-templates-title">
       <div class="section-heading">
         <div>
-          <h2 id="my-templates-title">My Templates</h2>
-          <p>Fields are always optional for clients - templates guide check-ins, they never block anyone.</p>
+          <h2 id="my-templates-title">My Templates <app-info-hint label="About reordering templates">Drag a row by its <strong>⠿</strong> handle to change the order. The order matters: if you ever go over your plan's allowance, the templates lowest in this list are the ones that lock first.</app-info-hint></h2>
         </div>
       </div>
-
-      @if (orderedActiveTemplates().length) {
-        <p class="drag-hint">Drag a row by its ⠿ handle to change which templates lock first if you go over plan.</p>
-      }
       <div class="template-list" cdkDropList (cdkDropListDropped)="dropTemplate($event)">
         @for (template of orderedActiveTemplates(); track template.id) {
           <div class="template-row" cdkDrag [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
@@ -85,7 +80,7 @@
             <span class="row-name">{{ template.name }}</span>
             <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
             <span class="row-meta">{{ template.fields.length }} fields</span>
-            <span class="row-meta">{{ template.assigned_count }} clients assigned</span>
+            <span class="row-meta">{{ assignedLabel(template.assigned_count) }}</span>
             @if (template.purpose) {
               <span class="row-purpose">{{ template.purpose }}</span>
             }
@@ -95,9 +90,12 @@
             </div>
           </div>
         } @empty {
-          <div class="template-row empty-row">
-            <span class="row-name">No templates yet</span>
-            <span class="row-purpose">Adopt a standard template above or create your own to start tracking client progress.</span>
+          <!-- Was styled as a `template-row`, so it read as a real (clickable)
+               template. It is a message, and it now carries the action. -->
+          <div class="list-empty">
+            <p><strong>No templates yet</strong></p>
+            <p>Adopt a standard template above, or create your own to start tracking client progress.</p>
+            <a routerLink="/professional/templates/create" class="primary-action compact">Create Template</a>
           </div>
         }
       </div>
@@ -111,7 +109,7 @@
               </span>
               <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
               <span class="row-meta">{{ template.fields.length }} fields</span>
-              <span class="row-meta">{{ template.assigned_count }} clients assigned</span>
+              <span class="row-meta">{{ assignedLabel(template.assigned_count) }}</span>
               @if (template.purpose) {
                 <span class="row-purpose">{{ template.purpose }}</span>
               }

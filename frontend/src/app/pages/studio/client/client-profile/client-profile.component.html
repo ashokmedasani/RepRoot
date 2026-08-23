@@ -136,10 +136,10 @@
 
       @if (settingsTab === 'legal') {
       <section class="portal-card settings-section">
-        <div class="card-header"><div><h2>Privacy &amp; Legal</h2><p>Review your legal documents and latest acceptance.</p></div></div>
+        <div class="card-header"><div><h2>Privacy and Legal</h2><p>Review your legal documents and latest acceptance.</p></div></div>
         <div class="legal-summary">
           <div class="legal-summary-row"><span>Privacy Policy</span><a routerLink="/privacy/client" target="_blank" rel="noopener">View</a></div>
-          <div class="legal-summary-row"><span>Terms &amp; Conditions</span><a routerLink="/terms/client" target="_blank" rel="noopener">View</a></div>
+          <div class="legal-summary-row"><span>Terms and Conditions</span><a routerLink="/terms/client" target="_blank" rel="noopener">View</a></div>
           <div class="legal-summary-row"><span>Last legal acceptance</span><strong>{{ latestLegalAcceptanceDate ? (latestLegalAcceptanceDate | date: 'medium') : 'Not recorded' }}</strong></div>
           <div class="legal-summary-row"><span>Accepted document version</span><strong>{{ latestLegalDocumentVersion || 'Not recorded' }}</strong></div>
         </div>
@@ -494,7 +494,7 @@
 
                   <div class="entry-submit-row">
                     <button type="submit" class="primary-action" [disabled]="savingTemplateId === template.id">
-                      {{ savingTemplateId === template.id ? 'Saving...' : (editingEntryId ? 'Review Update' : 'Review & Submit') }}
+                      {{ savingTemplateId === template.id ? 'Saving...' : (editingEntryId ? 'Review Update' : 'Review and Submit') }}
                     </button>
                     <button type="button" class="ghost-action" (click)="clearEntryForm(template)">Clear Form</button>
                   </div>

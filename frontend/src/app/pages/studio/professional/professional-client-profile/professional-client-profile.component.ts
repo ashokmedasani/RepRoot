@@ -624,18 +624,28 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       labelByKey.set(field.key || field.label, field.label);
     }
 
+    // Identity fields are shown like any other change. They used to be skipped
+    // here, which meant a request that changed only a client's name or email
+    // produced an empty diff -- and the card said "This request does not change
+    // any details" directly above an Approve button that applied it anyway.
+    const identityLabels: Record<string, string> = {
+      first_name: 'First name',
+      last_name: 'Last name',
+      email: 'Email address'
+    };
+
     const rows: { label: string; oldValue: string; newValue: string }[] = [];
 
     for (const [key, value] of Object.entries(request.proposed_answers || {})) {
-      if (['first_name', 'last_name', 'email'].includes(key)) {
-        continue;
-      }
-
       const oldValue = String(current[key] ?? '').trim();
       const newValue = String(value ?? '').trim();
 
       if (oldValue !== newValue) {
-        rows.push({ label: labelByKey.get(key) || key.replace(/_/g, ' '), oldValue: oldValue || 'Not added', newValue: newValue || 'Not added' });
+        rows.push({
+          label: identityLabels[key] || labelByKey.get(key) || key.replace(/_/g, ' '),
+          oldValue: oldValue || 'Not added',
+          newValue: newValue || 'Not added'
+        });
       }
     }
 
@@ -1067,7 +1077,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ----- reset password (Account & Access dialog) -----
+  // ----- reset password (Account and Access dialog) -----
   //
   // Previously used window.prompt() to collect the new temporary password.
   // Native browser dialogs like window.prompt() aren't part of the page —
@@ -1111,7 +1121,7 @@ export class ProfessionalClientProfileComponent implements OnInit, OnDestroy {
       title: 'Reset password and send credentials to',
       target: client.email,
       impact: 'The client will receive a new temporary password and must change it at next login.',
-      confirmLabel: 'Reset & Send'
+      confirmLabel: 'Reset and Send'
     });
 
     if (!confirmed) {

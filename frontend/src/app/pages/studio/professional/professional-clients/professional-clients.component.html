@@ -6,17 +6,21 @@
   titleId="professional-clients-title"
 >
   <button page-actions type="button" class="secondary-action" (click)="loadClients()">Refresh</button>
+  <!-- Same action, same place as on Forms and Groups: adding a client from the
+       Clients page is the obvious thing to want here and there was no way to
+       do it without navigating away first. -->
+  <a page-actions routerLink="/professional/clients/add" class="primary-action" data-tour="add-client">Add Client</a>
 
   @if (isLoading) {
-    <section class="panel">
-      <p>Loading clients...</p>
+    <section class="panel" aria-busy="true">
+      <app-skeleton variant="row" [count]="6" label="Loading your clients"></app-skeleton>
     </section>
   } @else {
     @if (message) {
       <p class="message error-message">{{ message }}</p>
     }
 
-    <section class="summary-band" aria-label="Client summary">
+    <section class="summary-band" data-tour="client-summary" aria-label="Client summary">
       <article>
         <span>Total Clients</span>
         <strong>{{ clients.length }}</strong>
@@ -58,7 +62,7 @@
         </select>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" data-tour="client-table">
         <table>
           <thead>
             <tr>
@@ -66,6 +70,7 @@
               <th>Client Name</th>
               <th>Email</th>
               <th>Group</th>
+              <th>Came From</th>
               <th>Username</th>
               <th>Status</th>
               <th>Joined On</th>
@@ -87,11 +92,26 @@
                 </td>
                 <td>{{ client.email }}</td>
                 <td>{{ client.group_name }}</td>
+                <!-- `onboarding_method` and `reference_id` were already in every
+                     response and shown nowhere, so there was no way to tell how
+                     a client reached you. -->
+                <td class="origin-cell">
+                  <span>{{ onboardingLabel(client) }}</span>
+                  @if (client.reference_id) {
+                    <small>{{ client.reference_id }}</small>
+                  }
+                </td>
                 <td>{{ client.username || '—' }}</td>
                 <td>
                   <span class="status-pill">{{ client.is_active ? 'Active' : 'Inactive' }}</span>
                   @if (!client.has_portal_access) {
                     <span class="status-pill muted">No portal access</span>
+                  }
+                  <!-- The filter above offers "Pending password change" and this
+                       column never rendered it, so every matching row looked
+                       exactly like an ordinary active client. -->
+                  @if (client.must_change_password) {
+                    <span class="status-pill warn">Temporary password</span>
                   }
                 </td>
                 <td>{{ client.created_at | date: 'mediumDate' }}</td>
@@ -101,7 +121,22 @@
               </tr>
             } @empty {
               <tr>
-                <td colspan="8">No clients found. Approve a form request and create client access first.</td>
+                <td colspan="9">
+                  @if (clients.length) {
+                    <!-- They have clients; the search or filter just excluded
+                         them all. Telling them to go approve a form request
+                         here was actively misleading. -->
+                    <div class="table-empty">
+                      <p>No clients match the current search or filter.</p>
+                      <button type="button" class="ghost-action compact" (click)="clearFilters()">Clear filters</button>
+                    </div>
+                  } @else {
+                    <div class="table-empty">
+                      <p>No clients yet. Approve a form request, or add a client directly.</p>
+                      <a routerLink="/professional/forms-groups" class="ghost-action compact">Go to Forms and Groups</a>
+                    </div>
+                  }
+                </td>
               </tr>
             }
           </tbody>

@@ -17,13 +17,14 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
 import { formatApiError, initialsFor } from '@shared/utils/ui-helpers';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 type GroupTab = 'overview' | 'pending-users' | 'approved-users' | 'registration-form' | 'settings';
 
 @Component({
   selector: 'app-professional-group-users',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent],
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent, SkeletonComponent],
   templateUrl: './professional-group-users.component.html',
   styleUrl: './professional-group-users.component.scss'
 })
@@ -51,7 +52,7 @@ export class ProfessionalGroupUsersComponent implements OnInit {
     { id: 'overview', label: 'Overview' },
     { id: 'pending-users', label: 'Pending Users' },
     { id: 'approved-users', label: 'Approved Users' },
-    { id: 'registration-form', label: 'Client Registration Form' },
+    { id: 'registration-form', label: 'Client Information Form' },
     { id: 'settings', label: 'Settings' }
   ];
   decliningSubmissionId: number | null = null;
@@ -106,7 +107,16 @@ export class ProfessionalGroupUsersComponent implements OnInit {
   }
 
   get recentApprovedUsers(): ClientAccessRecord[] {
-    return this.activeClients.slice(0, 5);
+    // Actually sorted by join date. This used to be the first five in whatever
+    // order the API happened to return, under a heading that said "Latest".
+    return [...this.activeClients]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+  }
+
+  clearUserFilters(): void {
+    this.searchTerm = '';
+    this.statusFilter = 'all';
   }
 
   get registrationFields(): DynamicField[] {
@@ -231,7 +241,7 @@ export class ProfessionalGroupUsersComponent implements OnInit {
 
     void navigator.clipboard.writeText(this.registrationLink);
     this.messageType = 'success';
-    this.message = 'Group registration form link copied.';
+    this.message = 'Client Information Form link copied.';
   }
 
   initials(client: ClientAccessRecord): string {

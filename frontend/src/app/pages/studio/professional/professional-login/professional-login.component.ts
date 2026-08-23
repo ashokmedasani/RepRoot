@@ -20,6 +20,7 @@ export class ProfessionalLoginComponent {
 
   isSubmitting = false;
   loginMessage = '';
+  loginMessageIsError = false;
   isGoogleAvailable = true;
   loginNotice = window.sessionStorage.getItem('professional-login-notice') || '';
 
@@ -38,11 +39,17 @@ export class ProfessionalLoginComponent {
     const identifier = this.loginForm.identifier.trim().toLowerCase();
 
     if (!identifier || !this.loginForm.password) {
+      // `loginMessageIsError` exists because progress ("Verifying...") and
+      // failure ("Login failed") share one variable and one element. Without
+      // it a wrong password rendered in the same calm brand-blue box as the
+      // loading state, which reads as "still working", not "that was wrong".
+      this.loginMessageIsError = true;
       this.loginMessage = 'Username/email and password are required.';
       return;
     }
 
     this.isSubmitting = true;
+    this.loginMessageIsError = false;
     this.loginMessage = 'Verifying professional login...';
 
     this.professionalAuthApi.login(identifier, this.loginForm.password).subscribe({
@@ -54,6 +61,7 @@ export class ProfessionalLoginComponent {
         this.routeAfterLogin();
       },
       error: (error: unknown) => {
+        this.loginMessageIsError = true;
         this.loginMessage = this.formatApiError(error, 'Login failed. Check username/email and password.');
         this.isSubmitting = false;
       }
@@ -68,24 +76,10 @@ export class ProfessionalLoginComponent {
     this.loginMessage = message;
   }
 
-  handleGoogleCredential(credential: string): void {
-    this.isSubmitting = true;
-    this.loginMessage = 'Verifying with Google...';
-
-    this.professionalAuthApi.googleAuth(credential).subscribe({
-      next: (response) => {
-        window.sessionStorage.setItem('professional-auth-token', response.token);
-        window.sessionStorage.setItem('professional-account-id', String(response.professional.id));
-        window.sessionStorage.setItem('professional-account-username', response.professional.username);
-        this.loginMessage = 'Checking profile status...';
-        this.routeAfterLogin();
-      },
-      error: (error: unknown) => {
-        this.loginMessage = this.formatApiError(error, 'Google sign-in failed. Please try again.');
-        this.isSubmitting = false;
-      }
-    });
-  }
+  // Google sign-in no longer completes on this page. Clicking the button
+  // leaves the site entirely for Google's account chooser, and the browser
+  // returns to /auth/google/complete -- GoogleCallbackComponent owns that
+  // half of the flow and does the token exchange and routing.
 
   private routeAfterLogin(): void {
     this.professionalAuthApi.getProfileStatus().subscribe({

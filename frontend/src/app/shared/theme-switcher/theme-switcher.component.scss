@@ -45,14 +45,8 @@
   background: linear-gradient(135deg, #101820 0 48%, #58a6ff 50% 100%);
 }
 
-[data-theme-swatch='green-wellness'] {
-  background: linear-gradient(135deg, #f5fbf7 0 48%, #198754 50% 100%);
-}
-
-[data-theme-swatch='purple-premium'] {
-  background: linear-gradient(135deg, #faf8ff 0 48%, #6d3fd1 50% 100%);
-}
-
-[data-theme-swatch='black-gold'] {
-  background: linear-gradient(135deg, #10100d 0 48%, #d6a82d 50% 100%);
+// Half light, half dark -- the swatch says 'whichever your device is' without
+// needing a label to explain it.
+[data-theme-swatch='system'] {
+  background: linear-gradient(135deg, #ffffff 0 48%, #101820 50% 100%);
 }

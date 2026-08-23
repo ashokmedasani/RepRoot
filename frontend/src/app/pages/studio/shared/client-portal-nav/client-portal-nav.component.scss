@@ -105,8 +105,13 @@ nav {
     border-right: 0;
     border-bottom: 1px solid var(--app-border);
     padding: 0.75rem 1.25rem;
-    background: var(--app-glass-bg);
-    backdrop-filter: blur(16px);
+    // Opaque instead of glass. A backdrop-filter on persistent chrome forces the
+    // element onto its own compositor layer, which softens text at fractional
+    // device pixel ratios -- Windows laptops at 125%/150% scaling -- and makes
+    // the browser re-sample everything behind it on every scroll frame. Both were
+    // reported from testing: blurry, and clumsy to scroll. Modal backdrops keep
+    // their blur; they are transient and blurring the page behind them is the point.
+    background: var(--app-surface);
   }
   nav { flex-direction: row; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 0; scrollbar-width: none; }
   nav::-webkit-scrollbar { display: none; }

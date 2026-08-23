@@ -6,7 +6,7 @@ import { formatApiError } from '@shared/utils/ui-helpers';
 
 @Component({
   selector: 'app-admin-team', standalone: true, imports: [AdminPageShellComponent, FormsModule],
-  template: `<app-admin-page-shell title="Team & Access" subtitle="Owner-controlled departments, roles and least-privilege access." activeSection="team">
+  template: `<app-admin-page-shell title="Team and Access" subtitle="Owner-controlled departments, roles and least-privilege access." activeSection="team">
     @if(message){<p class="message">{{message}}</p>}
     @if(data){
       <section class="owner"><div><small>Protected account</small><strong>{{data.viewer.full_name || data.viewer.username}}</strong></div><span>Owner authority cannot be delegated or edited by staff.</span></section>

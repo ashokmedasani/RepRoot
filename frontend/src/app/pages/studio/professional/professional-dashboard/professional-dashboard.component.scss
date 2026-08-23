@@ -13,6 +13,13 @@ p {
   animation: slide-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+// Consecutive cards sat edge to edge, so Messages / Pending Requests / Client
+// Account Requests read as one undivided slab rather than three panels.
+.activity-card + .activity-card,
+.dash-chart-row + .activity-card {
+  margin-top: 1.1rem;
+}
+
 .panel h2,
 .panel-heading h2 {
   color: var(--app-text);
@@ -30,16 +37,27 @@ p {
 }
 
 .action-required {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.6rem 1rem;
+  display: grid;
+  gap: 0.9rem;
   margin-bottom: 1rem;
   border: 1px solid color-mix(in srgb, #f59e0b 55%, var(--app-border));
   border-radius: var(--app-panel-radius);
   padding: 0.7rem 1rem;
   background: color-mix(in srgb, #f59e0b 9%, var(--app-surface));
+}
+
+.action-required-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.action-required-heading > strong {
+  flex: 0 0 auto;
+  color: var(--app-muted);
+  font-size: 0.76rem;
+  font-weight: 750;
 }
 
 .action-required .eyebrow {
@@ -59,35 +77,75 @@ p {
   max-width: 34rem;
 }
 
-.action-required-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.4rem;
-  max-width: 100%;
+.action-required-checklist {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
-.action-required-links a {
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  background: var(--app-primary);
-  color: #fff;
-  font-weight: 650;
-  font-size: 0.78rem;
-  line-height: 1.2;
+.checklist-item {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.4rem;
+  min-height: 4.5rem;
+  border: 1px solid color-mix(in srgb, #f59e0b 28%, var(--app-border));
+  border-radius: var(--app-radius-lg);
+  padding: 0.6rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: center;
   text-decoration: none;
-  white-space: nowrap;
+}
+
+a.checklist-item:hover,
+a.checklist-item:focus-visible {
+  border-color: var(--app-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-primary) 16%, transparent);
+}
+
+.checklist-status {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, #f59e0b 14%, var(--app-surface-soft));
+  color: #b45309;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.checklist-item.completed {
+  border-color: color-mix(in srgb, #16a34a 28%, var(--app-border));
+  color: var(--app-muted);
+}
+
+.checklist-item.completed .checklist-status {
+  background: color-mix(in srgb, #16a34a 14%, var(--app-surface-soft));
+  color: #15803d;
 }
 
 @media (max-width: 720px) {
   .action-required {
-    align-items: stretch;
-    flex-direction: column;
     padding: 0.75rem 0.9rem;
   }
 
-  .action-required-links {
-    justify-content: flex-start;
+  .action-required-heading {
+    display: grid;
+  }
+
+  .action-required-checklist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .action-required-checklist {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -102,15 +160,33 @@ p {
   font-weight: 700;
 }
 
+// `--kpi-value-col` is the width reserved for the number on the right of every
+// card in the row. It must be a FIXED width, not `auto`: with `auto` each card
+// sizes that column to its own digits, so a row showing 0 / 3 / 1 / 128 puts
+// its four numbers at four different distances from the card edge and the row
+// reads as badly spaced. One shared width makes them line up.
 .attention-kpi-row {
+  --kpi-value-col: 4.75rem;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 1rem;
   margin-bottom: 1.25rem;
 }
 
-.revenue-kpi-row {
+// Rows that hold two cards must say so, otherwise the four-column track list
+// above squeezes both into the left half of the page.
+.kpi-row-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kpi-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+// Money, not counts: "1,24,500.00 INR" needs far more room than a tally.
+.revenue-kpi-row {
+  --kpi-value-col: 10.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .field-label {
@@ -177,12 +253,12 @@ p {
 
 .attention-kpi {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.2rem 0.75rem;
+  grid-template-columns: minmax(0, 1fr) var(--kpi-value-col);
+  gap: 0.25rem 0.9rem;
   align-items: center;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-lg);
-  padding: 0.85rem 0.95rem;
+  padding: 1rem 1.05rem;
   background: var(--app-card-bg-gradient);
   box-shadow: var(--app-shadow-sm);
   transition: transform var(--app-transition-fast), border-color var(--app-transition-fast), box-shadow var(--app-transition-fast);
@@ -205,9 +281,32 @@ p {
 .attention-kpi strong {
   grid-column: 2;
   grid-row: 1 / span 2;
+  justify-self: end;
+  min-width: 0;
+  // Never break a value across lines. `overflow-wrap: anywhere` turned
+  // "1 / 25" into "1 /" above "25", which is what made these read as broken.
+  white-space: nowrap;
   color: var(--app-text);
   font-size: 1.8rem;
+  line-height: 1.15;
+  text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+// Ratio values ("0 / 250") are far wider than a plain tally, so the rows that
+// show them get a wider column and a smaller number rather than overflowing.
+.kpi-row-ratio {
+  --kpi-value-col: 6.25rem;
+}
+
+.kpi-row-ratio .attention-kpi strong {
+  font-size: 1.45rem;
+}
+
+// Currency strings are long; shrink them so they stay on one line inside the
+// wider column rather than wrapping under themselves.
+.revenue-kpi-row .attention-kpi strong {
+  font-size: 1.25rem;
 }
 
 .attention-kpi small {
@@ -238,9 +337,21 @@ p {
   color: var(--app-primary-strong);
 }
 
+// Green means one thing only: "there is nothing here for you to do."
+//
+// `.clear` is set when a to-do count reaches zero. `.completed` is for a card
+// that reports work already finished, which is also good news. A card that is
+// merely a running total (`.metric`) must stay neutral -- previously "Total
+// Clients" and the revenue totals rendered in the same green as "0 unread
+// messages", so a number that needed no action and a number that was simply
+// a count were indistinguishable.
 .attention-kpi.clear strong,
 .attention-kpi.completed strong {
   color: var(--app-success);
+}
+
+.attention-kpi.metric strong {
+  color: var(--app-text);
 }
 
 /* ---- Upcoming schedules table ---- */
@@ -384,14 +495,24 @@ p {
 
 @media (max-width: 900px) {
 
-  .attention-kpi-row {
+  .attention-kpi-row,
+  .kpi-row-3,
+  .revenue-kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  // Two-up leaves each card wider, so the ratio can go back to full size.
+  .kpi-row-ratio .attention-kpi strong {
+    font-size: 1.7rem;
   }
 }
 
 @media (max-width: 620px) {
 
-  .attention-kpi-row {
+  .attention-kpi-row,
+  .kpi-row-2,
+  .kpi-row-3,
+  .revenue-kpi-row {
     grid-template-columns: 1fr;
   }
 

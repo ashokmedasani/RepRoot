@@ -37,93 +37,80 @@
 .brand-rep { color: var(--app-text); }
 .brand-root { color: var(--app-primary); }
 
+// One centered column. The previous two-column layout led with a large
+// decorative badge reading "Try again", which competed with the actual
+// message and left three buttons of equal weight underneath -- nothing told
+// the user what to do next. Message first, one obvious action, one quiet way
+// out.
 .error-panel {
-  display: grid;
-  grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.2fr);
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: clamp(2rem, 6vw, 5rem);
-  min-height: calc(100vh - 9rem);
-  padding: clamp(2rem, 6vw, 5rem);
-}
-
-.error-visual {
-  position: relative;
-  display: grid;
-  width: min(20rem, 100%);
-  aspect-ratio: 1;
-  place-items: center;
-  justify-self: center;
-  border: 1px solid color-mix(in srgb, var(--app-primary) 24%, var(--app-border));
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--app-primary-soft) 65%, var(--app-surface));
-  box-shadow: var(--app-shadow-lg);
-}
-
-.error-code {
-  position: relative;
-  z-index: 1;
-  color: var(--app-primary-strong);
-  font-size: clamp(3.5rem, 9vw, 6.5rem);
-  font-weight: 850;
-  letter-spacing: -0.07em;
-}
-
-.error-pulse {
-  position: absolute;
-  inset: 13%;
-  border: 1px dashed color-mix(in srgb, var(--app-primary) 38%, transparent);
-  border-radius: 50%;
-}
-
-.error-copy {
-  max-width: 37rem;
-}
-
-.error-copy h1 {
+  justify-content: center;
+  min-height: calc(100vh - 12rem);
   max-width: 34rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vw, 3rem) 0;
+  text-align: center;
+}
+
+.error-panel h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  letter-spacing: -0.04em;
+  font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
 .error-message {
-  margin: 1.15rem 0 0;
+  margin: 0.9rem 0 0;
   color: var(--app-muted);
-  font-size: 1.05rem;
-  line-height: 1.75;
+  font-size: 1rem;
+  line-height: 1.65;
 }
 
 .error-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
   margin-top: 2rem;
 }
 
-.support-copy {
-  margin: 1.5rem 0 0;
+.error-actions .primary-action {
+  min-width: 13rem;
+}
+
+// Deliberately not a button. The secondary route out should be available
+// without competing with the primary action for attention.
+.link-action {
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: var(--app-radius-sm, 0.4rem);
+  background: none;
   color: var(--app-muted);
-  font-size: 0.82rem;
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.link-action:hover,
+.link-action:focus-visible {
+  color: var(--app-text);
+}
+
+.support-copy {
+  margin: 2.5rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  opacity: 0.85;
 }
 
 @media (max-width: 760px) {
   .error-panel {
-    grid-template-columns: 1fr;
-    align-content: center;
-    min-height: auto;
-    padding: 4rem 0;
-    text-align: center;
-  }
-
-  .error-visual {
-    width: min(14rem, 65vw);
-  }
-
-  .error-copy {
-    margin: 0 auto;
-  }
-
-  .error-actions {
-    justify-content: center;
+    min-height: calc(100vh - 9rem);
+    padding: 2rem 0;
   }
 }

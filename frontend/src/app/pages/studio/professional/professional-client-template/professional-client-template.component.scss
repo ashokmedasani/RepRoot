@@ -159,6 +159,14 @@
   gap: 0.85rem;
 }
 
+// A 16rem minimum overflows any viewport narrower than that, and there was no
+// media query to catch it.
+@media (max-width: 620px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stat-card {
   display: grid;
   gap: 0.75rem;

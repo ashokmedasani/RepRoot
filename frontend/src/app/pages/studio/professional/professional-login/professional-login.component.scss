@@ -82,3 +82,12 @@ input {
   height: 1px;
   background: var(--app-border, rgba(0, 0, 0, 0.1));
 }
+
+// Failure has to look different from progress. `.form-message` carries the
+// brand-blue "working on it" styling, and a wrong password used to render in
+// exactly that, indistinguishable from "Verifying professional login...".
+.form-message.error-message {
+  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
+  color: #d92d20;
+  border-color: color-mix(in srgb, #d92d20 20%, transparent);
+}

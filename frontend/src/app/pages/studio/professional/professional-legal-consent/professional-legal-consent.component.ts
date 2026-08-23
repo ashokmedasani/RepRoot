@@ -23,9 +23,9 @@ export class ProfessionalLegalConsentComponent {
 
   constructor() {
     this.api.getLegalConfiguration().subscribe({
-      next: ({ professional, effective_date }) => {
+      next: ({ professional, last_updated_date, effective_date }) => {
         this.legalVersion = professional.version;
-        this.legalEffectiveDate = effective_date;
+        this.legalEffectiveDate = last_updated_date || effective_date;
       }
     });
   }
@@ -34,7 +34,12 @@ export class ProfessionalLegalConsentComponent {
     if (!this.acceptedLegalDocuments) return;
     this.submitting = true;
     this.api.acceptLegalDocuments().subscribe({
-      next: () => void this.router.navigate(['/professional/dashboard']),
+      next: ({ profile }) => {
+        const destination = profile.profile_setup_completed
+          ? '/professional/dashboard'
+          : '/professional/profile-setup';
+        void this.router.navigate([destination]);
+      },
       error: (error: unknown) => {
         this.submitting = false;
         this.message = formatApiError(error, 'Legal acceptance could not be saved.');

@@ -440,3 +440,24 @@ h3 {
   font-size: 0.85rem;
   line-height: 1.55;
 }
+
+
+.qr-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.qr-existing {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qr-existing img {
+  width: 4rem;
+  height: 4rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  object-fit: contain;
+  background: var(--app-surface);
+}

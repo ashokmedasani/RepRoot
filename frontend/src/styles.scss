@@ -11,7 +11,13 @@
   --app-border: #dbe4f3;
   --app-primary: #2563eb;
   --app-primary-strong: #1d4ed8;
+  /* Foreground for anything sitting ON --app-primary. The dark theme's
+     primary is a pale sky blue, where white text all but vanishes. */
+  --app-on-primary: #ffffff;
   --app-primary-soft: #e6eefd;
+  /* Unfilled part of the data-usage ring. Must differ from --app-surface,
+     which fills the hole in the middle of it. */
+  --app-gauge-track: #dbe3ef;
   --app-accent: #38bdf8;
   --app-success: #1f9d63;
   --app-warning-soft: #fff8e6;
@@ -54,7 +60,11 @@
   --app-border: #334155;
   --app-primary: #38bdf8;
   --app-primary-strong: #7dd3fc;
+  --app-on-primary: #082f49;
   --app-primary-soft: rgba(56, 189, 248, 0.1);
+  /* Deliberately NOT --app-surface-soft: in this theme that is the same value
+     as --app-surface, which made the gauge invisible. */
+  --app-gauge-track: #3b4a63;
   --app-accent: #2dd4bf;
   --app-success: #34d399;
   --app-warning-soft: #2d2613;
@@ -68,72 +78,6 @@
   --app-card-bg-gradient: linear-gradient(135deg, var(--app-surface), color-mix(in srgb, var(--app-surface) 97%, #121b2a));
 }
 
-[data-theme='green-wellness'] {
-  --app-bg: #f4f9f6;
-  --app-surface: #ffffff;
-  --app-surface-soft: #eaf5ee;
-  --app-text: #0f241a;
-  --app-muted: #526b5e;
-  --app-border: #cfe6d9;
-  --app-primary: #15803d;
-  --app-primary-strong: #166534;
-  --app-primary-soft: #f0fdf4;
-  --app-accent: #0f766e;
-  --app-success: #16a34a;
-  --app-shadow: 0 1px 3px rgba(21, 128, 61, 0.04), 0 8px 24px rgba(21, 128, 61, 0.05);
-  --app-shadow-sm: 0 1px 2px rgba(21, 128, 61, 0.05);
-  --app-shadow-lg: 0 10px 30px -10px rgba(21, 128, 61, 0.1), 0 1px 3px rgba(21, 128, 61, 0.04);
-
-  --app-glass-bg: rgba(255, 255, 255, 0.75);
-  --app-glass-border: rgba(255, 255, 255, 0.6);
-  --app-card-bg-gradient: linear-gradient(135deg, var(--app-surface), color-mix(in srgb, var(--app-surface) 97%, var(--app-primary-soft)));
-}
-
-[data-theme='purple-premium'] {
-  --app-bg: #f9f8fc;
-  --app-surface: #ffffff;
-  --app-surface-soft: #f3f0fa;
-  --app-text: #1e1333;
-  --app-muted: #645c73;
-  --app-border: #e2dcf0;
-  --app-primary: #7c3aed;
-  --app-primary-strong: #6d28d9;
-  --app-primary-soft: #f5f3ff;
-  --app-accent: #c084fc;
-  --app-success: #0d9488;
-  --app-shadow: 0 1px 3px rgba(124, 58, 237, 0.04), 0 8px 24px rgba(124, 58, 237, 0.05);
-  --app-shadow-sm: 0 1px 2px rgba(124, 58, 237, 0.05);
-  --app-shadow-lg: 0 10px 30px -10px rgba(124, 58, 237, 0.1), 0 1px 3px rgba(124, 58, 237, 0.04);
-
-  --app-glass-bg: rgba(255, 255, 255, 0.75);
-  --app-glass-border: rgba(255, 255, 255, 0.6);
-  --app-card-bg-gradient: linear-gradient(135deg, var(--app-surface), color-mix(in srgb, var(--app-surface) 97%, var(--app-primary-soft)));
-}
-
-[data-theme='black-gold'] {
-  color-scheme: dark;
-  --app-bg: #0c0b08;
-  --app-surface: #14120f;
-  --app-surface-soft: #1b1914;
-  --app-text: #fefcf0;
-  --app-muted: #a8a08d;
-  --app-border: #2e2a22;
-  --app-primary: #eab308;
-  --app-primary-strong: #ca8a04;
-  --app-primary-soft: rgba(234, 179, 8, 0.08);
-  --app-accent: #f59e0b;
-  --app-success: #ca8a04;
-  --app-warning-soft: #2e2608;
-  --app-warning-border: #4d3d0c;
-  --app-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --app-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
-
-  --app-glass-bg: rgba(20, 18, 15, 0.75);
-  --app-glass-border: rgba(255, 255, 255, 0.04);
-  --app-card-bg-gradient: linear-gradient(135deg, var(--app-surface), color-mix(in srgb, var(--app-surface) 97%, #1a1813));
-}
-
 * {
   box-sizing: border-box;
 }
@@ -145,7 +89,11 @@ html {
 }
 
 body {
-  min-height: 100vh;
+  /* Matches the app shell, which is sized in dvh. With body at 100vh and the
+     shell at 100dvh the two disagree by exactly the height of a browser's
+     retracting toolbar, leaving a scrollable strip of empty background below
+     the app that has nothing in it. */
+  min-height: 100dvh;
   margin: 0;
   background: var(--app-bg);
   color: var(--app-text);
@@ -256,15 +204,6 @@ a {
   border-color: color-mix(in srgb, var(--app-primary) 30%, var(--app-border));
 }
 
-.glass-panel {
-  background: var(--app-glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--app-glass-border);
-  border-radius: var(--app-panel-radius);
-  padding: var(--app-panel-padding);
-  box-shadow: var(--app-shadow);
-}
 
 /* Premium Buttons Styling */
 .primary-action {
@@ -548,4 +487,20 @@ input[type='file']:not(.visually-hidden)::file-selector-button {
     justify-items: center;
     text-align: center;
   }
+}
+
+// Dark-mode brand mark.
+//
+// The light logo sits on a white square, which looks like a bright patch cut
+// out of a dark page. Flutter already solved this with a dedicated
+// high-contrast asset (assets/icon/icon_dark.png, chosen in RepRootLogo);
+// this is the same file, so web and mobile stay identical.
+//
+// Done as one attribute-matched rule rather than editing the ten templates
+// that render the mark: no component needs to know about theming, and any
+// future usage is covered automatically. Keyed on [data-theme=dark], which
+// ThemeService sets for BOTH an explicit Dark choice and System resolving to
+// dark -- so it follows the OS setting too.
+[data-theme='dark'] img[src$='/brand/reproot/mark.png'] {
+  content: url('/brand/reproot/mark-dark.png');
 }

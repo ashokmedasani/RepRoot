@@ -46,17 +46,17 @@ def _otp_email_content(otp: str, purpose: str) -> tuple[str, str, str]:
   is_password_reset = purpose == 'password-reset'
   action = 'reset your password' if is_password_reset else 'verify your email address'
   heading = 'Password reset verification' if is_password_reset else 'Verify your email address'
-  subject = f'{otp} is your RepRoot Studio verification code'
+  subject = f'{otp} is your RepRoot verification code'
   support_email = settings.STUDIO_SUPPORT_EMAIL
 
   plain_text = (
-    f'RepRoot Studio\n\n{heading}\n\n'
+    f'RepRoot\n\n{heading}\n\n'
     f'Use this verification code to {action}:\n\n{otp}\n\n'
     'This code expires in 10 minutes and can be used only once.\n\n'
-    'Never share this code. RepRoot Studio support will never ask for it. '
+    'Never share this code. RepRoot support will never ask for it. '
     'If you did not request this code, you can safely ignore this email.\n\n'
     f'Need help? Contact {support_email}.\n\n'
-    'RepRoot Studio · A product of RepRoot'
+    'RepRoot'
   )
 
   html_message = f'''<!doctype html>
@@ -65,16 +65,16 @@ def _otp_email_content(otp: str, purpose: str) -> tuple[str, str, str]:
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fc;padding:32px 12px;">
       <tr><td align="center">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #dbe5f5;border-radius:16px;overflow:hidden;">
-          <tr><td style="padding:24px 32px;background:#155eef;color:#ffffff;font-size:20px;font-weight:700;">RepRoot Studio</td></tr>
+          <tr><td style="padding:24px 32px;background:#155eef;color:#ffffff;font-size:20px;font-weight:700;">RepRoot</td></tr>
           <tr><td style="padding:32px;">
             <p style="margin:0 0 8px;color:#155eef;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">Secure verification</p>
             <h1 style="margin:0 0 14px;font-size:26px;line-height:1.25;">{heading}</h1>
             <p style="margin:0 0 24px;color:#475467;font-size:15px;line-height:1.6;">Use the code below to {action}.</p>
             <div style="margin:0 0 24px;padding:18px;border:1px solid #b9cef8;border-radius:12px;background:#eef4ff;color:#123fb7;font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;">{escape(otp)}</div>
             <p style="margin:0 0 8px;color:#344054;font-size:14px;line-height:1.6;"><strong>Expires in 10 minutes.</strong> This code can be used only once.</p>
-            <p style="margin:0;color:#667085;font-size:13px;line-height:1.6;">Never share this code. RepRoot Studio support will never ask for it. If you did not request this email, no action is required.</p>
+            <p style="margin:0;color:#667085;font-size:13px;line-height:1.6;">Never share this code. RepRoot support will never ask for it. If you did not request this email, no action is required.</p>
           </td></tr>
-          <tr><td style="padding:20px 32px;border-top:1px solid #e4e7ec;background:#f9fafb;color:#667085;font-size:12px;line-height:1.6;">Need help? <a href="mailto:{support_email}" style="color:#155eef;">{support_email}</a><br>RepRoot Studio · A product of RepRoot</td></tr>
+          <tr><td style="padding:20px 32px;border-top:1px solid #e4e7ec;background:#f9fafb;color:#667085;font-size:12px;line-height:1.6;">Need help? <a href="mailto:{support_email}" style="color:#155eef;">{support_email}</a><br>RepRoot</td></tr>
         </table>
       </td></tr>
     </table>

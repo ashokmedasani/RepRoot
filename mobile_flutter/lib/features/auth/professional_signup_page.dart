@@ -686,7 +686,7 @@ class _GoogleSignupReviewSheetState extends State<_GoogleSignupReviewSheet> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Review how RepRoot Studio works',
+                'Review how RepRoot works',
                 style: context.text.titleLarge,
               ),
               const SizedBox(height: AppSpacing.sm),

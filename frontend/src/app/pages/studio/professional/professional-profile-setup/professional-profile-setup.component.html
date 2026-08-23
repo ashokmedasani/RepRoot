@@ -3,9 +3,12 @@
     <div class="setup-intro">
       <p class="eyebrow">Required first login step</p>
       <h1 id="profile-setup-title">Professional profile setup</h1>
+      <!-- The form is eleven fields and an optional photo. "10-15 minutes" was
+           five to ten times the real cost, on the first screen a brand-new
+           professional sees, on a step they cannot skip. -->
       <p class="warning">
-        Profile setup is required before using your professional dashboard. This may take around 10-15 minutes. Your profile
-        helps organize your forms, groups, clients, and resources.
+        A few details before your dashboard opens &mdash; about two minutes. This is what organizes your
+        forms, groups, clients, and resources.
       </p>
     </div>
 
@@ -88,9 +91,19 @@
             } @else if (codeStatus === 'available') {
               <span class="field-help success-text">This code is available.</span>
             } @else if (codeStatus === 'taken') {
-              <span class="field-help error-text">This code is already taken. Try another.</span>
+              <span class="field-help error-text">{{ codeMessage || 'This code is already taken. Try another.' }}</span>
+              @if (codeSuggestions.length) {
+                <span class="code-suggestions" aria-label="Available professional code suggestions">
+                  @for (suggestion of codeSuggestions; track suggestion) {
+                    <button type="button" (click)="useProfessionalCodeSuggestion(suggestion)">{{ suggestion }}</button>
+                  }
+                </span>
+              }
             } @else {
-              <span class="field-help">Clients type this to log in. Keep it short and memorable.</span>
+              <span class="field-help">Clients type this to log in. Keep it short and memorable; your business name is often a good choice.</span>
+              @if (codeMessage) {
+                <span class="field-help error-text">{{ codeMessage }}</span>
+              }
             }
           </label>
           </div>
@@ -189,4 +202,53 @@
       </form>
     }
   </section>
+
+  @if (isPhotoCropOpen) {
+    <div class="crop-dialog-backdrop" role="presentation" (click)="cancelPhotoCrop()">
+      <section
+        class="crop-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-crop-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="crop-dialog-heading">
+          <div>
+            <p class="crop-eyebrow">Profile picture</p>
+            <h2 id="setup-crop-title">Adjust your photo</h2>
+          </div>
+          <button type="button" class="crop-close" aria-label="Close photo editor" (click)="cancelPhotoCrop()">&times;</button>
+        </div>
+
+        <p class="crop-help">Drag the photo to position it, then use zoom to choose what appears inside the circle.</p>
+        <div class="crop-stage">
+          <canvas
+            #setupCropCanvas
+            class="crop-canvas"
+            width="320"
+            height="320"
+            aria-label="Circular profile picture preview"
+            (pointerdown)="beginCropDrag($event)"
+            (pointermove)="moveCrop($event)"
+            (pointerup)="endCropDrag($event)"
+            (pointercancel)="endCropDrag($event)"
+          ></canvas>
+        </div>
+
+        <label class="crop-zoom">
+          <span>Zoom</span>
+          <input type="range" min="1" max="3" step="0.01" [value]="cropZoom" (input)="onCropZoomChange($event)">
+        </label>
+
+        <div class="crop-dialog-actions">
+          <button type="button" class="secondary-action compact" (click)="resetPhotoCrop()">Reset</button>
+          <span class="crop-action-spacer"></span>
+          <button type="button" class="secondary-action compact" (click)="cancelPhotoCrop()">Cancel</button>
+          <button type="button" class="crop-apply" [disabled]="isProcessingCrop" (click)="applyPhotoCrop()">
+            {{ isProcessingCrop ? 'Preparing...' : 'Use photo' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
 </main>

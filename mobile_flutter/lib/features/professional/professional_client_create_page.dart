@@ -260,12 +260,12 @@ class _ProfessionalClientCreatePageState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'A client registration form is required.',
+                          'A Client Information Form is required.',
                           style: context.text.titleSmall,
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          'Create a group registration form before adding a '
+                          'Create the group\'s Client Information Form before adding a '
                           'client manually.',
                           style: context.text.bodySmall,
                         ),
@@ -454,7 +454,7 @@ class _Form extends StatelessWidget {
           Text('New client', style: context.text.titleSmall),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'The selected group\'s registration form is saved with the client.',
+            'The selected group\'s Client Information Form is saved with the client.',
             style: context.text.bodySmall,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -472,7 +472,7 @@ class _Form extends StatelessWidget {
           if (groupId > 0 && fields.isEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
-              'This group\'s registration form has no fields yet.',
+              'This group\'s Client Information Form has no fields yet.',
               style: context.text.bodySmall,
             ),
           ],

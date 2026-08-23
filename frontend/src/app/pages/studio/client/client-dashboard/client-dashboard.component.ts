@@ -13,6 +13,7 @@ import { buildFieldCharts } from '@studio-shared/analytics/graph-engine';
 import { ClientPageShellComponent } from '@studio-shared/client-page-shell/client-page-shell.component';
 import { FixedHeightListComponent } from '@studio-shared/fixed-height-list/fixed-height-list.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 interface TemplateGraphGroup {
   template: TrackingTemplateRecord;
@@ -22,7 +23,7 @@ interface TemplateGraphGroup {
 @Component({
   selector: 'app-client-dashboard',
   standalone: true,
-  imports: [ChartRendererComponent, ClientPageShellComponent, DatePipe, FixedHeightListComponent, RouterLink],
+  imports: [ChartRendererComponent, ClientPageShellComponent, DatePipe, FixedHeightListComponent, RouterLink, SkeletonComponent],
   templateUrl: './client-dashboard.component.html',
   styleUrl: './client-dashboard.component.scss'
 })

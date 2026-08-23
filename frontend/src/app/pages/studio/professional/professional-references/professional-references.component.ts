@@ -16,6 +16,9 @@ import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.serv
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
+import { assertPdfWithinLimit, compressImageFile } from '@shared/utils/image-compression';
+import { InfoHintComponent } from '@shared/info-hint/info-hint.component';
 
 type ReferenceTypeLabel = 'Video Link' | 'PDF' | 'Text' | 'Image';
 
@@ -71,7 +74,7 @@ interface CategoryForm {
 @Component({
   selector: 'app-professional-references',
   standalone: true,
-  imports: [DatePipe, FormsModule, DragDropModule, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, DragDropModule, ProfessionalPageShellComponent, SkeletonComponent, InfoHintComponent],
   templateUrl: './professional-references.component.html',
   styleUrl: './professional-references.component.scss'
 })
@@ -144,15 +147,73 @@ export class ProfessionalReferencesComponent implements OnInit {
       .map((id) => byId.get(id))
       .filter(
         (reference): reference is ProfessionalReferenceView =>
-          !!reference && reference.category === categoryName && reference.subcategory === subcategory
+          !!reference &&
+          reference.category === categoryName &&
+          reference.subcategory === subcategory &&
+          this.matchesQuery(reference)
       );
   }
 
   lockedResourcesFor(categoryName: string, subcategory: string): ProfessionalReferenceView[] {
     const lockedIds = new Set(this.lockStatus()?.resources.locked_ids ?? []);
     return this.references().filter(
-      (reference) => reference.category === categoryName && reference.subcategory === subcategory && lockedIds.has(reference.id)
+      (reference) =>
+        reference.category === categoryName &&
+        reference.subcategory === subcategory &&
+        lockedIds.has(reference.id) &&
+        this.matchesQuery(reference)
     );
+  }
+
+  /** Whether a resource matches the search box.
+   *
+   *  The two functions above are the only ones the template actually renders,
+   *  and neither used to consult `query()` at all -- so typing in the search
+   *  box filtered nothing. Its only visible effect was `isCategoryOpen()`
+   *  returning true for every category, which expanded all of them and showed
+   *  *more* rows than before searching. */
+  private matchesQuery(reference: ProfessionalReferenceView): boolean {
+    const search = this.query().trim().toLowerCase();
+    if (!search) {
+      return true;
+    }
+
+    return [reference.title, reference.category, reference.subcategory, reference.type, reference.description, reference.tags.join(' ')]
+      .join(' ')
+      .toLowerCase()
+      .includes(search);
+  }
+
+  /** True while the user is searching, so the template can hide categories and
+   *  subcategories that contain no matches instead of rendering empty shells. */
+  isSearching(): boolean {
+    return Boolean(this.query().trim());
+  }
+
+  /** Subcategories worth rendering: all of them normally, and only the ones
+   *  holding a match while searching. */
+  visibleSubcategoriesFor(category: ResourceCategoryRecord): string[] {
+    if (!this.isSearching()) {
+      return category.subcategories;
+    }
+
+    return category.subcategories.filter(
+      (subcategory) =>
+        this.orderedActiveResourcesFor(category.name, subcategory).length > 0 ||
+        this.lockedResourcesFor(category.name, subcategory).length > 0
+    );
+  }
+
+  categoryHasVisibleResources(category: ResourceCategoryRecord): boolean {
+    return !this.isSearching() || this.visibleSubcategoriesFor(category).length > 0;
+  }
+
+  /** Total matches across every category, for the "nothing found" message. */
+  searchMatchCount(): number {
+    if (!this.isSearching()) {
+      return this.references().length;
+    }
+    return this.references().filter((reference) => this.matchesQuery(reference)).length;
   }
 
   dropResource(event: CdkDragDrop<ProfessionalReferenceView[]>, categoryName: string, subcategory: string): void {
@@ -199,6 +260,9 @@ export class ProfessionalReferencesComponent implements OnInit {
   readonly isEditorOpen = signal(false);
   readonly isCategoryEditorOpen = signal(false);
   readonly isSaving = signal(false);
+  /** Both library requests are in flight. Without this the template rendered
+   *  its "No categories yet." empty state on every load. */
+  readonly isLoading = signal(true);
   readonly categoryEditorMode = signal<'create' | 'edit' | 'subcategory'>('create');
   readonly referenceUsage = signal({ used: 0, limit: null as number | null });
   readonly referenceLimitReached = computed(() => {
@@ -340,7 +404,7 @@ export class ProfessionalReferencesComponent implements OnInit {
     this.message.set('');
   }
 
-  saveCategory(): void {
+  async saveCategory(): Promise<void> {
     const name = this.categoryForm.name.trim();
 
     if (!name) {
@@ -348,12 +412,42 @@ export class ProfessionalReferencesComponent implements OnInit {
       return;
     }
 
-    this.isSaving.set(true);
     const existingCategory = this.categories().find((category) => category.id === this.categoryForm.categoryId);
     const subcategories = existingCategory && this.categoryEditorMode() === 'subcategory'
       ? [...existingCategory.subcategories, ...this.parseSubcategories(this.categoryForm.subcategoriesText)]
       : this.parseSubcategories(this.categoryForm.subcategoriesText);
     const uniqueSubcategories = Array.from(new Set(subcategories.map((item) => item.trim()).filter(Boolean)));
+
+    // Editing the list is a delete path too: any subcategory the professional
+    // removed from the textarea still owns resources, and those resources match
+    // no rendered block afterwards -- they vanish from the library while still
+    // counting against the plan's resource limit. The explicit Delete button
+    // already warns about this; the edit path did not.
+    if (existingCategory && this.categoryEditorMode() === 'edit') {
+      const removed = existingCategory.subcategories.filter((item) => !uniqueSubcategories.includes(item));
+      const orphaned = removed.filter(
+        (item) =>
+          this.orderedActiveResourcesFor(existingCategory.name, item).length > 0 ||
+          this.lockedResourcesFor(existingCategory.name, item).length > 0
+      );
+
+      if (orphaned.length) {
+        const confirmed = await this.confirmation.confirm({
+          kind: 'delete',
+          title: 'Remove subcategories that still hold resources',
+          target: orphaned.join(', '),
+          impact:
+            'The resources filed under them stay in your library and keep using resource slots, but they will no longer appear anywhere. Move or delete those resources first if you want to keep them reachable.',
+          confirmLabel: 'Remove Anyway'
+        });
+
+        if (!confirmed) {
+          return;
+        }
+      }
+    }
+
+    this.isSaving.set(true);
     const request = existingCategory
       ? this.referencesApi.updateCategory(existingCategory.id, name, this.categoryForm.description.trim(), uniqueSubcategories)
       : this.referencesApi.createCategory(name, this.categoryForm.description.trim(), uniqueSubcategories);
@@ -566,17 +660,39 @@ export class ProfessionalReferencesComponent implements OnInit {
         input.value = '';
         return;
       }
-    } else if (!file.type.startsWith('image/')) {
+
+      // The resource library had no size check at all, so a large scan was
+      // uploaded whole and then counted against the plan's storage.
+      try {
+        assertPdfWithinLimit(file);
+      } catch (error: unknown) {
+        this.message.set(error instanceof Error ? error.message : 'That PDF could not be used.');
+        input.value = '';
+        return;
+      }
+
+      this.form.file = file;
+      this.form.fileName = file.name;
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
       this.message.set('Only image uploads are supported for image resources.');
       input.value = '';
       return;
     }
 
-    this.form.file = file;
-    this.form.fileName = file.name;
-    if (this.form.type !== 'PDF') {
-      this.form.type = 'Image';
-    }
+    void compressImageFile(file)
+      .then((result) => {
+        this.form.file = result.file;
+        this.form.fileName = result.file.name;
+        this.form.type = 'Image';
+        this.message.set('');
+      })
+      .catch((error: unknown) => {
+        input.value = '';
+        this.message.set(error instanceof Error ? error.message : 'That image could not be used.');
+      });
   }
 
   openReference(reference: ProfessionalReferenceView): void {
@@ -610,9 +726,24 @@ export class ProfessionalReferencesComponent implements OnInit {
   }
 
   private loadLibrary(): void {
+    this.isLoading.set(true);
+    let outstanding = 2;
+    const settle = () => {
+      outstanding -= 1;
+      if (outstanding === 0) {
+        this.isLoading.set(false);
+      }
+    };
+
     this.referencesApi.getCategories().subscribe({
-      next: (response) => this.categories.set(response.categories),
-      error: (error: unknown) => this.message.set(formatApiError(error, 'Categories could not be loaded.'))
+      next: (response) => {
+        this.categories.set(response.categories);
+        settle();
+      },
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Categories could not be loaded.'));
+        settle();
+      }
     });
     this.referencesApi.getResources().subscribe({
       next: (response) => {
@@ -620,8 +751,12 @@ export class ProfessionalReferencesComponent implements OnInit {
         this.references.set(views);
         this.referenceUsage.set(response.usage);
         this.selectedReferenceId.set(views[0]?.id || 0);
+        settle();
       },
-      error: (error: unknown) => this.message.set(formatApiError(error, 'Resources could not be loaded.'))
+      error: (error: unknown) => {
+        this.message.set(formatApiError(error, 'Resources could not be loaded.'));
+        settle();
+      }
     });
   }
 

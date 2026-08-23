@@ -1,14 +1,6 @@
-/* Shared visual rhythm for every public, legal, portal, and authentication page. */
-app-home .section,
-app-studio .section { width: min(1120px, calc(100% - 2.5rem)) !important; padding-block: clamp(3.75rem, 6vw, 6rem) !important; scroll-margin-top: 5rem !important; }
-app-home .hero,
-app-studio .hero { min-height: min(650px, calc(100vh - 4.75rem)) !important; padding-top: 3rem !important; gap: clamp(2.5rem, 5vw, 5rem) !important; }
-app-home .hero { grid-template-columns: minmax(0, 1.35fr) minmax(18rem, .65fr) !important; }
-app-studio .hero { grid-template-columns: minmax(0, 1.25fr) minmax(19rem, .75fr) !important; }
-app-home h1,
-app-studio h1 { max-width: 20ch !important; font-size: clamp(2.35rem, 3.6vw, 3.65rem) !important; line-height: 1.06 !important; }
-app-home h2,
-app-studio h2 { font-size: clamp(1.85rem, 3vw, 2.75rem) !important; line-height: 1.1 !important; }
+/* Shared visual rhythm for legal, portal, and authentication pages. Public
+   homepage typography is owned by its component so card headings cannot be
+   accidentally promoted to marketing-heading sizes. */
 app-public-site-header .site-header { z-index: 30; min-height: 4.75rem; width: min(1180px, calc(100% - 2.5rem)); padding-block: .75rem; }
 app-access-entry-placeholder .portal-page { padding: 0 !important; background: color-mix(in srgb, var(--app-bg) 95%, var(--app-surface)) !important; }
 app-access-entry-placeholder .portal-header { min-height: 4.75rem; width: min(1040px, 100%) !important; }
@@ -30,14 +22,8 @@ app-auth-page-shell .auth-footer { width: min(1120px, calc(100% - 2.5rem)) !impo
   app-legal .legal-nav { width: 100%; overflow-x: auto; padding-bottom: .25rem; }
   app-legal .legal-nav a { flex: 0 0 auto; }
   app-legal .legal-body { width: calc(100% - 1.5rem) !important; margin-top: 2rem !important; }
-  app-cookie-consent .cookie-banner { max-height: min(72vh, 34rem); overflow-y: auto; padding: 1rem !important; }
-  app-cookie-consent .cookie-banner p:not(.eyebrow) { font-size: .78rem !important; line-height: 1.42 !important; }
 }
 
 @media (max-width: 560px) {
-  app-home .section,
-  app-studio .section { width: min(100% - 1.5rem, 1120px) !important; padding-block: 3.25rem !important; }
-  app-home h1,
-  app-studio h1 { font-size: clamp(2.1rem, 10vw, 2.65rem) !important; }
   app-public-site-header .site-header { width: calc(100% - 1.5rem); }
 }

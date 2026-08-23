@@ -14,6 +14,16 @@
   <p class="message error-message">{{ loadError }}</p>
 }
 
+<!-- Says only that it is unavailable, never why. A configuration flag is an
+     operator's concern; naming it here would put backend internals in front of
+     professionals and their clients. -->
+@if (settings && !isPaymentsEnabled) {
+  <p class="message error-message">
+    Payment settings are temporarily unavailable, so changes cannot be saved right now.
+    Everything already set up keeps working.
+  </p>
+}
+
 @if (activeSection === 'reporting') {
   <section class="payment-section" aria-labelledby="reporting-currency-title">
     <h3 id="reporting-currency-title">Reporting Currency</h3>
@@ -23,7 +33,7 @@
     </p>
 
     @if (!settings && !loadError) {
-      <p class="state-note">Loading payment settings...</p>
+      <app-skeleton variant="card" [count]="2" label="Loading payment settings"></app-skeleton>
     }
 
     @if (settings) {
@@ -43,8 +53,8 @@
               }
             </select>
           </label>
-          <button type="button" class="primary-action" [disabled]="isSaving" (click)="saveReportingCurrency()">
-            {{ isSaving ? 'Saving...' : 'Confirm & Lock Currency' }}
+          <button type="button" class="primary-action" [disabled]="isSaving || !isPaymentsEnabled" (click)="saveReportingCurrency()">
+            {{ isSaving ? 'Saving...' : 'Confirm and Lock Currency' }}
           </button>
         </div>
 
@@ -109,7 +119,7 @@
     }
 
     @if (isLoadingMethods) {
-      <p class="state-note">Loading payment methods...</p>
+      <app-skeleton variant="row" [count]="3" label="Loading payment methods"></app-skeleton>
     }
 
     @if (!isLoadingMethods && !methods.length && !showMethodForm) {
@@ -203,9 +213,23 @@
         }
 
         <div class="form-grid">
-          <label>
+          <label class="qr-field">
             <span class="field-label">QR code image (optional)</span>
             <input name="qrCode" type="file" accept="image/png,image/jpeg,image/webp" (change)="onQrFileSelected($event)">
+            <!-- The form used to give no sign that a QR was already stored, and
+                 no way to take one off again. -->
+            @if (qrFileName) {
+              <span class="field-help">Selected: {{ qrFileName }}</span>
+            } @else if (existingQrUrl(); as qrUrl) {
+              <span class="qr-existing">
+                <img [src]="qrUrl" alt="Current QR code">
+                <button type="button" class="ghost-action compact danger" (click)="markQrForRemoval()">Remove QR</button>
+              </span>
+            } @else if (removeExistingQr) {
+              <span class="field-help">The stored QR code will be removed when you save.</span>
+            } @else {
+              <span class="field-help">PNG, JPG or WEBP, up to 2 MB.</span>
+            }
           </label>
 
           <label>
@@ -290,16 +314,16 @@
     <h3 id="disclosures-title">Payment Disclosures</h3>
     <div class="disclosure-block">
       <p>
-        RepRoot Studio is a payment tracking and client-management platform. For manually collected
-        payments, RepRoot Studio does not receive, hold, transfer, or control the money.
+        RepRoot is a payment tracking and client-management platform. For manually collected
+        payments, RepRoot does not receive, hold, transfer, or control the money.
       </p>
       <p>
         Manual payment records reflect information entered by you and your clients. They are not
-        proof that RepRoot Studio processed a transaction — you and your client remain responsible
+        proof that RepRoot processed a transaction — you and your client remain responsible
         for confirming the payment.
       </p>
       <p>
-        RepRoot Studio does not verify ownership of external manual payment accounts or control how
+        RepRoot does not verify ownership of external manual payment accounts or control how
         externally received funds are transferred.
       </p>
     </div>

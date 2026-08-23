@@ -86,7 +86,7 @@ class BrandedShare {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'image/png')],
-        title: '$title — RepRoot Studio',
+        title: '$title — RepRoot',
         text: subtitle.isEmpty ? title : '$title · $subtitle',
       ),
     );
@@ -137,7 +137,7 @@ class BrandedShare {
     const brandX = _pad + _markSize + 12;
     _drawText(
       canvas,
-      'RepRoot Studio',
+      'RepRoot',
       const Offset(brandX, _pad + 2),
       TextStyle(color: text, fontSize: 15, fontWeight: FontWeight.w800),
     );

@@ -5,10 +5,14 @@
   activeSection="forms-groups"
   titleId="lead-form-title"
 >
-    <a page-actions class="secondary-action" routerLink="/professional/forms-groups">&larr; Back to Forms &amp; Client Groups</a>
+    <a page-actions class="secondary-action" routerLink="/professional/forms-groups">&larr; Back to Forms and Client Groups</a>
 
     @if (isLoading) {
-      <p class="message">Loading form builder...</p>
+      <section class="setup-card" aria-busy="true">
+        <app-skeleton variant="title" label="Loading the form builder"></app-skeleton>
+        <app-skeleton variant="text" [lines]="2"></app-skeleton>
+        <app-skeleton variant="block"></app-skeleton>
+      </section>
     } @else if (step === 'form') {
       <section class="setup-card">
         <label>

@@ -29,6 +29,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from .email_policy import SignupEmailDomainError, validate_signup_email_domain
 from .models import LegalAcceptanceRecord, ProfessionalProfile
 
 User = get_user_model()
@@ -140,6 +141,11 @@ def get_or_create_professional_for_google(claims: dict, allow_create: bool = Fal
     raise GoogleAuthError(
       'No professional account exists for this Google address. Use the sign-up page and accept the legal terms first.'
     )
+
+  try:
+    email = validate_signup_email_domain(email)
+  except SignupEmailDomainError as error:
+    raise GoogleAuthError(str(error)) from error
 
   with transaction.atomic():
     username = _generate_unique_username(email)

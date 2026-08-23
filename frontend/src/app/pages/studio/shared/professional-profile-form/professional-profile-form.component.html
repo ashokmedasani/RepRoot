@@ -16,11 +16,11 @@
             <h2>{{ previewName }}</h2>
             <p>{{ profileForm.controls.professional_headline.value || 'Add a professional headline to introduce your training style.' }}</p>
             <div class="photo-actions">
-              <button type="button" class="secondary-action compact" (click)="profilePhotoInput.click()">
+              <button type="button" class="secondary-action compact" [disabled]="!isEditing" (click)="profilePhotoInput.click()">
                 {{ loadedProfile?.profile_photo_url || selectedProfilePhotoPreview ? 'Change photo' : 'Upload photo' }}
               </button>
               @if (hasCustomProfilePhoto) {
-                <button type="button" class="secondary-action danger compact" [disabled]="isRemovingPhoto" (click)="removeProfilePhoto()">
+                <button type="button" class="secondary-action danger compact" [disabled]="!isEditing || isRemovingPhoto" (click)="removeProfilePhoto()">
                   {{ isRemovingPhoto ? 'Removing...' : 'Remove Picture' }}
                 </button>
               }
@@ -60,6 +60,9 @@
                 <option [value]="gender">{{ gender }}</option>
               }
             </select>
+            @if (hasError('gender')) {
+              <span class="field-help error-text">Select your gender.</span>
+            }
           </label>
           <label>
             <span class="field-label">Birth month <span class="required">*</span></span>
@@ -69,6 +72,9 @@
                 <option [value]="month.value">{{ month.label }}</option>
               }
             </select>
+            @if (hasError('birth_month')) {
+              <span class="field-help error-text">Select your birth month.</span>
+            }
           </label>
           <label>
             <span class="field-label">Birth year <span class="required">*</span></span>
@@ -78,6 +84,9 @@
                 <option [value]="year">{{ year }}</option>
               }
             </select>
+            @if (hasError('birth_year')) {
+              <span class="field-help error-text">Select your birth year.</span>
+            }
           </label>
           <label>
             <span class="field-label">Country <span class="required">*</span></span>
@@ -87,6 +96,9 @@
                 <option [value]="country.name">{{ country.name }}</option>
               }
             </select>
+            @if (hasError('country')) {
+              <span class="field-help error-text">Select your country.</span>
+            }
           </label>
           <label>
             <span class="field-label">State / Region <span class="required">*</span></span>
@@ -96,6 +108,9 @@
                 <option [value]="state">{{ state }}</option>
               }
             </select>
+            @if (hasError('state')) {
+              <span class="field-help error-text">Select your state or region.</span>
+            }
           </label>
           <label>
             <span class="field-label">Professional headline</span>
@@ -107,8 +122,8 @@
           <span class="field-label">
             About me
             <span class="visibility-toggle" role="group" aria-label="About visibility">
-              <button type="button" [class.active]="!profileVisibility.about" (click)="setVisibility('about', false)">Private</button>
-              <button type="button" [class.active]="profileVisibility.about" (click)="setVisibility('about', true)">Public</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.about" (click)="setVisibility('about', false)">Private</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.about" (click)="setVisibility('about', true)">Public</button>
             </span>
           </span>
           <textarea formControlName="about_me" rows="5"></textarea>
@@ -119,8 +134,8 @@
         <div class="section-heading">
           <h2>Professional Details</h2>
           <span class="visibility-toggle" role="group" aria-label="Professional details visibility">
-            <button type="button" [class.active]="!profileVisibility.professional_summary" (click)="setVisibility('professional_summary', false)">Private</button>
-            <button type="button" [class.active]="profileVisibility.professional_summary" (click)="setVisibility('professional_summary', true)">Public</button>
+            <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.professional_summary" (click)="setVisibility('professional_summary', false)">Private</button>
+            <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.professional_summary" (click)="setVisibility('professional_summary', true)">Public</button>
           </span>
         </div>
         <div class="form-grid">
@@ -134,31 +149,59 @@
           </label>
           <label>
             <span class="field-label">Specializations</span>
-            <input type="text" formControlName="specializations">
+            <input type="text" formControlName="specializations" placeholder="Separate with commas">
           </label>
           <label>
             <span class="field-label">Languages known</span>
-            <input type="text" formControlName="languages_known">
+            <input type="text" formControlName="languages_known" placeholder="Separate with commas">
           </label>
         </div>
         <label>
           <span class="field-label">
-            Training style
-            <span class="visibility-toggle" role="group" aria-label="Training style visibility">
-              <button type="button" [class.active]="!profileVisibility.training_style" (click)="setVisibility('training_style', false)">Private</button>
-              <button type="button" [class.active]="profileVisibility.training_style" (click)="setVisibility('training_style', true)">Public</button>
+            Professional style
+            <span class="visibility-toggle" role="group" aria-label="Professional style visibility">
+              <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.training_style" (click)="setVisibility('training_style', false)">Private</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.training_style" (click)="setVisibility('training_style', true)">Public</button>
             </span>
           </span>
           <textarea formControlName="training_style" rows="4"></textarea>
         </label>
       </section>
 
+      <!-- These four are saved, round-tripped and rendered on the public
+           profile, but had no input anywhere in the app -- so a professional
+           could see their Instagram link on their profile page and had no way
+           to change or remove it. -->
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>Links and Social</h2>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Website</span>
+            <input type="url" formControlName="website_url" placeholder="https://">
+          </label>
+          <label>
+            <span class="field-label">Instagram</span>
+            <input type="url" formControlName="instagram_url" placeholder="https://instagram.com/...">
+          </label>
+          <label>
+            <span class="field-label">YouTube</span>
+            <input type="url" formControlName="youtube_url" placeholder="https://youtube.com/...">
+          </label>
+          <label>
+            <span class="field-label">Intro video</span>
+            <input type="url" formControlName="intro_video_url" placeholder="https://">
+          </label>
+        </div>
+      </section>
+
       <section class="section-block">
         <div class="section-heading">
           <h2>Certifications</h2>
           <span class="visibility-toggle" role="group" aria-label="Certification visibility">
-            <button type="button" [class.active]="!profileVisibility.certification" (click)="setVisibility('certification', false)">Private</button>
-            <button type="button" [class.active]="profileVisibility.certification" (click)="setVisibility('certification', true)">Public</button>
+            <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.certification" (click)="setVisibility('certification', false)">Private</button>
+            <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.certification" (click)="setVisibility('certification', true)">Public</button>
           </span>
         </div>
         <div class="form-grid">
@@ -179,58 +222,135 @@
               }
             </select>
           </label>
-          <label class="upload-field">
-            <span class="field-label">Certificate PDF/image</span>
-            <input type="file" accept="application/pdf,image/*" (change)="handleFileSelected($event, 'certification_file')">
-            <span class="field-help">{{ selectedFileNames['certification_file'] || 'Optional upload.' }}</span>
-          </label>
+        </div>
+        <!-- The certificate file upload used to live here as well as in the
+             gallery below, which is what made this read as the same thing
+             twice. There is now exactly one place to upload a certificate. -->
+        <p class="field-help section-footnote">
+          Upload the certificate itself under <strong>Certificates</strong> below.
+        </p>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>Certificates</h2>
+          <div class="section-actions">
+            <span class="visibility-toggle" role="group" aria-label="Images visibility">
+              <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.images" (click)="setVisibility('images', false)">Private</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.images" (click)="setVisibility('images', true)">Public</button>
+            </span>
+            <span class="gallery-count">{{ imagesFor(certificatesGroup).length }} / {{ maxImagesPerGroup }}</span>
+          </div>
+        </div>
+
+        <label
+          class="gallery-dropzone"
+          [class.is-active]="galleryDropTarget === certificatesGroup"
+          [class.is-disabled]="!isEditing || remainingSlots(certificatesGroup) <= 0"
+          (dragover)="onGalleryDragOver(certificatesGroup, $event)"
+          (dragleave)="onGalleryDragLeave()"
+          (drop)="onGalleryDrop(certificatesGroup, $event)"
+        >
+          <input
+            type="file"
+            class="visually-hidden"
+            accept="image/*"
+            multiple
+            [disabled]="!isEditing || remainingSlots(certificatesGroup) <= 0"
+            (change)="handleGalleryPicker(certificatesGroup, $event)"
+          >
+          <strong>{{ isCompressing(certificatesGroup) ? 'Preparing images...' : 'Drag images here, or click to choose' }}</strong>
+          <span class="field-help">Your certificates and qualifications. Up to {{ maxImagesPerGroup }} images, resized automatically.</span>
+        </label>
+
+        <div class="media-list">
+          @for (image of imagesFor(certificatesGroup); track image.previewUrl; let index = $index; let first = $first; let last = $last) {
+            <div
+              class="media-row"
+              [class.is-dragging]="draggingGalleryGroup === certificatesGroup && draggingGalleryIndex === index"
+              [attr.draggable]="isEditing ? true : null"
+              (dragstart)="startGalleryReorder(certificatesGroup, index)"
+              (dragover)="onGalleryRowDragOver(certificatesGroup, $event, index)"
+              (drop)="dropGalleryRow(certificatesGroup, $event, index)"
+              (dragend)="endGalleryReorder()"
+            >
+              <div class="media-preview-wrap">
+                <img class="media-preview" [src]="image.previewUrl" [alt]="image.title || 'Certificate'">
+              </div>
+              <label class="media-title">
+                <span class="field-label">Title</span>
+                <input type="text" maxlength="180" [disabled]="!isEditing" [(ngModel)]="image.title" (ngModelChange)="markDirty()" [ngModelOptions]="{ standalone: true }">
+              </label>
+              <div class="media-row-actions">
+                <button type="button" class="icon-action" title="Move up" aria-label="Move image up" [disabled]="!isEditing || first" (click)="moveGalleryImage(certificatesGroup, index, -1)">&uarr;</button>
+                <button type="button" class="icon-action" title="Move down" aria-label="Move image down" [disabled]="!isEditing || last" (click)="moveGalleryImage(certificatesGroup, index, 1)">&darr;</button>
+                <button type="button" class="secondary-action compact danger" [disabled]="!isEditing" (click)="removeGalleryImage(certificatesGroup, index)">Remove</button>
+              </div>
+            </div>
+          } @empty {
+            <p class="field-help">No certificates added yet.</p>
+          }
         </div>
       </section>
 
       <section class="section-block">
         <div class="section-heading">
-          <h2>Images</h2>
+          <h2>Other Images</h2>
           <div class="section-actions">
             <span class="visibility-toggle" role="group" aria-label="Images visibility">
-              <button type="button" [class.active]="!profileVisibility.images" (click)="setVisibility('images', false)">Private</button>
-              <button type="button" [class.active]="profileVisibility.images" (click)="setVisibility('images', true)">Public</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.images" (click)="setVisibility('images', false)">Private</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.images" (click)="setVisibility('images', true)">Public</button>
             </span>
-            <button type="button" class="secondary-action compact" (click)="addProfileImage()">Add Image</button>
+            <span class="gallery-count">{{ imagesFor(otherGroup).length }} / {{ maxImagesPerGroup }}</span>
           </div>
         </div>
 
+        <label
+          class="gallery-dropzone"
+          [class.is-active]="galleryDropTarget === otherGroup"
+          [class.is-disabled]="!isEditing || remainingSlots(otherGroup) <= 0"
+          (dragover)="onGalleryDragOver(otherGroup, $event)"
+          (dragleave)="onGalleryDragLeave()"
+          (drop)="onGalleryDrop(otherGroup, $event)"
+        >
+          <input
+            type="file"
+            class="visually-hidden"
+            accept="image/*"
+            multiple
+            [disabled]="!isEditing || remainingSlots(otherGroup) <= 0"
+            (change)="handleGalleryPicker(otherGroup, $event)"
+          >
+          <strong>{{ isCompressing(otherGroup) ? 'Preparing images...' : 'Drag images here, or click to choose' }}</strong>
+          <span class="field-help">Transformations, achievements, physique shots, anything else. Up to {{ maxImagesPerGroup }} images, resized automatically.</span>
+        </label>
+
         <div class="media-list">
-          @for (image of profileImages; track $index; let index = $index) {
-            <div class="media-row">
+          @for (image of imagesFor(otherGroup); track image.previewUrl; let index = $index; let first = $first; let last = $last) {
+            <div
+              class="media-row"
+              [class.is-dragging]="draggingGalleryGroup === otherGroup && draggingGalleryIndex === index"
+              [attr.draggable]="isEditing ? true : null"
+              (dragstart)="startGalleryReorder(otherGroup, index)"
+              (dragover)="onGalleryRowDragOver(otherGroup, $event, index)"
+              (drop)="dropGalleryRow(otherGroup, $event, index)"
+              (dragend)="endGalleryReorder()"
+            >
               <div class="media-preview-wrap">
-                @if (image.url) {
-                  <img class="media-preview" [src]="image.url" [alt]="image.title || image.category">
-                } @else {
-                  <span>Select an image</span>
-                }
+                <img class="media-preview" [src]="image.previewUrl" [alt]="image.title || 'Profile image'">
               </div>
-              <div class="media-fields">
-                <label>
-                  <span class="field-label">Category</span>
-                  <select [(ngModel)]="image.category" [ngModelOptions]="{ standalone: true }">
-                    @for (category of imageCategories; track category) {
-                      <option [value]="category">{{ category }}</option>
-                    }
-                  </select>
-                </label>
-                <label>
-                  <span class="field-label">Title</span>
-                  <input type="text" [(ngModel)]="image.title" [ngModelOptions]="{ standalone: true }">
-                </label>
-                <label class="upload-field">
-                  <span class="field-label">Image upload</span>
-                  <input type="file" accept="image/*" (change)="handleProfileImageSelected($event, index)">
-                </label>
+              <label class="media-title">
+                <span class="field-label">Title</span>
+                <input type="text" maxlength="180" [disabled]="!isEditing" [(ngModel)]="image.title" (ngModelChange)="markDirty()" [ngModelOptions]="{ standalone: true }">
+              </label>
+              <div class="media-row-actions">
+                <button type="button" class="icon-action" title="Move up" aria-label="Move image up" [disabled]="!isEditing || first" (click)="moveGalleryImage(otherGroup, index, -1)">&uarr;</button>
+                <button type="button" class="icon-action" title="Move down" aria-label="Move image down" [disabled]="!isEditing || last" (click)="moveGalleryImage(otherGroup, index, 1)">&darr;</button>
+                <button type="button" class="secondary-action compact danger" [disabled]="!isEditing" (click)="removeGalleryImage(otherGroup, index)">Remove</button>
               </div>
-              <button type="button" class="secondary-action compact danger" (click)="removeProfileImage(index)">Remove</button>
             </div>
           } @empty {
-            <p class="field-help">Add certificates, transformation photos, achievements, body physique, or other images.</p>
+            <p class="field-help">No other images added yet.</p>
           }
         </div>
       </section>
@@ -240,25 +360,25 @@
           <h2>Links</h2>
           <div class="section-actions">
             <span class="visibility-toggle" role="group" aria-label="Links visibility">
-              <button type="button" [class.active]="!profileVisibility.links" (click)="setVisibility('links', false)">Private</button>
-              <button type="button" [class.active]="profileVisibility.links" (click)="setVisibility('links', true)">Public</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="!profileVisibility.links" (click)="setVisibility('links', false)">Private</button>
+              <button type="button" [disabled]="!isEditing" [class.active]="profileVisibility.links" (click)="setVisibility('links', true)">Public</button>
             </span>
-            <button type="button" class="secondary-action compact" (click)="addProfileLink()">Add Link</button>
+            <button type="button" class="secondary-action compact" [disabled]="!isEditing" (click)="addProfileLink()">Add Link</button>
           </div>
         </div>
 
         <div class="link-list">
           @for (link of profileLinks; track $index; let index = $index) {
-            <div class="link-row-edit">
+            <div class="link-row-edit" [class.row-invalid]="incompleteLinkIndex === index">
               <label>
                 <span class="field-label">Title</span>
-                <input type="text" [(ngModel)]="link.title" [ngModelOptions]="{ standalone: true }">
+                <input type="text" [disabled]="!isEditing" [(ngModel)]="link.title" (ngModelChange)="markDirty()" [ngModelOptions]="{ standalone: true }">
               </label>
               <label>
                 <span class="field-label">URL</span>
-                <input type="url" [(ngModel)]="link.url" [ngModelOptions]="{ standalone: true }" placeholder="https://">
+                <input type="url" [disabled]="!isEditing" [(ngModel)]="link.url" (ngModelChange)="markDirty()" [ngModelOptions]="{ standalone: true }" placeholder="https://">
               </label>
-              <button type="button" class="secondary-action compact danger" (click)="removeProfileLink(index)">Remove</button>
+              <button type="button" class="secondary-action compact danger" [disabled]="!isEditing" (click)="removeProfileLink(index)">Remove</button>
             </div>
           } @empty {
             <p class="field-help">Add any public profile link with a title and URL.</p>
@@ -266,7 +386,14 @@
         </div>
       </section>
 
-      <button type="submit" class="primary-action" [disabled]="isSaving">{{ isSaving ? 'Saving...' : 'Save profile' }}</button>
+      @if (isEditing) {
+        <div class="profile-edit-bar">
+          <button type="button" class="secondary-action compact" [disabled]="isSaving" (click)="cancelEditing()">Cancel</button>
+          <button type="submit" class="primary-action compact" [disabled]="isSaving || !hasUnsavedChanges">
+            {{ isSaving ? 'Saving...' : 'Save profile' }}
+          </button>
+        </div>
+      }
 
       @if (profileMessage) {
         <p class="message" [class.error-message]="profileMessage.includes('required') || profileMessage.includes('could not')">
@@ -275,4 +402,53 @@
       }
     </div>
   </form>
+
+  @if (isProfilePhotoCropOpen) {
+    <div class="crop-dialog-backdrop" role="presentation" (click)="cancelProfilePhotoCrop()">
+      <section
+        class="crop-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="crop-dialog-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="crop-dialog-heading">
+          <div>
+            <p class="crop-eyebrow">Profile picture</p>
+            <h2 id="crop-dialog-title">Adjust your photo</h2>
+          </div>
+          <button type="button" class="crop-close" aria-label="Close photo editor" (click)="cancelProfilePhotoCrop()">×</button>
+        </div>
+
+        <p class="crop-help">Drag the photo to position it, then use zoom to choose what appears inside the circle.</p>
+        <div class="crop-stage">
+          <canvas
+            #cropCanvas
+            class="crop-canvas"
+            width="320"
+            height="320"
+            aria-label="Circular profile picture preview"
+            (pointerdown)="beginCropDrag($event)"
+            (pointermove)="moveCrop($event)"
+            (pointerup)="endCropDrag($event)"
+            (pointercancel)="endCropDrag($event)"
+          ></canvas>
+        </div>
+
+        <label class="crop-zoom">
+          <span>Zoom</span>
+          <input type="range" min="1" max="3" step="0.01" [(ngModel)]="cropZoom" [ngModelOptions]="{ standalone: true }" (input)="onCropZoomChange()">
+        </label>
+
+        <div class="crop-dialog-actions">
+          <button type="button" class="secondary-action compact" (click)="resetPhotoCrop()">Reset</button>
+          <span class="crop-action-spacer"></span>
+          <button type="button" class="secondary-action compact" (click)="cancelProfilePhotoCrop()">Cancel</button>
+          <button type="button" class="crop-apply" [disabled]="isProcessingCrop" (click)="applyProfilePhotoCrop()">
+            {{ isProcessingCrop ? 'Preparing...' : 'Use photo' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
 }

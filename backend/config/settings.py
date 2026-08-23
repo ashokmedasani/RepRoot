@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 import os
 
@@ -180,7 +181,8 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
 SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '').strip()
-STUDIO_SUPPORT_EMAIL = os.environ.get('STUDIO_SUPPORT_EMAIL', 'studio.support@rep-root.com').strip()
+# STUDIO-HIDDEN 2026-08-17: default was 'studio.support@rep-root.com'.
+STUDIO_SUPPORT_EMAIL = os.environ.get('STUDIO_SUPPORT_EMAIL', 'support@rep-root.com').strip()
 ERROR_ALERT_EMAIL = os.environ.get('ERROR_ALERT_EMAIL', SUPPORT_EMAIL).strip()
 MEETING_FROM_EMAIL = os.environ.get('MEETING_FROM_EMAIL', DEFAULT_FROM_EMAIL).strip()
 
@@ -300,13 +302,19 @@ REST_FRAMEWORK = {
 }
 
 REPROOT_AUTH_TOKEN_TTL_HOURS = int(os.environ.get('REPROOT_AUTH_TOKEN_TTL_HOURS', '12'))
-REPROOT_PROFESSIONAL_LEGAL_VERSION = os.environ.get('REPROOT_PROFESSIONAL_LEGAL_VERSION', '2026-07-30').strip()
-REPROOT_CLIENT_LEGAL_VERSION = os.environ.get('REPROOT_CLIENT_LEGAL_VERSION', '2026-07-30').strip()
-REPROOT_LEGAL_EFFECTIVE_DATE = os.environ.get('REPROOT_LEGAL_EFFECTIVE_DATE', '2026-07-30').strip()
-# Compatibility alias for older internal code. New role-specific code must use
-# the professional/client settings above so one audience is not forced to
-# re-accept documents changed only for the other audience.
-REPROOT_LEGAL_DOCUMENT_VERSION = REPROOT_PROFESSIONAL_LEGAL_VERSION
+REPROOT_LEGAL_LAST_UPDATED_DATE = os.environ.get('REPROOT_LEGAL_LAST_UPDATED_DATE', '2026-08-16').strip()
+try:
+  date.fromisoformat(REPROOT_LEGAL_LAST_UPDATED_DATE)
+except ValueError as exc:
+  raise ImproperlyConfigured('REPROOT_LEGAL_LAST_UPDATED_DATE must use YYYY-MM-DD format.') from exc
+
+# Compatibility aliases: existing account rows and API clients still use the
+# role-specific version fields. A single configured date now drives both roles
+# so every legal screen and acceptance check changes together.
+REPROOT_PROFESSIONAL_LEGAL_VERSION = REPROOT_LEGAL_LAST_UPDATED_DATE
+REPROOT_CLIENT_LEGAL_VERSION = REPROOT_LEGAL_LAST_UPDATED_DATE
+REPROOT_LEGAL_EFFECTIVE_DATE = REPROOT_LEGAL_LAST_UPDATED_DATE
+REPROOT_LEGAL_DOCUMENT_VERSION = REPROOT_LEGAL_LAST_UPDATED_DATE
 REPROOT_SUPPORTED_COUNTRIES = {
   value.strip().upper()
   for value in os.environ.get('REPROOT_SUPPORTED_COUNTRIES', 'IN,INDIA,US,USA,UNITED STATES,UNITED STATES OF AMERICA').split(',')
@@ -316,6 +324,14 @@ REPROOT_SUPPORTED_COUNTRIES = {
 # views or Angular pages. Existing professionals remain on Starter unless an admin
 # explicitly changes their ProfessionalProfile.plan_tier.
 REPROOT_DEFAULT_PLAN = os.environ.get('REPROOT_DEFAULT_PLAN', 'starter_free').strip().lower()
+
+# Canonical public plan codes. Legacy codes are retained only as aliases so
+# existing database rows resolve to current plans; they do not define another
+# set of limits and are not exposed in the billing catalogue.
+REPROOT_PLAN_ALIASES = {
+  'starter': 'starter_free',
+  'premium': 'premium_unlimited',
+}
 
 # Storage quotas are still being tuned against real usage data, so the
 # Starter Free byte limit stays a single env-configurable knob; Pro and
@@ -331,7 +347,7 @@ REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES = int(
   os.environ.get('REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES', str(10 * 1024 * 1024 * 1024))
 )
 
-# 3-Tier Billing System: Starter Free / Pro / Premium Unlimited
+# Public 3-tier billing system: Free / Pro / Premium
 REPROOT_PLAN_TIERS = {
   'starter_free': {
     'name': 'Free',
@@ -385,21 +401,6 @@ REPROOT_PLAN_TIERS = {
     'professional_storage_bytes': REPROOT_PREMIUM_UNLIMITED_STORAGE_LIMIT_BYTES,
     'client_data_retention_days': int(os.environ.get('REPROOT_PREMIUM_UNLIMITED_DATA_RETENTION_DAYS', '180')),
   },
-  # Legacy tiers (for backward compatibility during migration)
-  'starter': {
-    'name': 'Starter (Legacy)',
-    'lead_forms': 1, 'groups': 5, 'clients': None, 'templates': 5,
-    'resources': 100, 'categories': 10, 'subcategories_per_category': 5,
-    'professional_storage_bytes': 50 * 1024 * 1024,
-    'client_data_retention_days': 60,
-  },
-  'premium': {
-    'name': 'Premium (Legacy)',
-    'lead_forms': 3, 'groups': 25, 'clients': None, 'templates': 50,
-    'resources': 1000, 'categories': 50, 'subcategories_per_category': 20,
-    'professional_storage_bytes': 1024 * 1024 * 1024,
-    'client_data_retention_days': 180,
-  },
 }
 
 # Data usage warning & account lifecycle thresholds
@@ -412,6 +413,17 @@ REPROOT_DATA_DELETION_DAYS = int(os.environ.get('REPROOT_DATA_DELETION_DAYS', '3
 # Recycle Bin: how long a soft-deleted item (chat message, tracking/progress
 # entry, reminder, reference, template) stays restorable before permanent purge.
 REPROOT_RECYCLE_BIN_DAYS = int(os.environ.get('REPROOT_RECYCLE_BIN_DAYS', '14'))
+# A deleted professional ACCOUNT is held longer than an individual deleted item.
+# Deliberately separate from REPROOT_RECYCLE_BIN_DAYS above: that one governs the
+# per-item bin (client accounts, chat images, resources) shown in Settings and
+# described to users as 14 days. Changing one must not silently move the other.
+REPROOT_PROFESSIONAL_RECYCLE_DAYS = int(os.environ.get('REPROOT_PROFESSIONAL_RECYCLE_DAYS', '30'))
+# The optional cooling-off period before a requested deletion becomes real. The
+# professional can still sign in during it, and signing in cancels the deletion.
+REPROOT_DELETION_HOLD_DAYS = int(os.environ.get('REPROOT_DELETION_HOLD_DAYS', '14'))
+# Minimum gap between changes to the username or email a professional signs in
+# with. The first change is always allowed regardless of account age.
+REPROOT_SIGNIN_CHANGE_COOLDOWN_DAYS = int(os.environ.get('REPROOT_SIGNIN_CHANGE_COOLDOWN_DAYS', '30'))
 REPROOT_OPERATIONAL_DATA_MAX_DAYS = int(os.environ.get('REPROOT_OPERATIONAL_DATA_MAX_DAYS', '180'))
 REPROOT_ERROR_LOG_RETENTION_DAYS = int(os.environ.get('REPROOT_ERROR_LOG_RETENTION_DAYS', '90'))
 
@@ -442,6 +454,8 @@ REPROOT_BILLING_CANCEL_URL = os.environ.get(
 # payment involved whenever a tier's real Stripe price isn't configured — lets
 # the whole lifecycle (limits, storage quota, lock/grace clearing) be exercised
 # end-to-end today. Flip this off once real prices are set for every tier.
+# This development shortcut is still subordinate to the master payment lock;
+# it cannot change a plan while REPROOT_PAYMENTS_ENABLED is false.
 REPROOT_BILLING_TEST_MODE = os.environ.get('REPROOT_BILLING_TEST_MODE', 'True' if DEBUG else 'False').lower() == 'true'
 
 # Razorpay is backend-only. Never expose the key secret or webhook secret to
@@ -457,5 +471,38 @@ REPROOT_ADS_ENABLED = False
 # selected provider, webhook verification, and production credentials are ready.
 REPROOT_PAYMENTS_ENABLED = os.environ.get('REPROOT_PAYMENTS_ENABLED', 'False').lower() == 'true'
 
+# Manual payment tracking -- reporting currency, a professional's own payment
+# methods, payment requests and proofs between them and their clients -- is a
+# core part of the product and involves no payment provider at all.
+#
+# It is deliberately NOT governed by REPROOT_PAYMENTS_ENABLED. That flag exists
+# to stop professionals changing subscription tier, and pointing it at this as
+# well meant switching off plan upgrades also silently froze the manual payment
+# workspace: the screen loaded, the form accepted input, and every save came
+# back 503. Separate concerns, separate switches.
+REPROOT_MANUAL_PAYMENTS_ENABLED = (
+  os.environ.get('REPROOT_MANUAL_PAYMENTS_ENABLED', 'True').lower() == 'true'
+)
+
 # Base URL used when building links inside notification emails (Client Payments).
 REPROOT_FRONTEND_URL = os.environ.get('REPROOT_FRONTEND_URL', 'http://localhost:4300')
+
+
+def _normalized_domain_set(variable_name, default=''):
+  return {
+    domain.strip().lower().rstrip('.')
+    for domain in os.environ.get(variable_name, default).split(',')
+    if domain.strip()
+  }
+
+
+# Keep the allowlist empty to accept legitimate business domains. During a
+# controlled public test it can be set to selected consumer providers. The
+# blocklist applies in both modes and contains only disposable/reserved domains.
+REPROOT_SIGNUP_ALLOWED_EMAIL_DOMAINS = _normalized_domain_set(
+  'REPROOT_SIGNUP_ALLOWED_EMAIL_DOMAINS'
+)
+REPROOT_SIGNUP_BLOCKED_EMAIL_DOMAINS = _normalized_domain_set(
+  'REPROOT_SIGNUP_BLOCKED_EMAIL_DOMAINS',
+  'example.com,example.org,example.net,example.test,localhost,mailinator.com,guerrillamail.com,10minutemail.com',
+)

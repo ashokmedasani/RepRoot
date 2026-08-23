@@ -352,3 +352,18 @@ p {
     align-items: flex-start;
   }
 }
+
+// An empty state is a message, not a row. Styling it as `.template-row` made
+// it look like a real template you could click.
+.list-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.list-empty p {
+  margin: 0;
+  color: var(--app-muted);
+}

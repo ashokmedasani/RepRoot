@@ -57,6 +57,10 @@ class _ProfessionalSettingsBillingPageState
   }
 
   Future<void> _choosePlan(String _) async {
+    if (_billing?.paymentsEnabled != true) {
+      _toast('Subscription plan changes are unavailable during testing.');
+      return;
+    }
     final opened = await launchUrl(
       Uri.parse(
         Env.studioUrl('/professional/account-settings?section=billing'),
@@ -69,6 +73,10 @@ class _ProfessionalSettingsBillingPageState
   Future<void> _cancelPlan() async {
     final billing = _billing;
     if (billing == null) return;
+    if (!billing.paymentsEnabled) {
+      _toast('Membership changes are unavailable during testing.');
+      return;
+    }
     if (!billing.storageDowngradeEligible) {
       _toast(
         'Cancellation is blocked because storage is '
@@ -166,6 +174,10 @@ class _ProfessionalSettingsBillingPageState
   }
 
   Future<void> _openBillingPortal() async {
+    if (_billing?.paymentsEnabled != true) {
+      _toast('The billing portal is unavailable during testing.');
+      return;
+    }
     try {
       final url = await ref
           .read(professionalAuthApiProvider)
@@ -250,6 +262,14 @@ class _ProfessionalSettingsBillingPageState
               child: Center(child: CircularProgressIndicator()),
             ),
           ] else ...[
+            if (!billing.paymentsEnabled) ...[
+              const AppCard(
+                child: Text(
+                  'Subscription plan and membership changes are unavailable during testing. Your current plan details remain visible below.',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
             _BillingControls(
               cycles: _availableCycles(billing),
               selectedCycle: _selectedCycle,
@@ -266,6 +286,7 @@ class _ProfessionalSettingsBillingPageState
               currentPlanCode: billing.planCode,
               priceFor: _priceFor,
               cycleSuffix: _cycleSuffix(),
+              paymentsEnabled: billing.paymentsEnabled,
               onChoosePlan: _choosePlan,
             ),
             if (_showsMembershipManagement(billing)) ...[
@@ -373,6 +394,7 @@ class _PlanComparison extends StatelessWidget {
     required this.currentPlanCode,
     required this.priceFor,
     required this.cycleSuffix,
+    required this.paymentsEnabled,
     required this.onChoosePlan,
   });
 
@@ -380,6 +402,7 @@ class _PlanComparison extends StatelessWidget {
   final String currentPlanCode;
   final String Function(ProfessionalPlanTier) priceFor;
   final String cycleSuffix;
+  final bool paymentsEnabled;
   final ValueChanged<String> onChoosePlan;
 
   @override
@@ -448,6 +471,7 @@ class _PlanComparison extends StatelessWidget {
                           price: priceFor(plan),
                           cycleSuffix: cycleSuffix,
                           isCurrent: plan.code == currentPlanCode,
+                          paymentsEnabled: paymentsEnabled,
                           onChoose: () => onChoosePlan(plan.code),
                         ),
                     ],
@@ -489,6 +513,7 @@ class _PlanHeaderCell extends StatelessWidget {
     required this.price,
     required this.cycleSuffix,
     required this.isCurrent,
+    required this.paymentsEnabled,
     required this.onChoose,
   });
 
@@ -497,6 +522,7 @@ class _PlanHeaderCell extends StatelessWidget {
   final String price;
   final String cycleSuffix;
   final bool isCurrent;
+  final bool paymentsEnabled;
   final VoidCallback onChoose;
 
   bool get _isFree => tier.code == 'starter_free' || tier.code == 'starter';
@@ -567,7 +593,7 @@ class _PlanHeaderCell extends StatelessWidget {
                 : _isFree
                 ? const SizedBox(height: AppSize.buttonHeightSm)
                 : OutlinedButton(
-                    onPressed: onChoose,
+                    onPressed: paymentsEnabled ? onChoose : null,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, AppSize.buttonHeightSm),
                       padding: const EdgeInsets.symmetric(
@@ -575,7 +601,7 @@ class _PlanHeaderCell extends StatelessWidget {
                       ),
                       textStyle: context.text.labelSmall,
                     ),
-                    child: const Text('Choose'),
+                    child: Text(paymentsEnabled ? 'Choose' : 'Unavailable'),
                   ),
           ),
         ],
@@ -705,7 +731,8 @@ class _MembershipCard extends StatelessWidget {
               label: 'Cancellation effective',
               value: shortDate(billing.cancellationEffectiveAt!),
             ),
-          if (billing.billingConfigured || isPaid) ...[
+          if (billing.paymentsEnabled &&
+              (billing.billingConfigured || isPaid)) ...[
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,

@@ -11,11 +11,13 @@ import { PlanLockApiService, PlanLockStatus } from '@core/api/plan-lock-api.serv
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
+import { InfoHintComponent } from '@shared/info-hint/info-hint.component';
 
 @Component({
   selector: 'app-professional-templates',
   standalone: true,
-  imports: [RouterLink, DragDropModule, ProfessionalPageShellComponent],
+  imports: [RouterLink, DragDropModule, ProfessionalPageShellComponent, SkeletonComponent, InfoHintComponent],
   templateUrl: './professional-templates.component.html',
   styleUrl: './professional-templates.component.scss'
 })
@@ -163,6 +165,14 @@ export class ProfessionalTemplatesComponent implements OnInit {
         this.message = formatApiError(error, 'Template could not be deleted.');
       }
     });
+  }
+
+  /** "0 clients assigned" reads as a defect; say what it means instead. */
+  assignedLabel(count: number): string {
+    if (!count) {
+      return 'Not assigned yet';
+    }
+    return `${count} client${count === 1 ? '' : 's'} assigned`;
   }
 
   cadenceLabel(cadence: string): string {

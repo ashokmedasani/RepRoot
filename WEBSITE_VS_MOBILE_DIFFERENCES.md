@@ -46,7 +46,7 @@ Small known non-parities remaining (deliberate, low priority): web's registratio
 ## 5. Payments (deferred by you — waiting on Razorpay support)
 
 - Provider is Razorpay; `REPROOT_PAYMENTS_ENABLED` currently defaults to `False` in settings, and billing runs in test mode (plan changes apply instantly, no charge).
-- Real prices live in `backend/accounts/razorpay_billing.py` (Pro ₹299/$5.99, Premium ₹999/$14.99, 6-month "pay for 5" and yearly "pay for 10" cycles).
+- The approved plan policy is recorded only in `Documentation/PLAN_AND_BILLING_DRAFT.md`. The backend catalogue still requires the separately approved implementation pass; do not copy prices from older reports or historical code notes.
 - Mobile opens checkout/billing-portal URLs in the external browser — same flow as web. Nothing mobile-specific should need to change when you finish the Razorpay configuration; it's all backend config.
 - When you enable payments for real: re-test the upgrade dialog, cancellation scheduling, and the "cancellation blocked at >100% Free storage" path on both platforms.
 

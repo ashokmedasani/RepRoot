@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Country, State } from 'country-state-city';
@@ -13,7 +13,7 @@ import { formatApiError } from '@shared/utils/ui-helpers';
   templateUrl: './professional-profile-setup.component.html',
   styleUrl: './professional-profile-setup.component.scss'
 })
-export class ProfessionalProfileSetupComponent implements OnInit {
+export class ProfessionalProfileSetupComponent implements OnInit, OnDestroy {
   private readonly formBuilder = inject(FormBuilder);
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
@@ -45,8 +45,24 @@ export class ProfessionalProfileSetupComponent implements OnInit {
   selectedPhotoName = '';
   profilePhotoUrl = '';
   selectedPhotoPreview = '';
+  isPhotoCropOpen = false;
+  isProcessingCrop = false;
+  cropZoom = 1;
+  cropOffsetX = 0;
+  cropOffsetY = 0;
+  readonly cropViewportSize = 320;
   private isPatchingProfile = false;
   private selectedPhoto: File | null = null;
+  private cropImage: HTMLImageElement | null = null;
+  private cropSourceUrl = '';
+  private cropOriginalFileName = 'profile-photo.jpg';
+  private activeCropPointerId: number | null = null;
+  private cropPointerX = 0;
+  private cropPointerY = 0;
+  private professionalCodeTimer: ReturnType<typeof setTimeout> | null = null;
+  private professionalCodeRequest = 0;
+
+  @ViewChild('setupCropCanvas') private cropCanvas?: ElementRef<HTMLCanvasElement>;
 
   readonly setupForm = this.formBuilder.nonNullable.group({
     first_name: ['', Validators.required],
@@ -63,6 +79,8 @@ export class ProfessionalProfileSetupComponent implements OnInit {
   });
 
   codeStatus: 'idle' | 'available' | 'taken' = 'idle';
+  codeSuggestions: string[] = [];
+  codeMessage = '';
 
   get stateOptions(): string[] {
     const selectedCountry = this.countries.find((country) => country.name === this.setupForm.controls.country.value);
@@ -108,16 +126,158 @@ export class ProfessionalProfileSetupComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    if (this.professionalCodeTimer) {
+      clearTimeout(this.professionalCodeTimer);
+    }
+    this.revokePhotoPreview();
+    this.releaseCropSource();
+  }
+
   checkProfessionalCode(): void {
+    if (this.professionalCodeTimer) {
+      clearTimeout(this.professionalCodeTimer);
+    }
+    const control = this.setupForm.controls.professional_code;
+    // The code is stored lowercase (see the save handler). Checking the raw
+    // value meant a professional typed FITJOHN, was told it was available, and
+    // ended up with `fitjohn` -- then told clients to type FITJOHN.
+    const code = control.value.trim().toLowerCase();
     this.codeStatus = 'idle';
+    this.codeSuggestions = [];
+    this.codeMessage = '';
+    if (control.invalid || code.length < 4) {
+      return;
+    }
+
+    const requestId = ++this.professionalCodeRequest;
+    this.professionalCodeTimer = setTimeout(() => {
+      this.professionalAuthApi.checkProfessionalCode(code).subscribe({
+        next: (result) => {
+          if (requestId !== this.professionalCodeRequest || code !== control.value.trim().toLowerCase()) return;
+          this.codeStatus = result.available ? 'available' : 'taken';
+          this.codeSuggestions = result.suggestions || [];
+          this.codeMessage = result.available && code !== control.value.trim()
+            ? `${result.message} It will be saved as "${code}".`
+            : result.message;
+        },
+        error: () => {
+          if (requestId !== this.professionalCodeRequest) return;
+          this.codeStatus = 'idle';
+          this.codeMessage = 'Availability could not be checked. Try again.';
+        }
+      });
+    }, 350);
+  }
+
+  useProfessionalCodeSuggestion(suggestion: string): void {
+    this.setupForm.controls.professional_code.setValue(suggestion);
+    this.checkProfessionalCode();
   }
 
   handlePhotoSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0] || null;
-    this.selectedPhoto = file;
-    this.selectedPhotoName = file?.name || '';
-    this.selectedPhotoPreview = file ? URL.createObjectURL(file) : '';
+    input.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.setupMessage = 'Choose an image file for your profile picture.';
+      return;
+    }
+
+    this.openPhotoCropper(file);
+  }
+
+  onCropZoomChange(event: Event): void {
+    this.cropZoom = Number((event.target as HTMLInputElement).value);
+    this.clampCropOffsets();
+    this.drawCropPreview();
+  }
+
+  resetPhotoCrop(): void {
+    this.cropZoom = 1;
+    this.cropOffsetX = 0;
+    this.cropOffsetY = 0;
+    this.drawCropPreview();
+  }
+
+  beginCropDrag(event: PointerEvent): void {
+    if (!this.cropImage) return;
+    this.activeCropPointerId = event.pointerId;
+    this.cropPointerX = event.clientX;
+    this.cropPointerY = event.clientY;
+    (event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);
+  }
+
+  moveCrop(event: PointerEvent): void {
+    if (this.activeCropPointerId !== event.pointerId) return;
+    const canvas = event.currentTarget as HTMLCanvasElement;
+    const displayScale = this.cropViewportSize / canvas.getBoundingClientRect().width;
+    this.cropOffsetX += (event.clientX - this.cropPointerX) * displayScale;
+    this.cropOffsetY += (event.clientY - this.cropPointerY) * displayScale;
+    this.cropPointerX = event.clientX;
+    this.cropPointerY = event.clientY;
+    this.clampCropOffsets();
+    this.drawCropPreview();
+  }
+
+  endCropDrag(event: PointerEvent): void {
+    if (this.activeCropPointerId === event.pointerId) {
+      this.activeCropPointerId = null;
+    }
+  }
+
+  cancelPhotoCrop(): void {
+    this.isPhotoCropOpen = false;
+    this.cropImage = null;
+    this.releaseCropSource();
+  }
+
+  applyPhotoCrop(): void {
+    if (!this.cropImage || this.isProcessingCrop) return;
+    this.isProcessingCrop = true;
+
+    const outputSize = 640;
+    const output = document.createElement('canvas');
+    output.width = outputSize;
+    output.height = outputSize;
+    const context = output.getContext('2d');
+    if (!context) {
+      this.isProcessingCrop = false;
+      this.setupMessage = 'The photo editor could not prepare this image.';
+      return;
+    }
+
+    const geometry = this.cropGeometry();
+    const multiplier = outputSize / this.cropViewportSize;
+    context.drawImage(
+      this.cropImage,
+      geometry.x * multiplier,
+      geometry.y * multiplier,
+      geometry.width * multiplier,
+      geometry.height * multiplier
+    );
+
+    output.toBlob((blob) => {
+      this.isProcessingCrop = false;
+      if (!blob) {
+        this.setupMessage = 'The cropped profile picture could not be created.';
+        return;
+      }
+
+      const baseName = this.cropOriginalFileName.replace(/\.[^.]+$/, '') || 'profile-photo';
+      this.selectedPhoto = new File([blob], `${baseName}-cropped.jpg`, {
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+      this.selectedPhotoName = this.selectedPhoto.name;
+      this.revokePhotoPreview();
+      this.selectedPhotoPreview = URL.createObjectURL(this.selectedPhoto);
+      this.setupMessage = '';
+      this.isPhotoCropOpen = false;
+      this.cropImage = null;
+      this.releaseCropSource();
+    }, 'image/jpeg', 0.92);
   }
 
   saveProfileSetup(): void {
@@ -133,7 +293,7 @@ export class ProfessionalProfileSetupComponent implements OnInit {
     this.professionalAuthApi.saveProfile(this.buildProfileFormData()).subscribe({
       next: () => {
         this.isSaving = false;
-        void this.router.navigate(['/professional/profile']);
+        void this.router.navigate(['/professional/dashboard']);
       },
       error: (error: unknown) => {
         this.setupMessage = formatApiError(error, 'Profile setup could not be saved.');
@@ -165,5 +325,76 @@ export class ProfessionalProfileSetupComponent implements OnInit {
     }
 
     return formData;
+  }
+
+  private openPhotoCropper(file: File): void {
+    this.releaseCropSource();
+    this.cropSourceUrl = URL.createObjectURL(file);
+    this.cropOriginalFileName = file.name;
+    const image = new Image();
+    image.onload = () => {
+      this.cropImage = image;
+      this.cropZoom = 1;
+      this.cropOffsetX = 0;
+      this.cropOffsetY = 0;
+      this.isPhotoCropOpen = true;
+      requestAnimationFrame(() => this.drawCropPreview());
+    };
+    image.onerror = () => {
+      this.setupMessage = 'This image could not be opened. Choose a different photo.';
+      this.releaseCropSource();
+    };
+    image.src = this.cropSourceUrl;
+  }
+
+  private drawCropPreview(): void {
+    const canvas = this.cropCanvas?.nativeElement;
+    if (!canvas || !this.cropImage) return;
+    canvas.width = this.cropViewportSize;
+    canvas.height = this.cropViewportSize;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const geometry = this.cropGeometry();
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(this.cropImage, geometry.x, geometry.y, geometry.width, geometry.height);
+  }
+
+  private cropGeometry(): { x: number; y: number; width: number; height: number } {
+    if (!this.cropImage) return { x: 0, y: 0, width: 0, height: 0 };
+    const baseScale = Math.max(
+      this.cropViewportSize / this.cropImage.naturalWidth,
+      this.cropViewportSize / this.cropImage.naturalHeight
+    );
+    const scale = baseScale * this.cropZoom;
+    const width = this.cropImage.naturalWidth * scale;
+    const height = this.cropImage.naturalHeight * scale;
+    return {
+      x: (this.cropViewportSize - width) / 2 + this.cropOffsetX,
+      y: (this.cropViewportSize - height) / 2 + this.cropOffsetY,
+      width,
+      height
+    };
+  }
+
+  private clampCropOffsets(): void {
+    const geometry = this.cropGeometry();
+    const maxX = Math.max(0, (geometry.width - this.cropViewportSize) / 2);
+    const maxY = Math.max(0, (geometry.height - this.cropViewportSize) / 2);
+    this.cropOffsetX = Math.max(-maxX, Math.min(maxX, this.cropOffsetX));
+    this.cropOffsetY = Math.max(-maxY, Math.min(maxY, this.cropOffsetY));
+  }
+
+  private revokePhotoPreview(): void {
+    if (this.selectedPhotoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(this.selectedPhotoPreview);
+    }
+    this.selectedPhotoPreview = '';
+  }
+
+  private releaseCropSource(): void {
+    if (this.cropSourceUrl) {
+      URL.revokeObjectURL(this.cropSourceUrl);
+      this.cropSourceUrl = '';
+    }
   }
 }

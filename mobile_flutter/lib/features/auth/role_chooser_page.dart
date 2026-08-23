@@ -113,9 +113,9 @@ class _Brand extends StatelessWidget {
       children: [
         const RepRootLogo(size: 64),
         const SizedBox(height: AppSpacing.md),
-        // "RepRoot Studio" is the product name the website uses (its
-        // `brand__text`), so the signed-out screen now says the same thing
-        // both places instead of describing the product differently.
+        // STUDIO-HIDDEN 2026-08-17: this wordmark read "RepRoot Studio"; the trailing
+        // " Studio" TextSpan is commented out below. Matches the website
+        // `brand__text`, which now also reads "RepRoot".
         Text.rich(
           TextSpan(
             style: text.displaySmall,
@@ -125,7 +125,7 @@ class _Brand extends StatelessWidget {
                 text: 'Root',
                 style: TextStyle(color: context.colors.primary),
               ),
-              const TextSpan(text: ' Studio'),
+              // const TextSpan(text: ' Studio'),
             ],
           ),
           textAlign: TextAlign.center,

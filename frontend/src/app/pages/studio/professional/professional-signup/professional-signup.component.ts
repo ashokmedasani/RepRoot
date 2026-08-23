@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { ProfessionalAuthApiService, ProfessionalSignupPayload } from '@core/api/professional-auth-api.service';
+import { GoogleRedirectService } from '@core/auth/google-redirect.service';
 import { AuthPageShellComponent } from '@studio-shared/auth-page-shell/auth-page-shell.component';
 import { PasswordInputComponent } from '@studio-shared/password-input/password-input.component';
 import { PasswordRequirementsComponent } from '@studio-shared/password-requirements/password-requirements.component';
@@ -23,7 +24,9 @@ type UsernameStatus = 'idle' | 'available' | 'taken' | 'failed';
 export class ProfessionalSignupComponent implements OnDestroy {
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly router = inject(Router);
+  private readonly googleRedirect = inject(GoogleRedirectService);
   private resendTimerId: number | undefined;
+  private usernameCheckTimerId: number | undefined;
 
   signupMessage = '';
   emailCheckMessage = '';
@@ -43,8 +46,13 @@ export class ProfessionalSignupComponent implements OnDestroy {
   showLegalReview = false;
   acceptedLegalDocuments = false;
   pendingGoogleCredential = '';
+  /** Distinguishes the legal dialog opened ahead of the Google redirect from
+   *  the one opened to create an email/password account. Clicking Google now
+   *  leaves the site, so acceptance has to be collected before the redirect
+   *  rather than after a popup returned a credential. */
+  isGoogleLegalGate = false;
   legalVersion = '';
-  legalEffectiveDate = '';
+  legalLastUpdatedDate = '';
   isGoogleAvailable = true;
   isGoogleSubmitting = false;
 
@@ -58,9 +66,9 @@ export class ProfessionalSignupComponent implements OnDestroy {
 
   constructor() {
     this.professionalAuthApi.getLegalConfiguration().subscribe({
-      next: ({ professional, effective_date }) => {
+      next: ({ professional, last_updated_date, effective_date }) => {
         this.legalVersion = professional.version;
-        this.legalEffectiveDate = effective_date;
+        this.legalLastUpdatedDate = last_updated_date || effective_date;
       }
     });
   }
@@ -139,14 +147,32 @@ export class ProfessionalSignupComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.clearResendTimer();
+    this.clearUsernameCheckTimer();
   }
 
   handleUsernameChange(): void {
+    this.clearUsernameCheckTimer();
     this.usernameStatus = 'idle';
     this.verifiedUsername = '';
     this.usernameCheckMessage = '';
     this.usernameSuggestions = [];
     this.fieldErrors.username = '';
+
+    const username = this.signupForm.username.trim().toLowerCase();
+    if (!username) {
+      return;
+    }
+
+    const validationError = this.getUsernameLengthError(username);
+    if (validationError) {
+      if (username.length >= 5) {
+        this.fieldErrors.username = validationError;
+      }
+      return;
+    }
+
+    this.usernameCheckMessage = 'Checking availability...';
+    this.usernameCheckTimerId = window.setTimeout(() => this.verifyUsername(), 450);
   }
 
   applyUsernameSuggestion(suggestion: string): void {
@@ -165,6 +191,11 @@ export class ProfessionalSignupComponent implements OnDestroy {
     this.fieldErrors.otp = '';
     this.clearResendTimer();
     this.resendCountdown = 0;
+  }
+
+  editVerifiedEmail(): void {
+    this.handleEmailChange();
+    this.signupForm.emailOtp = '';
   }
 
   handleOtpChange(): void {
@@ -298,6 +329,9 @@ export class ProfessionalSignupComponent implements OnDestroy {
 
     this.professionalAuthApi.checkUsername(username).subscribe({
       next: (response) => {
+        if (this.signupForm.username.trim().toLowerCase() !== username) {
+          return;
+        }
         this.usernameStatus = response.available ? 'available' : 'taken';
         this.verifiedUsername = response.available ? username : '';
         this.usernameCheckMessage = response.available
@@ -308,6 +342,9 @@ export class ProfessionalSignupComponent implements OnDestroy {
         this.isCheckingUsername = false;
       },
       error: () => {
+        if (this.signupForm.username.trim().toLowerCase() !== username) {
+          return;
+        }
         this.usernameStatus = 'failed';
         this.fieldErrors.username = 'Could not verify username. Please refresh and try again.';
         this.usernameCheckMessage = '';
@@ -326,41 +363,20 @@ export class ProfessionalSignupComponent implements OnDestroy {
     this.fieldErrors.general = message;
   }
 
-  handleGoogleCredential(credential: string): void {
-    this.pendingGoogleCredential = credential;
+  openGoogleLegalGate(): void {
+    this.isGoogleLegalGate = true;
     this.openLegalReview('google');
   }
 
+  /** Accepting in the dialog is the last thing that happens on this page --
+   *  the next line navigates away to Google's account chooser. */
   confirmGoogleSignup(): void {
-    if (!this.hasAcceptedLegalDocuments || !this.pendingGoogleCredential) {
+    if (!this.hasAcceptedLegalDocuments) {
       return;
     }
     this.isGoogleSubmitting = true;
-    this.fieldErrors.general = '';
-    this.signupMessage = 'Verifying with Google...';
-
-    this.professionalAuthApi.googleAuth(this.pendingGoogleCredential, true).subscribe({
-      next: (response) => {
-        if (!response.is_new_account) {
-          window.sessionStorage.removeItem('professional-auth-token');
-          this.isGoogleSubmitting = false;
-          this.closeLegalReview();
-          this.fieldErrors.general = 'An account already exists for this Google email. Please sign in.';
-          return;
-        }
-        window.sessionStorage.setItem('professional-auth-token', response.token);
-        window.sessionStorage.setItem('professional-account-id', String(response.professional.id));
-        window.sessionStorage.setItem('professional-account-username', response.professional.username);
-        this.isGoogleSubmitting = false;
-        this.closeLegalReview();
-        void this.router.navigate([response.professional.profile_setup_completed ? '/professional/dashboard' : '/professional/profile-setup']);
-      },
-      error: (error: unknown) => {
-        this.signupMessage = '';
-        this.fieldErrors.general = this.formatApiError(error, 'Google sign-up failed. Please try again.');
-        this.isGoogleSubmitting = false;
-      }
-    });
+    this.signupMessage = 'Redirecting to Google...';
+    this.googleRedirect.start('signup');
   }
 
   createProfessionalAccount(): void {
@@ -380,7 +396,9 @@ export class ProfessionalSignupComponent implements OnDestroy {
     }
 
     if (this.usernameStatus !== 'available' || this.verifiedUsername !== username) {
-      this.fieldErrors.username = 'Please verify username availability before creating the account.';
+      this.fieldErrors.username = this.isCheckingUsername
+        ? 'Please wait while we check username availability.'
+        : 'Choose an available username before creating the account.';
       this.signupMessage = '';
       return;
     }
@@ -434,6 +452,7 @@ export class ProfessionalSignupComponent implements OnDestroy {
     }
     this.showLegalReview = false;
     this.acceptedLegalDocuments = false;
+    this.isGoogleLegalGate = false;
     this.pendingGoogleCredential = '';
   }
 
@@ -631,6 +650,13 @@ export class ProfessionalSignupComponent implements OnDestroy {
     if (this.resendTimerId !== undefined) {
       window.clearInterval(this.resendTimerId);
       this.resendTimerId = undefined;
+    }
+  }
+
+  private clearUsernameCheckTimer(): void {
+    if (this.usernameCheckTimerId !== undefined) {
+      window.clearTimeout(this.usernameCheckTimerId);
+      this.usernameCheckTimerId = undefined;
     }
   }
 }

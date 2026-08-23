@@ -754,3 +754,25 @@ textarea {
     justify-content: space-between;
   }
 }
+
+.outcome-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.waiting-for {
+  color: var(--app-muted);
+  font-weight: 700;
+}
+
+.table-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
+.table-empty p {
+  margin: 0;
+  color: var(--app-muted);
+}

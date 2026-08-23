@@ -643,3 +643,9 @@ label {
   background: #f1faf7;
   color: #29443f;
 }
+
+.ref-added {
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}

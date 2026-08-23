@@ -496,12 +496,51 @@ textarea {
 }
 
 /* ---- Meetings ---- */
+/* Each kind of meeting is its own card, matching the dashboard's Activity
+   cards. These used to be flat sections separated by a horizontal rule, which
+   read as one continuous list under headings rather than as separate things. */
 .meetings-section {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius);
+  padding: var(--app-panel-padding);
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow);
+}
+
+.meetings-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.meetings-heading h2 {
+  margin: 0;
+}
+
+/* How many are in this box, answered without counting the rows. */
+.meetings-count {
+  min-width: 1.6rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* History is counted, but quietly -- it is not something to act on. */
+.meetings-count.muted-count {
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
 }
 
 .source-note { margin: -0.35rem 0 0.9rem; }
-.lead-source-section { border-top: 1px solid var(--app-border); padding-top: 1.25rem; }
+/* No rule between the boxes: the card edges already separate them. */
+.lead-source-section { padding-top: var(--app-panel-padding); }
 .lead-meeting-card { border-left: 4px solid #7c3aed; }
 .source-pill { width: fit-content; border-radius: 999px; padding: 0.18rem 0.55rem; background: #ede9fe; color: #6d28d9; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; }
 
@@ -758,4 +797,29 @@ textarea {
   border-color: #d92d20;
   background: rgba(217, 45, 32, 0.08);
   color: #d92d20;
+}
+
+// Whether the client accepted is the first thing a trainer wants from a
+// meeting row, and it was not shown at all.
+.response-tag {
+  justify-self: start;
+  border: 1px solid var(--app-border);
+  border-radius: 2rem;
+  padding: 0.1rem 0.55rem;
+  background: var(--app-surface-soft);
+  color: var(--app-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.response-tag.accepted {
+  border-color: color-mix(in srgb, var(--app-success) 40%, var(--app-border));
+  background: color-mix(in srgb, var(--app-success) 12%, var(--app-surface));
+  color: var(--app-success);
+}
+
+.response-tag.declined {
+  border-color: color-mix(in srgb, #d92d20 35%, var(--app-border));
+  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
+  color: #b42318;
 }

@@ -20,19 +20,27 @@
     @if (referenceLimitReached()) {
       <p class="limit-message">You have reached the Version 1 resource limit.</p>
     }
-    <div class="search-actions-row">
+    <div class="search-actions-row" data-tour="resource-search">
       <label class="search-box">
         <span class="visually-hidden">Search resources</span>
         <input type="search" [ngModel]="query()" (ngModelChange)="setSearch($event)" placeholder="Search resources...">
       </label>
       <button type="button" class="primary-action" (click)="addCategory()">+ Create Category</button>
+      <!-- Both drag mechanics on this page explained in one place, rather than
+           a line of prose above every category and every subcategory. -->
+      <app-info-hint label="About reordering resources">Drag a category or a resource by its <strong>⠿</strong> handle to change the order. Category order matters: if you go over your plan's allowance, the categories lowest in the list lock first, and their resources lock with them. Inside a subcategory, the order simply sets which resources your clients see first.</app-info-hint>
     </div>
 
-    @if (orderedActiveCategories().length) {
-      <p class="drag-hint">Drag a category by its ⠿ handle to change which categories (and their resources) lock first if you go over plan.</p>
+    @if (isLoading()) {
+      <!-- Without this the page rendered its "No categories yet." empty state on
+           every single load, before the two requests came back. -->
+      <app-skeleton variant="row" [count]="4" />
     }
+
+    @if (!isLoading()) {
     <div class="cat-list" cdkDropList (cdkDropListDropped)="dropCategory($event)">
     @for (category of orderedActiveCategories(); track category.id) {
+      @if (categoryHasVisibleResources(category)) {
       <div class="cat-accordion" cdkDrag>
         <div class="cat-header">
           <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
@@ -53,7 +61,7 @@
           <div class="cat-body">
             <button type="button" class="ghost-action compact add-subcategory" (click)="addSubcategory(category)">+ Add Subcategory</button>
 
-            @for (subcategory of category.subcategories; track subcategory) {
+            @for (subcategory of visibleSubcategoriesFor(category); track subcategory) {
               <section class="subcat-block">
                 <div class="subcat-header">
                   <h3>{{ subcategory }}</h3>
@@ -63,9 +71,6 @@
                   </div>
                 </div>
 
-                @if (orderedActiveResourcesFor(category.name, subcategory).length) {
-                  <p class="drag-hint">Drag a resource by its ⠿ handle to change its priority within this subcategory.</p>
-                }
                 <div class="subcategory-references" cdkDropList (cdkDropListDropped)="dropResource($event, category.name, subcategory)">
                 @for (reference of orderedActiveResourcesFor(category.name, subcategory); track reference.id) {
               <div class="ref-item" cdkDrag [class.open]="expandedReferenceId() === reference.id">
@@ -73,6 +78,9 @@
                   <span class="drag-handle" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
                   <span class="ref-caret" [class.open]="expandedReferenceId() === reference.id">&rsaquo;</span>
                   <span class="ref-title">{{ reference.title }}</span>
+                  <!-- Added date was only visible after expanding a row, so a
+                       collapsed list gave no way to tell new from stale. -->
+                  <span class="ref-added">Added {{ reference.createdAt | date: 'mediumDate' }}</span>
                   <span class="type-pill">{{ reference.type }}</span>
                 </button>
 
@@ -167,6 +175,7 @@
           </div>
         }
       </div>
+      }
     } @empty {
       <div class="empty-category">
         <p>No categories yet.</p>
@@ -175,9 +184,19 @@
     }
     </div>
 
+    }
+
+    @if (!isLoading() && isSearching() && searchMatchCount() === 0) {
+      <div class="empty-category">
+        <p>No resources match &ldquo;{{ query() }}&rdquo;.</p>
+        <button type="button" class="ghost-action" (click)="setSearch('')">Clear search</button>
+      </div>
+    }
+
     @if (lockedCategoriesList().length) {
       <div class="cat-list locked-list">
         @for (category of lockedCategoriesList(); track category.id) {
+          @if (categoryHasVisibleResources(category)) {
           <div class="cat-accordion locked">
             <div class="cat-header">
               <button type="button" class="cat-expand" (click)="toggleCategory(category.name)" [attr.aria-expanded]="isCategoryOpen(category.name)">
@@ -197,7 +216,7 @@
 
             @if (isCategoryOpen(category.name)) {
               <div class="cat-body">
-                @for (subcategory of category.subcategories; track subcategory) {
+                @for (subcategory of visibleSubcategoriesFor(category); track subcategory) {
                   <section class="subcat-block">
                     <div class="subcat-header">
                       <h3>{{ subcategory }}</h3>
@@ -232,6 +251,7 @@
               </div>
             }
           </div>
+          }
         }
       </div>
     }
@@ -352,26 +372,35 @@
             <h2 id="category-editor-title">
               {{ categoryEditorMode() === 'create' ? 'Create Category' : (categoryEditorMode() === 'edit' ? 'Edit Category' : 'Add Subcategory') }}
             </h2>
-            <p>Use categories to organize professional-owned reusable resources.</p>
+            @if (categoryEditorMode() === 'subcategory') {
+              <p>Adding to <strong>{{ categoryForm.name }}</strong>.</p>
+            } @else {
+              <p>Use categories to organize professional-owned reusable resources.</p>
+            }
           </div>
           <button type="button" class="icon-button" title="Close" (click)="isCategoryEditorOpen.set(false)">x</button>
         </div>
 
-        <label>
-          <span>Category name</span>
-          <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Exercises" [readonly]="categoryEditorMode() === 'subcategory'" required>
-        </label>
+        <!-- Category name and description are the category's own fields. When
+             adding a subcategory they were shown read-only, which read as two
+             dead inputs to fill in. The category is named in the header above
+             instead, so the form asks for the one thing it needs. -->
+        @if (categoryEditorMode() !== 'subcategory') {
+          <label>
+            <span>Category name</span>
+            <input type="text" [(ngModel)]="categoryForm.name" name="categoryName" placeholder="Exercises" required>
+          </label>
 
-        <label>
-          <span>Category description <small>Optional</small></span>
-          <textarea
-            rows="3"
-            [(ngModel)]="categoryForm.description"
-            name="categoryDescription"
-            placeholder="Short description for this category"
-            [readonly]="categoryEditorMode() === 'subcategory'"
-          ></textarea>
-        </label>
+          <label>
+            <span>Category description <small>Optional</small></span>
+            <textarea
+              rows="3"
+              [(ngModel)]="categoryForm.description"
+              name="categoryDescription"
+              placeholder="Short description for this category"
+            ></textarea>
+          </label>
+        }
 
         @if (categoryEditorMode() !== 'create') {
           <label>

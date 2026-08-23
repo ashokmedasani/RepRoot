@@ -241,7 +241,11 @@ void main() {
 
     test('keeps the status when the body is JSON but not an object', () async {
       final error = await capture(500, ['boom']);
-      expect(error.message, contains('error 500'));
+      expect(
+        error.message,
+        'RepRoot could not complete that request. Please try again.',
+      );
+      expect(error.message, isNot(contains('500')));
       expect(error.statusCode, 500);
     });
 
@@ -253,7 +257,11 @@ void main() {
         '<html><body>Server Error (500)</body></html>',
         contentType: 'text/html',
       );
-      expect(error.message, contains('error 500'));
+      expect(
+        error.message,
+        'RepRoot could not complete that request. Please try again.',
+      );
+      expect(error.message, isNot(contains('500')));
       expect(error.statusCode, 500);
     });
 
@@ -264,7 +272,10 @@ void main() {
         await runApi(() => dio.get<dynamic>('/x/'));
         fail('expected ApiException');
       } on ApiException catch (error) {
-        expect(error.message, contains('Cannot reach the server'));
+        expect(
+          error.message,
+          'Cannot reach RepRoot. Check your internet connection and try again.',
+        );
       }
     });
   });

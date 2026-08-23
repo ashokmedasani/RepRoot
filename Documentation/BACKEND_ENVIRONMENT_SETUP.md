@@ -18,12 +18,26 @@ or redeploy Django after changing values.
 | `DJANGO_SECRET_KEY` | Yes | A new long random production secret |
 | `DJANGO_DEBUG` | No | `False` |
 | `DJANGO_ALLOWED_HOSTS` | No | Backend hostname, such as `api.example.com` |
-| `REPROOT_FRONTEND_URL` | No | Public Angular application URL |
+| `REPROOT_FRONTEND_URL` | No | Canonical public RepRoot origin; public lead-form links are generated from it |
+| `REPROOT_LEGAL_LAST_UPDATED_DATE` | No | Shared legal-document date in ISO `YYYY-MM-DD` format |
+| `REPROOT_SIGNUP_ALLOWED_EMAIL_DOMAINS` | No | Optional comma-separated provider allowlist; empty permits valid company domains |
+| `REPROOT_SIGNUP_BLOCKED_EMAIL_DOMAINS` | No | Comma-separated disposable or reserved domains rejected during signup |
 | `CORS_ALLOWED_ORIGINS` | No | Allowed frontend origins, comma-separated |
 | `CSRF_TRUSTED_ORIGINS` | No | HTTPS frontend origins, comma-separated |
 
 Keep the secure-cookie and HSTS fields at the values shown in `.env.example`
 after production HTTPS is active.
+
+Set `REPROOT_FRONTEND_URL` to the public RepRoot origin without a trailing slash
+(for example, `https://your-domain.com`). Flutter and browser API
+responses use it to produce the same shareable lead-form URL. Add the signup
+domain policy values manually in `backend/.env` locally and in the hosting
+provider's backend environment dashboard for deployment; restart or redeploy
+the backend after changing them. These values are configuration, not secrets.
+
+Set `REPROOT_LEGAL_LAST_UPDATED_DATE` whenever either current legal document is
+revised. The value is non-secret, must use ISO `YYYY-MM-DD`, and is the single
+date displayed and enforced for both professional and client acceptance.
 
 When CloudFront terminates HTTPS in front of an HTTP Elastic Beanstalk origin,
 set `DJANGO_PROXY_SSL_HEADER=HTTP_CLOUDFRONT_FORWARDED_PROTO`. Keep the default
@@ -83,18 +97,16 @@ Keep `GOOGLE_CALENDAR_ENABLED=False` until every credential is present.
 
 Private Calendar operations require OAuth; an API key is insufficient.
 
-## Stripe billing
+## Payment provider setup
 
-Use test-mode values until the payment flow and webhook are verified.
+Payment-provider setup is intentionally deferred. Do not configure checkout
+from an older provider list or treat environment variables as the source of
+plan names, limits, or prices. The approved commercial policy is maintained in
+`Documentation/PLAN_AND_BILLING_DRAFT.md`; implementation and provider setup
+will be completed as a separate controlled phase.
 
 | Variable | Secret | What to enter |
 | --- | --- | --- |
-| `STRIPE_PUBLISHABLE_KEY` | No | Stripe publishable key |
-| `STRIPE_SECRET_KEY` | Yes | Stripe backend secret/restricted key |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Webhook signing secret |
-| `STRIPE_PRO_PRICE_ID` | No | Recurring Pro price ID |
-| `STRIPE_PREMIUM_PRICE_ID` | No | Alternate/legacy Premium price ID |
-| `STRIPE_PREMIUM_UNLIMITED_PRICE_ID` | No | Premium Unlimited recurring price ID |
 | `REPROOT_BILLING_TEST_MODE` | No | `True` for simulation; otherwise `False` |
 | `REPROOT_BILLING_PROVIDER` | No | Set to `razorpay` |
 | `RAZORPAY_KEY_ID` | No | Razorpay test/live public key ID; backend checkout response may use it |

@@ -625,3 +625,22 @@ dd {
   gap: 0.7rem;
   margin-top: 0.25rem;
 }
+
+.status-pill.warn {
+  border-color: color-mix(in srgb, #f79009 40%, var(--app-border));
+  background: color-mix(in srgb, #f79009 12%, var(--app-surface));
+  color: #b54708;
+}
+
+.table-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
+.table-empty p {
+  margin: 0;
+  color: var(--app-muted);
+}

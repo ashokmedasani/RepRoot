@@ -135,7 +135,7 @@ class _ClientLegalConsentPageState
                 children: [
                   const SizedBox(height: AppSpacing.md),
                   const AuthBrand(
-                    title: 'Review how RepRoot Studio works',
+                    title: 'Review how RepRoot works',
                     subtitle:
                         'Before entering the client portal, review the '
                         'documents that apply specifically to clients.',
@@ -164,7 +164,7 @@ class _ClientLegalConsentPageState
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'RepRoot Studio provides the software. Your '
+                          'RepRoot provides the software. Your '
                           'professional decides what information and activities '
                           'to request.',
                           style: context.text.bodySmall?.copyWith(

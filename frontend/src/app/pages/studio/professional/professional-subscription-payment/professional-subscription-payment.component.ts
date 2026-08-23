@@ -55,7 +55,7 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
               <li>You can cancel anytime — there's no lock-in period.</li>
               <li>Cancelling schedules a downgrade for the end of your current billing period; nothing is ever deleted, items over the new plan's limits are simply locked until you upgrade again or remove some.</li>
               <li>{{ cycle === 'monthly' ? 'Monthly billing renews automatically until cancelled.' : (cycleName(billing) + ' billing is prepaid for the full period and is non-refundable once the period starts.') }}</li>
-              <li>By continuing, you agree to RepRoot Studio's Terms of Service and Cancellation Policy.</li>
+              <li>By continuing, you agree to RepRoot's Terms of Service and Cancellation Policy.</li>
             </ul>
             <label class="terms-agree">
               <input type="checkbox" [(ngModel)]="agreedToTerms" name="agreedToTerms" />
@@ -65,10 +65,12 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 
           @if (billing.test_mode) {
             <div class="test-notice">Testing checkout: no gateway is connected and no charge will be made. Confirming applies the plan for limit testing.</div>
+          } @else if (!billing.payments_enabled) {
+            <div class="test-notice">Subscription plan changes are unavailable during testing.</div>
           }
           @if (message) { <p class="message">{{ message }}</p> }
-          <button type="button" class="confirm-action" [disabled]="loading || !agreedToTerms" (click)="confirm()">
-            {{ loading ? 'Processing...' : (billing.test_mode ? 'Confirm test upgrade' : 'Continue to payment') }}
+          <button type="button" class="confirm-action" [disabled]="loading || !agreedToTerms || !billing.payments_enabled" (click)="confirm()">
+            {{ !billing.payments_enabled ? 'Unavailable during testing' : (loading ? 'Processing...' : (billing.test_mode ? 'Confirm test upgrade' : 'Continue to payment')) }}
           </button>
         } @else { <p>Loading checkout...</p> }
       </section>
@@ -178,7 +180,10 @@ export class ProfessionalSubscriptionPaymentComponent implements OnInit {
   }
 
   confirm(): void {
-    if (!this.billing || !this.agreedToTerms) return;
+    if (!this.billing?.payments_enabled || !this.agreedToTerms) {
+      this.message = 'Subscription payments are not available yet.';
+      return;
+    }
     this.loading = true;
     this.api.createBillingCheckout(this.targetTier, this.cycle, this.billing.billing_currency).subscribe({
       next: (result) => {

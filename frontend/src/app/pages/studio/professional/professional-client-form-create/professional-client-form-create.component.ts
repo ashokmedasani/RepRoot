@@ -22,7 +22,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
   group: ProfessionalGroup | null = null;
   customFields: DynamicField[] = [];
   externalSuggestionGroups: ExternalSuggestionGroup[] = [];
-  isMandatory = true;
+  readonly isMandatory = true;
   isLoading = true;
   isSaving = false;
   message = '';
@@ -44,8 +44,6 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
         this.customFields = (this.group.registration_form?.fields || [])
           .filter((field) => !field.is_core)
           .map((field) => ({ ...field }));
-        this.isMandatory = this.group.registration_form?.is_mandatory ?? true;
-
         // Never auto-copy or pre-populate fields here (Fixes after 1 Test
         // Launch, Priority 5 item 7) -- the group form starts with only the
         // locked core fields (seeded server-side) plus whatever the trainer
@@ -83,7 +81,7 @@ export class ProfessionalClientFormCreateComponent implements OnInit {
     this.formsGroupsApi.saveRegistrationForm(this.group.id, this.customFields, this.isMandatory).subscribe({
       next: () => {
         this.messageType = 'success';
-        this.message = 'Client creation form saved. Forms & Groups setup is complete.';
+        this.message = 'Client Information Form saved. Forms and Client Groups setup is complete.';
         window.setTimeout(() => void this.router.navigate(['/professional/forms-groups']), 900);
       },
       error: (error: unknown) => {

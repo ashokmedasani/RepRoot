@@ -119,7 +119,7 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
                 Text('Appearance', style: sheetContext.text.titleMedium),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Choose how RepRoot Studio looks on this device.',
+                  'Choose how RepRoot looks on this device.',
                   style: sheetContext.text.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.md),

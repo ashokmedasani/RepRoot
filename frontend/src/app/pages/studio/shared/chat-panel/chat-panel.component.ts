@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 
 import { ChatApiService, ChatMessageRecord } from '@core/api/chat-api.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { compressImageFile } from '@shared/utils/image-compression';
 
 const CHAT_POLL_INTERVAL_MS = 5000;
 
@@ -60,15 +61,19 @@ export class ChatPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (file.size > ChatPanelComponent.MAX_IMAGE_BYTES) {
-      this.errorMessage = 'Images must be 5MB or smaller.';
-      return;
-    }
-
-    this.clearPendingImage();
-    this.pendingImage = file;
-    this.pendingImagePreviewUrl = URL.createObjectURL(file);
-    this.errorMessage = '';
+    // Resized rather than refused: a progress photo sent from a phone is
+    // several megabytes, and none of that survives being viewed in a chat
+    // bubble.
+    void compressImageFile(file)
+      .then((result) => {
+        this.clearPendingImage();
+        this.pendingImage = result.file;
+        this.pendingImagePreviewUrl = URL.createObjectURL(result.file);
+        this.errorMessage = '';
+      })
+      .catch((error: unknown) => {
+        this.errorMessage = error instanceof Error ? error.message : 'That image could not be used.';
+      });
   }
 
   clearPendingImage(): void {

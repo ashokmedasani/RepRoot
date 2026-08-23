@@ -6,8 +6,10 @@
   titleId="account-settings-title"
 >
   <div class="settings-grid">
-    <nav class="settings-menu" aria-label="Settings sections">
-      @for (item of menu; track item.id) {
+    <!-- Ten tabs no longer fit across one line. The first six stay put and the
+         rest go behind "More", rather than wrapping into a second ragged row. -->
+    <nav class="settings-menu" data-tour="settings-tabs" aria-label="Settings sections">
+      @for (item of primaryMenu; track item.id) {
         <button
           type="button"
           class="settings-tab"
@@ -17,6 +19,37 @@
           {{ item.label }}
         </button>
       }
+
+      <span class="settings-more">
+        <button
+          type="button"
+          class="settings-tab settings-more__trigger"
+          [class.active]="isOverflowActive"
+          [attr.aria-expanded]="isMoreMenuOpen"
+          aria-haspopup="true"
+          (pointerdown)="openMoreMenu($event)"
+          (click)="toggleMoreMenu($event)"
+        >
+          {{ overflowLabel }}
+          <span class="settings-more__caret expander-caret" aria-hidden="true"></span>
+        </button>
+
+        @if (isMoreMenuOpen) {
+          <span class="settings-more__panel" role="menu">
+            @for (item of overflowMenu; track item.id) {
+              <button
+                type="button"
+                role="menuitem"
+                class="settings-more__item"
+                [class.active]="activeSection === item.id"
+                (click)="chooseOverflowSection(item.id)"
+              >
+                {{ item.label }}
+              </button>
+            }
+          </span>
+        }
+      </span>
     </nav>
 
     <section class="settings-panel panel">
@@ -24,9 +57,14 @@
       @if (activeSection === 'my-account') {
         <div class="account-content">
           <section class="account-section" aria-labelledby="my-account-title">
-            <div>
-              <h2 id="my-account-title">My Account</h2>
-              <p class="section-note">Update your personal and professional details. These power your public Profile page.</p>
+            <div class="section-heading-row">
+              <div>
+                <h2 id="my-account-title">My Account</h2>
+                <p class="section-note">Update your personal and professional details. These power your public Profile page.</p>
+              </div>
+              @if (!isProfileEditing) {
+                <button type="button" class="primary-action compact" (click)="startProfileEdit()">Edit profile</button>
+              }
             </div>
             <app-professional-profile-form />
           </section>
@@ -37,26 +75,234 @@
       <!-- 2. Security -->
       @if (activeSection === 'security') {
         <div class="account-content">
+          <section class="account-section" aria-labelledby="signin-details-title">
+            <div>
+              <h2 id="signin-details-title">Sign-in Details</h2>
+              <p class="section-note">The username and email address you use to sign in. Each can be changed once every {{ signinDetails?.cooldown_days ?? 30 }} days.</p>
+            </div>
+
+            @if (signinDetails; as details) {
+              <div class="signin-rows">
+                <!-- username -->
+                <div class="signin-row">
+                  <div class="signin-value">
+                    <span>Username</span>
+                    <strong>{{ details.username }}</strong>
+                  </div>
+                  @if (editingSigninField !== 'username') {
+                    <button type="button" class="secondary-action compact"
+                            [disabled]="!details.can_change_username || editingSigninField !== 'none'"
+                            (click)="startUsernameEdit()">Edit</button>
+                  }
+                </div>
+
+                @if (!details.can_change_username && editingSigninField !== 'username') {
+                  <p class="signin-hint">Changed recently. You can change it again after {{ details.username_available_at | date: 'd MMMM y' }}.</p>
+                }
+
+                @if (editingSigninField === 'username') {
+                  <div class="signin-editor">
+                    <label>
+                      <span class="field-label">New username</span>
+                      <input type="text" name="usernameDraft" [(ngModel)]="usernameDraft" autocomplete="off" placeholder="Letters, numbers, dot and hyphen">
+                    </label>
+                    <div class="signin-actions">
+                      <button type="button" class="secondary-action" [disabled]="isSigninBusy" (click)="cancelSigninEdit()">Cancel</button>
+                      <button type="button" class="primary-action" [disabled]="isSigninBusy || !usernameDraft.trim()" (click)="saveUsername()">
+                        {{ isSigninBusy ? 'Saving...' : 'Save username' }}
+                      </button>
+                    </div>
+                  </div>
+                }
+
+                <!-- email -->
+                <div class="signin-row">
+                  <div class="signin-value">
+                    <span>Email address</span>
+                    <strong>{{ details.email }}</strong>
+                  </div>
+                  @if (editingSigninField !== 'email') {
+                    <button type="button" class="secondary-action compact"
+                            [disabled]="!details.can_change_email || editingSigninField !== 'none'"
+                            (click)="startEmailEdit()">Edit</button>
+                  }
+                </div>
+
+                @if (!details.can_change_email && editingSigninField !== 'email') {
+                  <p class="signin-hint">Changed recently. You can change it again after {{ details.email_available_at | date: 'd MMMM y' }}.</p>
+                }
+
+                @if (details.pending_email && editingSigninField !== 'email') {
+                  <p class="signin-hint">
+                    Waiting for confirmation of <strong>{{ details.pending_email }}</strong>.
+                    <button type="button" class="link-button" [disabled]="isSigninBusy" (click)="cancelPendingEmailChange()">Cancel that change</button>
+                  </p>
+                }
+
+                @if (editingSigninField === 'email') {
+                  <div class="signin-editor">
+                    <label>
+                      <span class="field-label">New email address</span>
+                      <input type="email" name="emailDraft" [(ngModel)]="emailDraft" autocomplete="off" placeholder="you@example.com">
+                    </label>
+                    <p class="signin-hint">
+                      We send a code to the new address. Your email only changes once that code is entered, so a typo cannot lock you out.
+                    </p>
+
+                    @if (details.pending_email) {
+                      <label>
+                        <span class="field-label">Code sent to {{ details.pending_email }}</span>
+                        <input type="text" name="emailCodeDraft" [(ngModel)]="emailCodeDraft" autocomplete="one-time-code" inputmode="numeric" placeholder="6-digit code">
+                      </label>
+                    }
+
+                    <div class="signin-actions">
+                      <button type="button" class="secondary-action" [disabled]="isSigninBusy" (click)="cancelSigninEdit()">Cancel</button>
+                      @if (details.pending_email) {
+                        <button type="button" class="primary-action" [disabled]="isSigninBusy || !emailCodeDraft.trim()" (click)="confirmEmailChange()">
+                          {{ isSigninBusy ? 'Confirming...' : 'Confirm new email' }}
+                        </button>
+                      } @else {
+                        <button type="button" class="primary-action" [disabled]="isSigninBusy || !emailDraft.trim()" (click)="sendEmailChangeCode()">
+                          {{ isSigninBusy ? 'Sending...' : 'Send code' }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (signinMessage) {
+              <p class="account-message" [class.error-message]="signinMessageType === 'error'">{{ signinMessage }}</p>
+            }
+          </section>
+
           <section class="account-section" aria-labelledby="professional-code-title">
             <div>
               <h2 id="professional-code-title">Professional Code</h2>
-              <p class="section-note">Clients may use this code during login or professional lookup. Changes must remain unique.</p>
+              <p class="section-note">
+                Your clients sign in with this code plus their own username and password.
+              </p>
             </div>
+
+            <!-- Copy and Change sit on the same row as the code itself. Change
+                 was on its own line below, which cost a whole row of height for
+                 one button. -->
             <div class="current-code-display">
-              <span>Current professional code</span>
-              <strong>{{ professionalCode || 'Not set' }}</strong>
+              <span class="current-code-value">
+                <span>Current professional code</span>
+                <strong>{{ professionalCode || 'Not set' }}</strong>
+              </span>
+              <span class="current-code-actions">
+                @if (professionalCode) {
+                  <button type="button" class="ghost-action compact" (click)="copyProfessionalCode()">
+                    {{ isCodeCopied ? 'Copied' : 'Copy' }}
+                  </button>
+                }
+                @if (codeStep === 'idle') {
+                  <button type="button" class="secondary-action compact" (click)="beginCodeChange()">Change</button>
+                }
+              </span>
             </div>
-            <form class="code-form" (ngSubmit)="saveProfessionalCode()">
-              <label>
-                <span class="field-label">Change professional code</span>
-                <input type="text" name="professionalCode" [(ngModel)]="codeDraft" placeholder="e.g. FITJOHN" autocomplete="off">
-              </label>
-              <button type="submit" class="primary-action" [disabled]="isSavingCode">
-                {{ isSavingCode ? 'Saving...' : 'Validate & Save Code' }}
-              </button>
-            </form>
+
+            <!-- Staged like account deletion, and for the same reason: this
+                 change signs every client out of the only credentials they
+                 have, and they are never told it happened. One click was far
+                 too little friction for that. -->
+            @if (codeStep === 'review') {
+              <div class="code-stage">
+                <p class="code-step-label">Step 1 of 2 &mdash; choose the new code</p>
+
+                @if (codeImpact) {
+                  <ul class="code-impact">
+                    <li><span>Clients affected</span><strong>{{ codeImpact.clients_total }}</strong></li>
+                    <li><span>Signed out until told the new code</span><strong>{{ codeImpact.clients_with_access }}</strong></li>
+                    <li><span>Reachable by email</span><strong>{{ codeImpact.clients_contactable }}</strong></li>
+                  </ul>
+                  @if (codeImpact.clients_with_access > codeImpact.clients_contactable) {
+                    <p class="danger-note">
+                      {{ codeImpact.clients_with_access - codeImpact.clients_contactable }} of them have no email
+                      address on file. You will have to tell those clients yourself.
+                    </p>
+                  }
+                }
+
+                <label class="deletion-field">
+                  <span class="field-label">New professional code</span>
+                  <input
+                    type="text"
+                    name="professionalCode"
+                    [(ngModel)]="codeDraft"
+                    (ngModelChange)="onCodeDraftChange()"
+                    autocomplete="off"
+                    placeholder="e.g. reprootfit"
+                  >
+                  @if (codeFormatError) {
+                    <span class="field-help error-text">{{ codeFormatError }}</span>
+                  } @else if (codeAvailability === 'checking') {
+                    <span class="field-help">Checking availability...</span>
+                  } @else if (codeAvailability === 'taken') {
+                    <span class="field-help error-text">{{ codeAvailabilityMessage }}</span>
+                  } @else if (codeAvailability === 'available') {
+                    <span class="field-help success-text">
+                      Available. It will be saved as <strong>{{ normalizedCodeDraft }}</strong>.
+                    </span>
+                  }
+                </label>
+
+                <label class="deletion-check">
+                  <input type="checkbox" name="notifyClients" [(ngModel)]="notifyClientsOfCodeChange">
+                  <span>Email my clients the new code (recommended &mdash; otherwise they simply cannot sign in).</span>
+                </label>
+
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonCodeChange()">Cancel</button>
+                  <button type="button" class="primary-action" [disabled]="!canReviewCode" (click)="advanceToCodeConfirm()">Continue</button>
+                </div>
+              </div>
+            } @else if (codeStep === 'confirm') {
+              <div class="code-stage">
+                <p class="code-step-label">Step 2 of 2 &mdash; confirm</p>
+                <p class="danger-note">
+                  Your code changes from <strong>{{ professionalCode }}</strong> to
+                  <strong>{{ normalizedCodeDraft }}</strong> as soon as you confirm.
+                </p>
+                <ul class="code-consequences">
+                  <li>Every client is signed out of the old code immediately.</li>
+                  <li>
+                    @if (notifyClientsOfCodeChange) {
+                      Clients with an email address on file are sent the new code.
+                    } @else {
+                      No client is told. You have chosen not to email them.
+                    }
+                  </li>
+                  <li>Anything showing the old code &mdash; saved links, printed material &mdash; becomes wrong.</li>
+                  <li>Your own sign-in and your clients' usernames and passwords are unaffected.</li>
+                </ul>
+
+                <label class="deletion-field">
+                  <span class="field-label">Type <strong>{{ codeConfirmationPhrase }}</strong> to confirm</span>
+                  <input
+                    type="text"
+                    name="codeConfirmation"
+                    [(ngModel)]="codeTypedConfirmation"
+                    autocomplete="off"
+                    [placeholder]="codeConfirmationPhrase"
+                  >
+                </label>
+
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonCodeChange()">Cancel</button>
+                  <button type="button" class="primary-action" [disabled]="!isCodeConfirmationTyped || isSavingCode" (click)="submitCodeChange()">
+                    {{ isSavingCode ? 'Saving...' : 'Change code' }}
+                  </button>
+                </div>
+              </div>
+            }
+
             @if (codeMessage) {
-              <p class="account-message" [class.error-message]="codeMessageType === 'error'">{{ codeMessage }}</p>
+              <p class="account-message" role="status" [class.error-message]="codeMessageType === 'error'">{{ codeMessage }}</p>
             }
           </section>
 
@@ -78,6 +324,13 @@
                   <span class="field-help error-text">Confirm password must match new password.</span>
                 }
               </label>
+              <!-- Lives inside the form. It used to render at the very bottom
+                   of the settings panel, below the whole Delete Professional
+                   Account section -- so "This password was used recently" came
+                   back a full screen away from the field that caused it. -->
+              @if (accountMessage) {
+                <p class="message" role="status" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
+              }
               <button type="submit" class="primary-action" [disabled]="isChangingPassword || !isNewPasswordRequirementsMet || passwordForm.password !== passwordForm.confirmPassword">
                 {{ isChangingPassword ? 'Changing...' : 'Change password' }}
               </button>
@@ -87,20 +340,108 @@
           <section class="account-section danger-section" aria-labelledby="delete-account-title">
             <div>
               <h2 id="delete-account-title">Delete Professional Account</h2>
-              <p class="danger-note">To delete your professional account, please contact Support.</p>
+
+              @if (deletionState?.is_deletion_pending) {
+                <div class="deletion-pending">
+                  <strong>Deletion scheduled</strong>
+                  <p>
+                    Your account will be deleted on
+                    {{ deletionState?.deletion_hold_ends_at | date: 'd MMMM y' }}.
+                    Nothing has been removed yet, and your clients cannot sign in until this is cancelled.
+                  </p>
+                  <p class="danger-note">Signing in again also cancels it automatically.</p>
+                  <button type="button" class="primary-action" [disabled]="isDeletionBusy" (click)="cancelScheduledDeletion()">
+                    {{ isDeletionBusy ? 'Cancelling...' : 'Cancel deletion' }}
+                  </button>
+                </div>
+              } @else if (deletionStep === 'idle') {
+                <p class="danger-note">
+                  Deleting your account removes your clients' access and everything stored here.
+                  You will be shown exactly what is affected before anything happens.
+                </p>
+                <button type="button" class="secondary-action danger" (click)="beginDeletion()">Delete my account</button>
+              } @else if (deletionStep === 'intent') {
+                <p class="danger-note">Nothing is deleted at this step.</p>
+                <label class="deletion-field">
+                  <span class="field-label">Type <strong>YES</strong> to continue</span>
+                  <input type="text" name="deletionIntent" [(ngModel)]="deletionTypedIntent" autocomplete="off" placeholder="YES">
+                </label>
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonDeletion()">Cancel</button>
+                  <button type="button" class="secondary-action danger" [disabled]="!isIntentTyped" (click)="advanceToImpact()">Continue</button>
+                </div>
+              } @else if (deletionStep === 'impact') {
+                <p class="danger-note">This is everything the account holds today. All of it is removed.</p>
+                <ul class="deletion-impact">
+                  @for (row of deletionImpactLabels; track row.key) {
+                    <li><span>{{ row.label }}</span><strong>{{ deletionState?.impact?.[row.key] ?? 0 }}</strong></li>
+                  }
+                </ul>
+                <label class="deletion-check">
+                  <input type="checkbox" name="deletionAck" [(ngModel)]="deletionAcknowledged">
+                  <span>I understand all of the above will be deleted, including my clients' access.</span>
+                </label>
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonDeletion()">Cancel</button>
+                  <button type="button" class="secondary-action danger" [disabled]="!deletionAcknowledged" (click)="advanceToMode()">Continue</button>
+                </div>
+              } @else if (deletionStep === 'mode') {
+                <p class="danger-note">Choose how this happens.</p>
+                <div class="deletion-choice">
+                  <article>
+                    <h3>Keep a {{ deletionState?.hold_days ?? 14 }}-day hold</h3>
+                    <p>
+                      Recommended. Nothing is deleted yet and you can sign in any time within
+                      {{ deletionState?.hold_days ?? 14 }} days to cancel. Your clients lose access straight away
+                      and get it back if you return.
+                    </p>
+                    <button type="button" class="primary-action" [disabled]="isDeletionBusy" (click)="submitDeletion('hold')">
+                      {{ isDeletionBusy ? 'Scheduling...' : 'Schedule with hold' }}
+                    </button>
+                  </article>
+                  <article>
+                    <h3>Delete immediately</h3>
+                    <p>
+                      You and your clients lose access now. Support can still restore the account for
+                      {{ deletionState?.recycle_days ?? 30 }} days, after which it is gone permanently.
+                    </p>
+                    <button type="button" class="secondary-action danger" (click)="chooseImmediate()">Delete immediately</button>
+                  </article>
+                </div>
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonDeletion()">Cancel</button>
+                </div>
+              } @else if (deletionStep === 'immediate') {
+                <p class="danger-note">
+                  This skips the hold period. To confirm, type the phrase below exactly.
+                </p>
+                <label class="deletion-field">
+                  <span class="field-label">Type: {{ immediatePhrase }}</span>
+                  <input type="text" name="deletionImmediate" [(ngModel)]="deletionTypedImmediate" autocomplete="off" [placeholder]="immediatePhrase">
+                </label>
+                <div class="deletion-actions">
+                  <button type="button" class="secondary-action" (click)="abandonDeletion()">Cancel</button>
+                  <button type="button" class="secondary-action danger" [disabled]="!isImmediatePhraseTyped || isDeletionBusy" (click)="submitDeletion('immediate')">
+                    {{ isDeletionBusy ? 'Deleting...' : 'Delete my account now' }}
+                  </button>
+                </div>
+              }
+
+              @if (deletionMessage) {
+                <p class="account-message" [class.error-message]="deletionMessageType === 'error'">{{ deletionMessage }}</p>
+              }
             </div>
           </section>
         </div>
       }
 
-      <!-- 2b. Plan & Billing -->
+      <!-- 2b. Plan and Billing -->
       @if (activeSection === 'billing') {
         <div class="account-content">
           <section class="account-section" aria-labelledby="billing-title">
             <div class="section-heading-row">
               <div>
-                <h2 id="billing-title">Plan & Billing</h2>
-                <p class="section-note">Compare Free, Pro, and Premium usage, pricing, and limits. Paid trainer plans never display advertisements.</p>
+                <h2 id="billing-title">Plan and Billing</h2>
               </div>
               <button type="button" class="ghost-action compact" (click)="loadBillingStatus()" title="Reload your plan and billing status">Refresh</button>
             </div>
@@ -132,7 +473,9 @@
                 <div class="billing-preview-heading">
                   <div>
                     <h3>Choose Your Plan</h3>
-                    @if (billing.test_mode) {
+                    @if (!billing.payments_enabled) {
+                      <p>Plan changes and membership actions are unavailable during testing.</p>
+                    } @else if (billing.test_mode) {
                       <p>Temporary testing only. No payment will be collected.</p>
                     } @else {
                       <p>Checkout is billed through Razorpay.</p>
@@ -144,7 +487,6 @@
                         <option [value]="cycle.code">{{ cycle.name }}</option>
                       }
                     </select>
-                    <span class="detected-region">{{ billing.billing_region }} · {{ billing.billing_currency }}</span>
                   </div>
                 </div>
 
@@ -154,7 +496,7 @@
                   </div>
                 }
 
-                @if (billing.has_billing_account) {
+                @if (billing.has_billing_account && billing.payments_enabled) {
                   <button type="button" class="secondary-action compact" [disabled]="isOpeningPortal" (click)="openBillingPortal()">
                     {{ isOpeningPortal ? 'Opening...' : 'Manage billing' }}
                   </button>
@@ -170,7 +512,7 @@
                         {{ plan.code === 'starter_free' ? '➤' : (plan.code === 'pro' ? '★' : '♛') }}
                       </div>
                       <h3>{{ plan.name }}</h3>
-                      <p>{{ index === 0 ? 'For getting started' : (index === 1 ? 'For growing trainers' : 'For established trainers') }}</p>
+                      <p>{{ index === 0 ? 'For getting started' : (index === 1 ? 'For a growing practice' : 'For an established practice') }}</p>
                       <div class="preview-plan-price">
                         <strong>{{ planPrice(billing, plan.code) }}</strong>
                         <span>/{{ selectedBillingCycle === 'monthly' ? 'month' : selectedBillingCycle === 'six_months' ? '6 months' : 'year' }}</span>
@@ -191,10 +533,10 @@
                         type="button"
                         class="preview-plan-action"
                         [class.current]="billing.plan.code === plan.code"
-                        [disabled]="billing.plan.code === plan.code || isStartingCheckout || plan.code === 'starter_free'"
+                        [disabled]="!canUpgradePlan(billing, plan.code) || isStartingCheckout"
                         (click)="applyTemporaryPlan(plan.code)"
                       >
-                        {{ billing.plan.code === plan.code ? 'Current Plan' : (plan.code === 'starter_free' ? 'Use cancellation below' : 'Continue to checkout') }}
+                        {{ billing.plan.code === plan.code ? 'Current Plan' : (!billing.payments_enabled ? 'Unavailable during testing' : (plan.code === 'starter_free' ? 'Use cancellation below' : 'Continue to checkout')) }}
                       </button>
                     </article>
                   }
@@ -294,10 +636,10 @@
                       <button
                         type="button"
                         class="link-action danger"
-                        [disabled]="isCancellingPlan || isLoadingAssessment || !selectedAssessment || !selectedAssessment.storage.eligible"
+                        [disabled]="!billing.payments_enabled || isCancellingPlan || isLoadingAssessment || !selectedAssessment || !selectedAssessment.storage.eligible"
                         (click)="cancelPlan()"
                       >
-                        {{ isCancellingPlan ? 'Scheduling...' : 'Cancel membership' }}
+                        {{ !billing.payments_enabled ? 'Cancellation unavailable during testing' : (isCancellingPlan ? 'Scheduling...' : 'Cancel membership') }}
                       </button>
                     }
                     @if (billingActionMessage) {
@@ -331,7 +673,7 @@
           <section class="account-section" aria-labelledby="notifications-title">
             <div>
               <h2 id="notifications-title">Notifications</h2>
-              <p class="section-note">Choose which activity appears in RepRoot Studio and which alerts are also delivered by email.</p>
+              <p class="section-note">Choose which activity appears in RepRoot and which alerts are also delivered by email.</p>
             </div>
             <div class="notification-toolbar" aria-label="Bulk notification controls">
               <span>Quick controls</span>
@@ -364,7 +706,7 @@
           <section class="account-section" aria-labelledby="appearance-title">
             <div>
               <h2 id="appearance-title">Appearance</h2>
-              <p class="section-note">Pick the theme that suits you. Applies across the app.</p>
+              <p class="section-note">Pick the theme that suits you. Applies across RepRoot, including the public pages.</p>
             </div>
             <app-theme-switcher />
           </section>
@@ -377,7 +719,6 @@
           <section class="account-section" aria-labelledby="storage-title">
             <div>
               <h2 id="storage-title">Data Usage</h2>
-              <p class="section-note">How full your plan is, by the section that's using it. Hidden operational history still counts toward storage and is permanently removed after 180 days.</p>
             </div>
 
             @if (dataUsage; as usage) {
@@ -418,7 +759,12 @@
                   <span>{{ usage.plan_name }} plan usage</span>
                   <strong>{{ usage.usage_percent }}%</strong>
                   <small>{{ usageLabelText(usage.usage_label) }}</small>
-                  <small>{{ storageSize(usage.included_quota_bytes) }} included · {{ storageSize(usage.hard_limit_bytes) }} temporary ceiling</small>
+                  <small>
+                    {{ storageSize(usage.included_quota_bytes) }} included
+                    @if (usage.is_over_quota) {
+                      · {{ storageSize(usage.hard_limit_bytes) }} temporary ceiling
+                    }
+                  </small>
                 </div>
                 <div>
                   <span>Stored records</span>
@@ -462,7 +808,7 @@
                 <div class="recycle-bin-header">
                   <div>
                     <h3 id="recycle-bin-title">Recycle Bin</h3>
-                    <p class="section-note">Deleted client accounts, chat images, and resources stay here for 14 days before they're gone for good.</p>
+                    <p class="section-note">Anything you delete lands here first. Restore it any time within 14 days.</p>
                   </div>
                   <button type="button" class="secondary-action" [disabled]="isLoadingRecycleBin" (click)="loadRecycleBin()">
                     {{ isLoadingRecycleBin ? 'Loading...' : 'Refresh' }}
@@ -520,17 +866,42 @@
               <h2 id="application-guide-title">Application Guide</h2>
               <p class="section-note">A practical map of every professional workspace and how information moves through RepRoot.</p>
             </div>
+            <div class="guide-flow">
+              <!-- Replays the tour that runs once after the first sign-in.
+                   Parked at the right of the row; the hint explains on hover
+                   that it walks this workflow on the real screens. -->
+              <button
+                type="button"
+                class="guide-play guide-flow__play"
+                data-hint="Play the walkthrough: every step of this workflow is highlighted on the real page."
+                aria-label="Play the walkthrough of the recommended workflow"
+                (click)="playWelcomeTour()"
+              >▶</button>
+              <div>
+                <strong>Recommended workflow</strong>
+                <p>Complete Profile → Create Forms and Groups → Build Templates → Check Resources → Approve or Add Clients</p>
+              </div>
+            </div>
+
             <div class="guide-list">
-              @for (item of guideItems; track item.title) {
+              @for (item of guidePages; track item.key) {
                 <article>
-                  <div><h3>{{ item.title }}</h3><p>{{ item.detail }}</p></div>
-                  <a [routerLink]="item.route">Open</a>
+                  <div><h3>{{ item.title }}</h3><p>{{ item.summary }}</p></div>
+                  <span class="guide-item-actions">
+                    <a [routerLink]="item.route">Open</a>
+                    <!-- Goes to the page and opens that page's guide there,
+                         rather than explaining it away from the thing it
+                         describes. -->
+                    <button
+                      type="button"
+                      class="guide-play"
+                      [attr.aria-label]="'Open ' + item.title + ' with its guide'"
+                      [attr.data-hint]="'Play the ' + item.title + ' walkthrough on the page itself.'"
+                      (click)="playPageGuide(item.route)"
+                    >▶</button>
+                  </span>
                 </article>
               }
-            </div>
-            <div class="guide-flow">
-              <strong>Recommended workflow</strong>
-              <p>Complete Profile → create Forms & Groups → add or approve Clients → build Templates → assign Resources → monitor entries and schedules from Dashboard.</p>
             </div>
           </section>
         </div>
@@ -549,7 +920,7 @@
           <section class="account-section" aria-labelledby="about-title">
             <div>
               <h2 id="about-title">About</h2>
-              <p class="section-note">RepRoot — your professional &amp; client workspace.</p>
+              <p class="section-note">RepRoot — your professional and client workspace.</p>
             </div>
             <ul class="info-list">
               <li>
@@ -565,7 +936,7 @@
                 <a routerLink="/privacy/professional" target="_blank" rel="noopener">View</a>
               </li>
               <li>
-                <span>Terms &amp; Conditions</span>
+                <span>Terms and Conditions</span>
                 <a routerLink="/terms/professional" target="_blank" rel="noopener">View</a>
               </li>
               @if (legalProfile?.legal_acceptance_history?.length) {
@@ -590,8 +961,6 @@
 
     </section>
 
-    @if (accountMessage) {
-      <p class="message" [class.error-message]="accountMessageType === 'error'">{{ accountMessage }}</p>
-    }
+
   </div>
 </app-professional-page-shell>

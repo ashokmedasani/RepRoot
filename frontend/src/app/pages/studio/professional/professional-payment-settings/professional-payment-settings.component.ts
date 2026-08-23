@@ -12,6 +12,10 @@ import {
 } from '@core/api/payments-api.service';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
+import { compressImageFile } from '@shared/utils/image-compression';
+
+
 
 type PaymentSettingsSection = 'reporting' | 'transactions' | 'methods' | 'integrated' | 'disclosures';
 
@@ -75,7 +79,7 @@ const CATEGORY_LABELS: Record<ManualPaymentCategory, string> = {
 @Component({
   selector: 'app-payment-settings',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, SkeletonComponent],
   templateUrl: './professional-payment-settings.component.html',
   styleUrl: './professional-payment-settings.component.scss'
 })
@@ -120,6 +124,8 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
   methodForm = this.blankMethodForm();
   clientFieldValues: Record<string, string> = {};
   qrFile: File | null = null;
+  qrFileName = '';
+  removeExistingQr = false;
 
   previewData: ManualPaymentMethodClientView | null = null;
   showPreview = false;
@@ -140,6 +146,13 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
       next: (response) => (this.transactions = response.transactions),
       error: () => (this.transactions = [])
     });
+  }
+
+  /** Whether this environment can accept payment writes at all. Defaults to
+   *  true so the screen behaves normally against a backend that predates the
+   *  flag being sent. */
+  get isPaymentsEnabled(): boolean {
+    return this.settings?.payments_enabled !== false;
   }
 
   // --- Reporting currency ---------------------------------------------------
@@ -222,25 +235,92 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     };
     this.clientFieldValues = { ...method.client_visible_fields };
     this.qrFile = null;
+    this.qrFileName = '';
+    this.removeExistingQr = false;
     this.methodFormMessage = '';
     this.showMethodForm = true;
   }
 
   onCategoryChange(): void {
-    const allowedKeys = new Set(this.clientFieldDefs.map((def) => def.key));
-    for (const key of Object.keys(this.clientFieldValues)) {
-      if (!allowedKeys.has(key)) {
-        delete this.clientFieldValues[key];
-      }
-    }
+    // Deliberately does nothing to the typed values.
+    //
+    // This used to delete every value whose key was not in the newly selected
+    // category's field list. Flicking from Bank Transfer to "Other" to see what
+    // it offered, and back again, silently wiped four fields the professional
+    // had already filled in. Values for fields the current category does not
+    // show are simply not rendered; `saveMethod()` decides what is sent.
   }
 
   onQrFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.qrFile = input.files?.[0] || null;
+    const file = input.files?.[0] || null;
+
+    if (!file) {
+      this.qrFile = null;
+      this.qrFileName = '';
+      return;
+    }
+
+    // A photo of a QR sticker off a modern phone is several megabytes. Resize
+    // it rather than sending the professional away to shrink it themselves --
+    // a QR only has to be legible, not high resolution.
+    void compressImageFile(file)
+      .then((result) => {
+        this.qrFile = result.file;
+        this.qrFileName = result.file.name;
+        this.removeExistingQr = false;
+        this.methodFormMessage = '';
+      })
+      .catch((error: unknown) => {
+        input.value = '';
+        this.qrFile = null;
+        this.qrFileName = '';
+        this.methodFormMessage = error instanceof Error ? error.message : 'That image could not be used.';
+      });
+  }
+
+  /** The QR already stored against the method being edited, if any. */
+  existingQrUrl(): string {
+    if (!this.editingMethodId || this.removeExistingQr) {
+      return '';
+    }
+    return this.methods.find((method) => method.id === this.editingMethodId)?.qr_code || '';
+  }
+
+  clearQrSelection(): void {
+    this.qrFile = null;
+    this.qrFileName = '';
+  }
+
+  /** There was previously no way to take a QR code back off a method. */
+  markQrForRemoval(): void {
+    this.qrFile = null;
+    this.qrFileName = '';
+    this.removeExistingQr = true;
+  }
+
+  /** Required client-visible fields for the selected category that are blank.
+   *  `required: true` in the field definitions used to be purely decorative --
+   *  a UPI method could be saved with no UPI ID, leaving the client a payment
+   *  option with no way to pay. */
+  missingRequiredFields(): string[] {
+    return this.clientFieldDefs
+      .filter((def) => def.required && !(this.clientFieldValues[def.key] || '').trim())
+      .map((def) => def.label);
   }
 
   saveMethod(): void {
+    const missing = this.missingRequiredFields();
+    if (missing.length) {
+      this.methodFormMessage = `Complete the required ${missing.length === 1 ? 'field' : 'fields'}: ${missing.join(', ')}.`;
+      return;
+    }
+
+    if (!this.methodForm.display_label.trim()) {
+      this.methodFormMessage = 'Give this payment method a name your clients will recognise.';
+      return;
+    }
+
     const payload = new FormData();
     payload.append('name', this.methodForm.name || this.methodForm.display_label);
     payload.append('category', this.methodForm.category);
@@ -250,17 +330,21 @@ export class ProfessionalPaymentSettingsComponent implements OnInit {
     payload.append('internal_notes', this.methodForm.internal_notes);
     payload.append('supported_currencies', JSON.stringify(this.methodForm.supported_currencies));
 
-    const clientFields: Record<string, string> = {};
+    // Start from everything the server already had, so a key this build does
+    // not know about -- one added server-side, or written by an older client --
+    // survives an edit instead of being erased the next time this form saves.
+    const clientFields: Record<string, string> = { ...this.clientFieldValues };
     for (const def of this.clientFieldDefs) {
-      const value = (this.clientFieldValues[def.key] || '').trim();
-      if (value) {
-        clientFields[def.key] = value;
-      }
+      // Empty string, not "omit the key": omitting it meant clearing a field
+      // and saving left the old value in place, with no way to delete it.
+      clientFields[def.key] = (this.clientFieldValues[def.key] || '').trim();
     }
     payload.append('client_visible_fields', JSON.stringify(clientFields));
 
     if (this.qrFile) {
       payload.append('qr_code', this.qrFile);
+    } else if (this.removeExistingQr) {
+      payload.append('qr_code', '');
     }
 
     this.isSavingMethod = true;

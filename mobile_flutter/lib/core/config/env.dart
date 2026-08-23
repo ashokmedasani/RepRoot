@@ -65,12 +65,13 @@ class Env {
     defaultValue: 'https://rep-root.com',
   );
 
-  /// Public RepRoot Studio application. This is intentionally public
+  /// STUDIO-HIDDEN 2026-08-17: default host was 'https://studio.rep-root.com'.
+  /// Public RepRoot application. This is intentionally public
   /// configuration and is used when a task is safer to finish on the website,
   /// such as purchasing or managing a subscription.
   static const String studioWebUrl = String.fromEnvironment(
     'STUDIO_WEB_URL',
-    defaultValue: 'https://studio.rep-root.com',
+    defaultValue: 'https://rep-root.com',
   );
 
   static String studioUrl(String path) {

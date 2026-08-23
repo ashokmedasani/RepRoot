@@ -133,7 +133,7 @@ export class ProfessionalManualClientCreateComponent implements OnInit, OnDestro
             title: 'Create client and send login credentials to',
             target: email,
             impact: 'The client account will be created and the username and temporary password will be emailed.',
-            confirmLabel: 'Create & Send'
+            confirmLabel: 'Create and Send'
           }
         : this.portalAccessMode === 'manual'
         ? {

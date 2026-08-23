@@ -102,6 +102,23 @@ small,
   color: var(--app-success);
 }
 
+.code-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.code-suggestions button {
+  border: 1px solid var(--app-primary);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  background: var(--app-surface);
+  color: var(--app-primary);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
 .help-tip {
   position: relative;
   display: inline-grid;
@@ -187,6 +204,130 @@ textarea:focus {
   color: #d92d20;
 }
 
+.crop-dialog-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 1rem;
+  background: rgb(15 23 42 / 68%);
+  backdrop-filter: blur(4px);
+}
+
+.crop-dialog {
+  width: min(31rem, 100%);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-xl);
+  padding: 1.25rem;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-lg);
+}
+
+.crop-dialog-heading,
+.crop-dialog-actions,
+.crop-zoom {
+  display: flex;
+  align-items: center;
+}
+
+.crop-dialog-heading {
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.crop-dialog-heading h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 1.2rem;
+}
+
+.crop-dialog-heading p {
+  margin: 0.25rem 0 0;
+  color: var(--app-muted);
+  font-size: 0.84rem;
+}
+
+.crop-close {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+
+.crop-stage {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--app-radius-lg);
+  padding: 1rem;
+  background: color-mix(in srgb, var(--app-text) 7%, var(--app-surface-soft));
+}
+
+.crop-canvas {
+  display: block;
+  width: min(22rem, 100%);
+  height: auto;
+  border: 3px solid var(--app-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--app-border), var(--app-shadow);
+  cursor: grab;
+  touch-action: none;
+}
+
+.crop-canvas:active {
+  cursor: grabbing;
+}
+
+.crop-zoom {
+  gap: 0.8rem;
+  margin: 1rem 0;
+  color: var(--app-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.crop-zoom input {
+  flex: 1;
+  min-height: auto;
+  padding: 0;
+  accent-color: var(--app-primary);
+}
+
+.crop-dialog-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.crop-dialog-actions button {
+  min-height: 2.65rem;
+  border-radius: var(--app-radius-lg);
+  padding: 0 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crop-dialog-actions .secondary-action {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+  color: var(--app-text);
+}
+
+.crop-dialog-actions .primary-action {
+  border: 0;
+  background: var(--app-primary);
+  color: #ffffff;
+}
+
 @media (max-width: 720px) {
   .setup-page {
     padding: 1rem;
@@ -197,6 +338,11 @@ textarea:focus {
   }
 
   .field-row.two {
+    grid-template-columns: 1fr;
+  }
+
+  .crop-dialog-actions {
+    display: grid;
     grid-template-columns: 1fr;
   }
 

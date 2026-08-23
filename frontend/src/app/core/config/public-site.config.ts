@@ -1,14 +1,12 @@
-export type PublicBrand = 'reproot' | 'studio';
+export type PublicBrand = 'reproot';
 
 export const PUBLIC_SITE = {
-  parentUrl: 'https://www.rep-root.com',
-  studioUrl: 'https://studio.rep-root.com',
-  studioPortalUrl: 'https://studio.rep-root.com/portal',
-  parentSupportEmail: 'support@rep-root.com',
-  studioSupportEmail: 'studio.support@rep-root.com'
+  rootUrl: 'https://rep-root.com',
+  portalUrl: 'https://rep-root.com/portal',
+  supportEmail: 'support@rep-root.com'
 } as const;
 
-export function publicSupportEmail(brand: PublicBrand): string {
+export function publicSupportEmail(_brand: PublicBrand): string {
   const configured = window.APP_CONFIG?.supportEmail?.trim();
-  return configured || (brand === 'studio' ? PUBLIC_SITE.studioSupportEmail : PUBLIC_SITE.parentSupportEmail);
+  return configured || PUBLIC_SITE.supportEmail;
 }

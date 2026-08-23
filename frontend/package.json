@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "ng serve --port 4300",
-    "build": "ng build",
+    "config": "node scripts/write-app-config.mjs",
+    "start": "node scripts/write-app-config.mjs && ng serve --port 4300",
+    "build": "node scripts/write-app-config.mjs && ng build",
     "build:render": "node scripts/write-app-config.mjs && ng build",
-    "test": "ng test"
+    "test": "node scripts/check-guide-anchors.mjs && ng test professional-management-platform"
   },
   "dependencies": {
     "@angular/animations": "20.3.26",
@@ -30,6 +31,9 @@
     "@angular/build": "20.3.31",
     "@angular/cli": "20.3.32",
     "@angular/compiler-cli": "20.3.26",
-    "typescript": "~5.8.0"
+    "@types/node": "^22.20.1",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.8.0",
+    "vitest": "^3.2.7"
   }
 }

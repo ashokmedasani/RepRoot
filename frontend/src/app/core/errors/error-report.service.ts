@@ -1,6 +1,8 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, of } from 'rxjs';
+import { NavigationEnd, Router } from '@angular/router';
+import { UserActionService } from './user-action.service';
+import { catchError, filter, of } from 'rxjs';
 
 declare global {
   interface Window {
@@ -33,16 +35,48 @@ interface ErrorReportPayload {
 @Injectable({ providedIn: 'root' })
 export class ErrorReportService {
   private readonly apiBaseUrl = this.getApiBaseUrl();
+  private currentRoute = this.safeRoute(window.location.pathname);
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    router: Router,
+    private readonly userAction: UserActionService
+  ) {
+    router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd)).subscribe((event) => {
+      const nextRoute = this.safeRoute(event.urlAfterRedirects);
+      if (nextRoute !== this.currentRoute) {
+        window.sessionStorage.setItem('reproot-previous-route', this.currentRoute);
+        this.currentRoute = nextRoute;
+      }
+    });
+  }
 
-  report(message: string, options: { stackTrace?: string; level?: ErrorReportLevel; requestPath?: string } = {}): void {
+  report(
+    message: string,
+    options: {
+      stackTrace?: string;
+      level?: ErrorReportLevel;
+      requestPath?: string;
+      context?: Record<string, unknown>;
+    } = {}
+  ): void {
+    const appRoute = this.safeRoute(this.currentRoute || window.location.pathname);
     const payload: ErrorReportPayload = {
       platform: 'web',
       level: options.level ?? 'error',
-      message: message.slice(0, 500),
+      message: this.safeMessage(message).slice(0, 500),
       stack_trace: (options.stackTrace ?? '').slice(0, 20000),
-      request_path: options.requestPath ?? window.location.pathname,
+      request_path: this.safeRoute(options.requestPath ?? appRoute),
+      context: {
+        ...options.context,
+        app_route: appRoute,
+        previous_route: this.safeRoute(window.sessionStorage.getItem('reproot-previous-route') || ''),
+        // What the user actually did just before this. Without it an alert can
+        // say where a failure happened but never what provoked it.
+        ...this.lastActionContext(),
+        online: navigator.onLine,
+        reported_at: new Date().toISOString()
+      },
       device_info: navigator.userAgent.slice(0, 300)
     };
 
@@ -50,6 +84,35 @@ export class ErrorReportService {
       .post(`${this.apiBaseUrl}/errors/report/`, payload, { headers: this.headers() })
       .pipe(catchError(() => of(null)))
       .subscribe();
+  }
+
+  private lastActionContext(): Record<string, unknown> {
+    const action = this.userAction.snapshot();
+    if (!action.label) {
+      return {};
+    }
+    return {
+      last_action: action.label,
+      last_action_page: action.route,
+      last_action_age_ms: String(action.ageMs)
+    };
+  }
+
+  private safeMessage(message: string): string {
+    const normalized = String(message || '').trim();
+    return normalized && normalized !== '[object Object]' ? normalized : 'Unidentified browser exception';
+  }
+
+  private safeRoute(value: string): string {
+    if (!value) {
+      return '';
+    }
+    try {
+      const url = new URL(value, window.location.origin);
+      return url.origin === window.location.origin ? url.pathname : url.pathname;
+    } catch {
+      return value.split('?', 1)[0].slice(0, 300);
+    }
   }
 
   private headers(): HttpHeaders {

@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">Locked fields</p>
         <h2>Universal Core Fields</h2>
-        <p>These fields are required for every client and cannot be removed.</p>
+        <p>First name, last name, and email identify every client and cannot be removed.</p>
       </div>
       <span class="lock-pill">Locked</span>
     </div>
@@ -24,35 +24,7 @@
     <div class="section-heading compact">
       <div>
         <h2>Suggested Fields</h2>
-        <p>Tap a suggestion to add it, then customize.</p>
-      </div>
-      @if (!suggestionSearch && selectedCategory === 'All') {
-        <button type="button" class="link-toggle" (click)="toggleAllChips()">
-          {{ showAllChips ? 'Show less' : 'More' }}
-        </button>
-      }
-    </div>
-
-    <div class="suggestion-filters">
-      <input
-        type="search"
-        class="suggestion-search"
-        placeholder="Search suggested fields..."
-        [(ngModel)]="suggestionSearch"
-        name="suggestionSearch"
-        aria-label="Search suggested fields"
-      >
-      <div class="category-chip-row">
-        @for (category of recommendedCategories; track category) {
-          <button
-            type="button"
-            class="category-chip"
-            [class.category-chip-active]="selectedCategory === category"
-            (click)="selectCategory(category)"
-          >
-            {{ category }}
-          </button>
-        }
+        <p>Choose any fields that help your workflow. Suggestions are optional.</p>
       </div>
     </div>
 
@@ -68,9 +40,16 @@
         >
           <span class="chip-plus">{{ isRecommendedFieldAdded(template) ? '✓' : '+' }}</span>{{ template.label }}
         </button>
-      } @empty {
-        <p class="empty-note">No suggested fields match your search.</p>
       }
+
+      <button
+        type="button"
+        class="field-chip field-chip-custom"
+        (click)="addFieldFromSuggestions()"
+        title="Add a field of your own, then choose its type and settings"
+      >
+        <span class="chip-plus">+</span>Add your own field
+      </button>
     </div>
   </section>
 
@@ -101,7 +80,7 @@
     }
   }
 
-  <section class="custom-builder" aria-label="Custom field builder">
+  <section class="custom-builder" aria-label="Custom field builder" #customBuilder>
     <div class="section-heading">
       <div>
         <p class="eyebrow">Your form</p>
@@ -147,13 +126,20 @@
                 </select>
               </label>
 
-              <label>
-                <span class="field-label">Required / Optional</span>
-                <select [(ngModel)]="field.required" [name]="'fieldRequired' + $index">
-                  <option [ngValue]="true">Required</option>
-                  <option [ngValue]="false">Optional</option>
-                </select>
-              </label>
+              @if (allowRequiredSelection) {
+                <label>
+                  <span class="field-label">Required / Optional</span>
+                  <select [(ngModel)]="field.required" [name]="'fieldRequired' + $index">
+                    <option [ngValue]="true">Required</option>
+                    <option [ngValue]="false">Optional</option>
+                  </select>
+                </label>
+              } @else {
+                <div class="optional-field-note">
+                  <span class="field-label">Response</span>
+                  <p>Optional for clients in this group.</p>
+                </div>
+              }
 
               <label>
                 <span class="field-label">Placeholder</span>

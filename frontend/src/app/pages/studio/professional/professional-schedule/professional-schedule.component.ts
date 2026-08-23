@@ -18,6 +18,7 @@ import {
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 const WEEKDAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -36,6 +37,26 @@ function toLocalIso(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** The local calendar day a meeting falls on, from its ISO `start_at`.
+ *
+ *  `start_at` arrives as UTC (`2026-08-19T19:30:00Z`), so `start_at.slice(0, 10)`
+ *  yields the *UTC* day — which is exactly the round-trip `toLocalIso` above
+ *  exists to avoid. In IST (UTC+5:30) a meeting at 01:00 on Aug 20 local is
+ *  19:30Z on Aug 19, so slicing put it on the Aug 19 cell while the grid itself
+ *  was built from local days: the cell showed a meeting, and clicking it
+ *  reported none. Parsing to a Date first re-anchors it to the viewer's zone. */
+function meetingLocalIso(startAt: string): string {
+  return toLocalIso(new Date(startAt));
+}
+
+/** Meeting states that occupy the trainer's time.
+ *
+ *  A meeting they *declined* is not booked time. Filtering only `cancelled`
+ *  left declined and still-pending requests painting days Busy in the heat map
+ *  and counted in the per-cell tally, while the day's list — which shows only
+ *  `scheduled` — came back empty. */
+const BUSY_MEETING_STATUSES = new Set(['scheduled', 'completed']);
+
 interface CalendarCell {
   iso: string;
   day: number;
@@ -50,7 +71,7 @@ interface CalendarCell {
 @Component({
   selector: 'app-professional-schedule',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, SkeletonComponent],
   templateUrl: './professional-schedule.component.html',
   styleUrl: './professional-schedule.component.scss'
 })
@@ -377,7 +398,7 @@ export class ProfessionalScheduleComponent implements OnInit {
    * trainer clicked (if any) so the calendar and list stay in sync. */
   get displayedUpcomingMeetings(): ScheduledMeetingRecord[] {
     if (!this.selectedCalendarDate) return this.upcomingMeetings;
-    return this.upcomingMeetings.filter((m) => m.start_at.slice(0, 10) === this.selectedCalendarDate);
+    return this.upcomingMeetings.filter((m) => meetingLocalIso(m.start_at) === this.selectedCalendarDate);
   }
 
   // --- Calendar view ----------------------------------------------------
@@ -431,8 +452,8 @@ export class ProfessionalScheduleComponent implements OnInit {
   private meetingCountsByDate(): Record<string, number> {
     const counts: Record<string, number> = {};
     for (const meeting of this.meetings) {
-      if (meeting.status === 'cancelled') continue;
-      const iso = meeting.start_at.slice(0, 10);
+      if (!BUSY_MEETING_STATUSES.has(meeting.status)) continue;
+      const iso = meetingLocalIso(meeting.start_at);
       counts[iso] = (counts[iso] || 0) + 1;
     }
     return counts;
@@ -441,8 +462,8 @@ export class ProfessionalScheduleComponent implements OnInit {
   private meetingMinutesByDate(): Record<string, number> {
     const minutes: Record<string, number> = {};
     for (const meeting of this.meetings) {
-      if (meeting.status === 'cancelled') continue;
-      const iso = meeting.start_at.slice(0, 10);
+      if (!BUSY_MEETING_STATUSES.has(meeting.status)) continue;
+      const iso = meetingLocalIso(meeting.start_at);
       const duration = Math.max(0, (new Date(meeting.end_at).getTime() - new Date(meeting.start_at).getTime()) / 60000);
       minutes[iso] = (minutes[iso] || 0) + duration;
     }
@@ -528,13 +549,31 @@ export class ProfessionalScheduleComponent implements OnInit {
   }
 
   /** Each block is already saved the instant it's added or removed above --
-   * there's no separate draft state to persist. This just gives Weekly
-   * availability its own explicit confirmation, mirroring the "Save meeting
-   * defaults" button above it, rather than only Meeting defaults having a
-   * visible save action. */
-  confirmWeeklyAvailabilitySaved(): void {
-    this.messageType = 'success';
-    this.message = 'Weekly availability saved.';
+   * there is no separate draft state to persist, so this only closes the
+   * panel. It is labelled "Done", not "Save", because a save button that saves
+   * nothing is how a typed-but-not-added block got lost. */
+  /** Whether the client has responded to this meeting invitation. */
+  clientResponseLabel(meeting: ScheduledMeetingRecord): string {
+    switch (meeting.client_response_status) {
+      case 'accepted':
+        return 'Client accepted';
+      case 'declined':
+        return 'Client declined';
+      default:
+        return 'Awaiting client response';
+    }
+  }
+
+  closeAvailabilityPanel(): void {
+    // Warn rather than close silently: a half-typed block is the exact mistake
+    // the old "Save weekly availability" label encouraged.
+    if (this.newWindow.start_time && this.newWindow.end_time) {
+      this.messageType = 'error';
+      this.message = 'You have a block typed in but not added. Press "Add block" to save it, or clear the times.';
+      return;
+    }
+
+    this.message = '';
     this.showAvailabilityPanel = false;
   }
 
@@ -890,7 +929,7 @@ export class ProfessionalScheduleComponent implements OnInit {
 
   openReschedule(meeting: ScheduledMeetingRecord): void {
     this.reschedulingMeeting = meeting;
-    this.rescheduleDate = meeting.start_at.slice(0, 10);
+    this.rescheduleDate = meetingLocalIso(meeting.start_at);
     this.selectedRescheduleSlot = '';
     this.manualRescheduleLocal = '';
     this.rescheduleSlots = {};

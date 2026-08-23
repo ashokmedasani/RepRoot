@@ -53,7 +53,7 @@
 
 - Search and Create Category now share one responsive toolbar row.
 - Category rows show name, description, subcategory count, reference count, expansion, edit, and confirmed delete actions.
-- Version 1 plan limits are configured through `COACHFLOW_PLAN_LIMITS`; total references default to 100, categories to 10, and subcategories per category to 5.
+- The Version 1 limit configuration described at the time of this historical change has been superseded. It must not be used for current plan or billing decisions; see `Documentation/PLAN_AND_BILLING_DRAFT.md`.
 - The page prominently reports references used, disables Add Reference at the total limit, and shows the Version 1 limit message without plan upselling.
 
 ## Trainer profile and Security

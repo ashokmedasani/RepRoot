@@ -1,21 +1,21 @@
 <main class="consent-page">
   <header class="consent-topbar">
     <a routerLink="/portal" class="brand">
-      <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
-      <span><span>Rep</span><span class="brand__root">Root</span> Studio</span>
+      <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
+      <span><span>Rep</span><span class="brand__root">Root</span></span>
     </a>
     <span class="secure-note">Professional access</span>
   </header>
   <section class="consent-card">
     <p class="eyebrow">Updated legal documents</p>
     <h1>Review before continuing</h1>
-    <p>RepRoot Studio has published a new legal-document version. Your earlier acceptance remains in your account history.</p>
-    @if (legalVersion) { <p class="intro">Effective {{ legalEffectiveDate }} · Version {{ legalVersion }}</p> }
+    <p>RepRoot has published updated legal documents. Your earlier acceptance remains in your account history.</p>
+    @if (legalEffectiveDate) { <p class="intro">Last updated: {{ legalEffectiveDate }}</p> }
     <div class="document-links">
-      <a routerLink="/terms/professional" target="_blank"><strong>Professional Terms &amp; Conditions</strong><span>Account, client-data, payment, and platform responsibilities.</span></a>
+      <a routerLink="/terms/professional" target="_blank"><strong>Professional Terms and Conditions</strong><span>Account, client-data, payment, and platform responsibilities.</span></a>
       <a routerLink="/privacy/professional" target="_blank"><strong>Professional Privacy Notice</strong><span>How professional and client information is processed.</span></a>
     </div>
-    <label><input type="checkbox" [(ngModel)]="acceptedLegalDocuments"><span>I have reviewed and accept the Professional Terms &amp; Conditions and Professional Privacy Notice.</span></label>
+    <label><input type="checkbox" [(ngModel)]="acceptedLegalDocuments"><span>I have reviewed and accept the Professional Terms and Conditions and Professional Privacy Notice.</span></label>
     @if (message) { <p class="error">{{ message }}</p> }
     <button type="button" (click)="submit()" [disabled]="submitting || !acceptedLegalDocuments">{{ submitting ? 'Saving...' : 'Accept and Continue' }}</button>
   </section>

@@ -77,6 +77,7 @@ class ProfessionalBillingStatus {
     required this.planRenewsAt,
     required this.hasBillingAccount,
     required this.billingConfigured,
+    required this.paymentsEnabled,
     required this.testMode,
     required this.availableUpgrades,
     required this.catalog,
@@ -98,6 +99,7 @@ class ProfessionalBillingStatus {
   final String? planRenewsAt;
   final bool hasBillingAccount;
   final bool billingConfigured;
+  final bool paymentsEnabled;
 
   /// True while real Stripe pricing isn't wired for every tier — "Update plan"
   /// applies the tier directly with no charge.
@@ -139,6 +141,7 @@ class ProfessionalBillingStatus {
       planRenewsAt: json['plan_renews_at'] as String?,
       hasBillingAccount: json['has_billing_account'] as bool? ?? false,
       billingConfigured: json['billing_configured'] as bool? ?? false,
+      paymentsEnabled: json['payments_enabled'] as bool? ?? false,
       testMode: json['test_mode'] as bool? ?? false,
       availableUpgrades:
           (json['available_upgrades'] as Map<dynamic, dynamic>? ?? {}).map(

@@ -30,6 +30,7 @@ import {
   ProfessionalDataUsageResponse,
   ProfessionalOnboardingStatus
 } from '@core/api/professional-auth-api.service';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 type DashboardTab = 'activity' | 'payments' | 'schedules';
 
@@ -40,10 +41,17 @@ interface MessageRow {
   lastAt: string;
 }
 
+interface OnboardingChecklistItem {
+  code: string;
+  label: string;
+  route: string;
+  completed: boolean;
+}
+
 @Component({
   selector: 'app-professional-dashboard',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent, ChartRendererComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ProfessionalPageShellComponent, FixedHeightListComponent, ChartRendererComponent, SkeletonComponent],
   templateUrl: './professional-dashboard.component.html',
   styleUrl: './professional-dashboard.component.scss'
 })
@@ -111,6 +119,22 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
     pending_profile_edits: 0,
     nearest_date: ''
   };
+
+  get onboardingChecklist(): OnboardingChecklistItem[] {
+    if (!this.onboarding) return [];
+
+    return [
+      { code: 'form', label: 'Lead Form', route: '/professional/forms/create', completed: this.onboarding.form_created },
+      { code: 'group', label: 'Group', route: '/professional/groups/create', completed: this.onboarding.group_created },
+      { code: 'template', label: 'Template', route: '/professional/templates/create', completed: this.onboarding.template_created },
+      { code: 'resource', label: 'Resources', route: '/professional/resource', completed: this.onboarding.resource_created },
+      { code: 'meeting_setup', label: 'Meeting Setup', route: '/professional/schedule', completed: this.onboarding.meeting_setup_complete }
+    ];
+  }
+
+  get onboardingCompletedCount(): number {
+    return this.onboardingChecklist.filter((item) => item.completed).length;
+  }
 
   ngOnInit(): void {
     this.professionalAuthApi.getDataUsage().subscribe({
@@ -260,6 +284,18 @@ export class ProfessionalDashboardComponent implements OnInit, OnDestroy {
       ],
       meta: { subtitle: `${this.activityActionCount} items waiting on you` }
     };
+  }
+
+  /**
+   * Card headings carry their count -- "12 Messages" -- but an empty card
+   * headed "0 Messages" reads as a broken number rather than as nothing to
+   * do, so at zero the heading is just the plain noun.
+   */
+  headingCount(count: number, singular: string, plural: string): string {
+    if (!count) {
+      return plural;
+    }
+    return `${count} ${count === 1 ? singular : plural}`;
   }
 
   initialsForSubmission(submission: LeadSubmission): string {

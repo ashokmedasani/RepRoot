@@ -1,10 +1,14 @@
 <main class="auth-page">
   <header class="auth-topbar">
     <a routerLink="/portal" class="brand">
-      <span class="brand__mark"><img src="/brand/studio/mark.png" alt=""></span>
-      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span> Studio</span>
+      <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
+      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span></span>
     </a>
     <div class="top-action">
+      <!-- Every sign-in, sign-up and password screen goes through this shell,
+           so one control covers all of them. A client sitting on a sign-in page
+           has no account yet and no other way to reach Appearance. -->
+      <app-theme-toggle label="Site appearance" />
       <span>{{ actionLabel }}</span>
       <a [routerLink]="actionLink">{{ actionLinkText }}</a>
     </div>
@@ -18,17 +22,15 @@
   </section>
 
   <footer class="auth-footer">
-    <div class="footer-summary"><strong>RepRoot Studio</strong><span>Professional-client workspace by RepRoot.</span></div>
+    <div class="footer-summary"><strong>RepRoot</strong><span>Professional-client workspace.</span></div>
     <nav aria-label="Website, help, and legal links">
-      <a href="https://rep-root.com" target="_blank" rel="noopener">RepRoot website</a>
-      <a routerLink="/">Studio overview</a>
-      <a href="mailto:studio.support@rep-root.com">Help &amp; Support</a>
+      <a routerLink="/">RepRoot overview</a>
+      <a href="mailto:support@rep-root.com">Help and Support</a>
       <a routerLink="/terms/professional" target="_blank">Professional Terms</a>
       <a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
       <a routerLink="/terms/client" target="_blank">Client Terms</a>
       <a routerLink="/privacy/client" target="_blank">Client Privacy</a>
-      <a routerLink="/cookies" target="_blank">Cookie Notice</a>
     </nav>
-    <p>Use of RepRoot Studio is subject to the documents applicable to your account role. Never share passwords or one-time verification codes.</p>
+    <p>Use of RepRoot is subject to the documents applicable to your account role. Never share passwords or one-time verification codes.</p>
   </footer>
 </main>

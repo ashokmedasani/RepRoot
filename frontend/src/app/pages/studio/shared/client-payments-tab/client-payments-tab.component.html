@@ -50,7 +50,7 @@
 
     @if (dashboardUnlocked) {
       <p class="disclaimer-note">
-        RepRoot Studio records information you enter here. It does not receive, hold, or transfer these payments,
+        RepRoot records information you enter here. It does not receive, hold, or transfer these payments,
         and does not verify ownership of external payment accounts.
       </p>
     }
@@ -92,7 +92,7 @@
         @for (request of overpaidRequests; track request.request_id) {
           <span>{{ request.overpaid_amount }} {{ request.requested_currency }} extra on {{ request.request_id }}</span>
         }
-        <small>Review this before creating the next request. RepRoot Studio does not automatically apply it as credit.</small>
+        <small>Review this before creating the next request. RepRoot does not automatically apply it as credit.</small>
       </div>
     }
 

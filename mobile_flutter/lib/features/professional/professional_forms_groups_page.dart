@@ -2018,7 +2018,7 @@ class _ProfessionalFormsGroupsPageState
           ? group.description
           : (group.hasRegistrationForm
                 ? 'Registration link active'
-                : 'No registration form'),
+                : 'No Client Information Form'),
       leading: dragIndex == null
           ? null
           : ReorderableDragStartListener(
@@ -2302,7 +2302,7 @@ class _FormRequestSheetState extends ConsumerState<_FormRequestSheet> {
                       child: Text(
                         group.hasRegistrationForm
                             ? group.name
-                            : '${group.name} (no registration form)',
+                            : '${group.name} (no Client Information Form)',
                       ),
                     ),
                   )

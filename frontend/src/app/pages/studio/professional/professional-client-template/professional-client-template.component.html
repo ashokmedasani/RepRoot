@@ -15,7 +15,7 @@
 
   @if (isLoading) {
     <section class="panel">
-      <p>Loading template details...</p>
+      <app-skeleton variant="card" [count]="3" label="Loading template details"></app-skeleton>
     </section>
   } @else if (assignment && client) {
     <section class="panel detail-panel">

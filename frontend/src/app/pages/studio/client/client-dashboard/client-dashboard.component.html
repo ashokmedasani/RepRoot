@@ -8,7 +8,10 @@
 
   @if (message) { <p class="message error-message">{{ message }}</p> }
   @if (isLoading) {
-    <section class="dashboard-panel"><p>Loading dashboard...</p></section>
+    <section class="dashboard-panel" aria-busy="true">
+      <app-skeleton variant="card" [count]="4" label="Loading your dashboard"></app-skeleton>
+      <app-skeleton variant="block"></app-skeleton>
+    </section>
   } @else if (dashboard) {
     <section class="kpi-grid" aria-label="Client dashboard metrics">
       <article class="streak"><span>Current Check-in Streak</span><strong>{{ summary.current_streak }} days</strong><small>Consecutive active days</small></article>
@@ -26,7 +29,7 @@
 
     <section class="dashboard-panel meetings-panel">
       <header>
-        <div><h2>Meetings &amp; Reminders</h2><p>Meeting requests, confirmed sessions, and professional reminders in one place.</p></div>
+        <div><h2>Meetings and Reminders</h2><p>Meeting requests, confirmed sessions, and professional reminders in one place.</p></div>
         <a routerLink="/client/meetings" class="ghost-action">Open All</a>
       </header>
       <div class="dashboard-meeting-list">

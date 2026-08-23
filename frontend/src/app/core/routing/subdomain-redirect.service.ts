@@ -4,7 +4,7 @@ import { filter, take } from 'rxjs';
 
 /**
  * One Angular build serves three "sites" off one hostname each:
- * rep-root.com (RepRoot marketing), studio.rep-root.com (the Studio app),
+ * rep-root.com (the public site and application),
  * operate.rep-root.com (the internal admin console). All routes exist in every
  * build regardless of hostname — this only decides what the bare `/` path
  * shows, so a bookmark or shared link still resolves correctly wherever it's
@@ -23,11 +23,7 @@ export class SubdomainRedirectService {
       if (window.location.pathname !== '/') return;
 
       const host = window.location.hostname;
-      if (host.startsWith('studio.')) {
-        // Render the Studio homepage while keeping its canonical public URL at
-        // the root of the Studio subdomain. `_studio-home` is internal only.
-        void this.router.navigateByUrl('/_studio-home', { skipLocationChange: true, replaceUrl: true });
-      } else if (host.startsWith('operate.')) {
+      if (host.startsWith('operate.')) {
         void this.router.navigateByUrl('/admin-portal/login', { replaceUrl: true });
       }
     });

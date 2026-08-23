@@ -10,20 +10,35 @@
   }
 
   @if (isLoading) {
-    <section class="panel">
-      <p>Loading dashboard...</p>
+    <section class="panel" aria-busy="true">
+      <app-skeleton variant="title" label="Loading your dashboard"></app-skeleton>
+      <app-skeleton variant="card" [count]="3"></app-skeleton>
+      <app-skeleton variant="row" [count]="4"></app-skeleton>
     </section>
   } @else {
     @if (onboarding && onboarding.missing_actions.length > 0) {
-      <section class="action-required" aria-labelledby="action-required-title">
-        <div>
-          <p class="eyebrow">Workspace setup</p>
-          <h2 id="action-required-title">Action Required</h2>
-          <p>{{ onboarding.message }}</p>
+      <section class="action-required" data-tour="workspace-setup" aria-labelledby="action-required-title">
+        <div class="action-required-heading">
+          <div>
+            <p class="eyebrow">Workspace setup</p>
+            <h2 id="action-required-title">Action Required</h2>
+            <p>{{ onboarding.message }}</p>
+          </div>
+          <strong>{{ onboardingCompletedCount }} of {{ onboardingChecklist.length }} completed</strong>
         </div>
-        <div class="action-required-links">
-          @for (action of onboarding.actions; track action.code) {
-            <a [routerLink]="action.route">{{ action.label }}</a>
+        <div class="action-required-checklist" aria-label="Workspace setup progress">
+          @for (item of onboardingChecklist; track item.code) {
+            @if (item.completed) {
+              <div class="checklist-item completed" [attr.aria-label]="item.label + ' completed'">
+                <span class="checklist-status" aria-hidden="true">✓</span>
+                <span>{{ item.label }}</span>
+              </div>
+            } @else {
+              <a class="checklist-item" [routerLink]="item.route">
+                <span class="checklist-status" aria-hidden="true">{{ $index + 1 }}</span>
+                <span>{{ item.label }}</span>
+              </a>
+            }
           }
         </div>
       </section>
@@ -31,23 +46,23 @@
 
     @if (planUsage; as usage) {
       <p class="current-plan-line">Current Plan: <strong>{{ usage.plan_name }}</strong></p>
-      <div class="attention-kpi-row" aria-label="Workspace totals">
-        <article class="attention-kpi clear">
+      <div class="attention-kpi-row kpi-row-ratio" data-tour="plan-totals" aria-label="Workspace totals">
+        <article class="attention-kpi metric">
           <span>Total Clients</span>
           <strong>{{ resourceUsageDisplay('clients') }}</strong>
           <small>{{ resourceUsageCaption('clients') }}</small>
         </article>
-        <article class="attention-kpi">
+        <article class="attention-kpi metric">
           <span>Total Groups</span>
           <strong>{{ resourceUsageDisplay('groups') }}</strong>
           <small>{{ resourceUsageCaption('groups') }}</small>
         </article>
-        <article class="attention-kpi">
+        <article class="attention-kpi metric">
           <span>Total Templates</span>
           <strong>{{ resourceUsageDisplay('templates') }}</strong>
           <small>{{ resourceUsageCaption('templates') }}</small>
         </article>
-        <article class="attention-kpi">
+        <article class="attention-kpi metric">
           <span>Total Resources</span>
           <strong>{{ resourceUsageDisplay('resources') }}</strong>
           <small>{{ resourceUsageCaption('resources') }}</small>
@@ -55,25 +70,25 @@
       </div>
     }
 
-    <nav class="dash-tabs" aria-label="Dashboard sections">
-      <button type="button" class="dash-tab" [class.active]="activeTab === 'activity'" (click)="selectTab('activity')">
+    <nav class="dash-tabs" data-tour="dashboard-tabs" aria-label="Dashboard sections">
+      <button type="button" class="dash-tab" data-tour="tab-activity" [class.active]="activeTab === 'activity'" (click)="selectTab('activity')">
         <span>Activity</span>
         @if (activityActionCount > 0) { <span class="tab-badge">{{ activityActionCount }}</span> }
       </button>
       @if (paymentsEnabled) {
-        <button type="button" class="dash-tab" [class.active]="activeTab === 'payments'" (click)="selectTab('payments')">
+        <button type="button" class="dash-tab" data-tour="tab-payments" [class.active]="activeTab === 'payments'" (click)="selectTab('payments')">
           <span>Payments</span>
           @if (paymentsBadgeCount > 0) { <span class="tab-badge" title="Needs review, overdue, or has unread updates">{{ paymentsBadgeCount }}</span> }
         </button>
       }
-      <button type="button" class="dash-tab" [class.active]="activeTab === 'schedules'" (click)="selectTab('schedules')">
+      <button type="button" class="dash-tab" data-tour="tab-schedules" [class.active]="activeTab === 'schedules'" (click)="selectTab('schedules')">
         <span>Schedules</span>
         @if (scheduleActionCount > 0) { <span class="tab-badge">{{ scheduleActionCount }}</span> }
       </button>
     </nav>
 
     @if (activeTab === 'activity') {
-      <div class="attention-kpi-row" aria-label="Activity needing action">
+      <div class="attention-kpi-row" data-tour="activity-summary" aria-label="Activity needing action">
         <article class="attention-kpi review" [class.clear]="unreadMessagesTotal === 0">
           <span>Messages</span>
           <strong>{{ unreadMessagesTotal }}</strong>
@@ -89,7 +104,7 @@
           <strong>{{ pendingProfileEdits.length }}</strong>
           <small>Client account requests</small>
         </article>
-        <article class="attention-kpi completed">
+        <article class="attention-kpi review" [class.clear]="activityActionCount === 0">
           <span>Total</span>
           <strong>{{ activityActionCount }}</strong>
           <small>Items waiting on you</small>
@@ -103,8 +118,7 @@
       <section class="activity-card">
         <div class="panel-heading">
           <div>
-            <h2>Messages</h2>
-            <p>Clients with unread messages, most recent first.</p>
+            <h2>{{ headingCount(messageRows.length, 'Message', 'Messages') }}</h2>
           </div>
         </div>
         <app-fixed-height-list [visibleRows]="5">
@@ -128,8 +142,7 @@
       <section class="activity-card">
         <div class="panel-heading">
           <div>
-            <h2>Pending Requests</h2>
-            <p>New applicants waiting for your review.</p>
+            <h2>{{ headingCount(pendingRequests.length, 'Pending Request', 'Pending Requests') }}</h2>
           </div>
           <a routerLink="/professional/forms-groups" class="ghost-action compact">View All</a>
         </div>
@@ -153,8 +166,7 @@
       <section class="activity-card">
         <div class="panel-heading">
           <div>
-            <h2>Client Account Requests</h2>
-            <p>Profile edits and account deletions waiting for review.</p>
+            <h2>{{ headingCount(pendingProfileEdits.length, 'Client Account Request', 'Client Account Requests') }}</h2>
           </div>
         </div>
         <app-fixed-height-list [visibleRows]="6">
@@ -200,6 +212,7 @@
     }
 
     @if (activeTab === 'payments' && paymentsEnabled) {
+      <div data-tour="payments-panel">
       @if (revenueUnlocked && revenue; as rev) {
         <section class="activity-card">
           <div class="panel-heading">
@@ -234,17 +247,17 @@
           }
 
           <div class="attention-kpi-row revenue-kpi-row" aria-label="Logged payment totals">
-            <article class="attention-kpi clear">
+            <article class="attention-kpi metric">
               <span>Total Logged</span>
               <strong>{{ rev.total_logged | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
               <small>Private payment records</small>
             </article>
-            <article class="attention-kpi clear">
+            <article class="attention-kpi metric">
               <span>Manual Logs</span>
               <strong>{{ rev.manual_logged_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
               <small>{{ rev.period_start | date: 'MMM d' }} &ndash; {{ rev.period_end | date: 'MMM d, y' }}</small>
             </article>
-            <article class="attention-kpi clear">
+            <article class="attention-kpi metric">
               <span>Integrated Payments</span>
               <strong>{{ rev.integrated_total | number: '1.2-2' }} {{ rev.reporting_currency }}</strong>
               <small>Available after provider setup</small>
@@ -314,7 +327,7 @@
 
       @if (revenueUnlocked) {
       <section class="activity-card">
-        <div class="attention-kpi-row" aria-label="Payments needing action">
+        <div class="attention-kpi-row kpi-row-2" aria-label="Payments needing action">
           <article class="attention-kpi review" [class.clear]="paymentReviewCount === 0">
             <span>Awaiting review</span>
             <strong>{{ paymentReviewCount }}</strong>
@@ -393,9 +406,11 @@
         </app-fixed-height-list>
       </section>
       }
+      </div>
     }
 
     @if (activeTab === 'schedules') {
+      <div data-tour="schedules-panel">
       <section class="activity-card">
         <div class="attention-kpi-row" aria-label="Schedules needing action">
           <article class="attention-kpi overdue" [class.clear]="scheduleSummary.overdue === 0">
@@ -479,6 +494,7 @@
           </div>
         </app-fixed-height-list>
       </section>
+      </div>
     }
   }
 </app-professional-page-shell>

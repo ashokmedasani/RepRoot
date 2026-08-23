@@ -15,6 +15,7 @@ import { ProfessionalPageShellComponent } from '@studio-shared/professional-page
 import { readImageAsDataUrl } from '@shared/utils/image-helpers';
 import { formatApiError } from '@shared/utils/ui-helpers';
 import { ConfirmationDialogService } from '@shared/confirmation-dialog/confirmation-dialog.service';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 interface SubmittedAnswer {
   label: string;
@@ -24,7 +25,7 @@ interface SubmittedAnswer {
 @Component({
   selector: 'app-professional-form-request-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, PasswordInputComponent, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, PasswordInputComponent, ProfessionalPageShellComponent, SkeletonComponent],
   templateUrl: './professional-form-request-detail.component.html',
   styleUrl: './professional-form-request-detail.component.scss'
 })
@@ -204,7 +205,7 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
             title: 'Approve and convert request for',
             target: this.submission.applicant_name,
             impact: `This request will become a client account and temporary login credentials will be sent to ${this.submission.email}.`,
-            confirmLabel: 'Approve & Create Client'
+            confirmLabel: 'Approve and Create Client'
           }
         : this.portalAccessMode === 'manual'
         ? {
@@ -212,14 +213,14 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
             title: 'Approve and convert request for',
             target: this.submission.applicant_name,
             impact: 'This request will become a client account. Credentials will not be emailed - you must deliver them separately.',
-            confirmLabel: 'Approve & Create Client'
+            confirmLabel: 'Approve and Create Client'
           }
         : {
             kind: 'approve',
             title: 'Approve request without portal access for',
             target: this.submission.applicant_name,
             impact: 'Only the applicant’s info will be stored - no login will be created. You can grant portal access later from the client’s profile.',
-            confirmLabel: 'Approve & Create Client'
+            confirmLabel: 'Approve and Create Client'
           }
     );
 
@@ -247,7 +248,7 @@ export class ProfessionalFormRequestDetailComponent implements OnInit {
       .subscribe({
         next: () => {
           this.messageType = 'success';
-          this.message = 'Client access created. Redirecting to Forms & Groups...';
+          this.message = 'Client access created. Redirecting to Forms and Groups...';
           window.setTimeout(() => void this.router.navigate(['/professional/forms-groups']), 900);
         },
         error: (error: unknown) => {

@@ -124,7 +124,7 @@ class _ProfessionalLegalConsentPageState
                   const AuthBrand(
                     title: 'Review before continuing',
                     subtitle:
-                        'RepRoot Studio has published a new legal-document '
+                        'RepRoot has published a new legal-document '
                         'version. Your earlier acceptance remains in your '
                         'account history.',
                   ),

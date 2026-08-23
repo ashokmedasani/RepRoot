@@ -1,13 +1,13 @@
 <main class="public-form-page">
-  <header class="public-topbar"><a routerLink="/">RepRoot Studio</a></header>
+  <header class="public-topbar"><a routerLink="/">RepRoot</a></header>
   <section class="public-form-shell">
     @if (isLoading) {
-      <p class="message">Loading registration form...</p>
+      <p class="message">Loading client information form...</p>
     } @else if (form && !referenceId) {
       <form class="public-form" (ngSubmit)="submitForm()">
         <header>
           <p class="eyebrow">{{ form.professional_name }} &middot; {{ form.group.name }}</p>
-          <h1>Client Registration Form</h1>
+          <h1>Client Information Form</h1>
           <p>You are registering for a known group. This is not a public enquiry or lead form.</p>
         </header>
 

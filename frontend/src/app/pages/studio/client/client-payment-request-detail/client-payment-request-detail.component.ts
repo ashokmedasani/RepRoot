@@ -13,6 +13,7 @@ import {
 import { ClientPageShellComponent } from '@studio-shared/client-page-shell/client-page-shell.component';
 import { PAYMENT_STATUS_LABELS } from '@studio-shared/client-payments-tab/client-payments-tab.component';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { assertPdfWithinLimit, compressImageFile } from '@shared/utils/image-compression';
 
 @Component({
   selector: 'app-client-payment-request-detail',
@@ -81,7 +82,40 @@ export class ClientPaymentRequestDetailComponent implements OnInit {
 
   onProofFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.proofFile = input.files?.[0] || null;
+    const file = input.files?.[0] || null;
+
+    if (!file) {
+      this.proofFile = null;
+      return;
+    }
+
+    // A proof is either a receipt PDF or a photo of one. The photo is resized
+    // to fit; the PDF is size-checked, since a browser cannot shrink one.
+    if (file.type === 'application/pdf') {
+      try {
+        assertPdfWithinLimit(file);
+        this.proofFile = file;
+        this.proofMessage = '';
+      } catch (error: unknown) {
+        input.value = '';
+        this.proofFile = null;
+        this.proofMessageType = 'error';
+        this.proofMessage = error instanceof Error ? error.message : 'That file could not be used.';
+      }
+      return;
+    }
+
+    void compressImageFile(file)
+      .then((result) => {
+        this.proofFile = result.file;
+        this.proofMessage = '';
+      })
+      .catch((error: unknown) => {
+        input.value = '';
+        this.proofFile = null;
+        this.proofMessageType = 'error';
+        this.proofMessage = error instanceof Error ? error.message : 'That image could not be used.';
+      });
   }
 
   submitProof(): void {

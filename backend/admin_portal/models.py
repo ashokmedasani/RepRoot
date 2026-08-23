@@ -422,4 +422,12 @@ def record_error(
     device_info=device_info,
     request_path=request_path,
   )
+
+  # Only new problems are worth an email -- repeats above just bump the
+  # counter and return early, so the operations mailbox gets one alert per
+  # distinct problem rather than one per occurrence. Sending is backgrounded
+  # and fully swallowed inside send_error_alert; it can never fail the caller.
+  from .error_alerts import send_error_alert
+  send_error_alert(log)
+
   return log, False

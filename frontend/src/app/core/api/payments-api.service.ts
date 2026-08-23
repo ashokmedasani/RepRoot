@@ -4,6 +4,9 @@ import { Observable } from 'rxjs';
 
 export interface PaymentSettingsRecord {
   payment_tracking_enabled: boolean;
+  /** False while the payments gateway flag is off: every write on the payment
+   *  settings screen is refused with 503 until it is turned on. */
+  payments_enabled?: boolean;
   reporting_currency: string;
   // Gates the payments dashboard/summary only — toggleable anytime, not a
   // one-way lock. Manual payment method setup is unaffected by this.

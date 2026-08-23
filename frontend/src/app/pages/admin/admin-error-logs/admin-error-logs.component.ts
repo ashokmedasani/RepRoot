@@ -87,6 +87,21 @@ interface ErrorLogRow {
                         <span><strong>Request path</strong>{{ detail.request_path || '—' }}</span>
                         <span><strong>First seen</strong>{{ detail.first_seen_at | date: 'medium' }}</span>
                       </div>
+                      @if (hasDiagnosticContext(detail)) {
+                        <section class="diagnostic-context" aria-label="Failure context">
+                          <h3>Failure context</h3>
+                          <div class="context-grid">
+                            @if (contextText(detail, 'category')) { <span><strong>Category</strong>{{ contextText(detail, 'category') }}</span> }
+                            @if (contextText(detail, 'http_status')) { <span><strong>HTTP status</strong>{{ contextText(detail, 'http_status') }}</span> }
+                            @if (contextText(detail, 'method')) { <span><strong>Method</strong>{{ contextText(detail, 'method') }}</span> }
+                            @if (contextText(detail, 'api_endpoint')) { <span><strong>API endpoint</strong>{{ contextText(detail, 'api_endpoint') }}</span> }
+                            @if (contextText(detail, 'app_route')) { <span><strong>Current page</strong>{{ contextText(detail, 'app_route') }}</span> }
+                            @if (contextText(detail, 'previous_route')) { <span><strong>Previous page</strong>{{ contextText(detail, 'previous_route') }}</span> }
+                            @if (contextText(detail, 'error_type')) { <span><strong>Error type</strong>{{ contextText(detail, 'error_type') }}</span> }
+                            @if (contextText(detail, 'reported_at')) { <span><strong>Reported at</strong>{{ contextText(detail, 'reported_at') }}</span> }
+                          </div>
+                        </section>
+                      }
                       @if (detail.stack_trace) { <pre class="stack">{{ detail.stack_trace }}</pre> }
                       @if (detail.resolved_by_username) { <p class="resolved-by">Resolved by {{ detail.resolved_by_username }} on {{ detail.resolved_at | date: 'medium' }}</p> }
                       @if (can('admin.errors.manage')) {
@@ -130,6 +145,7 @@ th{position:sticky;top:0;background:var(--app-surface);color:var(--app-muted);fo
 .detail-row td{background:var(--app-bg);padding:0}
 .detail{padding:1rem 1.2rem;display:grid;gap:.8rem}
 .detail-meta{display:flex;flex-wrap:wrap;gap:1rem 1.6rem;font-size:.78rem}.detail-meta span{display:flex;flex-direction:column;gap:.15rem;color:var(--app-text)}.detail-meta strong{color:var(--app-muted);font-size:.68rem;text-transform:uppercase}
+.diagnostic-context{border:1px solid var(--app-border);border-radius:.7rem;padding:.8rem;background:var(--app-surface-soft)}.diagnostic-context h3{margin:0 0 .65rem;font-size:.86rem}.context-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.7rem}.context-grid span{display:grid;gap:.15rem;min-width:0;word-break:break-word;font-size:.78rem}.context-grid strong{color:var(--app-muted);font-size:.66rem;text-transform:uppercase}
 .stack{margin:0;max-height:16rem;overflow:auto;border:1px solid var(--app-border);border-radius:.6rem;padding:.8rem;background:var(--app-surface);font-size:.75rem;white-space:pre-wrap;word-break:break-word}
 .resolved-by{margin:0;color:var(--app-muted);font-size:.8rem}
 .resolve-form{display:grid;gap:.6rem}.resolve-form textarea{min-height:4rem;resize:vertical}.resolve-actions{display:flex;gap:.5rem;flex-wrap:wrap}
@@ -167,6 +183,21 @@ export class AdminErrorLogsComponent implements OnInit {
 
   can(permission: string): boolean {
     return this.api.hasPermission(permission);
+  }
+
+  contextText(log: ErrorLogDetail, key: string): string {
+    const value = log.context?.[key];
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : '';
+  }
+
+  hasDiagnosticContext(log: ErrorLogDetail): boolean {
+    return ['category', 'http_status', 'method', 'api_endpoint', 'app_route', 'previous_route', 'error_type', 'reported_at']
+      .some((key) => Boolean(this.contextText(log, key)));
   }
 
   ngOnInit(): void {

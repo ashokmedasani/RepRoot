@@ -476,7 +476,7 @@ class _ProfessionalPaymentsPageState
         ),
         Text(
           'Share payment instructions with clients. Payments still happen '
-          'outside RepRoot Studio.',
+          'outside RepRoot.',
           style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -535,7 +535,7 @@ class _ProfessionalPaymentsPageState
           const SizedBox(height: AppSpacing.sm),
           const Text(
             'Manual payment methods are supplied by the professional. Payments '
-            'made through them happen outside RepRoot Studio.',
+            'made through them happen outside RepRoot.',
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
@@ -598,7 +598,7 @@ class _ProfessionalPaymentsPageState
                       title: 'About client payments',
                       body:
                           'Payments recorded here are separate from your '
-                          'RepRoot Studio subscription.',
+                          'RepRoot subscription.',
                     ),
                   ],
                 ),

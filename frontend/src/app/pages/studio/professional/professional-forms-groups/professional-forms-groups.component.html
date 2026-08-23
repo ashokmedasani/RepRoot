@@ -23,6 +23,7 @@
         <button
           type="button"
           class="workspace-tab"
+          data-tour="tab-forms"
           [class.active]="activeWorkspaceTab === 'forms'"
           [attr.aria-selected]="activeWorkspaceTab === 'forms'"
           (click)="setWorkspaceTab('forms')"
@@ -33,6 +34,7 @@
         <button
           type="button"
           class="workspace-tab"
+          data-tour="tab-groups"
           [class.active]="activeWorkspaceTab === 'groups'"
           [attr.aria-selected]="activeWorkspaceTab === 'groups'"
           (click)="setWorkspaceTab('groups')"
@@ -100,7 +102,7 @@
 
           @if (selectedLeadForm?.is_active) {
             <div class="lead-main">
-              <div class="form-link-box">
+              <div class="form-link-box" data-tour="lead-form-link">
                 <span>Public Form Link</span>
                 <div>
                   <a [href]="selectedLeadForm?.public_link" target="_blank" rel="noreferrer">{{ selectedLeadForm?.public_link }}</a>
@@ -108,22 +110,25 @@
                 </div>
               </div>
 
+              <!-- These read from the same filtered source as the tab badges
+                   below. Reading raw overview lengths here meant the card said
+                   "Pending 12" directly above a tab reading "Pending (9)". -->
               <div class="stats-grid">
                 <div class="stat-card total-stat">
                   <span>Total Requests</span>
-                  <strong>{{ overview.pending_forms.length + overview.approved_forms.length + overview.deleted_forms.length }}</strong>
+                  <strong>{{ submissionCount('pending') + submissionCount('approved') + submissionCount('deleted') }}</strong>
                 </div>
                 <div class="stat-card pending-stat">
                   <span>Pending</span>
-                  <strong>{{ overview.pending_forms.length }}</strong>
+                  <strong>{{ submissionCount('pending') }}</strong>
                 </div>
                 <div class="stat-card approved-stat">
                   <span>Approved</span>
-                  <strong>{{ overview.approved_forms.length }}</strong>
+                  <strong>{{ submissionCount('approved') }}</strong>
                 </div>
                 <div class="stat-card deleted-stat">
                   <span>Deleted</span>
-                  <strong>{{ overview.deleted_forms.length }}</strong>
+                  <strong>{{ submissionCount('deleted') }}</strong>
                 </div>
               </div>
             </div>
@@ -149,7 +154,7 @@
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">After form submission</p>
-                  <h2 id="meeting-settings-title">Introductory Meeting Settings</h2>
+                  <h2 id="meeting-settings-title" data-tour="meeting-settings">Introductory Meeting Settings</h2>
                   @if (selectedLeadForm?.introductory_meeting_enabled) {
                     <p>Applicants can request <strong>{{ selectedLeadForm?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
                   } @else {
@@ -185,7 +190,7 @@
                           <span class="status-pill">{{ request.status }}</span>
                           @if (request.status === 'pending') {
                             <div class="meeting-request-actions">
-                              <button type="button" class="primary-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'accept')">Accept &amp; send invite</button>
+                              <button type="button" class="primary-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'accept')">Accept and send invite</button>
                               <button type="button" class="ghost-action danger-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'decline')">Decline</button>
                             </div>
                           }
@@ -241,15 +246,18 @@
           }
         </section>
 
-        <section class="panel requests-panel" aria-labelledby="requests-title">
+        <section class="panel requests-panel" data-tour="form-requests" aria-labelledby="requests-title">
           <div class="section-heading">
             <h2 id="requests-title">Form Requests</h2>
             <label class="month-filter">
               <span>Filter by Month</span>
               <select [(ngModel)]="monthFilter" name="monthFilter">
-                <option value="">Last 6 months</option>
+                <option value="">All time</option>
                 @for (month of monthOptions; track month.value) {
                   <option [value]="month.value">{{ month.label }}</option>
+                }
+                @if (olderThanSixMonthsCount() > 0) {
+                  <option value="older">Older than 6 months ({{ olderThanSixMonthsCount() }})</option>
                 }
               </select>
             </label>
@@ -276,6 +284,7 @@
                   <th>Applicant Name</th>
                   <th>Email</th>
                   <th>Submitted On</th>
+                  <th>{{ selectedSubmissionView === 'approved' ? 'Approved On' : selectedSubmissionView === 'deleted' ? 'Deleted On' : 'Waiting' }}</th>
                   <th>Reference ID</th>
                   <th>Group</th>
                   <th>Actions</th>
@@ -288,6 +297,18 @@
                     <td>{{ submission.applicant_name }}</td>
                     <td>{{ submission.email }}</td>
                     <td>{{ submission.submitted_at | date: 'medium' }}</td>
+                    <!-- `converted_at` and `deleted_at` were already on every
+                         record and never rendered, so on the Approved tab there
+                         was no way to see when something was approved. -->
+                    <td class="outcome-cell">
+                      @if (selectedSubmissionView === 'approved') {
+                        {{ submission.converted_at ? (submission.converted_at | date: 'medium') : '—' }}
+                      } @else if (selectedSubmissionView === 'deleted') {
+                        {{ submission.deleted_at ? (submission.deleted_at | date: 'medium') : '—' }}
+                      } @else {
+                        <span class="waiting-for">{{ waitingFor(submission) }}</span>
+                      }
+                    </td>
                     <td>{{ submission.reference_id }}</td>
                     <td>
                       <span [class.not-assigned]="!submission.client_access">{{ groupNameFor(submission) }}</span>
@@ -305,7 +326,16 @@
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="7">No {{ selectedSubmissionView }} forms found.</td>
+                    <td colspan="8">
+                      <div class="table-empty">
+                        @if (monthFilter) {
+                          <p>No {{ selectedSubmissionView }} requests in the selected period.</p>
+                          <button type="button" class="ghost-action compact" (click)="monthFilter = ''">Show all time</button>
+                        } @else {
+                          <p>No {{ selectedSubmissionView }} requests yet.</p>
+                        }
+                      </div>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -317,18 +347,13 @@
       }
 
       @if (activeWorkspaceTab === 'groups') {
-        <section class="panel groups-panel" aria-labelledby="groups-title">
+        <section class="panel groups-panel" data-tour="groups" aria-labelledby="groups-title">
           <div class="section-heading">
             <div>
-              <h2 id="groups-title">Groups ({{ overview.groups.length }} / {{ overview.max_groups }})</h2>
-              <p>Organize clients and share group registration forms with known or already accepted clients.</p>
+              <h2 id="groups-title">Groups ({{ overview.groups.length }} / {{ overview.max_groups }}) <app-info-hint label="About reordering groups">Drag a group by its <strong>⠿</strong> handle to change the order. The order matters: if you ever go over your plan's allowance, the groups lowest in this list are the ones that lock first.</app-info-hint></h2>
             </div>
             <a routerLink="/professional/groups/create" class="primary-action group-create-action">Create Group</a>
           </div>
-
-          @if (orderedActiveGroups().length) {
-            <p class="drag-hint">Drag a group by its ⠿ handle to change which groups lock first if you go over plan.</p>
-          }
           <div class="group-list" cdkDropList (cdkDropListDropped)="dropGroup($event)">
             @for (group of orderedActiveGroups(); track group.id) {
               <article class="group-row" cdkDrag>
@@ -342,7 +367,7 @@
                   <span class="status-pill">Active</span>
                 </div>
                 <div class="group-actions">
-                  <span>{{ group.has_registration_form ? 'Group registration form ready' : 'Group registration form needed' }}</span>
+                  <span>{{ group.has_registration_form ? 'Client Information Form ready' : 'Client Information Form needed' }}</span>
                   <a [routerLink]="['/professional/groups', group.id]" class="ghost-action">Open group</a>
                   <a [routerLink]="['/professional/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
                 </div>
@@ -351,7 +376,8 @@
               <article class="group-row">
                 <div>
                   <h3>No groups yet</h3>
-                  <p>Create a group to finish setup.</p>
+                  <p>Groups are how you organise clients and share a Client Information Form with them.</p>
+                  <a routerLink="/professional/groups/create" class="primary-action compact">Create Group</a>
                 </div>
               </article>
             }
@@ -377,7 +403,7 @@
                     <span class="status-pill">Locked</span>
                   </div>
                   <div class="group-actions">
-                    <span>{{ group.has_registration_form ? 'Group registration form ready' : 'Group registration form needed' }}</span>
+                    <span>{{ group.has_registration_form ? 'Client Information Form ready' : 'Client Information Form needed' }}</span>
                     <button type="button" class="ghost-action" disabled title="This group is locked. Upgrade or free a slot to reopen it.">Open group</button>
                     <button type="button" class="secondary-action" disabled title="This group is locked. Upgrade or free a slot to edit its form.">Edit form</button>
                   </div>

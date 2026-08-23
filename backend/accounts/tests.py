@@ -784,7 +784,7 @@ class ProfessionalAvailabilityWindowTests(APITestCase):
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class ClientPaymentsWorkflowTests(APITestCase):
   """Client Payments — money professionals collect from their own clients.
-  Separate from RepRoot Studio Billing; see accounts/views_payments.py."""
+  Separate from RepRoot Billing; see accounts/views_payments.py."""
 
   def setUp(self):
     self.user = get_user_model().objects.create_user(

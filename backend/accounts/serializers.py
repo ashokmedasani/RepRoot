@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from .email_policy import SignupEmailDomainError, validate_signup_email_domain
 from .email_verification import consume_verified_email_token
 from .models import (
   ChatMessage,
@@ -45,6 +46,7 @@ from .models import (
   ProfessionalLeadForm,
   ProfessionalPaymentSettings,
   ProfessionalProfile,
+  ProfessionalProfileImage,
   ProfessionalResource,
   RecycleBinItem,
   UNIVERSAL_CORE_FIELDS,
@@ -53,12 +55,27 @@ from .payment_constants import (
   CATEGORY_REQUIRED_CLIENT_FIELDS,
   ISO_4217_CODES,
   PAYMENT_PROOF_CONTENT_TYPES,
+  PAYMENT_PROOF_IMAGE_MAX_BYTES,
   PAYMENT_PROOF_MAX_BYTES,
   PAYMENT_QR_CONTENT_TYPES,
   PAYMENT_QR_MAX_BYTES,
 )
 
+from .upload_limits import (
+  IMAGE_MAX_BYTES,
+  PDF_MAX_BYTES,
+  image_too_large_message,
+  pdf_too_large_message,
+)
+
 User = get_user_model()
+
+# The gallery is two fixed groups -- Certificates and Other Images -- with five
+# uploads each, not one open-ended photo library. The cap keeps a single profile
+# from dominating the professional's plan storage and keeps the public profile
+# page to a sane payload.
+MAX_IMAGES_PER_GALLERY_GROUP = 5
+MAX_PROFILE_GALLERY_IMAGES = MAX_IMAGES_PER_GALLERY_GROUP * 2
 
 
 def detect_upload_content_type(value):
@@ -116,6 +133,42 @@ LEGACY_PROFILE_VISIBILITY_KEYS = {
   'gallery': 'images',
   'social_links': 'links',
 }
+
+# The order sections appear in when a professional has not arranged them, and
+# the order any keys they did not mention fall back to.
+DEFAULT_PROFILE_SECTION_ORDER = [
+  'about',
+  'professional_summary',
+  'specializations',
+  'experience',
+  'languages',
+  'training_style',
+  'certification',
+  'images',
+  'links',
+]
+
+
+def normalize_profile_section_order(value):
+  """Return a complete, de-duplicated section order.
+
+  Tolerant by design: unknown keys are dropped and missing ones are appended in
+  their default position, so shipping a new section later cannot leave an
+  existing professional with a profile that silently omits it.
+  """
+  source = value if isinstance(value, list) else []
+  ordered = []
+
+  for key in source:
+    key = str(key)
+    if key in DEFAULT_PROFILE_SECTION_ORDER and key not in ordered:
+      ordered.append(key)
+
+  for key in DEFAULT_PROFILE_SECTION_ORDER:
+    if key not in ordered:
+      ordered.append(key)
+
+  return ordered
 
 
 def normalize_profile_visibility(value):
@@ -202,7 +255,7 @@ def validate_client_photo(value):
     return ''
 
   if len(photo) > 7_000_000:
-    raise serializers.ValidationError('The profile photo must be smaller than 5 MB.')
+    raise serializers.ValidationError(image_too_large_message('The profile photo'))
 
   match = re.match(r'^data:image/(jpeg|jpg|png|webp|gif);base64,(?P<data>.+)$', photo, re.IGNORECASE | re.DOTALL)
   if not match:
@@ -278,9 +331,18 @@ def normalize_dynamic_fields(fields):
 
 
 def get_public_form_link(request, public_slug):
-  origin = request.headers.get('Origin') if request else ''
-  base_url = origin or request.build_absolute_uri('/').rstrip('/') if request else ''
+  # Public forms always belong to the RepRoot website. Deriving this URL from
+  # the request host leaks API/instance hosts into Flutter responses because
+  # native clients do not send a browser Origin header.
+  base_url = str(getattr(settings, 'REPROOT_FRONTEND_URL', '') or '').strip().rstrip('/')
   return f'{base_url}/public/forms/{public_slug}' if base_url else f'/public/forms/{public_slug}'
+
+
+def validate_signup_email(value: str) -> str:
+  try:
+    return validate_signup_email_domain(value)
+  except SignupEmailDomainError as error:
+    raise serializers.ValidationError(str(error)) from error
 
 
 def validate_required_answers(fields, answers):
@@ -358,7 +420,7 @@ class EmailAvailabilitySerializer(serializers.Serializer):
   email = serializers.EmailField()
 
   def validate_email(self, value: str) -> str:
-    email = value.strip().lower()
+    email = validate_signup_email(value)
 
     if not email:
       raise serializers.ValidationError('Email is required.')
@@ -370,7 +432,7 @@ class EmailOtpRequestSerializer(serializers.Serializer):
   email = serializers.EmailField()
 
   def validate_email(self, value: str) -> str:
-    return value.strip().lower()
+    return validate_signup_email(value)
 
 
 class EmailOtpVerifySerializer(serializers.Serializer):
@@ -401,7 +463,7 @@ class ProfessionalSignupSerializer(serializers.Serializer):
     return username
 
   def validate_email(self, value: str) -> str:
-    email = value.strip().lower()
+    email = validate_signup_email(value)
 
     if User.objects.filter(email__iexact=email).exists():
       raise serializers.ValidationError('An account already exists for this email. Please sign in.')
@@ -477,6 +539,17 @@ def _reject_login_if_locked(user):
   profile = getattr(user, 'professional_profile', None)
   if profile is None:
     return
+
+  # A pending deletion is cancelled simply by coming back. This runs before the
+  # lock check below on purpose: the hold state never sets is_locked, so the
+  # account is still reachable, and cancelling here means the professional does
+  # not have to find a button to undo something they already changed their mind
+  # about. Import is local -- professional_deletion imports from this module's
+  # siblings and a top-level import would close the cycle.
+  if profile.lifecycle_status == profile.LIFECYCLE_PENDING_DELETION:
+    from .professional_deletion import cancel_deletion
+    cancel_deletion(profile, reason='you signed in')
+
   if profile.is_locked or profile.lifecycle_status == profile.LIFECYCLE_RECYCLED:
     raise serializers.ValidationError(
       'This account is frozen due to a billing overage. Contact support to restore access.'
@@ -664,6 +737,16 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
   transformation_photo_url = serializers.SerializerMethodField()
   training_photo_url = serializers.SerializerMethodField()
   legal_acceptance_history = serializers.SerializerMethodField()
+  # Read side of the gallery. Its shape is unchanged from when these lived in
+  # the `profile_images` JSONField, so every existing consumer -- the Angular
+  # profile page, the client-facing public profile, the Flutter app -- keeps
+  # working; only `url` changed from an inline base64 blob to a media URL.
+  profile_images = serializers.SerializerMethodField()
+  # Write side: a JSON array describing the gallery after the edit. Each entry
+  # is {id?, category, title, file_key?}. Files themselves ride along as
+  # separate multipart parts named by `file_key`, so one oversized picture can
+  # no longer fail the whole profile save.
+  gallery = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
   class Meta:
     model = ProfessionalProfile
@@ -710,8 +793,10 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       'youtube_url',
       'website_url',
       'profile_images',
+      'gallery',
       'profile_links',
       'profile_visibility',
+      'profile_section_order',
     ]
 
   def get_legal_acceptance_history(self, obj):
@@ -814,9 +899,6 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     return self.validate_image_upload(value)
 
   def validate_certification_file(self, value):
-    if value.size > 10 * 1024 * 1024:
-      raise serializers.ValidationError('Certification files must be smaller than 10 MB.')
-
     content_type = str(getattr(value, 'content_type', '') or '').lower()
     if content_type and content_type != 'application/pdf' and not content_type.startswith('image/'):
       raise serializers.ValidationError('Upload a PDF or image certification file.')
@@ -824,11 +906,20 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     detected_type = detect_upload_content_type(value)
     if detected_type is None:
       raise serializers.ValidationError('Upload a PDF or a JPG/PNG/WEBP image - the file content could not be verified.')
+
+    # Sized against what the bytes actually are, not what the upload header
+    # claimed: a PDF gets the document ceiling, an image gets the image one.
+    if detected_type == 'application/pdf':
+      if value.size > PDF_MAX_BYTES:
+        raise serializers.ValidationError(pdf_too_large_message('Certification PDFs'))
+    elif value.size > IMAGE_MAX_BYTES:
+      raise serializers.ValidationError(image_too_large_message('Certification images'))
+
     return value
 
   def validate_image_upload(self, value):
-    if value.size > 5 * 1024 * 1024:
-      raise serializers.ValidationError('Images must be smaller than 5 MB.')
+    if value.size > IMAGE_MAX_BYTES:
+      raise serializers.ValidationError(image_too_large_message())
 
     content_type = str(getattr(value, 'content_type', '') or '').lower()
     if content_type and not content_type.startswith('image/'):
@@ -838,6 +929,107 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
     if detected_type is None or not detected_type.startswith('image/'):
       raise serializers.ValidationError('Upload a valid JPG, PNG, WEBP, or GIF image - the file content could not be verified.')
     return value
+
+  def get_profile_images(self, obj):
+    """Stored gallery rows, merged with any legacy entry they do not cover.
+
+    The merge matters. The data migration converts `data:` URLs into files and
+    deliberately leaves anything else alone -- an entry that was already an
+    ordinary http URL has no bytes to copy. If this returned rows *instead of*
+    the legacy list whenever a single row existed, those untouched entries
+    would silently disappear from a professional's profile the moment their
+    first picture was converted.
+    """
+    images = [
+      {
+        'id': row.pk,
+        'category': row.category,
+        'title': row.title,
+        'url': self.get_file_url(row.image),
+      }
+      for row in obj.images.all()
+      if row.image
+    ]
+
+    legacy = obj.profile_images or []
+    if not isinstance(legacy, list):
+      return images
+
+    known_titles = {(image['category'], image['title']) for image in images}
+    for entry in legacy:
+      if not isinstance(entry, dict):
+        continue
+
+      url = str(entry.get('url') or '').strip()
+      # A `data:` entry has either been converted already or could not be
+      # decoded; either way it must not be served back as a multi-megabyte
+      # inline blob.
+      if not url or url.startswith('data:'):
+        continue
+
+      key = (str(entry.get('category') or ''), str(entry.get('title') or ''))
+      if key in known_titles:
+        continue
+
+      images.append({
+        'category': key[0] or ProfessionalProfileImage.CATEGORY_OTHER,
+        'title': key[1],
+        'url': url,
+      })
+
+    return images
+
+  def validate_gallery(self, value):
+    if not str(value or '').strip():
+      return []
+
+    try:
+      entries = json.loads(value)
+    except json.JSONDecodeError:
+      raise serializers.ValidationError('Invalid gallery format.')
+
+    if not isinstance(entries, list):
+      raise serializers.ValidationError('Expected a list of images.')
+
+    allowed_categories = {choice for choice, _label in ProfessionalProfileImage.CATEGORY_CHOICES}
+    cleaned = []
+    per_group = {}
+    for entry in entries:
+      if not isinstance(entry, dict):
+        continue
+
+      category = str(entry.get('category') or '').strip()
+      if category not in allowed_categories:
+        category = ProfessionalProfileImage.CATEGORY_OTHER
+
+      # Each group is capped independently, so filling Certificates cannot eat
+      # the slots available for Other Images.
+      per_group[category] = per_group.get(category, 0) + 1
+      if per_group[category] > MAX_IMAGES_PER_GALLERY_GROUP:
+        label = dict(ProfessionalProfileImage.CATEGORY_CHOICES).get(category, category)
+        raise serializers.ValidationError(
+          f'You can keep up to {MAX_IMAGES_PER_GALLERY_GROUP} images under {label}.'
+        )
+
+      cleaned.append({
+        'id': entry.get('id'),
+        'category': category,
+        'title': str(entry.get('title') or '').strip()[:180],
+        'file_key': str(entry.get('file_key') or '').strip(),
+      })
+
+    # Validate the uploads here, while this is still `is_valid()` and nothing
+    # has been written. Checking them during `update()` meant an over-sized
+    # picture raised only after the profile's text fields had already been
+    # saved, leaving a half-applied edit behind a 400 response.
+    uploads = getattr(self.context.get('request'), 'FILES', None)
+    if uploads:
+      for entry in cleaned:
+        upload = uploads.get(entry['file_key']) if entry['file_key'] else None
+        if upload is not None:
+          self.validate_image_upload(upload)
+
+    return cleaned
 
   def validate_profile_images(self, value):
     return self.normalize_profile_collection(value, {'category', 'title', 'url'})
@@ -856,6 +1048,15 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
       raise serializers.ValidationError('Expected an object.')
 
     return normalize_profile_visibility(value)
+
+  def validate_profile_section_order(self, value):
+    if isinstance(value, str):
+      try:
+        value = json.loads(value or '[]')
+      except json.JSONDecodeError:
+        raise serializers.ValidationError('Invalid JSON format.')
+
+    return normalize_profile_section_order(value)
 
   def normalize_profile_collection(self, value, allowed_keys):
     if isinstance(value, str):
@@ -882,6 +1083,7 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
 
   def update(self, instance, validated_data):
     user_data = validated_data.pop('user', {})
+    gallery = validated_data.pop('gallery', None)
     user = instance.user
 
     if 'first_name' in user_data:
@@ -903,7 +1105,60 @@ class ProfessionalProfileSerializer(serializers.ModelSerializer):
 
     instance.profile_setup_completed = True
     instance.save()
+
+    if gallery is not None:
+      self.apply_gallery(instance, gallery)
+
     return instance
+
+  def apply_gallery(self, instance, entries):
+    """Bring the stored gallery in line with what the professional submitted.
+
+    Entries carrying an `id` are existing rows: kept, re-titled, re-ordered,
+    and given a new file only if one was uploaded for them. Entries without an
+    `id` must bring a file or they are ignored. Any existing row absent from
+    the list was removed in the editor, so it is deleted here -- deletion is
+    explicit, never a side effect of a failed upload.
+    """
+    request = self.context.get('request')
+    uploads = getattr(request, 'FILES', None)
+
+    kept_ids = []
+    for position, entry in enumerate(entries):
+      # Already validated in `validate_gallery`, before anything was saved.
+      upload = uploads.get(entry['file_key']) if uploads and entry['file_key'] else None
+
+      row_id = entry.get('id')
+      if row_id:
+        row = instance.images.filter(pk=row_id).first()
+        if row is None:
+          continue
+        row.category = entry['category']
+        row.title = entry['title']
+        row.position = position
+        if upload is not None:
+          row.image = upload
+        row.save()
+        kept_ids.append(row.pk)
+        continue
+
+      if upload is None:
+        # A new slot with no file behind it is not an image yet. Skipping it is
+        # the only silent drop left here, and it cannot lose anything the
+        # professional actually provided.
+        continue
+
+      row = ProfessionalProfileImage(
+        profile=instance,
+        category=entry['category'],
+        title=entry['title'],
+        position=position,
+        image=upload,
+      )
+      row.save()
+      kept_ids.append(row.pk)
+
+    instance.images.exclude(pk__in=kept_ids).delete()
 
 
 class ProfessionalLeadFormSerializer(serializers.ModelSerializer):
@@ -1492,6 +1747,11 @@ class ProfessionalResourceSerializer(serializers.ModelSerializer):
       if upload and detect_upload_content_type(upload) != 'application/pdf':
         raise serializers.ValidationError({'file': 'The file content does not match a valid PDF.'})
 
+      # The resource library had no size check of any kind, so a 60 MB scan
+      # could be uploaded and would then count against the plan's storage.
+      if upload and upload.size > PDF_MAX_BYTES:
+        raise serializers.ValidationError({'file': pdf_too_large_message('Resource PDFs')})
+
     if resource_type == ProfessionalResource.TYPE_TEXT_NOTE:
       if not attrs.get('description', '').strip():
         raise serializers.ValidationError({'description': 'Text is required.'})
@@ -1511,6 +1771,9 @@ class ProfessionalResourceSerializer(serializers.ModelSerializer):
         detected_type = detect_upload_content_type(upload)
         if detected_type is None or not detected_type.startswith('image/'):
           raise serializers.ValidationError({'file': 'The file content does not match a supported image format.'})
+
+        if upload.size > IMAGE_MAX_BYTES:
+          raise serializers.ValidationError({'file': image_too_large_message('Resource images')})
 
     return attrs
 
@@ -1623,7 +1886,7 @@ class TrackingEntrySerializer(serializers.ModelSerializer):
     read_only_fields = ['id', 'client', 'template', 'template_name', 'edited_by_professional', 'created_at', 'updated_at']
 
 
-CHAT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+CHAT_IMAGE_MAX_BYTES = IMAGE_MAX_BYTES
 CHAT_IMAGE_CONTENT_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
 
 
@@ -1661,7 +1924,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
   def validate_image(self, value):
     if value.size > CHAT_IMAGE_MAX_BYTES:
-      raise serializers.ValidationError('Images must be 5MB or smaller.')
+      raise serializers.ValidationError(image_too_large_message())
     if value.content_type not in CHAT_IMAGE_CONTENT_TYPES:
       raise serializers.ValidationError('Images must be JPEG, PNG, WebP, or GIF.')
     detected_type = detect_upload_content_type(value)
@@ -1838,9 +2101,19 @@ class SupportIncidentSerializer(serializers.ModelSerializer):
       'id', 'incident_id', 'reporter_role', 'reporter_name', 'reporter_email', 'category',
       'subject', 'description', 'page_feature', 'platform', 'app_version', 'device_info',
       'screenshot_url', 'priority', 'status', 'assigned_support_name', 'resolution_note',
-      'closed_at', 'created_at', 'updated_at', 'messages',
+      'support_email_status', 'acknowledgement_email_status', 'email_delivery_error',
+      'email_delivery_updated_at', 'closed_at', 'created_at', 'updated_at', 'messages',
     ]
     read_only_fields = fields
+
+  def to_representation(self, instance):
+    data = super().to_representation(instance)
+    if not self.context.get('include_internal', False):
+      data.pop('support_email_status', None)
+      data.pop('acknowledgement_email_status', None)
+      data.pop('email_delivery_error', None)
+      data.pop('email_delivery_updated_at', None)
+    return data
 
   def get_messages(self, obj):
     messages = obj.messages.all()
@@ -1873,8 +2146,8 @@ class SupportIncidentCreateSerializer(serializers.Serializer):
   def validate_screenshot(self, value):
     if not value:
       return value
-    if value.size > 5 * 1024 * 1024:
-      raise serializers.ValidationError('Screenshots must be 5 MB or smaller.')
+    if value.size > IMAGE_MAX_BYTES:
+      raise serializers.ValidationError(image_too_large_message('Screenshots'))
     content_type = str(getattr(value, 'content_type', '')).lower()
     if content_type not in ('image/jpeg', 'image/png', 'image/webp'):
       raise serializers.ValidationError('Only PNG, JPEG, and WebP screenshots are supported.')
@@ -2184,6 +2457,16 @@ class ManualPaymentProfileSerializer(serializers.ModelSerializer):
     ]
     read_only_fields = ['id', 'created_at', 'updated_at']
 
+  def to_internal_value(self, data):
+    # An empty `qr_code` part means "remove the stored QR code". DRF's FileField
+    # rejects an empty string outright, so it is translated to an explicit null
+    # before validation runs. Without this there was no way to take a QR code
+    # back off a payment method once one had been uploaded.
+    if hasattr(data, 'get') and data.get('qr_code') == '':
+      data = data.copy()
+      data['qr_code'] = None
+    return super().to_internal_value(data)
+
   def validate_display_label(self, value):
     label = value.strip()
     if not label:
@@ -2203,13 +2486,13 @@ class ManualPaymentProfileSerializer(serializers.ModelSerializer):
     return codes
 
   def validate_qr_code(self, value):
-    if value is None:
-      return value
+    if value in (None, ''):
+      return None
     content_type = getattr(value, 'content_type', '')
     if content_type not in PAYMENT_QR_CONTENT_TYPES:
       raise serializers.ValidationError('QR code must be a PNG, JPG, or WEBP image.')
     if value.size > PAYMENT_QR_MAX_BYTES:
-      raise serializers.ValidationError('QR code image must be under 2MB.')
+      raise serializers.ValidationError(image_too_large_message('QR code images'))
     detected_type = detect_upload_content_type(value)
     if detected_type is None or detected_type != content_type:
       raise serializers.ValidationError('The file content does not match a supported PNG, JPG, or WEBP image.')
@@ -2466,13 +2749,17 @@ class PaymentProofSubmitSerializer(serializers.ModelSerializer):
     content_type = getattr(value, 'content_type', '')
     if content_type not in PAYMENT_PROOF_CONTENT_TYPES:
       raise serializers.ValidationError('Use a JPG, PNG, WEBP, or PDF file.')
-    if value.size > PAYMENT_PROOF_MAX_BYTES:
-      raise serializers.ValidationError('Proof file must be under 5MB.')
     detected_type = detect_upload_content_type(value)
     if detected_type is None or detected_type != content_type:
       raise serializers.ValidationError(
         'The file content does not match a supported JPG, PNG, WEBP, or PDF format.'
       )
+    # A proof is a receipt PDF or a photo of one; each gets its own ceiling.
+    if detected_type == 'application/pdf':
+      if value.size > PAYMENT_PROOF_MAX_BYTES:
+        raise serializers.ValidationError(pdf_too_large_message('Proof PDFs'))
+    elif value.size > PAYMENT_PROOF_IMAGE_MAX_BYTES:
+      raise serializers.ValidationError(image_too_large_message('Proof images'))
     return value
 
   def validate_confirmed_accurate(self, value):

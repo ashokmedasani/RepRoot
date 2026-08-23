@@ -195,12 +195,6 @@ p {
   margin-top: 0.75rem;
 }
 
-.chip-row .empty-note {
-  margin: 0;
-  color: var(--app-muted);
-  font-size: 0.85rem;
-}
-
 .field-chip {
   display: inline-flex;
   align-items: center;
@@ -233,6 +227,18 @@ p {
 .field-chip:disabled:hover {
   transform: none;
   background: var(--app-surface);
+}
+
+.field-chip-custom {
+  border-style: dashed;
+  background: transparent;
+  color: var(--app-text);
+}
+
+.field-chip-custom:hover {
+  border-style: solid;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
 }
 
 .chip-plus {

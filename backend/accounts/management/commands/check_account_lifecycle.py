@@ -5,6 +5,7 @@ from accounts.account_lifecycle import (
     send_overage_notifications,
 )
 from accounts.data_retention import purge_expired_client_data
+from accounts.professional_deletion import process_expired_deletion_holds
 from accounts.recycle_bin import purge_expired as purge_expired_recycle_bin
 from admin_portal.models import ErrorLog
 from django.conf import settings
@@ -34,6 +35,14 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'[FAILED] Notification send failed: {e}'))
             failures.append(f'notifications: {e}')
+
+        try:
+            self.stdout.write('Recycling accounts whose deletion hold has run out...')
+            moved = process_expired_deletion_holds()
+            self.stdout.write(self.style.SUCCESS(f'[OK] Deletion hold sweep complete ({moved} recycled)'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'[FAILED] Deletion hold sweep failed: {e}'))
+            failures.append(f'deletion holds: {e}')
 
         try:
             self.stdout.write('Moving 30-day frozen accounts to recycle and purging expired accounts...')

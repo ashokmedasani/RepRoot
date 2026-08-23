@@ -1,117 +1,55 @@
-# Render Deployment
+# Render Frontend Deployment
 
-This project deploys as two Render services:
+RepRoot uses Render only for the Angular static website. The Django API is
+deployed separately and is not configured by `render.yaml`.
 
-- `fitness-app-backend`: Django REST API
-- `fitness-app-frontend`: Angular static site
+## Deployment source
 
-## 1. Push the branch
+- Service: `reproot-web`
+- Repository branch: `Test`
+- Root directory: `frontend`
+- Build command: `npm ci && npm run build:render`
+- Publish directory: `dist/professional-management-platform/browser`
 
-Push this repository branch to GitHub, then create the services from the Render dashboard or from `render.yaml`.
-
-## 2. Create the PostgreSQL database
-
-Use a Render PostgreSQL database or any external PostgreSQL provider. Copy its external/internal database URL.
-
-Set this backend environment variable:
+Render must keep the single-page application rewrite configured:
 
 ```text
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+/* -> /index.html
 ```
 
-When `DATABASE_URL` is present, the backend uses it automatically. On every backend startup, `backend/scripts/render_start.sh` runs:
+## Public build configuration
 
-```bash
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput
-gunicorn config.wsgi:application --bind "0.0.0.0:${PORT:-8000}"
-```
-
-That means schema setup and future migrations are applied automatically after you add the external database link.
-
-## 3. Backend environment variables
-
-Required:
+Configure these values in the Render static-site environment dashboard:
 
 ```text
-DJANGO_DEBUG=False
-DJANGO_SECRET_KEY=<generate a strong secret>
-DJANGO_ALLOWED_HOSTS=<your-backend>.onrender.com
-DATABASE_URL=<external postgres database url>
-CORS_ALLOWED_ORIGINS=https://<your-frontend>.onrender.com
-CSRF_TRUSTED_ORIGINS=https://<your-frontend>.onrender.com
+RENDER_API_BASE_URL=https://api.your-domain.com
+SUPPORT_EMAIL=studio-support@your-domain.com
+GOOGLE_OAUTH_CLIENT_ID=<google-oauth-web-client-id>.apps.googleusercontent.com
 ```
 
-Production startup intentionally fails if SMTP is not configured. Set `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL` before the first deployment so OTP and client-credential messages are delivered securely instead of printed to logs.
+These values are public by design because they are included in the browser
+bundle. Never put a Google client secret, SMTP password, database credential,
+AWS secret, payment secret, private key, or access token in Render's frontend
+environment.
 
-Also configure:
+`npm run build:render` writes these public values into
+`frontend/public/app-config.js` immediately before the Angular production
+build. The committed file intentionally contains blank values.
 
-```text
-CACHE_URL=redis://...                 # shared OTP, throttle, and verification state
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_STORAGE_BUCKET_NAME=...
-AWS_S3_REGION_NAME=...
-AWS_S3_ENDPOINT_URL=...              # only for non-AWS S3-compatible providers
-```
+The Google OAuth Web Client ID must be identical to the backend
+`GOOGLE_OAUTH_CLIENT_ID` and the Flutter `GOOGLE_SERVER_CLIENT_ID` build value.
+A mismatch causes Google identity-token audience validation to fail.
 
-Durable object storage is required for deployed profile and reference uploads because a web-service filesystem is not durable. Redis is strongly recommended before running more than one API process.
+## Test deployment workflow
 
-## 4. Frontend API configuration
+1. Promote the approved release commit to the `Test` branch.
+2. Allow Render to build that exact commit.
+3. Confirm the Render build command and publish directory shown above.
+4. Verify the public homepage, Studio homepage, portal, professional login,
+   client login, and protected-route behavior.
+5. Confirm browser API requests use the HTTPS API URL and do not contain a
+   duplicated `/api/accounts` path.
+6. Keep the previous successful Render deploy available for rollback.
 
-Set this frontend environment variable in Render:
-
-```text
-RENDER_API_BASE_URL=https://<your-backend>.onrender.com
-```
-
-The frontend Render build command runs `npm run build:render`, which writes `frontend/public/app-config.js` before Angular builds:
-
-```javascript
-window.APP_CONFIG = {
-  apiBaseUrl: 'https://<your-backend>.onrender.com'
-};
-```
-
-For local development, leave `apiBaseUrl` blank. The Angular app falls back to:
-
-```text
-http://127.0.0.1:8000/api/accounts
-```
-
-## 5. Render commands
-
-Backend:
-
-```text
-Root Directory: backend
-Build Command: pip install -r requirements.txt
-Start Command: bash scripts/render_start.sh
-Health Check Path: /api/health/
-```
-
-Frontend:
-
-```text
-Root Directory: frontend
-Build Command: npm ci && npm run build:render
-Publish Directory: dist/professional-management-platform/browser
-Rewrite Rule: /* -> /index.html
-```
-
-## 6. Verify deployment
-
-Open these URLs after deployment:
-
-```text
-https://<your-backend>.onrender.com/api/health/
-https://<your-frontend>.onrender.com/
-```
-
-The health endpoint should return:
-
-```json
-{"status": "ok"}
-```
-
-Before directing real users to the deployment, also run `python manage.py check --deploy`, `python manage.py migrate --check`, the backend test suite, the Angular production build, and both Python and npm vulnerability audits.
+Changing a Render environment value requires a new static-site deployment so
+the build script can place the new public value into the generated bundle.

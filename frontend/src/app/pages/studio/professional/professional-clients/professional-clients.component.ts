@@ -12,11 +12,12 @@ import {
 } from '@core/api/forms-groups-api.service';
 import { ProfessionalPageShellComponent } from '@studio-shared/professional-page-shell/professional-page-shell.component';
 import { ChatApiService } from '@core/api/chat-api.service';
+import { SkeletonComponent } from '@studio-shared/skeleton/skeleton.component';
 
 @Component({
   selector: 'app-professional-clients',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent],
+  imports: [DatePipe, FormsModule, RouterLink, ProfessionalPageShellComponent, SkeletonComponent],
   templateUrl: './professional-clients.component.html',
   styleUrl: './professional-clients.component.scss'
 })
@@ -61,6 +62,26 @@ export class ProfessionalClientsComponent implements OnInit, OnDestroy {
 
   get pendingClients(): ClientAccessRecord[] {
     return this.clients.filter((client) => client.must_change_password);
+  }
+
+  /** How this client reached the professional. */
+  onboardingLabel(client: ClientAccessRecord): string {
+    switch (client.onboarding_method) {
+      case 'public_lead':
+        return 'Lead form';
+      case 'group_registration':
+        return 'Group registration';
+      case 'manual':
+        return 'Added manually';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  clearFilters(): void {
+    this.searchTerm = '';
+    this.groupFilter = 'all';
+    this.statusFilter = 'all';
   }
 
   get filteredClients(): ClientAccessRecord[] {

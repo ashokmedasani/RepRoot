@@ -11,6 +11,7 @@ import {
   ProfessionalAuthApiService
 } from '@core/api/professional-auth-api.service';
 import { formatApiError } from '@shared/utils/ui-helpers';
+import { compressImageFile } from '@shared/utils/image-compression';
 
 type ReporterRole = 'professional' | 'client';
 type Incident = SupportIncident | ClientSupportIncident;
@@ -76,7 +77,26 @@ export class SupportIncidentsComponent implements OnInit {
 
   onScreenshotSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.screenshot = input.files?.[0] || null;
+    const file = input.files?.[0] || null;
+
+    if (!file) {
+      this.screenshot = null;
+      return;
+    }
+
+    // This had no size check of any kind, so a full-resolution screenshot was
+    // uploaded whole and rejected by the server after the wait.
+    void compressImageFile(file)
+      .then((result) => {
+        this.screenshot = result.file;
+        this.message = '';
+      })
+      .catch((error: unknown) => {
+        input.value = '';
+        this.screenshot = null;
+        this.messageType = 'error';
+        this.message = error instanceof Error ? error.message : 'That screenshot could not be used.';
+      });
   }
 
   openForm(category = 'feedback'): void {

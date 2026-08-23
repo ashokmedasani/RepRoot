@@ -483,7 +483,7 @@ class _ClientPaymentsPanelState extends ConsumerState<ClientPaymentsPanel> {
         ),
       const SizedBox(height: AppSpacing.md),
       Text(
-        'RepRoot Studio records information you enter here. It does not '
+        'RepRoot records information you enter here. It does not '
         'receive, hold, or transfer these payments, and does not verify '
         'ownership of external payment accounts.',
         style: context.text.labelSmall?.copyWith(color: context.tokens.muted),

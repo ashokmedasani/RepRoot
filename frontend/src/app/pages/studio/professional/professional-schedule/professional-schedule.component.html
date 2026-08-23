@@ -17,7 +17,7 @@
   <button page-actions type="button" class="primary-action" (click)="openScheduleForm()">Schedule Meeting</button>
 
   @if (isLoading) {
-    <p class="state-note">Loading...</p>
+    <app-skeleton variant="card" [count]="3" label="Loading your schedule"></app-skeleton>
   } @else {
     @if (!hasAvailability && !showAvailabilityPanel) {
       <section class="connect-panel">
@@ -121,13 +121,18 @@
           }
         </div>
 
-        <button type="button" class="primary-action panel-save-action" (click)="confirmWeeklyAvailabilitySaved()">
-          Save weekly availability
+        <!-- Each block is saved by "Add block" above; there is no draft state.
+             This closes the panel. It used to read "Save weekly availability",
+             which invited filling in Day/Start/End and pressing it instead of
+             Add block -- you got a green "Weekly availability saved." and the
+             block was never created. -->
+        <button type="button" class="ghost-action panel-save-action" (click)="closeAvailabilityPanel()">
+          Done
         </button>
       </section>
     }
 
-    <section class="calendar-section">
+    <section class="calendar-section" data-tour="schedule-calendar">
       <div class="calendar-header">
         <h2>Calendar</h2>
         <div class="calendar-nav">
@@ -186,9 +191,19 @@
       }
     </section>
 
-    <section class="meetings-section client-request-section">
-      <h2>Client Meeting Requests</h2>
-      <p class="section-note source-note">Meeting times requested by clients stay here until you accept or decline them.</p>
+    <!-- Each kind of meeting is its own card, the way the dashboard separates
+         Messages / Pending Requests / Client Account Requests. They used to run
+         together as flat sections divided by rules, so it read as one long list
+         with headings rather than three distinct things. -->
+    <section class="meetings-section client-request-section" data-tour="schedule-meetings">
+      <div class="meetings-heading">
+        <h2>Client Meeting Requests</h2>
+        <!-- Nothing waiting means no badge at all. A grey "0" beside a
+             heading read as a broken counter. -->
+        @if (pendingClientRequests.length) {
+          <span class="meetings-count">{{ pendingClientRequests.length }}</span>
+        }
+      </div>
       @if (pendingClientRequests.length) {
         <div class="meeting-list">
           @for (meeting of pendingClientRequests; track meeting.id) {
@@ -201,7 +216,7 @@
                 @if (meeting.notes) { <small>{{ meeting.notes }}</small> }
               </div>
               <div class="meeting-actions">
-                <button type="button" class="primary-action" (click)="reviewClientRequest(meeting, 'accept')">Accept &amp; Confirm</button>
+                <button type="button" class="primary-action" (click)="reviewClientRequest(meeting, 'accept')">Accept and Confirm</button>
                 <button type="button" class="ghost-action danger" (click)="reviewClientRequest(meeting, 'decline')">Decline</button>
               </div>
             </article>
@@ -213,8 +228,12 @@
     </section>
 
     <section class="meetings-section">
-      <h2>Upcoming internal client meetings</h2>
-      <p class="section-note source-note">Scheduled directly by the trainer from a client profile or the Schedule workspace.</p>
+      <div class="meetings-heading">
+        <h2>Upcoming Client Meetings</h2>
+        @if (displayedUpcomingMeetings.length) {
+          <span class="meetings-count">{{ displayedUpcomingMeetings.length }}</span>
+        }
+      </div>
       @if (displayedUpcomingMeetings.length) {
         <div class="meeting-list">
           @for (meeting of displayedUpcomingMeetings; track meeting.id) {
@@ -226,6 +245,12 @@
                 }
                 <small>{{ meeting.title }}</small>
                 <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} &ndash; {{ meeting.end_at | date: 'h:mm a' }}</small>
+                <!-- `client_response_status` was already on every meeting and
+                     rendered nowhere, so there was no way to tell whether the
+                     client had actually accepted. -->
+                <span class="response-tag" [class.accepted]="meeting.client_response_status === 'accepted'" [class.declined]="meeting.client_response_status === 'declined'">
+                  {{ clientResponseLabel(meeting) }}
+                </span>
                 @if (isClashing(meeting)) {
                   <span class="clash-tag">⚠️ Overlaps another meeting</span>
                 }
@@ -244,8 +269,12 @@
     </section>
 
     <section class="meetings-section lead-source-section">
-      <h2>Lead-form introductory meetings</h2>
-      <p class="section-note source-note">Requested after a public lead form was submitted and confirmed by the trainer.</p>
+      <div class="meetings-heading">
+        <h2>Lead-form Introductory Meetings</h2>
+        @if (upcomingLeadMeetings.length) {
+          <span class="meetings-count">{{ upcomingLeadMeetings.length }}</span>
+        }
+      </div>
       @if (upcomingLeadMeetings.length) {
         <div class="meeting-list">
           @for (meeting of upcomingLeadMeetings; track meeting.id) {
@@ -270,8 +299,10 @@
 
     @if (pastLeadMeetings.length) {
       <section class="meetings-section lead-source-section">
-        <h2>Past lead-form meetings</h2>
-        <p class="section-note source-note">Use Forms &amp; Groups to send an apology or rescheduling email for an overdue meeting.</p>
+        <div class="meetings-heading">
+          <h2>Past Lead-form Meetings</h2>
+          <span class="meetings-count muted-count">{{ pastLeadMeetings.length }}</span>
+        </div>
         <div class="meeting-list">
           @for (meeting of pastLeadMeetings; track meeting.id) {
             <article class="meeting-card muted lead-meeting-card">
@@ -285,7 +316,10 @@
 
     @if (pastMeetings.length) {
       <section class="meetings-section">
-        <h2>Past &amp; Cancelled</h2>
+        <div class="meetings-heading">
+          <h2>Past and Cancelled</h2>
+          <span class="meetings-count muted-count">{{ pastMeetings.length }}</span>
+        </div>
         <div class="meeting-list">
           @for (meeting of pastMeetings; track meeting.id) {
             <article class="meeting-card muted">
@@ -349,7 +383,12 @@
                 <span>{{ client.first_name }} {{ client.last_name }}</span>
               </label>
             } @empty {
-              <p class="empty-note">No clients match "{{ clientSearchQuery }}".</p>
+              @if (clientSearchQuery.trim()) {
+                <p class="empty-note">No clients match &ldquo;{{ clientSearchQuery }}&rdquo;.</p>
+              } @else {
+                <!-- Rendered as: No clients match "". -->
+                <p class="empty-note">You have no clients yet. Approve a form request first, then schedule with them here.</p>
+              }
             }
           </div>
 
@@ -412,7 +451,7 @@
 
         <div class="manual-slot-row">
           <label class="manual-slot-input">
-            <span class="field-label">Or pick an exact date &amp; time</span>
+            <span class="field-label">Or pick an exact date and time</span>
             <input type="datetime-local" [(ngModel)]="manualSlotLocal" (ngModelChange)="applyManualSlot()">
           </label>
           <p class="section-note">Booking directly doesn't need your weekly availability set — that's only for the public lead-form page.</p>
@@ -473,7 +512,7 @@
 
         <div class="manual-slot-row">
           <label class="manual-slot-input">
-            <span class="field-label">Or pick an exact date &amp; time</span>
+            <span class="field-label">Or pick an exact date and time</span>
             <input type="datetime-local" [(ngModel)]="manualRescheduleLocal" (ngModelChange)="applyManualRescheduleSlot()">
           </label>
         </div>

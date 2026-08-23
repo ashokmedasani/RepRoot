@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/env.dart';
@@ -36,6 +37,28 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// App-wide connection state derived from real API requests.
+///
+/// This deliberately does not depend on a device "network connected" flag:
+/// Wi-Fi can be connected while the internet or API is unavailable. A
+/// successful response marks the app online, while connection/time-out errors
+/// mark it offline so every screen can show the same non-blocking notice.
+class NetworkAvailability {
+  NetworkAvailability._();
+
+  static final NetworkAvailability instance = NetworkAvailability._();
+
+  final ValueNotifier<bool> isOnline = ValueNotifier<bool>(true);
+
+  void markOnline() {
+    if (!isOnline.value) isOnline.value = true;
+  }
+
+  void markOffline() {
+    if (isOnline.value) isOnline.value = false;
+  }
+}
+
 class _AuthInterceptor extends Interceptor {
   _AuthInterceptor(this._session);
 
@@ -70,7 +93,21 @@ class _ErrorInterceptor extends Interceptor {
       'Terms and Conditions and Privacy Notice must be accepted';
 
   @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    NetworkAvailability.instance.markOnline();
+    handler.next(response);
+  }
+
+  @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response != null) {
+      NetworkAvailability.instance.markOnline();
+    } else if (err.type == DioExceptionType.connectionError ||
+        err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.sendTimeout) {
+      NetworkAvailability.instance.markOffline();
+    }
     final scheme =
         err.requestOptions.extra[kAuthSchemeKey] as AuthScheme? ??
         AuthScheme.none;
@@ -137,10 +174,10 @@ class _ErrorInterceptor extends Interceptor {
       DioExceptionType.sendTimeout =>
         'The server took too long to respond. Check your connection and try again.',
       DioExceptionType.connectionError =>
-        'Cannot reach the server. Check that you are on the same network and try again.',
+        'Cannot reach RepRoot. Check your internet connection and try again.',
       _ =>
         status != null
-            ? 'Something went wrong (error $status). Please try again.'
+            ? 'RepRoot could not complete that request. Please try again.'
             : 'Something went wrong. Please try again.',
     };
     return ApiException(message, statusCode: status);

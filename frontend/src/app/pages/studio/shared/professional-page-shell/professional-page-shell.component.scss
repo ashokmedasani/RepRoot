@@ -18,7 +18,9 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  height: 100vh;
+  /* dvh, like the shell around it: at 100vh the sidebar overhangs the grid it
+     sits in by the height of a retracting browser toolbar. */
+  height: 100dvh;
   border-right: 1px solid var(--app-border);
   padding: 1.5rem 1rem;
   background: var(--app-card-bg-gradient);
@@ -147,7 +149,12 @@ nav {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: conic-gradient(var(--app-primary) var(--usage-angle), var(--app-surface-soft) 0);
+  // The unfilled part of the ring must contrast with the hole in the middle.
+  // It used to be `--app-surface-soft` against a `--app-surface` centre, and in
+  // the dark theme those two variables are the same colour (#1e293b) -- so the
+  // whole gauge disappeared into the sidebar and only the tiny number showed.
+  background: conic-gradient(var(--app-primary) var(--usage-angle), var(--app-gauge-track) 0);
+  box-shadow: inset 0 0 0 1px var(--app-border);
 }
 
 .usage-gauge::before {
@@ -155,7 +162,9 @@ nav {
   width: 2.35rem;
   height: 2.35rem;
   border-radius: 50%;
+  // Matches the panel behind it so the ring reads as a ring.
   background: var(--app-surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-border) 60%, transparent);
   content: '';
 }
 
@@ -308,9 +317,13 @@ button:disabled {
     border-right: 0;
     border-bottom: 1px solid var(--app-border);
     padding: 0.75rem 1.25rem;
-    background: var(--app-glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    // Opaque instead of glass. A backdrop-filter on persistent chrome forces the
+    // element onto its own compositor layer, which softens text at fractional
+    // device pixel ratios -- Windows laptops at 125%/150% scaling -- and makes
+    // the browser re-sample everything behind it on every scroll frame. Both were
+    // reported from testing: blurry, and clumsy to scroll. Modal backdrops keep
+    // their blur; they are transient and blurring the page behind them is the point.
+    background: var(--app-surface);
   }
 
   .shell-main {

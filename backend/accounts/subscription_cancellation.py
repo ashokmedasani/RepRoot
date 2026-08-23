@@ -134,6 +134,12 @@ def apply_due_cancellation(profile):
   downgrade_to_starter_free_voluntarily() / downgrade_to_pro_voluntarily(),
   same as it would from any other downgrade path. Nothing is ever deleted
   here."""
+  # A scheduled cancellation is still a billing mutation. Keep the member's
+  # current plan and cancellation date visible during a billing freeze, but do
+  # not execute the downgrade until payments are deliberately enabled again.
+  if not settings.REPROOT_PAYMENTS_ENABLED:
+    return False
+
   if not profile.cancellation_effective_at or profile.cancellation_effective_at > timezone.now():
     return False
 

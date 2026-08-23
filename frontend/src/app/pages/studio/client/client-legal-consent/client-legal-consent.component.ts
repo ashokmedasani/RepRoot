@@ -24,16 +24,16 @@ export class ClientLegalConsentComponent {
 
   constructor() {
     this.api.getLegalConfiguration().subscribe({
-      next: ({ client, effective_date }) => {
+      next: ({ client, last_updated_date, effective_date }) => {
         this.legalVersion = client.version;
-        this.legalEffectiveDate = effective_date;
+        this.legalEffectiveDate = last_updated_date || effective_date;
       }
     });
   }
 
   submit(): void {
     if (!this.acceptedLegalDocuments) {
-      this.message = 'Review and accept the Client Terms & Conditions and Privacy Notice to continue.';
+      this.message = 'Review and accept the Client Terms and Conditions and Privacy Notice to continue.';
       return;
     }
     this.submitting = true;

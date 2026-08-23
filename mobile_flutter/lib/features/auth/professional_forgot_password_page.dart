@@ -828,6 +828,14 @@ class _PasswordRequirements extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nothing to check yet, so nothing to show. Rendered against an empty field
+    // this is a list of ways the user has already failed before typing a
+    // character; once they start it becomes live feedback on their progress.
+    // Matches the web behaviour in app-password-requirements.
+    if (password.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final tokens = context.tokens;
 
     return Padding(

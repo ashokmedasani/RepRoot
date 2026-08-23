@@ -1,6 +1,6 @@
 :host { display:block; }
 .portal-page { min-height:100vh;background:color-mix(in srgb,var(--app-bg) 95%,var(--app-surface));display:flex;flex-direction:column; }
-.portal-topbar { min-height:4.75rem;border-bottom:1px solid var(--app-border);padding:0 2rem;background:var(--app-glass-bg);backdrop-filter:blur(12px); }
+.portal-topbar { min-height:4.75rem;border-bottom:1px solid var(--app-border);padding:0 2rem;background:var(--app-surface); }
 .portal-header { display:flex;min-height:4.75rem;align-items:center;justify-content:space-between;gap:1rem;width:min(1040px,100%);margin:0 auto; }
 .studio-brand { display:inline-flex;align-items:center;gap:.65rem;color:var(--app-text);text-decoration:none; }
 .studio-brand > span { width:2.6rem;height:2.6rem;overflow:hidden;border-radius:.7rem;background:#fff;box-shadow:var(--app-shadow-sm); }
@@ -29,3 +29,9 @@
 .portal-footer a { color:var(--app-primary-strong);font-weight:700;text-decoration:none; }
 .portal-footer p { margin:0;line-height:1.5; }
 @media(max-width:700px){.portal-topbar{padding:0 1.25rem}.portal-header{align-items:center}.back-link{white-space:nowrap}.entry-grid{width:calc(100% - 1.5rem);grid-template-columns:1fr}.entry-card{min-height:auto}.card-actions{margin-top:1rem}.portal-footer{width:calc(100% - 1.5rem)}}
+
+.portal-topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}

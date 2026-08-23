@@ -18,9 +18,13 @@
   min-height: 4.75rem;
   border-bottom: 1px solid var(--app-border);
   padding: 0 2rem;
-  background: var(--app-glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  // Opaque instead of glass. A backdrop-filter on persistent chrome forces the
+  // element onto its own compositor layer, which softens text at fractional
+  // device pixel ratios -- Windows laptops at 125%/150% scaling -- and makes
+  // the browser re-sample everything behind it on every scroll frame. Both were
+  // reported from testing: blurry, and clumsy to scroll. Modal backdrops keep
+  // their blur; they are transient and blurring the page behind them is the point.
+  background: var(--app-surface);
 }
 
 .brand {

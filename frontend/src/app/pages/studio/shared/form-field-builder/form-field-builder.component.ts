@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, ElementRef, Input, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Country, State } from 'country-state-city';
 
@@ -35,11 +35,15 @@ interface FitnessFieldTemplate {
 })
 export class FormFieldBuilderComponent {
   @Input({ required: true }) customFields: DynamicField[] = [];
+  @Input() formPurpose: 'lead' | 'group' = 'lead';
+  @Input() allowRequiredSelection = true;
   /** Additional labeled suggestion sections, e.g. one per existing lead form,
    *  shown below the standard suggestions -- never auto-inserted, same
    *  click-to-add pattern as the built-in recommended fields. Only sections
    *  with at least one field should be included by the caller. */
   @Input() externalSuggestionGroups: ExternalSuggestionGroup[] = [];
+
+  @ViewChild('customBuilder') private readonly customBuilder?: ElementRef<HTMLElement>;
 
   readonly fieldTypes: FieldTypeOption[] = [
     { value: 'short_text', label: 'Short Text' },
@@ -69,7 +73,7 @@ export class FormFieldBuilderComponent {
       // suggested-fields chip must stay in sync or a professional adding
       // "Phone Number" from here ends up with a field that's silently
       // optional here but rejected as required everywhere else.
-      required: true
+      required: false
     },
     {
       icon: 'GO',
@@ -79,7 +83,7 @@ export class FormFieldBuilderComponent {
       placeholder: 'Select primary goal',
       help_text: 'Capture the client goal before assigning a program.',
       options: ['Weight Loss', 'Muscle Gain', 'Strength', 'General Fitness', 'Mobility', 'Sports Performance'],
-      required: true
+      required: false
     },
     {
       icon: 'EX',
@@ -109,54 +113,33 @@ export class FormFieldBuilderComponent {
     }
   ];
 
-  readonly recommendedCategories = ['All', ...new Set(this.recommendedFields.map((field) => field.category))];
-
-  showAllChips = false;
-  suggestionSearch = '';
-  selectedCategory = 'All';
-
-  private readonly primaryChips = [
-    'Phone Number',
-    'Primary Goal',
-    'Training Experience',
-    'Medical Conditions or Injuries',
-    'Preferred Training Mode'
-  ];
-
   get visibleRecommended(): FitnessFieldTemplate[] {
-    const isFiltering = Boolean(this.suggestionSearch.trim()) || this.selectedCategory !== 'All';
-
-    if (!isFiltering) {
-      const primary = this.primaryChips
-        .map((label) => this.recommendedFields.find((field) => field.label === label))
-        .filter((field): field is FitnessFieldTemplate => Boolean(field));
-
-      if (!this.showAllChips) {
-        return primary;
-      }
-
-      const rest = this.recommendedFields.filter((field) => !this.primaryChips.includes(field.label));
-      return [...primary, ...rest];
-    }
-
-    const query = this.suggestionSearch.trim().toLowerCase();
-    return this.recommendedFields.filter((field) => {
-      const matchesCategory = this.selectedCategory === 'All' || field.category === this.selectedCategory;
-      const matchesSearch = !query || field.label.toLowerCase().includes(query) || field.help_text.toLowerCase().includes(query);
-      return matchesCategory && matchesSearch;
-    });
-  }
-
-  toggleAllChips(): void {
-    this.showAllChips = !this.showAllChips;
-  }
-
-  selectCategory(category: string): void {
-    this.selectedCategory = category;
+    return this.recommendedFields;
   }
 
   addField(): void {
     this.customFields.push({ ...this.createEmptyField(), isEditing: true });
+  }
+
+  /** The "+" chip that sits after the suggestions.
+   *
+   *  Someone who scanned the suggestions and did not find what they wanted is
+   *  exactly the person who needs a custom field, so the option belongs here
+   *  rather than only in the builder heading further down. The new card
+   *  renders below the fold on most screens, so scroll to it — otherwise the
+   *  chip reads as broken. */
+  addFieldFromSuggestions(): void {
+    this.addField();
+    setTimeout(() => {
+      const host = this.customBuilder?.nativeElement;
+      if (!host) {
+        return;
+      }
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      host.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      const cards = host.querySelectorAll<HTMLElement>('.field-card');
+      cards[cards.length - 1]?.querySelector('input')?.focus({ preventScroll: true });
+    });
   }
 
   isRecommendedFieldAdded(template: FitnessFieldTemplate): boolean {
@@ -164,8 +147,8 @@ export class FormFieldBuilderComponent {
   }
 
   addRecommendedField(template: FitnessFieldTemplate): void {
-    // Already on the form (most likely because it's part of the default
-    // pre-populated set) — do nothing instead of inserting a duplicate field.
+    // Suggested fields are opt-in. If one was already added, do not insert a
+    // duplicate when its suggestion is selected again.
     if (this.isRecommendedFieldAdded(template)) {
       return;
     }
@@ -186,6 +169,7 @@ export class FormFieldBuilderComponent {
     this.customFields.push({
       ...field,
       options: [...(field.options || [])],
+      required: this.allowRequiredSelection ? Boolean(field.required) : false,
       is_core: false,
       isEditing: true
     });
@@ -295,7 +279,7 @@ export class FormFieldBuilderComponent {
     return {
       label: template.label,
       field_type: template.field_type,
-      required: Boolean(template.required),
+      required: this.allowRequiredSelection ? Boolean(template.required) : false,
       placeholder: template.placeholder,
       help_text: template.help_text,
       options: [...(template.options || [])],

@@ -1,12 +1,15 @@
 <main class="portal-page">
   <header class="portal-topbar"><div class="portal-header">
-    <a routerLink="/" class="studio-brand" aria-label="RepRoot Studio home"><span><img src="/brand/studio/mark.png" alt=""></span><strong>Rep<span>Root</span> Studio</strong></a>
-    <a routerLink="/" class="back-link">Return to Studio</a>
+    <a routerLink="/" class="studio-brand" aria-label="RepRoot home"><span><img src="/brand/reproot/mark.png" alt=""></span><strong>Rep<span>Root</span></strong></a>
+    <span class="portal-topbar-actions">
+      <app-theme-toggle label="Site appearance" />
+      <a routerLink="/" class="back-link">Return to RepRoot</a>
+    </span>
   </div></header>
   <section class="portal-intro" aria-labelledby="portal-title">
-    <p class="eyebrow">Studio portal</p><h1 id="portal-title">Choose your access</h1><p>Continue as a professional or client.</p>
+    <p class="eyebrow">RepRoot portal</p><h1 id="portal-title">Choose your access</h1><p>Continue as a professional or client.</p>
   </section>
-  <section class="entry-grid" aria-label="RepRoot Studio access options">
+  <section class="entry-grid" aria-label="RepRoot access options">
     <article class="entry-card">
       <span class="entry-icon">P</span><p class="card-label">Professional</p><h2>Professional workspace</h2>
       <p>Manage clients, workflows, records, meetings, and payments.</p>
@@ -20,11 +23,11 @@
     </article>
   </section>
   <footer class="portal-footer">
-    <div class="footer-summary"><strong>RepRoot Studio</strong><span>Professional-client workspace by RepRoot.</span></div>
+    <div class="footer-summary"><strong>RepRoot</strong><span>Professional-client workspace.</span></div>
     <nav aria-label="Website, help, and legal links">
-      <a [href]="publicSite.parentUrl">RepRoot website</a><a routerLink="/">Studio overview</a><a [href]="'mailto:' + publicSite.studioSupportEmail">Help &amp; Support</a>
+      <a routerLink="/">RepRoot overview</a><a [href]="'mailto:' + publicSite.supportEmail">Help and Support</a>
       <a routerLink="/terms/professional" target="_blank">Professional Terms</a><a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
-      <a routerLink="/terms/client" target="_blank">Client Terms</a><a routerLink="/privacy/client" target="_blank">Client Privacy</a><a routerLink="/cookies" target="_blank">Cookie Notice</a>
+      <a routerLink="/terms/client" target="_blank">Client Terms</a><a routerLink="/privacy/client" target="_blank">Client Privacy</a>
     </nav>
     <p>Use the access route intended for your account role. Never share passwords or one-time verification codes.</p>
   </footer>

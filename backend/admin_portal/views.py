@@ -518,6 +518,12 @@ class AdminAccountLifecycleListView(APIView):
         'recycled_at': profile.recycled_at,
         'recycle_expires_at': profile.recycle_expires_at,
         'days_remaining': max(0, (deadline - now).days) if deadline else None,
+        # Self-service deletion detail. Null for accounts that reached a
+        # non-active state some other way (billing freeze, admin action).
+        'deletion_requested_at': profile.deletion_requested_at,
+        'deletion_hold_ends_at': profile.deletion_hold_ends_at,
+        'deletion_impact': profile.deletion_impact_snapshot or {},
+        'is_self_requested': profile.lifecycle_reason == ProfessionalProfile.LIFECYCLE_REASON_TRAINER_REQUESTED,
       })
     deletion_requests = SupportIncident.objects.filter(
       reporter_role=SupportIncident.ROLE_PROFESSIONAL,
@@ -561,6 +567,7 @@ class AdminAccountLifecycleActionView(APIView):
         profile,
         reason=ProfessionalProfile.LIFECYCLE_REASON_TRAINER_REQUESTED,
         recycled_by_reference=request.admin_staff.staff_id,
+        retention_days=settings.REPROOT_PROFESSIONAL_RECYCLE_DAYS,
       )
       SupportIncident.objects.filter(
         reporter_professional=professional,
@@ -572,7 +579,15 @@ class AdminAccountLifecycleActionView(APIView):
         resolution_note=reason[:5000],
         closed_at=timezone.now(),
       )
-      message = 'Professional account moved to the 14-day Recycle Bin.'
+      message = f'Professional account moved to the {settings.REPROOT_PROFESSIONAL_RECYCLE_DAYS}-day Recycle Bin.'
+    elif action == 'cancel_deletion':
+      from accounts.professional_deletion import cancel_deletion
+      if not cancel_deletion(profile, reason='our support team cancelled it'):
+        return Response(
+          {'message': 'This account does not have a pending deletion to cancel.'},
+          status=status.HTTP_400_BAD_REQUEST,
+        )
+      message = 'Scheduled deletion cancelled. The account and its clients are active again.'
     elif action == 'restore':
       try:
         account_lifecycle.restore_professional_from_recycle(profile)

@@ -1,11 +1,11 @@
 <app-professional-page-shell
   [title]="group ? 'Group: ' + group.name : 'Group details'"
-  eyebrow="Forms & Groups"
-  [subtitle]="group ? 'Manage approved users, registration forms, and group settings.' : 'Loading group details.'"
+  eyebrow="Forms and Groups"
+  [subtitle]="group ? 'Manage approved users, the Client Information Form, and group settings.' : 'Loading group details.'"
   activeSection="forms-groups"
   titleId="group-users-title"
 >
-    <a page-actions routerLink="/professional/forms-groups" class="secondary-action">&larr; Back to Forms &amp; Client Groups</a>
+    <a page-actions routerLink="/professional/forms-groups" class="secondary-action">&larr; Back to Forms and Client Groups</a>
     @if (group) {
       <a page-actions [routerLink]="['/professional/groups', group.id, 'clients', 'add']" class="primary-action">Add Client</a>
     }
@@ -15,7 +15,7 @@
 
     @if (isLoading) {
       <section class="panel">
-        <p>Loading group workspace...</p>
+        <app-skeleton variant="row" [count]="6" label="Loading the group workspace"></app-skeleton>
       </section>
     } @else if (group) {
       @if (message) {
@@ -42,7 +42,7 @@
             <strong>{{ pendingInvites }}</strong>
           </article>
           <article>
-            <span>Registration Form</span>
+            <span>Client Information Form</span>
             <strong>{{ group.has_registration_form ? 'Ready' : 'Needed' }}</strong>
           </article>
         </div>
@@ -92,8 +92,8 @@
           <article class="panel recent-approved-panel">
             <div class="panel-header">
               <div>
-                <h2>Recent Activity</h2>
-                <p>Latest active clients in this group.</p>
+                <h2>Recently Joined</h2>
+                <p>The newest approved clients in this group.</p>
               </div>
             </div>
             <div class="mini-list wide">
@@ -102,7 +102,7 @@
                   <span class="avatar">{{ initials(client) }}</span>
                   <span>
                     <strong>{{ client.first_name }} {{ client.last_name }}</strong>
-                    <small>{{ client.email }}</small>
+                    <small>{{ client.email }} &middot; Joined {{ client.created_at | date: 'mediumDate' }}</small>
                   </span>
                 </a>
               } @empty {
@@ -133,7 +133,7 @@
                       <strong>{{ submission.applicant_name }}</strong>
                       <span>{{ submission.email }}</span>
                       <small>
-                        {{ submission.reference_id }} &middot; Source: Group Registration Form &middot;
+                        {{ submission.reference_id }} &middot; Source: Client Information Form &middot;
                         Submitted {{ submission.submitted_at | date: 'medium' }}
                       </small>
                       @if (missingRequiredFields(submission).length > 0) {
@@ -215,6 +215,10 @@
                         @if (!client.has_portal_access) {
                           <span class="status-pill muted">No portal access</span>
                         }
+                        <!-- Filterable above, previously not displayable here. -->
+                        @if (client.must_change_password) {
+                          <span class="status-pill warn">Temporary password</span>
+                        }
                       </td>
                       <td>{{ client.created_at | date: 'mediumDate' }}</td>
                       <td>
@@ -223,7 +227,17 @@
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="7">No users found for this group.</td>
+                      <td colspan="7">
+                        <div class="table-empty">
+                          @if (activeClients.length) {
+                            <p>No users match the current search or filter.</p>
+                            <button type="button" class="ghost-action compact" (click)="clearUserFilters()">Clear filters</button>
+                          } @else {
+                            <p>No approved users in this group yet.</p>
+                            <button type="button" class="ghost-action compact" (click)="openImportModal()">Import Clients</button>
+                          }
+                        </div>
+                      </td>
                     </tr>
                   }
                 </tbody>
@@ -238,18 +252,18 @@
           <article class="panel">
             <div class="panel-header">
               <div>
-                <h2>Client Registration Form</h2>
+                <h2>Client Information Form</h2>
                 <p>For known or accepted clients joining this group. This is separate from the public lead form used for initial enquiries.</p>
                 <span class="status-pill">{{ group.registration_form?.is_mandatory === false ? 'Optional - clients can be added without it' : 'Required before adding a client' }}</span>
               </div>
               <div class="registration-actions">
-                <button type="button" class="ghost-action" [disabled]="!registrationLink" (click)="copyRegistrationLink()">Share Registration Form</button>
+                <button type="button" class="ghost-action" [disabled]="!registrationLink" (click)="copyRegistrationLink()">Share Client Information Form</button>
                 <a [routerLink]="['/professional/groups', group.id, 'client-form', 'create']" class="primary-action">Edit Form</a>
               </div>
             </div>
 
             <div class="flow-note">
-              <strong>Group Registration Form</strong>
+            <strong>Client Information Form</strong>
               <span>Known client &rarr; group-specific details &rarr; professional review &rarr; account credentials.</span>
             </div>
 
@@ -260,7 +274,7 @@
                   <a [href]="registrationLink" target="_blank" rel="noreferrer">{{ registrationLink }}</a>
                   <button type="button" class="ghost-action" (click)="copyRegistrationLink()">Copy Link</button>
                 } @else {
-                  <p>The registration form link will appear after the form is ready.</p>
+                  <p>The Client Information Form link will appear after the form is ready.</p>
                 }
               </div>
             </div>
@@ -346,7 +360,7 @@
             <div class="import-body">
               <p>
                 Upload a CSV file with a header row. Columns will be matched against this group's
-                client registration form fields so you can confirm the mapping before anything is created.
+                Client Information Form fields so you can confirm the mapping before anything is created.
               </p>
               <label class="import-file-picker">
                 <span class="field-label">CSV file</span>

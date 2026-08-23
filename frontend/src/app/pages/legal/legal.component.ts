@@ -1,12 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { ThemeToggleComponent } from '@shared/theme-toggle/theme-toggle.component';
 
-/** Terms & Conditions and Privacy Policy selected by route data `doc`. */
+/** Terms and Conditions and Privacy Policy selected by route data `doc`. */
 @Component({
   selector: 'app-legal',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, ThemeToggleComponent],
   templateUrl: './legal.component.html',
   styleUrl: './legal.component.scss'
 })
@@ -18,10 +19,10 @@ export class LegalPageComponent implements OnInit {
   readonly audience = (this.route.snapshot.data['audience'] as 'platform' | 'professional' | 'client') || 'platform';
   lastUpdated = '';
   legalVersion = '';
-  readonly supportEmail = this.audience === 'platform' ? 'support@rep-root.com' : 'studio.support@rep-root.com';
+  readonly supportEmail = 'support@rep-root.com';
   readonly termsLink = this.audience === 'platform' ? '/terms' : `/terms/${this.audience}`;
   readonly privacyLink = this.audience === 'platform' ? '/privacy' : `/privacy/${this.audience}`;
-  readonly brandLabel = this.audience === 'platform' ? 'RepRoot' : 'RepRoot Studio';
+  readonly brandLabel = 'RepRoot';
   readonly documentAudience = this.audience === 'professional' ? 'Professional' : this.audience === 'client' ? 'Client' : 'Platform';
 
   ngOnInit(): void {
@@ -29,13 +30,14 @@ export class LegalPageComponent implements OnInit {
       next: (configuration) => {
         const role = this.audience === 'client' ? configuration.client : configuration.professional;
         this.legalVersion = role.version?.trim() || 'Current published version';
-        this.lastUpdated = configuration.effective_date?.trim()
-          ? this.formatEffectiveDate(configuration.effective_date)
-          : 'Effective date temporarily unavailable';
+        const publishedDate = configuration.last_updated_date?.trim() || configuration.effective_date?.trim();
+        this.lastUpdated = publishedDate
+          ? this.formatEffectiveDate(publishedDate)
+          : 'Last-updated date temporarily unavailable';
       },
       error: () => {
         this.legalVersion = 'Current published version';
-        this.lastUpdated = 'Effective date temporarily unavailable';
+        this.lastUpdated = 'Last-updated date temporarily unavailable';
       }
     });
   }

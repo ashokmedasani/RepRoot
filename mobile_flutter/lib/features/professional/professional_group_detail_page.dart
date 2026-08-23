@@ -227,8 +227,8 @@ class _ProfessionalGroupDetailPageState
             appBar: AppBar(
               title: Text(
                 _group?.registrationForm == null
-                    ? 'Create registration form'
-                    : 'Edit registration form',
+                    ? 'Create Client Information Form'
+                    : 'Edit Client Information Form',
               ),
               leading: IconButton(
                 onPressed: saving ? null : () => dialogContext.pop(false),
@@ -971,7 +971,7 @@ class _ProfessionalGroupDetailPageState
                 hasForm
                     ? '${registrationForm.fields.length} fields · '
                           '${registrationForm.isMandatory ? 'Required before adding a client' : 'Optional'}'
-                    : 'Add a registration form so people can join this group.',
+                    : 'Add a Client Information Form so people can join this group.',
                 style: context.text.bodySmall,
               ),
 

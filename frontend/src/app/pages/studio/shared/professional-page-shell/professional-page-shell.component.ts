@@ -1,9 +1,10 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ActivityNotification, ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
 import { ChatApiService } from '@core/api/chat-api.service';
+import { GuideService } from '@core/guide/guide.service';
 
 type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'schedule' | 'resource' | 'settings';
 
@@ -18,6 +19,10 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   private readonly professionalAuthApi = inject(ProfessionalAuthApiService);
   private readonly chatApi = inject(ChatApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  // Every professional page renders through this shell, so hosting the guide
+  // here is what makes it available everywhere without each page wiring it up.
+  readonly guide = inject(GuideService);
 
   @Input({ required: true }) title = '';
   @Input() eyebrow = '';
@@ -35,6 +40,19 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
+    // Arriving with ?guide=1 opens this page's own guide. That is how the play
+    // buttons in the Application Guide work: they navigate, and the
+    // destination shows its guide on arrival. The shell already knows which
+    // page it is, so no page has to declare anything.
+    if (this.route.snapshot.queryParamMap.get('guide') === '1') {
+      this.guide.startPageTour(this.activeSection);
+    } else if (!this.guide.isRunning()) {
+      // Runs once, ever: after that it is only reachable from the Application
+      // Guide. The isRunning check matters because the full tour navigates
+      // between pages, which re-runs this hook on every arrival.
+      this.guide.startFullTourIfUnseen();
+    }
+
     this.loadUnreadMessages();
     this.loadNotifications();
     this.unreadPoll = setInterval(() => { this.loadUnreadMessages(); this.loadNotifications(); }, 10000);

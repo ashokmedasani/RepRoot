@@ -2,12 +2,13 @@
   <aside class="sidebar" aria-label="Professional navigation">
     <a class="brand" routerLink="/professional/dashboard">
       <span class="brand-mark" aria-hidden="true">
-        <img src="/brand/studio/mark.png" alt="">
+        <img src="/brand/reproot/mark.png" alt="">
       </span>
-      <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span> Studio</span>
+      <!-- STUDIO-HIDDEN 2026-08-17: wordmark read "RepRoot Studio"; restore the " Studio" text node to revert. -->
+      <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span></span>
     </a>
 
-    <nav>
+    <nav data-tour="sidebar-nav">
       <a routerLink="/professional/dashboard" class="nav-item" [class.active]="activeSection === 'dashboard'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>
@@ -18,7 +19,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>
         </svg>
-        <span>Forms &amp; Groups</span>
+        <span>Forms and Groups</span>
       </a>
       <a routerLink="/professional/templates" class="nav-item" [class.active]="activeSection === 'templates'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -102,7 +103,7 @@
           }
         </div>
         <div class="page-actions">
-          <div class="notification-menu">
+          <div class="notification-menu" data-tour="notifications">
             <button type="button" class="notification-bell" (click)="toggleNotifications()" [attr.aria-expanded]="notificationsOpen" aria-label="Notifications">🔔
               @if (unreadNotifications > 0) { <span>{{ badgeLabel(unreadNotifications) }}</span> }
             </button>

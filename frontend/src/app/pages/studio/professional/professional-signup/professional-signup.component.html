@@ -1,31 +1,20 @@
 <app-auth-page-shell
   actionLabel="Already have an account?"
-  actionLinkText="Login"
+  actionLinkText="Sign in"
   actionLink="/professional/login"
   eyebrow="Professional registration"
   title="Create your account"
-  subtitle="Verify your username and email, secure your account, then review the Studio documents."
+  subtitle="Choose your username, verify your email, and create a secure RepRoot account."
   audience="professional"
   titleId="professional-signup-title"
   [wide]="true">
 
-  <ol class="registration-steps" aria-label="Account creation progress">
-    <li class="active"><span>1</span><div><strong>Account details</strong><small>Username and email</small></div></li>
-    <li [class.active]="emailOtpStatus !== 'idle'" [class.complete]="emailOtpStatus === 'verified'"><span>{{ emailOtpStatus === 'verified' ? '✓' : '2' }}</span><div><strong>Email verification</strong><small>Six-digit OTP</small></div></li>
-    <li [class.active]="emailOtpStatus === 'verified'"><span>3</span><div><strong>Secure and review</strong><small>Password and legal review</small></div></li>
-  </ol>
-
   <form class="auth-form" (ngSubmit)="createProfessionalAccount()">
     <label class="wide-field">
       <span class="field-label">Username <span class="required">*</span></span>
-      <span class="input-with-button">
-        <input name="username" type="text" [(ngModel)]="signupForm.username" (ngModelChange)="handleUsernameChange()" autocomplete="username" required>
-        <button type="button" [disabled]="isCheckingUsername" [class.success-button]="usernameStatus === 'available'" [class.error-button]="usernameStatus === 'taken' || usernameStatus === 'failed'" (click)="verifyUsername()">Verify</button>
-      </span>
+      <input name="username" type="text" [(ngModel)]="signupForm.username" (ngModelChange)="handleUsernameChange()" autocomplete="username" aria-describedby="username-status" required>
       @if (usernameCheckMessage) {
-        <span class="field-help" [class.success-text]="usernameStatus === 'available'" [class.error-text]="usernameStatus === 'taken' || usernameStatus === 'failed'">
-          {{ usernameCheckMessage }}
-        </span>
+        <span id="username-status" class="field-help" [class.success-text]="usernameStatus === 'available'" [class.error-text]="usernameStatus === 'taken' || usernameStatus === 'failed'" aria-live="polite">{{ usernameCheckMessage }}</span>
       }
       @if (usernameSuggestions.length) {
         <span class="field-help suggestions">
@@ -35,93 +24,77 @@
           }
         </span>
       }
-      @if (fieldErrors.username) {
-        <span class="field-help error-text">{{ fieldErrors.username }}</span>
-      }
+      @if (fieldErrors.username) { <span class="field-help error-text">{{ fieldErrors.username }}</span> }
     </label>
 
-    <label class="wide-field">
-      <span class="field-label">Email ID <span class="required">*</span></span>
-      <span class="input-with-button">
-        <input name="email" type="email" [(ngModel)]="signupForm.email" (ngModelChange)="handleEmailChange()" autocomplete="email" [readonly]="emailOtpStatus === 'verified'" required>
-        <button type="button" [disabled]="!canSendOtp" (click)="requestEmailOtp()">{{ sendOtpButtonText }}</button>
-      </span>
-      @if (isEmailAlreadyRegistered) {
-        <span class="field-help error-text">
-          An account already exists for this email. Please <a routerLink="/professional/login">sign in</a>. If needed, use <a routerLink="/professional/forgot-password">Forgot Password</a>.
+    @if (emailOtpStatus === 'verified') {
+      <section class="verified-summary wide-field" aria-label="Verified email">
+        <div><strong>Email verified</strong><span>{{ signupForm.email }}</span></div>
+        <button type="button" class="text-link" (click)="editVerifiedEmail()">Change</button>
+      </section>
+    } @else {
+      <label class="wide-field">
+        <span class="field-label">Email ID <span class="required">*</span></span>
+        <span class="input-with-button">
+          <input name="email" type="email" [(ngModel)]="signupForm.email" (ngModelChange)="handleEmailChange()" autocomplete="email" required>
+          <button type="button" [disabled]="!canSendOtp" (click)="requestEmailOtp()">{{ sendOtpButtonText }}</button>
         </span>
-      } @else if (emailOtpHelpText) {
-        <span class="field-help" [class.success-text]="emailOtpStatus === 'verified'" [class.error-text]="emailOtpStatus === 'failed'">
-          {{ emailOtpHelpText }}
-        </span>
-      } @else if (emailCheckMessage) {
-        <span class="field-help">{{ emailCheckMessage }}</span>
-      }
-      @if (fieldErrors.email && !isEmailAlreadyRegistered) {
-        <span class="field-help error-text">{{ fieldErrors.email }}</span>
-      }
-      @if (emailOtpStatus === 'sent') {
-        <span class="field-help">
-          If not received,
-          @if (resendCountdown > 0) {
-            <span>resend OTP enables in {{ resendCountdown }}s.</span>
-          } @else {
-            <button type="button" class="text-link" [disabled]="!canResendOtp" (click)="requestEmailOtp(true)">resend OTP</button>
-          }
-        </span>
-      }
-      @if (localDebugOtp) {
-        <span class="field-help success-text">Local test OTP: {{ localDebugOtp }}</span>
-      }
-    </label>
+        @if (isEmailAlreadyRegistered) {
+          <span class="field-help error-text">An account already exists for this email. Please <a routerLink="/professional/login">sign in</a>. If needed, use <a routerLink="/professional/forgot-password">Forgot Password</a>.</span>
+        } @else if (emailOtpHelpText) {
+          <span class="field-help" [class.error-text]="emailOtpStatus === 'failed'">{{ emailOtpHelpText }}</span>
+        } @else if (emailCheckMessage) {
+          <span class="field-help">{{ emailCheckMessage }}</span>
+        }
+        @if (fieldErrors.email && !isEmailAlreadyRegistered) { <span class="field-help error-text">{{ fieldErrors.email }}</span> }
+        @if (emailOtpStatus === 'sent') {
+          <span class="field-help">
+            If not received,
+            @if (resendCountdown > 0) { <span>resend OTP enables in {{ resendCountdown }}s.</span> }
+            @else { <button type="button" class="text-link" [disabled]="!canResendOtp" (click)="requestEmailOtp(true)">resend OTP</button> }
+          </span>
+        }
+        @if (localDebugOtp) { <span class="field-help success-text">Local test OTP: {{ localDebugOtp }}</span> }
+      </label>
 
-    @if (emailOtpStatus === 'sent' || emailOtpStatus === 'failed' || emailOtpStatus === 'verified') {
-    <label class="wide-field">
-      <span class="field-label">OTP <span class="required">*</span></span>
-      <span class="input-with-button">
-        <input class="otp-code" name="emailOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit code" [(ngModel)]="signupForm.emailOtp" (ngModelChange)="handleOtpChange()" required>
-        <button type="button" [disabled]="!canVerifyOtp" [class.success-button]="emailOtpStatus === 'verified'" [class.error-button]="emailOtpStatus === 'failed'" (click)="verifyEmailOtp()">{{ verifyOtpButtonText }}</button>
-      </span>
-      @if (fieldErrors.otp) {
-        <span class="field-help error-text">{{ fieldErrors.otp }}</span>
+      @if (emailOtpStatus === 'sent' || emailOtpStatus === 'failed') {
+        <label class="wide-field">
+          <span class="field-label">OTP <span class="required">*</span></span>
+          <span class="input-with-button">
+            <input class="otp-code" name="emailOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit code" [(ngModel)]="signupForm.emailOtp" (ngModelChange)="handleOtpChange()" required>
+            <button type="button" [disabled]="!canVerifyOtp" [class.error-button]="emailOtpStatus === 'failed'" (click)="verifyEmailOtp()">{{ verifyOtpButtonText }}</button>
+          </span>
+          @if (fieldErrors.otp) { <span class="field-help error-text">{{ fieldErrors.otp }}</span> }
+        </label>
       }
-    </label>
     }
 
     <label class="wide-field">
       <span class="field-label">Password <span class="required">*</span></span>
       <app-password-input name="password" [(ngModel)]="signupForm.password" (ngModelChange)="handlePasswordChange()" autocomplete="new-password" [required]="true" />
       <app-password-requirements [password]="signupForm.password" />
-      @if (fieldErrors.password) {
-        <span class="field-help error-text">{{ fieldErrors.password }}</span>
-      }
+      @if (fieldErrors.password) { <span class="field-help error-text">{{ fieldErrors.password }}</span> }
     </label>
 
     <label class="wide-field">
       <span class="field-label">Confirm Password <span class="required">*</span></span>
       <app-password-input name="confirmPassword" [(ngModel)]="signupForm.confirmPassword" (ngModelChange)="handleConfirmPasswordChange()" autocomplete="new-password" [required]="true" />
-      @if (fieldErrors.confirmPassword) {
-        <span class="field-help error-text">{{ fieldErrors.confirmPassword }}</span>
-      }
+      @if (fieldErrors.confirmPassword) { <span class="field-help error-text">{{ fieldErrors.confirmPassword }}</span> }
     </label>
 
     <button type="submit" class="primary-action wide-field" [disabled]="isSubmitting || !isPasswordRequirementsMet || signupForm.password !== signupForm.confirmPassword">Review and Create Account</button>
-
-    @if (signupMessage) {
-      <p class="form-message wide-field">{{ signupMessage }}</p>
-    }
-
-    @if (fieldErrors.general) {
-      <p class="form-message error-message wide-field">{{ fieldErrors.general }}</p>
-    }
+    @if (signupMessage) { <p class="form-message wide-field">{{ signupMessage }}</p> }
+    @if (fieldErrors.general) { <p class="form-message error-message wide-field">{{ fieldErrors.general }}</p> }
   </form>
 
   @if (isGoogleAvailable) {
     <div class="auth-divider"><span>or</span></div>
     <app-google-signin-button
       variant="signup"
+      intent="signup"
+      [confirmBeforeRedirect]="true"
       [disabled]="isGoogleSubmitting"
-      (credential)="handleGoogleCredential($event)"
+      (pressed)="openGoogleLegalGate()"
       (unavailable)="handleGoogleUnavailable()"
       (loadError)="handleGoogleLoadError($event)" />
   }
@@ -130,40 +103,34 @@
 @if (showLegalReview) {
   <div class="legal-overlay" role="presentation" (click)="closeLegalReview()">
     <section class="legal-dialog" role="dialog" aria-modal="true" aria-labelledby="professional-legal-review-title" (click)="$event.stopPropagation()">
-      <button type="button" class="dialog-close" aria-label="Close legal review" (click)="closeLegalReview()">×</button>
-      <p class="dialog-eyebrow">Account creation · Step 2 of 2</p>
-      <h2 id="professional-legal-review-title">Review how RepRoot Studio works</h2>
-      <p class="dialog-intro">Before we create your professional account, review and accept the documents that explain your responsibilities and how your data is handled.</p>
-      @if (legalVersion) {
-        <p class="legal-release">Effective {{ legalEffectiveDate }} · Version {{ legalVersion }}</p>
-      }
+      <button type="button" class="dialog-close" aria-label="Close legal review" (click)="closeLegalReview()">&times;</button>
+      <p class="dialog-eyebrow">Account creation</p>
+      <h2 id="professional-legal-review-title">Review the RepRoot documents</h2>
+      <p class="dialog-intro">
+        @if (isGoogleLegalGate) {
+          Before continuing to Google, review and accept the documents that explain your responsibilities and how your data is handled. Choosing a Google account will create your RepRoot professional account.
+        } @else {
+          Before we create your professional account, review and accept the documents that explain your responsibilities and how your data is handled.
+        }
+      </p>
+      @if (legalVersion) { <p class="legal-release">Last updated {{ legalLastUpdatedDate }}</p> }
 
       <div class="legal-links">
-        <a routerLink="/terms/professional" target="_blank" rel="noopener">
-          <strong>Professional Terms</strong>
-          <span>Account, client-data, payment, and platform responsibilities.</span>
-        </a>
-        <a routerLink="/privacy/professional" target="_blank" rel="noopener">
-          <strong>Professional Privacy Notice</strong>
-          <span>What RepRoot Studio processes, why it is used, and your choices.</span>
-        </a>
+        <a routerLink="/terms/professional" target="_blank" rel="noopener"><strong>Professional Terms and Conditions</strong><span>Account, client-data, payment, and platform responsibilities.</span></a>
+        <a routerLink="/privacy/professional" target="_blank" rel="noopener"><strong>Professional Privacy Notice</strong><span>What RepRoot processes, why it is used, and your choices.</span></a>
       </div>
 
       <label class="legal-check">
         <input type="checkbox" [(ngModel)]="acceptedLegalDocuments">
-        <span>I have reviewed and accept the Professional Terms &amp; Conditions and Professional Privacy Notice.</span>
+        <span>I have reviewed and accept the Professional Terms and Conditions and Professional Privacy Notice.</span>
       </label>
 
       <div class="dialog-actions">
         <button type="button" class="secondary-action" (click)="closeLegalReview()" [disabled]="isSubmitting || isGoogleSubmitting">Back</button>
-        @if (pendingGoogleCredential) {
-          <button type="button" class="primary-action" (click)="confirmGoogleSignup()" [disabled]="!hasAcceptedLegalDocuments || isGoogleSubmitting">
-            {{ isGoogleSubmitting ? 'Creating account...' : 'Accept and Create Account' }}
-          </button>
+        @if (isGoogleLegalGate) {
+          <button type="button" class="primary-action" (click)="confirmGoogleSignup()" [disabled]="!hasAcceptedLegalDocuments">Accept and Continue with Google</button>
         } @else {
-          <button type="button" class="primary-action" (click)="confirmProfessionalAccountCreation()" [disabled]="!hasAcceptedLegalDocuments || isSubmitting">
-            {{ isSubmitting ? 'Creating account...' : 'Accept and Create Account' }}
-          </button>
+          <button type="button" class="primary-action" (click)="confirmProfessionalAccountCreation()" [disabled]="!hasAcceptedLegalDocuments || isSubmitting">{{ isSubmitting ? 'Creating account...' : 'Accept and Create Account' }}</button>
         }
       </div>
     </section>

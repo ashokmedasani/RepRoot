@@ -1,9 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ThemeToggleComponent } from '@shared/theme-toggle/theme-toggle.component';
 
 /**
  * Shared chrome for every Studio auth page (professional login/signup/forgot
- * password, client login): the topbar with the RepRoot Studio logo, and the
+ * password, client login): the topbar with the RepRoot logo, and the
  * centered card with an eyebrow + title. Each page projects only its own
  * form content, so the logo and layout can't drift out of sync between pages
  * the way it did before this existed.
@@ -11,7 +12,7 @@ import { RouterLink } from '@angular/router';
 @Component({
   selector: 'app-auth-page-shell',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, ThemeToggleComponent],
   templateUrl: './auth-page-shell.component.html',
   styleUrl: './auth-page-shell.component.scss'
 })
