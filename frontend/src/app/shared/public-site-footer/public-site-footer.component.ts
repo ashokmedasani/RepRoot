@@ -6,6 +6,7 @@ import { PUBLIC_SITE, PublicBrand, publicSupportEmail } from '@core/config/publi
 @Component({ selector: 'app-public-site-footer', standalone: true, imports: [RouterLink], templateUrl: './public-site-footer.component.html', styleUrl: './public-site-footer.component.scss' })
 export class PublicSiteFooterComponent {
   @Input() brand: PublicBrand = 'reproot';
+  @Input() variant: 'public' | 'access' = 'public';
   readonly year = new Date().getFullYear();
   readonly publicSite = PUBLIC_SITE;
   get supportEmail(): string { return publicSupportEmail(this.brand); }

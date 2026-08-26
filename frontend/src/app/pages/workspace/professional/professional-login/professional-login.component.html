@@ -1,0 +1,44 @@
+<app-auth-page-shell
+  actionLabel="New to RepRoot?"
+  actionLinkText="Sign up"
+  actionLink="/professional/signup"
+  eyebrow="Professional portal"
+  title="Login to RepRoot"
+  subtitle="Access your professional dashboard using your verified account credentials."
+  audience="professional"
+  titleId="professional-login-title">
+
+  @if (loginNotice) {
+    <p class="form-message top-message">{{ loginNotice }}</p>
+  }
+
+  <form class="auth-form" (ngSubmit)="verifyProfessionalLogin()">
+    <label>
+      <span class="field-label">Email or Username <span class="required">*</span></span>
+      <input name="identifier" type="text" [(ngModel)]="loginForm.identifier" autocomplete="username" required>
+    </label>
+
+    <label>
+      <span class="field-label">Password <span class="required">*</span></span>
+      <app-password-input name="loginPassword" [(ngModel)]="loginForm.password" autocomplete="current-password" [required]="true" />
+    </label>
+
+    <a routerLink="/professional/forgot-password" class="forgot-link">Forgot password?</a>
+
+    <button type="submit" class="primary-action" [disabled]="isSubmitting">Continue</button>
+
+    @if (loginMessage) {
+      <p class="form-message" role="status" aria-live="polite" [class.error-message]="loginMessageIsError">{{ loginMessage }}</p>
+    }
+  </form>
+
+  @if (isGoogleAvailable) {
+    <div class="auth-divider"><span>or</span></div>
+    <app-google-signin-button
+      variant="login"
+      intent="login"
+      [disabled]="isSubmitting"
+      (unavailable)="handleGoogleUnavailable()"
+      (loadError)="handleGoogleLoadError($event)" />
+  }
+</app-auth-page-shell>

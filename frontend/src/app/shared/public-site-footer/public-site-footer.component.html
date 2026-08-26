@@ -1,8 +1,16 @@
 <footer>
-  <div class="footer-brand"><strong>RepRoot</strong><p>A structured professional-client workflow platform.</p></div>
+  <div class="footer-brand"><strong>RepRoot</strong><p>Professional-client relationship management.</p></div>
   <nav aria-label="Footer navigation">
-    <a routerLink="/">Overview</a><a routerLink="/portal">Portal</a>
-    <a routerLink="/privacy">Privacy</a><a routerLink="/terms">Terms</a><a routerLink="/" [queryParams]="{ section: 'contact' }">Contact</a>
+    @if (variant === 'access') {
+      <a routerLink="/">RepRoot</a>
+      <a routerLink="/" [queryParams]="{ section: 'contact' }">Help and Support</a>
+      <a routerLink="/terms/professional" target="_blank">Professional Terms</a>
+      <a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
+      <a routerLink="/terms/client" target="_blank">Client Terms</a>
+      <a routerLink="/privacy/client" target="_blank">Client Privacy</a>
+    } @else {
+      <a routerLink="/faq">FAQ</a><a routerLink="/privacy">Privacy</a><a routerLink="/terms">Terms</a>
+    }
   </nav>
   <p class="copyright">&copy; {{ year }} RepRoot.</p>
 </footer>

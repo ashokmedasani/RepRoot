@@ -2058,7 +2058,7 @@ class _RequestOutcome {
 
 /// Form request detail — the applicant's submitted answers with the approve /
 /// reject actions, replacing the blind convert. Port of
-/// frontend/src/app/pages/studio/professional/professional-form-request-detail.
+/// frontend/src/app/pages/workspace/professional/professional-form-request-detail.
 class _FormRequestSheet extends ConsumerStatefulWidget {
   const _FormRequestSheet({
     required this.submission,

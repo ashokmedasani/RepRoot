@@ -1,18 +1,20 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
-import { ThemeToggleComponent } from '@shared/theme-toggle/theme-toggle.component';
+import { PublicSiteFooterComponent } from '@shared/public-site-footer/public-site-footer.component';
+import { PublicSiteHeaderComponent } from '@shared/public-site-header/public-site-header.component';
 
 /** Terms and Conditions and Privacy Policy selected by route data `doc`. */
 @Component({
   selector: 'app-legal',
   standalone: true,
-  imports: [RouterLink, ThemeToggleComponent],
+  imports: [RouterLink, PublicSiteHeaderComponent, PublicSiteFooterComponent],
   templateUrl: './legal.component.html',
   styleUrl: './legal.component.scss'
 })
 export class LegalPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly authApi = inject(ProfessionalAuthApiService);
 
   readonly doc = (this.route.snapshot.data['doc'] as 'terms' | 'privacy') || 'terms';
@@ -24,6 +26,12 @@ export class LegalPageComponent implements OnInit {
   readonly privacyLink = this.audience === 'platform' ? '/privacy' : `/privacy/${this.audience}`;
   readonly brandLabel = 'RepRoot';
   readonly documentAudience = this.audience === 'professional' ? 'Professional' : this.audience === 'client' ? 'Client' : 'Platform';
+
+  navigatePublic(section: string): void {
+    void this.router.navigate(['/'], {
+      queryParams: section === 'overview' ? {} : { section }
+    });
+  }
 
   ngOnInit(): void {
     this.authApi.getLegalConfiguration().subscribe({

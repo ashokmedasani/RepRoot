@@ -1,76 +1,20 @@
 .legal-page {
   min-height: 100vh;
-  background: color-mix(in srgb, var(--app-bg) 92%, var(--app-surface));
-}
-
-.legal-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 4.5rem;
-  border-bottom: 1px solid var(--app-border);
-  padding: 0 1.5rem;
-  background: var(--app-surface);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  color: var(--app-text);
-  font-size: 1.1rem;
-  font-weight: 800;
-  text-decoration: none;
-  letter-spacing: var(--app-tracking-tight);
-}
-
-.brand__root {
-  color: var(--app-primary);
-}
-
-.brand__mark {
-  display: grid;
-  width: 2.4rem;
-  height: 2.4rem;
-  place-items: center;
-  overflow: hidden;
-  border-radius: var(--app-radius-md);
-  background: #fff;
-  box-shadow: var(--app-shadow-sm);
-}
-
-.brand__mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.legal-nav {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.legal-nav a {
-  border-radius: 999px;
-  padding: 0.5rem 0.95rem;
-  color: var(--app-muted);
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.legal-nav a.active {
-  background: var(--app-primary-soft);
-  color: var(--app-primary-strong);
+  background: var(--app-bg);
 }
 
 .legal-body {
   width: min(52rem, calc(100% - 2rem));
   margin: 1.75rem auto 4rem;
+  border: 1px solid var(--app-border);
+  border-radius: .9rem;
+  padding: clamp(1.25rem, 3vw, 2.35rem);
+  background: var(--app-surface);
+  box-shadow: 0 1.1rem 3rem color-mix(in srgb, var(--app-text) 9%, transparent);
 }
 
 h1 {
-  margin: 1.5rem 0 0.25rem;
+  margin: 0 0 0.25rem;
   color: var(--app-text);
   font-size: 1.9rem;
   font-weight: 800;
@@ -122,11 +66,17 @@ a {
   font-weight: 600;
 }
 
-.back-row {
-  margin-top: 2rem;
-}
+@media (max-width: 560px) {
+  .legal-body {
+    width: calc(100% - 1rem);
+    margin-top: .75rem;
+    margin-bottom: 2rem;
+    border-radius: .75rem;
+    padding: 1rem;
+  }
 
-.back-row a {
-  font-weight: 700;
-  text-decoration: none;
+  h1 { font-size: 1.55rem; }
+  h2 { font-size: 1.02rem; }
+  p, li { overflow-wrap:anywhere;line-height:1.58; }
+  ul { padding-left:1rem; }
 }

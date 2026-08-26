@@ -1,0 +1,590 @@
+<app-professional-page-shell
+  title="Schedule"
+  eyebrow="Professional Workspace"
+  subtitle="Every upcoming meeting across your clients, in one place — book, reschedule, or cancel without leaving RepRoot."
+  activeSection="schedule"
+  titleId="schedule-title">
+
+  <datalist id="timezoneOptions">
+    @for (zone of timezoneOptions; track zone) {
+      <option [value]="zone">{{ zone }} ({{ timezoneOffsetLabels[zone] }})</option>
+    }
+  </datalist>
+
+  <button page-actions type="button" class="ghost-action" (click)="toggleAvailabilityPanel()">
+    {{ showAvailabilityPanel ? 'Hide availability' : 'Manage availability' }}
+  </button>
+  <button page-actions type="button" class="primary-action" (click)="openScheduleForm()">Schedule Meeting</button>
+
+  @if (isLoading) {
+    <app-skeleton variant="card" [count]="3" label="Loading your schedule"></app-skeleton>
+  } @else {
+    @if (!hasAvailability && !showAvailabilityPanel) {
+      <section class="connect-panel">
+        <h2>Set your weekly availability</h2>
+        <p class="section-note">
+          Set the hours you're bookable each week and RepRoot computes open slots itself, generates a free video
+          link, and emails a calendar invite automatically.
+        </p>
+        <button type="button" class="primary-action" (click)="toggleAvailabilityPanel()">Set availability</button>
+      </section>
+    }
+
+    @if (showAvailabilityPanel) {
+      <section class="connect-panel availability-panel">
+        <h2 class="settings-heading">Meeting defaults</h2>
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Timezone</span>
+            <input
+              type="text"
+              [(ngModel)]="settingsForm.timezone"
+              list="timezoneOptions"
+              placeholder="Search for a timezone, e.g. Asia/Kolkata"
+              autocomplete="off"
+            >
+            @if (timezoneOffsetLabels[settingsForm.timezone]) {
+              <small class="zone-offset-hint">{{ timezoneOffsetLabels[settingsForm.timezone] }}</small>
+            }
+          </label>
+          <label>
+            <span class="field-label">Default meeting length (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="settingsForm.default_duration_minutes">
+          </label>
+          <label>
+            <span class="field-label">Slot interval (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="settingsForm.slot_interval_minutes">
+          </label>
+          <label>
+            <span class="field-label">Buffer between meetings (minutes)</span>
+            <input type="number" min="0" step="5" [(ngModel)]="settingsForm.buffer_minutes">
+          </label>
+        </div>
+        <button type="button" class="primary-action panel-save-action" [disabled]="isSavingSettings" (click)="saveSchedulingSettings()">
+          {{ isSavingSettings ? 'Saving...' : 'Save meeting defaults' }}
+        </button>
+
+        <h2>Weekly availability</h2>
+        <p class="section-note">
+          Add the blocks of time you're bookable. You can add more than one block on the same day
+          (e.g. Monday 10:00–12:00 and Monday 14:00–16:00).
+        </p>
+
+        <div class="add-window-row" #addWindowRow>
+          <label>
+            <span class="field-label">Day</span>
+            <select [(ngModel)]="newWindow.weekday">
+              @for (weekday of [0, 1, 2, 3, 4, 5, 6]; track weekday) {
+                <option [ngValue]="weekday">{{ weekdayLabels[weekday] }}</option>
+              }
+            </select>
+          </label>
+          <label>
+            <span class="field-label">Start</span>
+            <input type="time" [(ngModel)]="newWindow.start_time">
+          </label>
+          <label>
+            <span class="field-label">End</span>
+            <input type="time" [(ngModel)]="newWindow.end_time">
+          </label>
+          <button type="button" class="primary-action" [disabled]="isSavingWindow" (click)="addAvailabilityWindow()">
+            {{ isSavingWindow ? 'Adding...' : 'Add block' }}
+          </button>
+        </div>
+
+        <div class="availability-list">
+          @for (weekday of [0, 1, 2, 3, 4, 5, 6]; track weekday) {
+            <div class="availability-day-row" [class.day-row-off]="isWeekdayOff(weekday)">
+              <span class="weekday-tag">{{ weekdayLabels[weekday] }}</span>
+              @if (isWeekdayOff(weekday)) {
+                <span class="weekday-off-badge">Day off</span>
+              }
+              <div class="availability-blocks">
+                @for (window of windowsForWeekday(weekday); track window.id) {
+                  <span class="availability-block">
+                    {{ window.start_time.slice(0, 5) }}–{{ window.end_time.slice(0, 5) }}
+                    <button type="button" class="remove-block" (click)="removeAvailabilityWindow(window)" aria-label="Remove this block">&times;</button>
+                  </span>
+                } @empty {
+                  <span class="empty-note">No availability</span>
+                }
+              </div>
+              <button
+                type="button"
+                class="quick-add-block"
+                (click)="quickAddForWeekday(weekday)"
+                [attr.aria-label]="'Add a block on ' + weekdayLabels[weekday]"
+                title="Add a block on this day"
+              >+</button>
+            </div>
+          }
+        </div>
+
+        <!-- Each block is saved by "Add block" above; there is no draft state.
+             This closes the panel. It used to read "Save weekly availability",
+             which invited filling in Day/Start/End and pressing it instead of
+             Add block -- you got a green "Weekly availability saved." and the
+             block was never created. -->
+        <button type="button" class="ghost-action panel-save-action" (click)="closeAvailabilityPanel()">
+          Done
+        </button>
+      </section>
+    }
+
+    <section class="calendar-section" data-tour="schedule-calendar">
+      <div class="calendar-header">
+        <h2>Calendar</h2>
+        <div class="calendar-nav">
+          <button type="button" class="ghost-action day-off-button" (click)="openDaysOffModal()">Day off</button>
+          <button type="button" class="ghost-action" (click)="goToPrevMonth()" aria-label="Previous month">&lsaquo;</button>
+          <span class="calendar-month-label">{{ calendarMonthLabel }}</span>
+          <button type="button" class="ghost-action" (click)="goToNextMonth()" aria-label="Next month">&rsaquo;</button>
+        </div>
+      </div>
+      <div class="occupancy-legend" aria-label="Calendar availability legend">
+        <span><i class="open"></i>Open</span>
+        <span><i class="light"></i>Light (up to 1 hr)</span>
+        <span><i class="moderate"></i>Moderate (1–3 hrs)</span>
+        <span><i class="busy"></i>Busy (over 3 hrs)</span>
+      </div>
+      <div class="calendar-grid">
+        <div class="calendar-weekday-row">
+          @for (label of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track label) {
+            <span class="calendar-weekday">{{ label }}</span>
+          }
+        </div>
+        @for (week of calendarWeeks; track $index) {
+          <div class="calendar-week-row">
+            @for (cell of week; track cell.iso) {
+              <button
+                type="button"
+                class="calendar-day"
+                [class.outside-month]="!cell.inMonth"
+                [class.is-today]="cell.isToday"
+                [class.is-selected]="selectedCalendarDate === cell.iso"
+                [class.day-off]="cell.isDayOff"
+                [class.occupancy-light]="cell.occupancy === 'light'"
+                [class.occupancy-moderate]="cell.occupancy === 'moderate'"
+                [class.occupancy-busy]="cell.occupancy === 'busy'"
+                [attr.aria-label]="cell.iso + ': ' + (cell.isDayOff ? 'day off, ' : '') + (cell.meetingCount ? cell.meetingCount + ' meeting(s), ' + cell.bookedMinutes + ' minutes booked' : 'open')"
+                (click)="selectCalendarDay(cell.iso)">
+                <span class="calendar-day-number">{{ cell.day }}</span>
+                @if (cell.meetingCount) {
+                  <span class="calendar-day-load">{{ cell.meetingCount }} meeting{{ cell.meetingCount === 1 ? '' : 's' }}</span>
+                }
+              </button>
+            }
+          </div>
+        }
+      </div>
+      @if (selectedCalendarDate) {
+        <p class="section-note" [class.day-off-note]="isDateOff(selectedCalendarDate)">
+          @if (isDateOff(selectedCalendarDate)) {
+            You're on a day off on {{ selectedCalendarDate }} — no meetings.
+          } @else {
+            Showing meetings on {{ selectedCalendarDate }}
+          }
+          &middot;
+          <button type="button" class="link-action" (click)="clearCalendarSelection()">Show all upcoming</button>
+        </p>
+      }
+    </section>
+
+    <!-- Each kind of meeting is its own card, the way the dashboard separates
+         Messages / Pending Requests / Client Account Requests. They used to run
+         together as flat sections divided by rules, so it read as one long list
+         with headings rather than three distinct things. -->
+    <section class="meetings-section client-request-section" data-tour="schedule-meetings">
+      <div class="meetings-heading">
+        <h2>Client Meeting Requests</h2>
+        <!-- Nothing waiting means no badge at all. A grey "0" beside a
+             heading read as a broken counter. -->
+        @if (pendingClientRequests.length) {
+          <span class="meetings-count">{{ pendingClientRequests.length }}</span>
+        }
+      </div>
+      @if (pendingClientRequests.length) {
+        <div class="meeting-list">
+          @for (meeting of pendingClientRequests; track meeting.id) {
+            <article class="meeting-card client-request-card" [attr.id]="'meeting-' + meeting.id">
+              <div class="meeting-main">
+                <span class="source-pill">Needs approval</span>
+                <strong>{{ meeting.client_name }}</strong>
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} – {{ meeting.end_at | date: 'h:mm a' }}</small>
+                @if (meeting.notes) { <small>{{ meeting.notes }}</small> }
+              </div>
+              <div class="meeting-actions">
+                <button type="button" class="primary-action" (click)="reviewClientRequest(meeting, 'accept')">Accept and Confirm</button>
+                <button type="button" class="ghost-action danger" (click)="reviewClientRequest(meeting, 'decline')">Decline</button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No client meeting requests are waiting for approval.</p>
+      }
+    </section>
+
+    <section class="meetings-section">
+      <div class="meetings-heading">
+        <h2>Upcoming Client Meetings</h2>
+        @if (displayedUpcomingMeetings.length) {
+          <span class="meetings-count">{{ displayedUpcomingMeetings.length }}</span>
+        }
+      </div>
+      @if (displayedUpcomingMeetings.length) {
+        <div class="meeting-list">
+          @for (meeting of displayedUpcomingMeetings; track meeting.id) {
+            <article class="meeting-card" [class.clash]="isClashing(meeting)">
+              <div class="meeting-main">
+                <strong>{{ meeting.client_name }}</strong>
+                @if (meeting.is_group_meeting) {
+                  <small class="guest-list">Group meeting with {{ meeting.client_name }} + {{ guestNames(meeting) }}</small>
+                }
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }} &ndash; {{ meeting.end_at | date: 'h:mm a' }}</small>
+                <!-- `client_response_status` was already on every meeting and
+                     rendered nowhere, so there was no way to tell whether the
+                     client had actually accepted. -->
+                <span class="response-tag" [class.accepted]="meeting.client_response_status === 'accepted'" [class.declined]="meeting.client_response_status === 'declined'">
+                  {{ clientResponseLabel(meeting) }}
+                </span>
+                @if (isClashing(meeting)) {
+                  <span class="clash-tag">⚠️ Overlaps another meeting</span>
+                }
+              </div>
+              <div class="meeting-actions">
+                <a class="ghost-action" [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer">Join Link</a>
+                <button type="button" class="ghost-action" (click)="openReschedule(meeting)">Reschedule</button>
+                <button type="button" class="ghost-action danger" (click)="cancelMeeting(meeting)">Cancel</button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No upcoming meetings{{ selectedCalendarDate ? ' on this day' : '' }}. Schedule one whenever you're ready.</p>
+      }
+    </section>
+
+    <section class="meetings-section lead-source-section">
+      <div class="meetings-heading">
+        <h2>Lead-form Introductory Meetings</h2>
+        @if (upcomingLeadMeetings.length) {
+          <span class="meetings-count">{{ upcomingLeadMeetings.length }}</span>
+        }
+      </div>
+      @if (upcomingLeadMeetings.length) {
+        <div class="meeting-list">
+          @for (meeting of upcomingLeadMeetings; track meeting.id) {
+            <article class="meeting-card lead-meeting-card">
+              <div class="meeting-main">
+                <span class="source-pill">Lead form</span>
+                <strong>{{ meeting.applicant_name }}</strong>
+                <small>{{ meeting.form_title }} · {{ meeting.reference_id }}</small>
+                <small>{{ meeting.requested_start | date: 'EEE, MMM d, y · h:mm a' }} – {{ meeting.requested_end | date: 'h:mm a' }}</small>
+              </div>
+              <div class="meeting-actions">
+                <a routerLink="/professional/forms-groups" class="ghost-action">Open lead meetings</a>
+                @if (meeting.meeting_url) { <a class="primary-action" [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer">Join meeting</a> }
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-note">No upcoming lead-form introductory meetings.</p>
+      }
+    </section>
+
+    @if (pastLeadMeetings.length) {
+      <section class="meetings-section lead-source-section">
+        <div class="meetings-heading">
+          <h2>Past Lead-form Meetings</h2>
+          <span class="meetings-count muted-count">{{ pastLeadMeetings.length }}</span>
+        </div>
+        <div class="meeting-list">
+          @for (meeting of pastLeadMeetings; track meeting.id) {
+            <article class="meeting-card muted lead-meeting-card">
+              <div class="meeting-main"><span class="source-pill">Lead form</span><strong>{{ meeting.applicant_name }}</strong><small>{{ meeting.requested_start | date: 'medium' }} · {{ meeting.reference_id }}</small></div>
+              <a routerLink="/professional/forms-groups" class="ghost-action">Follow up</a>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+    @if (pastMeetings.length) {
+      <section class="meetings-section">
+        <div class="meetings-heading">
+          <h2>Past and Cancelled</h2>
+          <span class="meetings-count muted-count">{{ pastMeetings.length }}</span>
+        </div>
+        <div class="meeting-list">
+          @for (meeting of pastMeetings; track meeting.id) {
+            <article class="meeting-card muted">
+              <div class="meeting-main">
+                <strong>{{ meeting.client_name }}</strong>
+                <small>{{ meeting.title }}</small>
+                <small>{{ meeting.start_at | date: 'EEE, MMM d, y · h:mm a' }}</small>
+              </div>
+              <span class="status-pill" [attr.data-status]="meeting.status">{{ meeting.status }}</span>
+            </article>
+          }
+        </div>
+      </section>
+    }
+  }
+
+  @if (message) {
+    <p #messageBanner class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (showScheduleForm) {
+    <div class="modal-backdrop" (click)="showScheduleForm = false">
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title" (click)="$event.stopPropagation()">
+        <header>
+          <h2 id="schedule-modal-title">Schedule Meeting</h2>
+          <button type="button" class="modal-close" (click)="showScheduleForm = false" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="field-block">
+          <span class="field-label">Clients <span class="required">*</span></span>
+          <p class="section-note">Select one client, several for a group meeting, or add a whole group at once.</p>
+
+          @if (clientGroups.length) {
+            <div class="group-quick-select">
+              @for (group of clientGroups; track group.id) {
+                <button
+                  type="button"
+                  class="group-chip"
+                  [class.selected]="isGroupFullySelected(group)"
+                  [disabled]="!group.clients.length"
+                  (click)="toggleGroupSelection(group)">
+                  {{ isGroupFullySelected(group) ? '✓ ' : '+ ' }}{{ group.name }} ({{ group.clients.length }})
+                </button>
+              }
+            </div>
+          }
+
+          <input
+            type="search"
+            class="client-search"
+            placeholder="Search clients by name or username..."
+            [(ngModel)]="clientSearchQuery">
+
+          <div class="client-picker">
+            @for (client of filteredClients; track client.id) {
+              <label class="client-picker-option">
+                <input
+                  type="checkbox"
+                  [checked]="scheduleForm.client_ids.includes(client.id)"
+                  (change)="toggleClientSelection(client.id)">
+                <span>{{ client.first_name }} {{ client.last_name }}</span>
+              </label>
+            } @empty {
+              @if (clientSearchQuery.trim()) {
+                <p class="empty-note">No clients match &ldquo;{{ clientSearchQuery }}&rdquo;.</p>
+              } @else {
+                <!-- Rendered as: No clients match "". -->
+                <p class="empty-note">You have no clients yet. Approve a form request first, then schedule with them here.</p>
+              }
+            }
+          </div>
+
+          @if (scheduleForm.client_ids.length) {
+            <p class="section-note">{{ scheduleForm.client_ids.length }} client(s) selected.</p>
+          }
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Duration (minutes)</span>
+            <input type="number" min="5" step="5" [(ngModel)]="scheduleForm.duration_minutes" (ngModelChange)="loadSlots()">
+          </label>
+
+          <label>
+            <span class="field-label">Title</span>
+            <input type="text" [(ngModel)]="scheduleForm.title" placeholder="e.g. Monthly check-in">
+          </label>
+        </div>
+
+        <label>
+          <span class="field-label">Notes</span>
+          <textarea rows="2" [(ngModel)]="scheduleForm.notes" placeholder="Optional agenda or context"></textarea>
+        </label>
+
+        <div class="slot-picker-controls">
+          <label class="slot-date-picker">
+            <span class="field-label">Week starting</span>
+            <input type="date" [(ngModel)]="slotDate" (ngModelChange)="loadSlots()">
+          </label>
+          <label class="slot-timezone-picker">
+            <span class="field-label">Show times in</span>
+            <input type="text" [(ngModel)]="viewTimezone" list="timezoneOptions" autocomplete="off">
+            @if (timezoneOffsetLabels[viewTimezone]) {
+              <small class="zone-offset-hint">{{ timezoneOffsetLabels[viewTimezone] }}</small>
+            }
+          </label>
+        </div>
+
+        @if (isLoadingSlots) {
+          <p class="state-note">Loading available times...</p>
+        } @else if (slotDays.length) {
+          <div class="slot-days">
+            @for (day of slotDays; track day) {
+              <div class="slot-day">
+                <span class="slot-day-label">{{ formatSlotDay(day) }}</span>
+                <div class="slot-chips">
+                  @for (slot of slots[day]; track slot.start) {
+                    <button type="button" class="slot-chip" [class.selected]="selectedSlot === slot.start" (click)="selectedSlot = slot.start">
+                      {{ formatSlotTime(slot.start) }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">No open slots in this week.</p>
+        }
+
+        <div class="manual-slot-row">
+          <label class="manual-slot-input">
+            <span class="field-label">Or pick an exact date and time</span>
+            <input type="datetime-local" [(ngModel)]="manualSlotLocal" (ngModelChange)="applyManualSlot()">
+          </label>
+          <p class="section-note">Booking directly doesn't need your weekly availability set — that's only for the public lead-form page.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="ghost-action" (click)="showScheduleForm = false">Cancel</button>
+          <button type="button" class="primary-action" [disabled]="isSavingMeeting || !scheduleForm.client_ids.length || !selectedSlot" (click)="confirmScheduleMeeting()">
+            {{ isSavingMeeting ? 'Scheduling...' : 'Schedule Meeting' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (reschedulingMeeting; as meeting) {
+    <div class="modal-backdrop" (click)="closeReschedule()">
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title" (click)="$event.stopPropagation()">
+        <header>
+          <h2 id="reschedule-modal-title">Reschedule with {{ meeting.client_name }}</h2>
+          <button type="button" class="modal-close" (click)="closeReschedule()" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="slot-picker-controls">
+          <label class="slot-date-picker">
+            <span class="field-label">Week starting</span>
+            <input type="date" [(ngModel)]="rescheduleDate" (ngModelChange)="loadRescheduleSlots()">
+          </label>
+          <label class="slot-timezone-picker">
+            <span class="field-label">Show times in</span>
+            <input type="text" [(ngModel)]="viewTimezone" list="timezoneOptions" autocomplete="off">
+            @if (timezoneOffsetLabels[viewTimezone]) {
+              <small class="zone-offset-hint">{{ timezoneOffsetLabels[viewTimezone] }}</small>
+            }
+          </label>
+        </div>
+
+        @if (isLoadingRescheduleSlots) {
+          <p class="state-note">Loading available times...</p>
+        } @else if (rescheduleSlotDays.length) {
+          <div class="slot-days">
+            @for (day of rescheduleSlotDays; track day) {
+              <div class="slot-day">
+                <span class="slot-day-label">{{ formatSlotDay(day) }}</span>
+                <div class="slot-chips">
+                  @for (slot of rescheduleSlots[day]; track slot.start) {
+                    <button type="button" class="slot-chip" [class.selected]="selectedRescheduleSlot === slot.start" (click)="selectedRescheduleSlot = slot.start">
+                      {{ formatSlotTime(slot.start) }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty-note">No open slots in this week.</p>
+        }
+
+        <div class="manual-slot-row">
+          <label class="manual-slot-input">
+            <span class="field-label">Or pick an exact date and time</span>
+            <input type="datetime-local" [(ngModel)]="manualRescheduleLocal" (ngModelChange)="applyManualRescheduleSlot()">
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="ghost-action" (click)="closeReschedule()">Cancel</button>
+          <button type="button" class="primary-action" [disabled]="isSavingReschedule || !selectedRescheduleSlot" (click)="confirmReschedule()">
+            {{ isSavingReschedule ? 'Saving...' : 'Confirm New Time' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (showDaysOffModal) {
+    <div class="modal-backdrop" (click)="closeDaysOffModal()">
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="days-off-modal-title" (click)="$event.stopPropagation()">
+        <header>
+          <h2 id="days-off-modal-title">Days off</h2>
+          <button type="button" class="modal-close" (click)="closeDaysOffModal()" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="days-off-section">
+          <h3>Whole weekday, every week</h3>
+          <p class="section-note">
+            Turn off an entire weekday — e.g. every Monday — for as long as you like. Your hours for
+            that day stay saved underneath, so turning it back on brings them right back.
+          </p>
+          <div class="weekday-off-chips">
+            @for (weekday of [0, 1, 2, 3, 4, 5, 6]; track weekday) {
+              <button
+                type="button"
+                class="weekday-off-chip"
+                [class.weekday-off-chip-active]="isWeekdayOff(weekday)"
+                [disabled]="savingWeekdayOff === weekday"
+                (click)="toggleWeekdayOff(weekday)"
+              >{{ weekdayLabels[weekday] }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="days-off-section">
+          <h3>Specific dates</h3>
+          <p class="section-note">
+            Block off individual dates — holidays, vacation, or a one-off day. Add as many as you need.
+          </p>
+          <div class="add-window-row">
+            <label>
+              <span class="field-label">Date</span>
+              <input type="date" [(ngModel)]="newDateOff" [min]="todayIso">
+            </label>
+            <button type="button" class="primary-action" [disabled]="isSavingDateOff || !newDateOff" (click)="addDateOff()">
+              {{ isSavingDateOff ? 'Adding...' : 'Add date' }}
+            </button>
+          </div>
+
+          <div class="availability-list">
+            @for (dateOff of dateOffs; track dateOff.id) {
+              <div class="availability-day-row">
+                <span class="weekday-tag">{{ formatDateOff(dateOff.date) }}</span>
+                <button type="button" class="remove-block" (click)="removeDateOff(dateOff)" aria-label="Remove this day off">&times;</button>
+              </div>
+            } @empty {
+              <p class="empty-note">No specific days off scheduled.</p>
+            }
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="primary-action" (click)="closeDaysOffModal()">Done</button>
+        </div>
+      </section>
+    </div>
+  }
+</app-professional-page-shell>

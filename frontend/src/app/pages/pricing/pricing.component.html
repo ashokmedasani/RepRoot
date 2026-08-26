@@ -1,0 +1,44 @@
+<main class="pricing-page">
+  <app-public-site-header activeSection="plans" />
+
+  <section class="pricing-hero" aria-labelledby="pricing-title">
+    <p class="eyebrow">RepRoot pricing</p>
+    <h1 id="pricing-title">Start free. Grow when ready.</h1>
+    <p>Allow location access to view the pricing available for your region.</p>
+  </section>
+
+  @if (locationState === 'requesting') {
+    <section class="location-gate" aria-live="polite">
+      <span class="location-icon" aria-hidden="true"></span>
+      <h2>Checking your pricing region</h2>
+      <p>Your precise location is not saved, sent to RepRoot, or shown in your account.</p>
+    </section>
+  } @else if (locationState === 'denied' || locationState === 'unavailable') {
+    <section class="location-gate" aria-labelledby="location-required-title">
+      <span class="location-icon blocked" aria-hidden="true"></span>
+      <h2 id="location-required-title">Location access is needed</h2>
+      <p>Pricing stays hidden until your browser can identify India, the United States, or the international USD region.</p>
+      <button class="primary-action" type="button" (click)="detectLocation()">Try location again</button>
+      <p class="permission-help">If access was blocked, use the location or site-permissions icon beside the browser address, allow location, then try again.</p>
+    </section>
+  } @else {
+    <section class="pricing-content" aria-label="RepRoot plans">
+      <div class="region-row"><span>Pricing region</span><strong>{{ regionLabel }}</strong></div>
+      <div class="plan-grid">
+        @for (plan of plans; track plan.name) {
+          <article class="plan-card" [class.featured]="plan.featured">
+            @if (plan.featured) { <span class="popular">Popular</span> }
+            <p class="plan-name">{{ plan.name }}</p>
+            <p class="plan-description">{{ plan.description }}</p>
+            <p class="plan-price"><strong>{{ priceFor(plan) }}</strong><span>/month</span></p>
+            <ul>@for (feature of plan.features; track feature) { <li>{{ feature }}</li> }</ul>
+            <a routerLink="/professional/signup">{{ plan.name === 'Free' ? 'Start free' : 'Create an account' }}</a>
+          </article>
+        }
+      </div>
+      <p class="pricing-note">Countries outside India currently use USD pricing. Additional local-currency pricing is planned for a later release.</p>
+    </section>
+  }
+
+  <app-public-site-footer />
+</main>

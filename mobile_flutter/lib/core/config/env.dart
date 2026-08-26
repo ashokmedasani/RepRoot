@@ -51,7 +51,7 @@ class Env {
     }
   }
 
-  /// Public web app (the Angular Studio frontend) that publishes the legal
+  /// Public RepRoot web app that publishes the legal
   /// documents at `/terms/<audience>` and `/privacy/<audience>`.
   ///
   /// The documents are static pages rendered by the web app, not API content —
@@ -65,19 +65,12 @@ class Env {
     defaultValue: 'https://rep-root.com',
   );
 
-  /// STUDIO-HIDDEN 2026-08-17: default host was 'https://studio.rep-root.com'.
-  /// Public RepRoot application. This is intentionally public
-  /// configuration and is used when a task is safer to finish on the website,
-  /// such as purchasing or managing a subscription.
-  static const String studioWebUrl = String.fromEnvironment(
-    'STUDIO_WEB_URL',
-    defaultValue: 'https://rep-root.com',
-  );
-
-  static String studioUrl(String path) {
-    final root = studioWebUrl.endsWith('/')
-        ? studioWebUrl.substring(0, studioWebUrl.length - 1)
-        : studioWebUrl;
+  /// Builds an absolute URL for a RepRoot web route. This is used when a task
+  /// is safer to finish on the website, such as subscription management.
+  static String webUrl(String path) {
+    final root = webAppUrl.endsWith('/')
+        ? webAppUrl.substring(0, webAppUrl.length - 1)
+        : webAppUrl;
     return path.startsWith('/') ? '$root$path' : '$root/$path';
   }
 

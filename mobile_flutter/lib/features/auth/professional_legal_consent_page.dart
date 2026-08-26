@@ -13,7 +13,7 @@ import '../professional/professional_format.dart';
 
 /// Professional re-consent gate.
 ///
-/// Port of frontend/src/app/pages/studio/professional/professional-legal-consent.
+/// Port of frontend/src/app/pages/workspace/professional/professional-legal-consent.
 /// The backend publishes a legal version (`REPROOT_PROFESSIONAL_LEGAL_VERSION`);
 /// ProfessionalAccessPermission refuses every professional endpoint that is not
 /// marked `allow_outdated_legal` until the signed-in professional has accepted

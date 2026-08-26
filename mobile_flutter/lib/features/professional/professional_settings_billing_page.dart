@@ -63,7 +63,7 @@ class _ProfessionalSettingsBillingPageState
     }
     final opened = await launchUrl(
       Uri.parse(
-        Env.studioUrl('/professional/account-settings?section=billing'),
+        Env.webUrl('/professional/account-settings?section=billing'),
       ),
       mode: LaunchMode.externalApplication,
     );

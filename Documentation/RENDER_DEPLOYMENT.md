@@ -23,7 +23,7 @@ Configure these values in the Render static-site environment dashboard:
 
 ```text
 RENDER_API_BASE_URL=https://api.your-domain.com
-SUPPORT_EMAIL=studio-support@your-domain.com
+SUPPORT_EMAIL=support@your-domain.com
 GOOGLE_OAUTH_CLIENT_ID=<google-oauth-web-client-id>.apps.googleusercontent.com
 ```
 
@@ -45,7 +45,7 @@ A mismatch causes Google identity-token audience validation to fail.
 1. Promote the approved release commit to the `Test` branch.
 2. Allow Render to build that exact commit.
 3. Confirm the Render build command and publish directory shown above.
-4. Verify the public homepage, Studio homepage, portal, professional login,
+4. Verify the RepRoot homepage, portal, professional login,
    client login, and protected-route behavior.
 5. Confirm browser API requests use the HTTPS API URL and do not contain a
    duplicated `/api/accounts` path.

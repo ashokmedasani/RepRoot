@@ -137,7 +137,7 @@ Recommended Render service name: `reproot-web-staging`.
 3. Reuse the production build settings.
 4. Manually set the staging site's public API base URL to the Green API URL.
 5. Do not attach `rep-root.com`, `www.rep-root.com`, or
-   `studio.rep-root.com` to the staging service.
+   `rep-root.com` to the staging service.
 6. Deploy and record the Render deploy ID and temporary staging URL.
 7. Treat the staging URL as public unless access control is explicitly added.
    An unadvertised URL is not private.
@@ -147,7 +147,7 @@ Recommended Render service name: `reproot-web-staging`.
 Test through the staging Render URL only:
 
 - [ ] RepRoot parent homepage
-- [ ] RepRoot Studio public homepage and `/studio` redirect
+- [ ] RepRoot public homepage and `/portal` gateway
 - [ ] `/portal` and professional/client navigation
 - [ ] Professional signup, OTP, login, logout, and password reset
 - [ ] Client login and professional search
@@ -187,7 +187,7 @@ Do not rebuild from uncommitted local files between staging and production.
 
 ### Production smoke test
 
-- [ ] Parent and Studio public pages load over HTTPS
+- [ ] RepRoot public pages load over HTTPS
 - [ ] Portal and login pages load
 - [ ] API health returns HTTP 200
 - [ ] One professional can sign in and load the dashboard
@@ -340,7 +340,7 @@ have been recorded.
 - CloudFormation drift detection for Blue completed with `IN_SYNC` on
   2026-08-01. The clone may proceed from the recorded stack configuration.
 - The local repository is on branch `Test` at base commit `486c5a5`
-  ("Complete Studio workflows legal consent and cookie controls"). The intended
+  ("Complete RepRoot workflows legal consent and cookie controls"). The intended
   release also contains tracked, uncommitted changes, so this base commit must
   not be deployed as the new release. Validate and commit the complete intended
   state before building Green or the staging frontend.

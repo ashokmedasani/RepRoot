@@ -47,7 +47,7 @@ final _otpPattern = RegExp(r'^\d{6}$');
 
 /// Professional password recovery.
 ///
-/// Port of frontend/src/app/pages/studio/professional/professional-forgot-password —
+/// Port of frontend/src/app/pages/workspace/professional/professional-forgot-password —
 /// email -> reset OTP -> verify -> new password, all unauthenticated. Without it
 /// a professional who forgets their password has no way back in on mobile.
 class ProfessionalForgotPasswordPage extends ConsumerStatefulWidget {

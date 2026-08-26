@@ -5,16 +5,10 @@
   </a>
   <button class="menu-toggle" type="button" (click)="menuOpen = !menuOpen" [attr.aria-expanded]="menuOpen" aria-controls="public-navigation"><span></span><span></span><span></span><span class="sr-only">Menu</span></button>
   <nav id="public-navigation" [class.open]="menuOpen" aria-label="RepRoot navigation">
-    <button type="button" [class.active]="activeSection === 'overview'" (click)="selectSection('overview')">Overview</button>
-    <button type="button" [class.active]="activeSection === 'workflow'" (click)="selectSection('workflow')">How it works</button>
-    <button type="button" [class.active]="activeSection === 'features'" (click)="selectSection('features')">Features</button>
-    <button type="button" [class.active]="activeSection === 'professionals'" (click)="selectSection('professionals')">For professionals</button>
-    <button type="button" [class.active]="activeSection === 'clients'" (click)="selectSection('clients')">For clients</button>
-    <button type="button" [class.active]="activeSection === 'faq'" (click)="selectSection('faq')">FAQ</button>
-    <button type="button" [class.active]="activeSection === 'contact'" (click)="selectSection('contact')">Contact</button>
-    <!-- Appearance used to live only in Settings, behind a login, so a visitor
-         on the public site had no way to switch to dark. -->
-    <app-theme-toggle class="nav-theme" label="Site appearance" />
-    <a class="nav-cta" routerLink="/portal" (click)="closeMenu()">Sign in</a>
+    <a routerLink="/" [queryParams]="{ section: 'professionals' }" [class.active]="activeSection === 'professionals'" (click)="closeMenu()">Professionals</a>
+    <a routerLink="/" [queryParams]="{ section: 'clients' }" [class.active]="activeSection === 'clients'" (click)="closeMenu()">Clients</a>
+    <a routerLink="/pricing" [class.active]="activeSection === 'plans'" (click)="closeMenu()">Pricing</a>
+    <app-theme-toggle label="Site appearance" />
+    <a class="nav-cta" routerLink="/portal" (click)="closeMenu()">Launch RepRoot</a>
   </nav>
 </header>

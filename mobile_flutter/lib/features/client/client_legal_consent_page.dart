@@ -14,7 +14,7 @@ import '../professional/professional_format.dart';
 
 /// Client consent gate — first login and after a published version bump.
 ///
-/// Port of frontend/src/app/pages/studio/client/client-legal-consent. Sits next
+/// Port of frontend/src/app/pages/workspace/client/client-legal-consent. Sits next
 /// to [ClientChangePasswordPage] rather than under features/auth because, like
 /// that screen, it runs with a valid client session and gates the portal.
 ///

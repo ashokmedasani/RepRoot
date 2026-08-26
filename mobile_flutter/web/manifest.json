@@ -1,11 +1,11 @@
 {
-    "name": "RepRoot Studio",
+    "name": "RepRoot",
     "short_name": "RepRoot",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F8FAFC",
     "theme_color": "#2563EB",
-    "description": "RepRoot Studio — the professional and client workspace for RepRoot.",
+    "description": "RepRoot — the professional and client workspace.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

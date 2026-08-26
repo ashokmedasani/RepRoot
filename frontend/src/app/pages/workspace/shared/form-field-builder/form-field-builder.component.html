@@ -1,0 +1,274 @@
+<section class="builder-panel" aria-label="Fitness form builder">
+  <section class="core-fields-card" aria-label="Universal core fields">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Locked fields</p>
+        <h2>Universal Core Fields</h2>
+        <p>First name, last name, and email identify every client and cannot be removed.</p>
+      </div>
+      <span class="lock-pill">Locked</span>
+    </div>
+
+    <div class="core-grid">
+      @for (field of coreFields(); track field.key) {
+        <article>
+          <span class="core-icon">L</span>
+          <strong>{{ field.label }}</strong>
+          <small>{{ fieldTypeLabel(field.field_type) }} - Required</small>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="recommended-section" aria-label="Recommended fitness fields">
+    <div class="section-heading compact">
+      <div>
+        <h2>Suggested Fields</h2>
+        <p>Choose any fields that help your workflow. Suggestions are optional.</p>
+      </div>
+    </div>
+
+    <div class="chip-row">
+      @for (template of visibleRecommended; track template.label) {
+        <button
+          type="button"
+          class="field-chip"
+          [class.field-chip-added]="isRecommendedFieldAdded(template)"
+          [disabled]="isRecommendedFieldAdded(template)"
+          (click)="addRecommendedField(template)"
+          [title]="isRecommendedFieldAdded(template) ? template.label + ' is already on this form' : template.help_text"
+        >
+          <span class="chip-plus">{{ isRecommendedFieldAdded(template) ? '✓' : '+' }}</span>{{ template.label }}
+        </button>
+      }
+
+      <button
+        type="button"
+        class="field-chip field-chip-custom"
+        (click)="addFieldFromSuggestions()"
+        title="Add a field of your own, then choose its type and settings"
+      >
+        <span class="chip-plus">+</span>Add your own field
+      </button>
+    </div>
+  </section>
+
+  @for (group of externalSuggestionGroups; track group.title) {
+    @if (group.fields.length) {
+      <section class="recommended-section" aria-label="{{ group.title }}">
+        <div class="section-heading compact">
+          <div>
+            <h2>{{ group.title }}</h2>
+            <p>Tap a field to add it to this form, then customize.</p>
+          </div>
+        </div>
+        <div class="chip-row">
+          @for (field of group.fields; track field.label) {
+            <button
+              type="button"
+              class="field-chip"
+              [class.field-chip-added]="isFieldLabelAdded(field.label)"
+              [disabled]="isFieldLabelAdded(field.label)"
+              (click)="addExternalSuggestedField(field)"
+              [title]="isFieldLabelAdded(field.label) ? field.label + ' is already on this form' : field.help_text"
+            >
+              <span class="chip-plus">{{ isFieldLabelAdded(field.label) ? '✓' : '+' }}</span>{{ field.label }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+  }
+
+  <section class="custom-builder" aria-label="Custom field builder" #customBuilder>
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Your form</p>
+        <h2>Custom Field Builder</h2>
+        <p>Arrange fields, edit settings, duplicate fields, and preview the actual controls clients will see.</p>
+      </div>
+      <button type="button" class="add-button" (click)="addField()">Add Custom Field</button>
+    </div>
+
+    <div class="field-list">
+      @for (field of customFields; track $index) {
+        <article class="field-card">
+          <div class="field-card-header">
+            <div>
+              <span class="field-kicker">Field {{ $index + 1 }}</span>
+              <h3>{{ field.label || 'Untitled field' }}</h3>
+              <p>{{ fieldTypeLabel(field.field_type) }} - {{ field.required ? 'Required' : 'Optional' }}</p>
+            </div>
+            <div class="field-actions">
+              <button type="button" title="Move up" [disabled]="$index === 0" (click)="moveField($index, -1)">Up</button>
+              <button type="button" title="Move down" [disabled]="$index === customFields.length - 1" (click)="moveField($index, 1)">Down</button>
+              <button type="button" title="Duplicate field" (click)="duplicateField($index)">Duplicate</button>
+              <button type="button" title="Edit field" (click)="field.isEditing = !field.isEditing">
+                {{ field.isEditing ? 'Done' : 'Edit' }}
+              </button>
+              <button type="button" class="danger" title="Delete field" (click)="removeField($index)">Delete</button>
+            </div>
+          </div>
+
+          @if (field.isEditing) {
+            <div class="settings-grid">
+              <label>
+                <span class="field-label">Label</span>
+                <input type="text" [(ngModel)]="field.label" [name]="'fieldLabel' + $index" placeholder="Field label">
+              </label>
+
+              <label>
+                <span class="field-label">Field Type</span>
+                <select [(ngModel)]="field.field_type" [name]="'fieldType' + $index">
+                  @for (type of fieldTypes; track type.value) {
+                    <option [value]="type.value">{{ type.label }}</option>
+                  }
+                </select>
+              </label>
+
+              @if (allowRequiredSelection) {
+                <label>
+                  <span class="field-label">Required / Optional</span>
+                  <select [(ngModel)]="field.required" [name]="'fieldRequired' + $index">
+                    <option [ngValue]="true">Required</option>
+                    <option [ngValue]="false">Optional</option>
+                  </select>
+                </label>
+              } @else {
+                <div class="optional-field-note">
+                  <span class="field-label">Response</span>
+                  <p>Optional for clients in this group.</p>
+                </div>
+              }
+
+              <label>
+                <span class="field-label">Placeholder</span>
+                <input type="text" [(ngModel)]="field.placeholder" [name]="'fieldPlaceholder' + $index" placeholder="Placeholder text">
+              </label>
+
+              @if (needsOptions(field)) {
+                <label>
+                  <span class="field-label">Options</span>
+                  <input
+                    type="text"
+                    [ngModel]="optionsText(field)"
+                    (ngModelChange)="updateOptions(field, $event)"
+                    [name]="'fieldOptions' + $index"
+                    placeholder="Option one, Option two, Option three"
+                  >
+                </label>
+              }
+
+              <label class="wide-field">
+                <span class="field-label">Help Text</span>
+                <input type="text" [(ngModel)]="field.help_text" [name]="'fieldHelp' + $index" placeholder="Short helper text for clients">
+              </label>
+            </div>
+          }
+
+          <div class="field-preview">
+            <div class="preview-label">
+              <span>{{ field.label || 'Untitled field' }}</span>
+              @if (field.required) {
+                <strong>*</strong>
+              }
+            </div>
+
+            @switch (field.field_type) {
+              @case ('phone') {
+                <div class="compound-input phone-preview">
+                  <select disabled>
+                    <option>+1</option>
+                    <option>+91</option>
+                    <option>+44</option>
+                  </select>
+                  <input type="tel" disabled [placeholder]="field.placeholder || 'Phone number'">
+                </div>
+              }
+              @case ('date') {
+                <input type="date" disabled>
+              }
+              @case ('location') {
+                <div class="compound-input">
+                  <select disabled>
+                    <option>Country</option>
+                    @for (country of countries.slice(0, 4); track country.isoCode) {
+                      <option>{{ country.name }}</option>
+                    }
+                  </select>
+                  <select disabled>
+                    <option>State / Region</option>
+                  </select>
+                </div>
+              }
+              @case ('dropdown') {
+                <select disabled>
+                  <option>{{ field.placeholder || 'Select an option' }}</option>
+                  @for (option of field.options || []; track option) {
+                    <option>{{ option }}</option>
+                  }
+                </select>
+              }
+              @case ('checkbox') {
+                <div class="option-preview">
+                  @for (option of field.options?.length ? field.options : ['Option']; track option) {
+                    <label><input type="checkbox" disabled> {{ option }}</label>
+                  }
+                </div>
+              }
+              @case ('radio') {
+                <div class="option-preview">
+                  @for (option of field.options?.length ? field.options : ['Option one', 'Option two']; track option) {
+                    <label><input type="radio" disabled> {{ option }}</label>
+                  }
+                </div>
+              }
+              @case ('yes_no') {
+                <div class="option-preview inline-options">
+                  <label><input type="radio" disabled> Yes</label>
+                  <label><input type="radio" disabled> No</label>
+                </div>
+              }
+              @case ('number') {
+                @if (shouldShowUnit(field)) {
+                  <div class="compound-input number-unit-preview">
+                    <input type="number" disabled [placeholder]="field.placeholder || 'Enter number'">
+                    <select disabled>
+                      @for (unit of unitOptions(field); track unit) {
+                        <option>{{ unit }}</option>
+                      }
+                    </select>
+                  </div>
+                } @else {
+                  <input type="number" disabled [placeholder]="field.placeholder || 'Enter number'">
+                }
+              }
+              @case ('long_text') {
+                <textarea rows="4" disabled [placeholder]="field.placeholder || 'Type your answer here'"></textarea>
+              }
+              @case ('address') {
+                <textarea rows="3" disabled [placeholder]="field.placeholder || 'Street, city, postal code'"></textarea>
+              }
+              @case ('email') {
+                <input type="email" disabled [placeholder]="field.placeholder || 'name@example.com'">
+              }
+              @default {
+                <input type="text" disabled [placeholder]="field.placeholder || 'Short answer'">
+              }
+            }
+
+            @if (field.help_text) {
+              <p>{{ field.help_text }}</p>
+            }
+          </div>
+        </article>
+      } @empty {
+        <article class="empty-state">
+          <h3>No custom fields yet</h3>
+          <p>Add a recommended fitness field or create your own custom field.</p>
+          <button type="button" class="add-button" (click)="addField()">Add Custom Field</button>
+        </article>
+      }
+    </div>
+  </section>
+</section>

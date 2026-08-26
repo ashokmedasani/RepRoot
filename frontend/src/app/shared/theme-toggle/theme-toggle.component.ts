@@ -1,10 +1,9 @@
 import { Component, Input, inject } from '@angular/core';
 
 import { ThemeService } from '@core/theme/theme.service';
-import { ThemeId } from '@core/theme/theme.model';
 
 /**
- * Light / Dark / System control for the public site.
+ * Compact Light / Dark control for the public site.
  *
  * Appearance used to be reachable only from Settings, which is behind a login —
  * so a visitor reading the landing page or the terms, or a client sitting on a
@@ -19,53 +18,43 @@ import { ThemeId } from '@core/theme/theme.model';
   selector: 'app-theme-toggle',
   standalone: true,
   template: `
-    <div class="theme-toggle" role="group" [attr.aria-label]="label">
-      @for (theme of options; track theme.id) {
-        <button
-          type="button"
-          [class.active]="active === theme.id"
-          [attr.aria-pressed]="active === theme.id"
-          [title]="theme.description"
-          (click)="choose(theme.id)"
-        >
-          {{ theme.label }}
-        </button>
+    <button
+      class="theme-toggle"
+      type="button"
+      [attr.aria-label]="isDark ? 'Use light appearance' : 'Use dark appearance'"
+      [attr.aria-pressed]="isDark"
+      [title]="isDark ? 'Use light appearance' : 'Use dark appearance'"
+      (click)="toggle()"
+    >
+      @if (isDark) {
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
+      } @else {
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.3A8.4 8.4 0 0 1 8.7 3.8 8.5 8.5 0 1 0 20.2 15.3Z"></path></svg>
       }
-    </div>
+      <span class="sr-only">{{ label }}</span>
+    </button>
   `,
   styles: [`
     .theme-toggle {
-      display: inline-flex;
-      gap: 0.15rem;
+      display: inline-grid;
+      width: 2.45rem;
+      height: 2.45rem;
+      min-height: 2.45rem;
+      place-items: center;
       border: 1px solid var(--app-border);
-      border-radius: 2rem;
-      padding: 0.2rem;
+      border-radius: .5rem;
+      padding: .55rem;
       background: var(--app-surface);
-    }
-
-    .theme-toggle button {
-      border: 0;
-      border-radius: 2rem;
-      padding: 0.3rem 0.7rem;
-      background: transparent;
       color: var(--app-muted);
-      font: inherit;
-      font-size: 0.78rem;
-      font-weight: 700;
-      line-height: 1.2;
-      white-space: nowrap;
       cursor: pointer;
-      transition: background var(--app-transition-fast), color var(--app-transition-fast);
+      transition: border-color var(--app-transition-fast), background var(--app-transition-fast);
     }
-
-    .theme-toggle button:hover {
-      color: var(--app-text);
+    .theme-toggle:hover, .theme-toggle:focus-visible {
+      border-color: color-mix(in srgb, var(--app-primary) 55%, var(--app-border));
+      outline: none;
     }
-
-    .theme-toggle button.active {
-      background: var(--app-primary-soft);
-      color: var(--app-primary-strong);
-    }
+    svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
   `]
 })
 export class ThemeToggleComponent {
@@ -73,14 +62,11 @@ export class ThemeToggleComponent {
 
   @Input() label = 'Appearance';
 
-  /** Only the themes a public page is allowed to show. */
-  readonly options = this.themeService.themesFor('public');
-
-  get active(): ThemeId {
-    return this.themeService.activeTheme();
+  get isDark(): boolean {
+    return this.themeService.resolvedTheme() === 'dark';
   }
 
-  choose(themeId: ThemeId): void {
-    this.themeService.setTheme(themeId);
+  toggle(): void {
+    this.themeService.setTheme(this.isDark ? 'main-light-blue' : 'dark');
   }
 }

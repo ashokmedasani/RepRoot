@@ -8,18 +8,8 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/studio/studio.component').then((module) => module.StudioComponent),
+      import('./pages/reproot-home/reproot-home.component').then((module) => module.RepRootHomeComponent),
     title: 'RepRoot | Professional and Client Workflow Platform'
-  },
-  {
-    path: 'studio',
-    redirectTo: '',
-    pathMatch: 'full'
-  },
-  {
-    path: '_studio-home',
-    redirectTo: '',
-    pathMatch: 'full'
   },
   {
     path: 'about',
@@ -29,9 +19,19 @@ export const routes: Routes = [
   {
     path: 'contact',
     loadComponent: () =>
-      import('./pages/studio/studio.component').then((module) => module.StudioComponent),
+      import('./pages/reproot-home/reproot-home.component').then((module) => module.RepRootHomeComponent),
     data: { section: 'contact' },
     title: 'Contact RepRoot'
+  },
+  {
+    path: 'faq',
+    loadComponent: () => import('./pages/faq/faq.component').then((module) => module.FaqComponent),
+    title: 'Frequently Asked Questions | RepRoot'
+  },
+  {
+    path: 'pricing',
+    loadComponent: () => import('./pages/pricing/pricing.component').then((module) => module.PricingComponent),
+    title: 'Pricing | RepRoot'
   },
   {
     path: 'terms',
@@ -77,7 +77,7 @@ export const routes: Routes = [
   {
     path: 'portal',
     loadComponent: () =>
-      import('./pages/studio/portal/access-entry-placeholder.component').then(
+      import('./pages/workspace/portal/access-entry-placeholder.component').then(
         (module) => module.AccessEntryPlaceholderComponent
       ),
     title: 'RepRoot Portal | Professional and Client Access'
@@ -90,28 +90,28 @@ export const routes: Routes = [
   {
     path: 'client/login',
     loadComponent: () =>
-      import('./pages/studio/client/client-login/client-login.component').then((module) => module.ClientLoginComponent),
+      import('./pages/workspace/client/client-login/client-login.component').then((module) => module.ClientLoginComponent),
     title: 'Client Login'
   },
   {
     path: 'client/profile',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-profile/client-profile.component').then((module) => module.ClientProfileComponent),
+      import('./pages/workspace/client/client-profile/client-profile.component').then((module) => module.ClientProfileComponent),
     title: 'Client Portal'
   },
   {
     path: 'client/settings',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-profile/client-profile.component').then((module) => module.ClientProfileComponent),
+      import('./pages/workspace/client/client-profile/client-profile.component').then((module) => module.ClientProfileComponent),
     title: 'Client Settings'
   },
   {
     path: 'client/payments',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-payments/client-payments.component').then(
+      import('./pages/workspace/client/client-payments/client-payments.component').then(
         (module) => module.ClientPaymentsComponent
       ),
     title: 'Payments'
@@ -120,7 +120,7 @@ export const routes: Routes = [
     path: 'client/meetings',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-meetings/client-meetings.component').then(
+      import('./pages/workspace/client/client-meetings/client-meetings.component').then(
         (module) => module.ClientMeetingsComponent
       ),
     title: 'Meetings'
@@ -129,7 +129,7 @@ export const routes: Routes = [
     path: 'client/payments/requests/:requestId',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-payment-request-detail/client-payment-request-detail.component').then(
+      import('./pages/workspace/client/client-payment-request-detail/client-payment-request-detail.component').then(
         (module) => module.ClientPaymentRequestDetailComponent
       ),
     title: 'Payment Request'
@@ -139,7 +139,7 @@ export const routes: Routes = [
     canActivate: [clientAuthGuard],
     data: { audience: 'client' },
     loadComponent: () =>
-      import('./pages/studio/shared/payment-confirmation/payment-confirmation.component').then(
+      import('./pages/workspace/shared/payment-confirmation/payment-confirmation.component').then(
         (module) => module.PaymentConfirmationComponent
       ),
     title: 'Payment Confirmation'
@@ -148,7 +148,7 @@ export const routes: Routes = [
     path: 'client/change-password',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-change-password/client-change-password.component').then(
+      import('./pages/workspace/client/client-change-password/client-change-password.component').then(
         (module) => module.ClientChangePasswordComponent
       ),
     title: 'Change Password'
@@ -157,7 +157,7 @@ export const routes: Routes = [
     path: 'client/legal-consent',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-legal-consent/client-legal-consent.component').then(
+      import('./pages/workspace/client/client-legal-consent/client-legal-consent.component').then(
         (module) => module.ClientLegalConsentComponent
       ),
     title: 'Client Legal Review'
@@ -166,7 +166,7 @@ export const routes: Routes = [
     path: 'professional/legal-consent',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-legal-consent/professional-legal-consent.component').then(
+      import('./pages/workspace/professional/professional-legal-consent/professional-legal-consent.component').then(
         (module) => module.ProfessionalLegalConsentComponent
       ),
     title: 'Professional Legal Review'
@@ -174,7 +174,7 @@ export const routes: Routes = [
   {
     path: 'professional-access',
     loadComponent: () =>
-      import('./pages/studio/professional/professional-access/professional-access.component').then((module) => module.ProfessionalAccessComponent),
+      import('./pages/workspace/professional/professional-access/professional-access.component').then((module) => module.ProfessionalAccessComponent),
     title: 'Professional Access'
   },
   {
@@ -193,7 +193,7 @@ export const routes: Routes = [
     // exchanges its handoff, so no auth guard may sit in front of it.
     path: 'auth/google/complete',
     loadComponent: () =>
-      import('./pages/studio/professional/google-callback/google-callback.component').then(
+      import('./pages/workspace/professional/google-callback/google-callback.component').then(
         (module) => module.GoogleCallbackComponent
       ),
     title: 'Completing Google sign-in'
@@ -201,19 +201,19 @@ export const routes: Routes = [
   {
     path: 'professional/login',
     loadComponent: () =>
-      import('./pages/studio/professional/professional-login/professional-login.component').then((module) => module.ProfessionalLoginComponent),
+      import('./pages/workspace/professional/professional-login/professional-login.component').then((module) => module.ProfessionalLoginComponent),
     title: 'Professional Login'
   },
   {
     path: 'professional/signup',
     loadComponent: () =>
-      import('./pages/studio/professional/professional-signup/professional-signup.component').then((module) => module.ProfessionalSignupComponent),
+      import('./pages/workspace/professional/professional-signup/professional-signup.component').then((module) => module.ProfessionalSignupComponent),
     title: 'Professional Signup'
   },
   {
     path: 'professional/forgot-password',
     loadComponent: () =>
-      import('./pages/studio/professional/professional-forgot-password/professional-forgot-password.component').then(
+      import('./pages/workspace/professional/professional-forgot-password/professional-forgot-password.component').then(
         (module) => module.ProfessionalForgotPasswordComponent
       ),
     title: 'Forgot Password'
@@ -223,7 +223,7 @@ export const routes: Routes = [
     canActivate: [professionalAuthGuard],
     data: { audience: 'professional' },
     loadComponent: () =>
-      import('./pages/studio/shared/payment-confirmation/payment-confirmation.component').then(
+      import('./pages/workspace/shared/payment-confirmation/payment-confirmation.component').then(
         (module) => module.PaymentConfirmationComponent
       ),
     title: 'Payment Confirmation'
@@ -232,7 +232,7 @@ export const routes: Routes = [
     path: 'professional/dashboard',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-dashboard/professional-dashboard.component').then(
+      import('./pages/workspace/professional/professional-dashboard/professional-dashboard.component').then(
         (module) => module.ProfessionalDashboardComponent
       ),
     title: 'Dashboard'
@@ -241,7 +241,7 @@ export const routes: Routes = [
     path: 'professional/profile-setup',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-profile-setup/professional-profile-setup.component').then(
+      import('./pages/workspace/professional/professional-profile-setup/professional-profile-setup.component').then(
         (module) => module.ProfessionalProfileSetupComponent
       ),
     title: 'Professional Profile Setup'
@@ -250,14 +250,14 @@ export const routes: Routes = [
     path: 'professional/profile',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-profile/professional-profile.component').then((module) => module.ProfessionalProfileComponent),
+      import('./pages/workspace/professional/professional-profile/professional-profile.component').then((module) => module.ProfessionalProfileComponent),
     title: 'Professional Profile'
   },
   {
     path: 'professional/forms-groups',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-forms-groups/professional-forms-groups.component').then(
+      import('./pages/workspace/professional/professional-forms-groups/professional-forms-groups.component').then(
         (module) => module.ProfessionalFormsGroupsComponent
       ),
     title: 'Forms and Groups'
@@ -266,7 +266,7 @@ export const routes: Routes = [
     path: 'professional/forms-groups/requests/:submissionId',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-form-request-detail/professional-form-request-detail.component').then(
+      import('./pages/workspace/professional/professional-form-request-detail/professional-form-request-detail.component').then(
         (module) => module.ProfessionalFormRequestDetailComponent
       ),
     title: 'Form Request'
@@ -275,7 +275,7 @@ export const routes: Routes = [
     path: 'professional/forms/create',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-lead-form-create/professional-lead-form-create.component').then(
+      import('./pages/workspace/professional/professional-lead-form-create/professional-lead-form-create.component').then(
         (module) => module.ProfessionalLeadFormCreateComponent
       ),
     title: 'Create Lead Form'
@@ -284,7 +284,7 @@ export const routes: Routes = [
     path: 'professional/subscription-payment',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-subscription-payment/professional-subscription-payment.component').then(
+      import('./pages/workspace/professional/professional-subscription-payment/professional-subscription-payment.component').then(
         (module) => module.ProfessionalSubscriptionPaymentComponent
       ),
     title: 'Subscription Payment'
@@ -293,7 +293,7 @@ export const routes: Routes = [
     path: 'professional/groups/create',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-group-create/professional-group-create.component').then(
+      import('./pages/workspace/professional/professional-group-create/professional-group-create.component').then(
         (module) => module.ProfessionalGroupCreateComponent
       ),
     title: 'Create Group'
@@ -302,7 +302,7 @@ export const routes: Routes = [
     path: 'professional/groups/:groupId',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-group-users/professional-group-users.component').then(
+      import('./pages/workspace/professional/professional-group-users/professional-group-users.component').then(
         (module) => module.ProfessionalGroupUsersComponent
       ),
     title: 'Group Details'
@@ -311,7 +311,7 @@ export const routes: Routes = [
     path: 'professional/clients',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-clients/professional-clients.component').then(
+      import('./pages/workspace/professional/professional-clients/professional-clients.component').then(
         (module) => module.ProfessionalClientsComponent
       ),
     title: 'Clients'
@@ -395,7 +395,7 @@ export const routes: Routes = [
     path: 'client/dashboard',
     canActivate: [clientAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/client/client-dashboard/client-dashboard.component').then(
+      import('./pages/workspace/client/client-dashboard/client-dashboard.component').then(
         (module) => module.ClientDashboardComponent
       ),
     title: 'Client Dashboard'
@@ -404,7 +404,7 @@ export const routes: Routes = [
     path: 'professional/clients/add',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-manual-client-create/professional-manual-client-create.component').then(
+      import('./pages/workspace/professional/professional-manual-client-create/professional-manual-client-create.component').then(
         (module) => module.ProfessionalManualClientCreateComponent
       ),
     title: 'Add Client'
@@ -413,7 +413,7 @@ export const routes: Routes = [
     path: 'professional/groups/:groupId/clients/add',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-manual-client-create/professional-manual-client-create.component').then(
+      import('./pages/workspace/professional/professional-manual-client-create/professional-manual-client-create.component').then(
         (module) => module.ProfessionalManualClientCreateComponent
       ),
     title: 'Add Client'
@@ -422,7 +422,7 @@ export const routes: Routes = [
     path: 'professional/clients/:clientId',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-client-profile/professional-client-profile.component').then(
+      import('./pages/workspace/professional/professional-client-profile/professional-client-profile.component').then(
         (module) => module.ProfessionalClientProfileComponent
       ),
     title: 'Client Profile'
@@ -431,7 +431,7 @@ export const routes: Routes = [
     path: 'professional/clients/:clientId/templates/:assignmentId',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-client-template/professional-client-template.component').then(
+      import('./pages/workspace/professional/professional-client-template/professional-client-template.component').then(
         (module) => module.ProfessionalClientTemplateComponent
       ),
     title: 'Client Template'
@@ -440,7 +440,7 @@ export const routes: Routes = [
     path: 'professional/groups/:groupId/client-form/create',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-client-form-create/professional-client-form-create.component').then(
+      import('./pages/workspace/professional/professional-client-form-create/professional-client-form-create.component').then(
         (module) => module.ProfessionalClientFormCreateComponent
       ),
     title: 'Create Client Form'
@@ -449,7 +449,7 @@ export const routes: Routes = [
     path: 'professional/templates',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-templates/professional-templates.component').then(
+      import('./pages/workspace/professional/professional-templates/professional-templates.component').then(
         (module) => module.ProfessionalTemplatesComponent
       ),
     title: 'Tracking Templates'
@@ -458,7 +458,7 @@ export const routes: Routes = [
     path: 'professional/templates/create',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-tracking-template-create/professional-tracking-template-create.component').then(
+      import('./pages/workspace/professional/professional-tracking-template-create/professional-tracking-template-create.component').then(
         (module) => module.ProfessionalTrackingTemplateCreateComponent
       ),
     title: 'Create Tracking Template'
@@ -467,7 +467,7 @@ export const routes: Routes = [
     path: 'professional/templates/:templateId/edit',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-tracking-template-create/professional-tracking-template-create.component').then(
+      import('./pages/workspace/professional/professional-tracking-template-create/professional-tracking-template-create.component').then(
         (module) => module.ProfessionalTrackingTemplateCreateComponent
       ),
     title: 'Edit Tracking Template'
@@ -487,7 +487,7 @@ export const routes: Routes = [
     canActivate: [professionalAuthGuard],
     canDeactivate: [unsavedChangesGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-account-settings/professional-account-settings.component').then(
+      import('./pages/workspace/professional/professional-account-settings/professional-account-settings.component').then(
         (module) => module.ProfessionalAccountSettingsComponent
       ),
     title: 'Settings'
@@ -496,7 +496,7 @@ export const routes: Routes = [
     path: 'professional/schedule',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-schedule/professional-schedule.component').then(
+      import('./pages/workspace/professional/professional-schedule/professional-schedule.component').then(
         (module) => module.ProfessionalScheduleComponent
       ),
     title: 'Schedule'
@@ -505,7 +505,7 @@ export const routes: Routes = [
     path: 'professional/resource',
     canActivate: [professionalAuthGuard],
     loadComponent: () =>
-      import('./pages/studio/professional/professional-references/professional-references.component').then(
+      import('./pages/workspace/professional/professional-references/professional-references.component').then(
         (module) => module.ProfessionalReferencesComponent
       ),
     title: 'Resource Library'
@@ -513,13 +513,13 @@ export const routes: Routes = [
   {
     path: 'public/forms/:publicSlug',
     loadComponent: () =>
-      import('./pages/studio/client/public-lead-form/public-lead-form.component').then((module) => module.PublicLeadFormComponent),
+      import('./pages/workspace/client/public-lead-form/public-lead-form.component').then((module) => module.PublicLeadFormComponent),
     title: 'Professional Lead Form'
   },
   {
     path: 'public/group-registration/:publicSlug',
     loadComponent: () =>
-      import('./pages/studio/client/public-group-registration/public-group-registration.component').then(
+      import('./pages/workspace/client/public-group-registration/public-group-registration.component').then(
         (module) => module.PublicGroupRegistrationComponent
     ),
     title: 'Group Client Registration'

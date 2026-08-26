@@ -3,27 +3,44 @@
    accidentally promoted to marketing-heading sizes. */
 app-public-site-header .site-header { z-index: 30; min-height: 4.75rem; width: min(1180px, calc(100% - 2.5rem)); padding-block: .75rem; }
 app-access-entry-placeholder .portal-page { padding: 0 !important; background: color-mix(in srgb, var(--app-bg) 95%, var(--app-surface)) !important; }
-app-access-entry-placeholder .portal-header { min-height: 4.75rem; width: min(1040px, 100%) !important; }
-app-access-entry-placeholder .portal-intro { padding: clamp(2.2rem, 5vw, 3.75rem) 0 2rem !important; }
-app-access-entry-placeholder .portal-intro h1 { font-size: clamp(2.2rem, 4vw, 3.35rem) !important; line-height: 1.06 !important; }
-app-access-entry-placeholder .entry-card { min-height: 23rem !important; }
-app-legal .legal-topbar,
-app-auth-page-shell .auth-topbar { min-height: 4.75rem; padding: .75rem max(1.25rem, calc((100% - 1180px) / 2)) !important; }
-app-legal .brand__mark,
-app-auth-page-shell .brand__mark { width: 2.65rem !important; height: 2.65rem !important; }
+app-access-entry-placeholder .portal-intro { padding: clamp(1.25rem, 2.5vw, 2rem) 0 1.35rem !important; }
+app-access-entry-placeholder .portal-intro h1 { font-size: clamp(1.65rem, 2.6vw, 2.25rem) !important; line-height: 1.08 !important; }
+app-access-entry-placeholder .entry-card { min-height: 0 !important; }
 app-legal .legal-body { width: min(880px, calc(100% - 2.5rem)) !important; margin-top: 3rem !important; }
 app-legal h1 { font-size: clamp(2rem, 3vw, 2.65rem) !important; line-height: 1.1 !important; letter-spacing: -.03em; }
 app-auth-page-shell .auth-card { width: min(32rem, calc(100% - 2rem)) !important; margin: clamp(2.5rem, 6vw, 4.5rem) auto 2.5rem !important; padding: clamp(1.5rem, 4vw, 2.25rem) !important; }
 app-auth-page-shell .auth-card--wide { width: min(44rem, calc(100% - 2rem)) !important; }
-app-auth-page-shell .auth-footer { width: min(1120px, calc(100% - 2.5rem)) !important; }
+
+@keyframes public-page-enter {
+  from { opacity: 0; transform: translateY(.35rem); }
+  to { opacity: 1; transform: none; }
+}
+
+app-reproot-home .public-site,
+app-access-entry-placeholder .portal-page,
+app-auth-page-shell .auth-page,
+app-legal .legal-page {
+  animation: public-page-enter 220ms ease-out both;
+}
+
+app-access-entry-placeholder .entry-card,
+app-auth-page-shell .auth-card,
+app-legal .legal-body {
+  border-radius: .7rem !important;
+}
 
 @media (max-width: 760px) {
-  app-legal .legal-topbar { align-items: flex-start; flex-direction: column; padding: .9rem 1rem !important; }
-  app-legal .legal-nav { width: 100%; overflow-x: auto; padding-bottom: .25rem; }
-  app-legal .legal-nav a { flex: 0 0 auto; }
+  app-access-entry-placeholder .entry-card { min-height: auto !important; }
   app-legal .legal-body { width: calc(100% - 1.5rem) !important; margin-top: 2rem !important; }
 }
 
 @media (max-width: 560px) {
   app-public-site-header .site-header { width: calc(100% - 1.5rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-reproot-home .public-site,
+  app-access-entry-placeholder .portal-page,
+  app-auth-page-shell .auth-page,
+  app-legal .legal-page { animation: none; }
 }

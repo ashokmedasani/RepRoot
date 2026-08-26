@@ -1,0 +1,43 @@
+<main class="faq-page">
+  <app-public-site-header (sectionChange)="navigatePublic($event)" />
+
+  <section class="faq-intro">
+    <p>HELP CENTRE</p>
+    <h1>Frequently asked questions</h1>
+    <span>Short answers for professionals and clients.</span>
+  </section>
+
+  <section class="faq-list" aria-label="Frequently asked questions">
+    <details open>
+      <summary>What is RepRoot?</summary>
+      <p>RepRoot is a shared workspace where professionals organize clients, collect structured updates, schedule work, share resources, and follow progress.</p>
+    </details>
+    <details>
+      <summary>Who can use RepRoot?</summary>
+      <p>RepRoot is designed for professionals who manage ongoing client relationships, including trainers, coaches, tutors, consultants, mentors, and service professionals.</p>
+    </details>
+    <details>
+      <summary>How do professional accounts work?</summary>
+      <p>Professionals build the workspace: they create forms, groups, templates, resources, schedules, and client access based on the way they work.</p>
+    </details>
+    <details>
+      <summary>How do clients access RepRoot?</summary>
+      <p>Clients sign in using access provided by their professional. They can then view assigned work, submit updates, communicate, review meetings, and follow their own progress.</p>
+    </details>
+    <details>
+      <summary>Can I change my plan later?</summary>
+      <p>Yes. Available plan changes and current limits are shown inside the professional billing area. Payment processing may remain unavailable during testing.</p>
+    </details>
+    <details>
+      <summary>Who controls the information requested from clients?</summary>
+      <p>The professional decides which client information is needed for their service. RepRoot provides the software used to collect, organize, and protect that information.</p>
+    </details>
+  </section>
+
+  <section class="faq-support">
+    <div><p>STILL NEED HELP?</p><h2>Talk to RepRoot support.</h2></div>
+    <button type="button" (click)="navigatePublic('contact')">Contact support</button>
+  </section>
+
+  <app-public-site-footer />
+</main>

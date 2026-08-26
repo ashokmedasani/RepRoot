@@ -47,7 +47,7 @@ def _otp_email_content(otp: str, purpose: str) -> tuple[str, str, str]:
   action = 'reset your password' if is_password_reset else 'verify your email address'
   heading = 'Password reset verification' if is_password_reset else 'Verify your email address'
   subject = f'{otp} is your RepRoot verification code'
-  support_email = settings.STUDIO_SUPPORT_EMAIL
+  support_email = settings.SUPPORT_EMAIL
 
   plain_text = (
     f'RepRoot\n\n{heading}\n\n'

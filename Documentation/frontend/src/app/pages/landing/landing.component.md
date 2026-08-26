@@ -42,7 +42,7 @@ No authentication, backend, database, or dashboard behavior is implemented.
 
 ## Assumptions
 
-The temporary app name is `CoachFlow Studio`. The Page 2 destination URL is `/portal`.
+The application name is `RepRoot`. The Page 2 destination URL is `/portal`.
 
 ## Future improvements
 

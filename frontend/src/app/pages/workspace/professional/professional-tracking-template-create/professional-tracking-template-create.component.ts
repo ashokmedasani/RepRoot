@@ -1,0 +1,212 @@
+import { Component, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+
+import {
+  TemplateCadence,
+  TemplateField,
+  TemplateFieldType,
+  TemplatesApiService
+} from '@core/api/templates-api.service';
+import { ProfessionalPageShellComponent } from '@workspace-shared/professional-page-shell/professional-page-shell.component';
+import { formatApiError } from '@shared/utils/ui-helpers';
+
+interface BuilderField extends TemplateField {
+  localId: string;
+}
+
+@Component({
+  selector: 'app-professional-tracking-template-create',
+  standalone: true,
+  imports: [FormsModule, RouterLink, ProfessionalPageShellComponent],
+  templateUrl: './professional-tracking-template-create.component.html',
+  styleUrl: './professional-tracking-template-create.component.scss'
+})
+export class ProfessionalTrackingTemplateCreateComponent implements OnInit {
+  private readonly templatesApi = inject(TemplatesApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  templateId = 0;
+  isLoading = true;
+  isSaving = false;
+  message = '';
+  messageType: 'success' | 'error' = 'success';
+
+  templateInfo: { name: string; purpose: string; cadence: TemplateCadence; accent: string } = {
+    name: '',
+    purpose: '',
+    cadence: 'daily',
+    accent: 'green'
+  };
+  fields: BuilderField[] = [];
+
+  readonly maxFields = 8;
+  readonly fieldTypes: { value: TemplateFieldType; label: string }[] = [
+    { value: 'number', label: 'Number' },
+    { value: 'short_text', label: 'Short Text' },
+    { value: 'long_text', label: 'Long Text' },
+    { value: 'yes_no', label: 'Yes / No' },
+    { value: 'dropdown', label: 'Dropdown' },
+    { value: 'rating', label: 'Rating' }
+  ];
+
+  readonly cadences: { value: TemplateCadence; label: string }[] = [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' }
+  ];
+
+  readonly accents = ['green', 'blue', 'orange', 'purple'];
+
+  ngOnInit(): void {
+    this.templateId = Number(this.route.snapshot.paramMap.get('templateId')) || 0;
+
+    if (this.templateId) {
+      this.loadTemplate();
+    } else {
+      this.fields = [this.createField('New Target')];
+      this.isLoading = false;
+    }
+  }
+
+  get isEditMode(): boolean {
+    return this.templateId > 0;
+  }
+
+  addField(): void {
+    if (this.fields.length >= this.maxFields) {
+      this.messageType = 'error';
+      this.message = `You have reached the maximum of ${this.maxFields} tracking fields for this template.`;
+      return;
+    }
+
+    this.message = '';
+    this.fields = [...this.fields, this.createField('New Target')];
+  }
+
+  needsOptions(field: BuilderField): boolean {
+    return field.field_type === 'dropdown';
+  }
+
+  isRating(field: BuilderField): boolean {
+    return field.field_type === 'rating';
+  }
+
+  optionsText(field: BuilderField): string {
+    return (field.options || []).join(', ');
+  }
+
+  updateOptions(field: BuilderField, value: string): void {
+    field.options = value
+      .split(',')
+      .map((option) => option.trim())
+      .filter(Boolean);
+  }
+
+  removeField(field: BuilderField): void {
+    this.fields = this.fields.filter((currentField) => currentField.localId !== field.localId);
+  }
+
+  moveField(fieldIndex: number, direction: -1 | 1): void {
+    const targetIndex = fieldIndex + direction;
+
+    if (targetIndex < 0 || targetIndex >= this.fields.length) {
+      return;
+    }
+
+    const reordered = [...this.fields];
+    const [field] = reordered.splice(fieldIndex, 1);
+    reordered.splice(targetIndex, 0, field);
+    this.fields = reordered;
+  }
+
+  fieldTypeLabel(fieldType: TemplateFieldType): string {
+    return this.fieldTypes.find((type) => type.value === fieldType)?.label || 'Field';
+  }
+
+  saveTemplate(): void {
+    const name = this.templateInfo.name.trim();
+
+    if (!name) {
+      this.messageType = 'error';
+      this.message = 'Add a template name.';
+      return;
+    }
+
+    if (!this.fields.length) {
+      this.messageType = 'error';
+      this.message = 'Add at least one field for clients to fill in.';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const payload = {
+      name,
+      purpose: this.templateInfo.purpose.trim(),
+      cadence: this.templateInfo.cadence,
+      accent: this.templateInfo.accent,
+      custom_fields: this.fields.map((field, index) => ({
+        key: field.key || `field_${index + 1}`,
+        label: field.label,
+        field_type: field.field_type,
+        placeholder: field.placeholder,
+        options: field.field_type === 'dropdown' ? field.options || [] : [],
+        scale: field.field_type === 'rating' ? field.scale || 5 : null
+      }))
+    };
+    const request = this.isEditMode
+      ? this.templatesApi.updateTemplate(this.templateId, payload)
+      : this.templatesApi.createTemplate(payload);
+
+    this.isSaving = true;
+    request.subscribe({
+      next: () => {
+        this.isSaving = false;
+        void this.router.navigate(['/professional/templates']);
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Template could not be saved.');
+        this.isSaving = false;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  }
+
+  private loadTemplate(): void {
+    this.templatesApi.getTemplate(this.templateId).subscribe({
+      next: (response) => {
+        const template = response.template;
+        this.templateInfo = {
+          name: template.name,
+          purpose: template.purpose,
+          cadence: template.cadence,
+          accent: template.accent || 'green'
+        };
+        this.fields = template.fields.map((field) => ({ ...field, localId: this.createLocalId() }));
+        this.isLoading = false;
+      },
+      error: (error: unknown) => {
+        this.messageType = 'error';
+        this.message = formatApiError(error, 'Template could not be loaded.');
+        this.isLoading = false;
+      }
+    });
+  }
+
+  private createField(label: string): BuilderField {
+    return {
+      localId: this.createLocalId(),
+      label,
+      field_type: 'number',
+      placeholder: 'Client enters an update',
+      options: [],
+      scale: 5
+    };
+  }
+
+  private createLocalId(): string {
+    return `field-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+  }
+}

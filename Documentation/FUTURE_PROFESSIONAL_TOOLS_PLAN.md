@@ -2,13 +2,13 @@
 
 **Status:** Future product plan — not implemented  
 **Recorded:** August 11, 2026  
-**Scope:** RepRoot Studio website, with limited navigation support from the mobile application
+**Scope:** RepRoot website, with limited navigation support from the mobile application
 
 > This document records a proposed future design. It does not describe current product behavior, active plan entitlements, or available billing features. The current source code remains the source of truth until these items are implemented and validated.
 
 ## Purpose
 
-RepRoot Studio may add paid, website-focused tools that help professionals take their information outside the normal workspace and establish a public professional presence.
+RepRoot may add paid, website-focused tools that help professionals take their information outside the normal workspace and establish a public professional presence.
 
 The first proposed tools are:
 
@@ -140,7 +140,7 @@ Recommended information:
 - Expiry date.
 - Download and delete actions.
 
-Recommended initial retention: **30 days after successful generation**. Deleting or expiring an export artifact must never delete the original client or professional data from RepRoot Studio.
+Recommended initial retention: **30 days after successful generation**. Deleting or expiring an export artifact must never delete the original client or professional data from RepRoot.
 
 Existing export actions elsewhere in the website should eventually become shortcuts that open the Export Center with the relevant scope preselected. They should not become separate export implementations.
 
@@ -196,7 +196,7 @@ Preview must clearly distinguish unpublished changes from the public version. Th
 
 Publishing must require an explicit action and confirmation. Recommended public URL:
 
-`https://studio.rep-root.com/professionals/<public-slug>`
+`https://rep-root.com/professionals/<public-slug>`
 
 The public slug must be unique, normalized, protected against reserved words, and changeable through a controlled process. Public pages require abuse reporting, privacy controls, and the ability for operators to unpublish content when necessary.
 

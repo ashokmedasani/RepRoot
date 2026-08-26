@@ -1,7 +1,7 @@
 # Professional Side — Web vs Mobile Review
 
 **Date:** 6 August 2026
-**Scope:** Angular `frontend/src/app/pages/studio/professional/` vs Flutter `mobile_flutter/lib/features/professional/`
+**Scope:** Angular `frontend/src/app/pages/workspace/professional/` vs Flutter `mobile_flutter/lib/features/professional/`
 **Method:** Route map, API-surface diff (146 Flutter API methods vs 9 Angular API services), shared business-logic comparison, static code-health scan of both codebases. Verified with `npx tsc --noEmit` (0 errors) and `flutter analyze` (0 issues).
 
 ---

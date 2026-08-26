@@ -1,4 +1,4 @@
-# RepRoot Studio Pro and Premium Growth Features
+# RepRoot Pro and Premium Growth Features
 
 Status: product architecture proposal only. These features are not implemented,
 enabled, or advertised by the current application.
@@ -10,7 +10,7 @@ Paid plans should create measurable professional value in two areas:
 1. Operational control: help professionals retain, analyze, export, and reuse
    the information created through their work.
 2. Business growth: help professionals present their work publicly and convert
-   visitors into structured RepRoot Studio leads.
+   visitors into structured RepRoot leads.
 
 Plan limits remain sourced from the Django billing catalogue. This document
 does not replace or redefine the live plan configuration.
@@ -41,7 +41,7 @@ does not replace or redefine the live plan configuration.
 - Choice of four or five curated, accessible portfolio themes
 - Selected professional details, services, links, media, and qualifications
 - A public enquiry action connected to an existing active lead form
-- Optional RepRoot Studio professional-directory listing
+- Optional RepRoot professional-directory listing
 - Explicit marketing consent, preview, publication controls, and moderation
 - Custom branding can be considered after the core portfolio is stable
 
@@ -96,7 +96,7 @@ server-issued handoff token. It must not pass reusable auth tokens in a URL.
 
 Suggested mobile copy:
 
-> Manage exports and your public portfolio on the RepRoot Studio website.
+> Manage exports and your public portfolio on the RepRoot website.
 
 Mobile should still be able to view export status and portfolio publication
 status later, but full editing is intentionally web-first.
@@ -106,7 +106,7 @@ status later, but full editing is intentionally web-first.
 Website and Flutter must receive the same canonical shareable form URL from the
 backend. The backend uses `REPROOT_FRONTEND_URL` and returns:
 
-`https://studio.your-domain.com/public/forms/<public-slug>`
+`https://your-domain.com/public/forms/<public-slug>`
 
 The public route must not require professional or client authentication. It
 must retain spam controls, input validation, per-IP throttling, and professional

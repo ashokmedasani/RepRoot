@@ -1,4 +1,4 @@
-# RepRoot Studio Plan and Billing Draft
+# RepRoot Plan and Billing Draft
 
 **Status:** Approved plan policy — implementation intentionally pending  
 **Updated:** 10 August 2026
@@ -9,7 +9,7 @@ environment configuration.
 
 ## Public plan structure
 
-RepRoot Studio has exactly three public professional plan tiers:
+RepRoot has exactly three public professional plan tiers:
 
 1. Free
 2. Pro

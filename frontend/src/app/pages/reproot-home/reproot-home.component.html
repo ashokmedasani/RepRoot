@@ -1,0 +1,119 @@
+<main class="public-site">
+  <app-public-site-header [activeSection]="activeSection" (sectionChange)="selectSection($event)" />
+
+  <section class="story-shell" aria-label="Discover RepRoot">
+    <div #storyViewport class="story-viewport" [class.dragging]="isDragging" tabindex="0"
+      aria-label="RepRoot introduction. Swipe, drag, or use the arrow keys."
+      (scroll)="onStoryScroll()" (wheel)="onStoryWheel($event)" (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)" (keydown)="onStoryKeydown($event)">
+      <div class="story-track">
+        <article class="story-scene scene-overview" data-scene="0" aria-labelledby="overview-title">
+          <div class="scene-copy">
+            <p class="scene-label">What is RepRoot?</p>
+            <h1 id="overview-title">People and work.<br><strong>Connected clearly.</strong></h1>
+            <p>RepRoot helps professionals organize clients, recurring work, communication, and progress in one place.</p>
+            <div class="scene-actions">
+              <a class="primary-action" routerLink="/portal">Launch RepRoot</a>
+              <a class="text-action" routerLink="/professional/login">Professional sign in</a>
+              <a class="text-action" routerLink="/client/login">Client sign in</a>
+            </div>
+            <dl class="quick-answers">
+              <div><dt>Who is it for?</dt><dd>Professionals and their clients.</dd></div>
+              <div><dt>What does it solve?</dt><dd>Scattered updates, records, and follow-up.</dd></div>
+            </dl>
+          </div>
+          <div class="workspace-preview" aria-label="RepRoot workspace preview">
+            <div class="preview-sidebar" aria-hidden="true"><b>R</b><i></i><i></i><i></i><i></i></div>
+            <div class="preview-content">
+              <header><div><small>Professional dashboard</small><b>Personal Fitness Trainer</b></div><span>PF</span></header>
+              <div class="metric-row"><span><small>Active clients</small><b>12</b></span><span><small>Templates</small><b>5 active</b></span><span><small>This week</small><b>8 updates</b></span></div>
+              <div class="preview-panels">
+                <section class="activity-preview"><header><b>Recent activity</b><small>Today</small></header><div><span class="status-dot"></span><p><b>Weekly check-in</b><small>Rohan submitted an update</small></p><time>9:40 AM</time></div><div><span class="status-dot mint"></span><p><b>Meeting confirmed</b><small>Progress review</small></p><time>11:30 AM</time></div><div><span class="status-dot amber"></span><p><b>New enquiry</b><small>Lead form received</small></p><time>1:15 PM</time></div></section>
+                <section class="chart-preview"><header><b>Client consistency</b><small>Last 7 days</small></header><svg viewBox="0 0 220 82" aria-hidden="true"><path d="M5 70 C35 62 47 68 70 48 S107 57 132 31 S170 44 215 10" /></svg><div><span>Mon</span><span>Wed</span><span>Fri</span><span>Sun</span></div></section>
+              </div>
+              <div class="preview-footer"><span>Clients</span><span>Templates</span><span>Schedule</span><span>Messages</span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="story-scene scene-professionals" data-scene="1" aria-labelledby="professionals-title">
+          <div class="scene-copy">
+            <p class="scene-label">For professionals</p>
+            <h2 id="professionals-title">Build a workflow<br><strong>that fits your service.</strong></h2>
+            <p>Choose a feature to see how the workspace comes together.</p>
+            <div class="feature-tabs" role="tablist" aria-label="Professional features">
+              @for (feature of professionalFeatures; track feature) {
+                <button type="button" role="tab" [class.active]="activeProfessionalFeature === feature" [attr.aria-selected]="activeProfessionalFeature === feature" (click)="selectProfessionalFeature(feature)">{{ feature }}</button>
+              }
+            </div>
+            <a class="text-action slide-signin" routerLink="/professional/login">Open Professional Sign In</a>
+          </div>
+          <div class="feature-preview" role="tabpanel">
+            @switch (activeProfessionalFeature) {
+              @case ('forms') { <div class="feature-nav"><b>Lead forms</b><span class="selected">Fitness enquiry</span><span>Academic intake</span><span>Career coaching</span></div><div class="feature-detail"><div class="preview-title"><div><p class="scene-label">Public lead form</p><h3>Fitness coaching enquiry</h3></div><span class="status-badge live">Active</span></div><div class="real-form"><label>Full name <i>Rohan Mehta</i></label><label>Primary goal <i>Build a consistent routine</i></label><label>Preferred start date <i>Select a date</i></label></div><div class="preview-summary"><span><b>8</b><small>Total requests</small></span><span><b>2</b><small>Pending</small></span><span><b>6</b><small>Approved</small></span></div></div> }
+              @case ('templates') { <div class="feature-nav"><b>Templates</b><span class="selected">Weekly check-in</span><span>Study progress</span><span>Client follow-up</span></div><div class="feature-detail"><div class="preview-title"><div><p class="scene-label">Recurring template</p><h3>Weekly check-in</h3></div><span class="status-badge">Weekly</span></div><div class="template-entry"><label>Energy level <span class="scale"><i></i><i></i><i class="on"></i><i></i><i></i></span></label><label>Sessions completed <b>4</b></label><label>Progress note <span>Routine felt more consistent this week.</span></label></div><div class="mini-trend"><span>Mon</span><i style="--h:32%"></i><i style="--h:48%"></i><i style="--h:44%"></i><i style="--h:68%"></i><i style="--h:82%"></i><span>Sun</span></div></div> }
+              @case ('groups') { <div class="feature-nav"><b>Groups</b><span class="selected">Strength foundations</span><span>Coding cohort</span><span>Job search</span></div><div class="feature-detail"><div class="preview-title"><div><p class="scene-label">Client group</p><h3>Strength foundations</h3></div><span class="status-badge live">6 active</span></div><div class="group-list"><article><i>RM</i><div><b>Rohan Mehta</b><small>Weekly check-in due Friday</small></div><span>Active</span></article><article><i>DP</i><div><b>Daniel Okafor</b><small>Study progress submitted</small></div><span>Current</span></article><article><i>OG</i><div><b>Olivia Grant</b><small>Career follow-up scheduled</small></div><span>Current</span></article></div><p>Group forms and bulk import keep related clients in one structured workspace.</p></div> }
+              @case ('resources') { <div class="feature-nav"><b>Resources</b><span class="selected">Guides</span><span>Documents</span><span>References</span></div><div class="feature-detail"><div class="preview-title"><div><p class="scene-label">Shared library</p><h3>Client resources</h3></div><span class="status-badge">12 items</span></div><div class="document-list"><article><i>PDF</i><div><b>Getting started guide</b><small>Shared with Strength foundations</small></div><span>View</span></article><article><i>LINK</i><div><b>Weekly planning reference</b><small>Available to all active clients</small></div><span>Open</span></article><article><i>DOC</i><div><b>Session preparation notes</b><small>Updated yesterday</small></div><span>View</span></article></div></div> }
+              @case ('schedule') { <div class="feature-nav"><b>Schedule</b><span class="selected">This week</span><span>Availability</span><span>Reminders</span></div><div class="feature-detail"><div class="preview-title"><div><p class="scene-label">Professional schedule</p><h3>Tuesday, August 26</h3></div><span class="status-badge live">Available</span></div><div class="week-strip"><span><small>Mon</small>25</span><span class="active"><small>Tue</small>26</span><span><small>Wed</small>27</span><span><small>Thu</small>28</span><span><small>Fri</small>29</span></div><div class="meeting-list"><article><time>10:00</time><div><b>Progress review</b><small>Rohan Mehta · Confirmed</small></div></article><article><time>1:30</time><div><b>Client consultation</b><small>New enquiry · Pending</small></div></article><article><time>4:00</time><div><b>Weekly follow-up</b><small>Olivia Grant · Confirmed</small></div></article></div></div> }
+            }
+          </div>
+        </article>
+
+        <article class="story-scene scene-clients" data-scene="2" aria-labelledby="clients-title">
+          <div class="scene-copy">
+            <p class="scene-label">For clients</p>
+            <h2 id="clients-title">Know what to do.<br><strong>See how it is going.</strong></h2>
+            <p>Clients get a focused space shaped by their professional.</p>
+            <dl class="quick-answers">
+              <div><dt>What can clients do?</dt><dd>View work, submit updates, message, schedule, and follow progress.</dd></div>
+              <div><dt>Who controls the workflow?</dt><dd>The connected professional.</dd></div>
+            </dl>
+            <a class="text-action slide-signin" routerLink="/client/login">Open Client Sign In</a>
+          </div>
+          <div class="client-preview" aria-label="Client workflow preview">
+            <header><div><small>Client dashboard</small><b>Welcome back, Rohan</b></div><span>RM</span></header>
+            <article><span>Today</span><b>Weekly check-in</b><i>3 fields · Due today</i><em>Open</em></article>
+            <article><span>Progress</span><b>4 of 5 updates completed</b><div class="progress-line"><i></i></div><em>80%</em></article>
+            <article><span>Next meeting</span><b>Progress review</b><i>Tuesday · 10:00 AM</i><em>Confirmed</em></article>
+          </div>
+        </article>
+
+        <article class="story-scene scene-why" data-scene="3" aria-labelledby="why-title">
+          <div class="scene-copy"><p class="scene-label">Why RepRoot?</p><h2 id="why-title">Less scattered work.<br><strong>More useful attention.</strong></h2><p>Bring the recurring parts of a professional relationship into one structured flow.</p></div>
+          <div class="why-grid">
+            <article><span>01</span><b>Organize</b><p>People and records stay connected.</p></article>
+            <article><span>02</span><b>Track</b><p>Recurring updates become easier to review.</p></article>
+            <article><span>03</span><b>Communicate</b><p>Messages and actions keep their context.</p></article>
+            <article><span>04</span><b>Follow up</b><p>Meetings and reminders stay visible.</p></article>
+          </div>
+          <div class="audience-strip"><span>Trainers</span><span>Coaches</span><span>Tutors</span><span>Consultants</span><span>Service professionals</span><span>More</span></div>
+        </article>
+      </div>
+    </div>
+
+    <div class="story-controls" aria-label="Story navigation">
+      <button type="button" (click)="goToScene(activeScene - 1)" [disabled]="activeScene === 0" aria-label="Previous story">&#8592;</button>
+      <div>@for (section of storySections; track section; let index = $index) { <button type="button" [class.active]="activeScene === index" (click)="goToScene(index)" [attr.aria-label]="'Open ' + section" [attr.aria-current]="activeScene === index ? 'step' : null"></button> }</div>
+      <button type="button" (click)="goToScene(activeScene + 1)" [disabled]="activeScene === storySections.length - 1" aria-label="Next story">&#8594;</button>
+      <p [class.hidden]="hasInteracted">Swipe or drag</p>
+    </div>
+  </section>
+
+  <section #supportSection id="support" class="contact-panel" aria-labelledby="support-title">
+    @if (contactMessage) { <div class="contact-success" role="status" aria-live="polite"><span>&#10003;</span><div><p class="scene-label">Message sent</p><h2>Your query has been sent.</h2><p>{{ contactMessage }}</p>@if (contactTicketNumber) { <p>Support reference <strong>{{ contactTicketNumber }}</strong></p> }</div></div> }
+    <div class="contact-layout">
+      <div><p class="scene-label">Help and Support</p><h2 id="support-title">How can we help?</h2><p>Send a question or feedback. We will email you a support reference.</p><p class="support-note">{{ publicSite.supportEmail }}</p></div>
+      <form class="contact-form" (ngSubmit)="submitContact()" novalidate>
+        <label>Name<input name="contactName" [(ngModel)]="contact.name" maxlength="120" autocomplete="name" required></label>
+        <label>Email address<input name="contactEmail" [(ngModel)]="contact.email" maxlength="254" type="email" autocomplete="email" required></label>
+        <label>What is this about?<select name="contactCategory" [(ngModel)]="contact.category"><option value="general">General question</option><option value="product_feedback">Product feedback</option><option value="account_support">Account or access support</option><option value="privacy_security">Privacy or security</option><option value="partnership">Partnership enquiry</option><option value="other">Other</option></select></label>
+        @if (contact.category === 'other') { <label>Subject<input name="contactSubject" [(ngModel)]="contact.subject" maxlength="160" required></label> }
+        <label>Message<textarea name="contactMessage" [(ngModel)]="contact.message" maxlength="4000" rows="4" required></textarea></label>
+        @if (contactError) { <p class="form-message" role="alert">{{ contactError }}</p> }
+        <button class="primary-action" type="submit" [disabled]="contactSubmitting">{{ contactSubmitting ? 'Sending...' : 'Send message' }}</button>
+      </form>
+    </div>
+  </section>
+  <app-public-site-footer />
+</main>

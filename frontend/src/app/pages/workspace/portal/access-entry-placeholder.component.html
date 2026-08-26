@@ -1,0 +1,18 @@
+<main class="portal-page">
+  <app-public-site-header />
+  <section class="portal-intro" aria-labelledby="portal-title">
+    <p class="eyebrow">RepRoot portal</p><h1 id="portal-title">Choose your access</h1><p>Continue as a professional or client.</p>
+  </section>
+  <section class="entry-grid" aria-label="RepRoot access options">
+    <article class="entry-card">
+      <div class="entry-heading"><span class="entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9" cy="6.5" r="3"></circle><path d="M3.5 18.5c.5-4.2 2.4-6.3 5.5-6.3 1.6 0 2.9.5 3.8 1.5"></path><rect x="13" y="11.5" width="8" height="6.5" rx="1.2"></rect><path d="M15.5 11.5v-1.2c0-.7.5-1.2 1.2-1.2h.6c.7 0 1.2.5 1.2 1.2v1.2M13 14.4h8"></path></svg></span><h2>Professional workspace</h2></div>
+      <div class="card-actions"><a class="button primary" routerLink="/professional/login">Professional sign in</a><a class="button secondary" routerLink="/professional/signup">Create professional account</a></div>
+    </article>
+    <article class="entry-card">
+      <div class="entry-heading"><span class="entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.2 8.2c0-3 1.5-4.8 3.8-4.8s3.8 1.8 3.8 4.8c0 2.5-1.5 4.2-3.8 4.2s-3.8-1.7-3.8-4.2Z"></path><path d="M8.4 7.2c1.9 0 3.7-.8 5-2.2.5 1.1 1.3 2 2.4 2.6M5 20c.7-4.5 3-6.8 7-6.8s6.3 2.3 7 6.8"></path></svg></span><h2>Client workspace</h2></div>
+      <div class="access-note"><span><strong>Note:</strong> Your professional must create your client account and provide the professional code and sign-in details.</span></div>
+      <div class="card-actions"><a class="button primary" routerLink="/client/login">Client sign in</a></div>
+    </article>
+  </section>
+  <app-public-site-footer variant="access" />
+</main>

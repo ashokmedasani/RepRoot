@@ -1,15 +1,5 @@
 <main class="legal-page">
-  <header class="legal-topbar">
-    <a [routerLink]="audience === 'platform' ? '/' : '/portal'" class="brand">
-      <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
-      <span class="brand__text"><span class="brand__rep">Rep</span><span class="brand__root">Root</span></span>
-    </a>
-    <nav class="legal-nav" aria-label="Legal documents">
-      <a [routerLink]="termsLink" [class.active]="doc === 'terms'">{{ documentAudience }} Terms and Conditions</a>
-      <a [routerLink]="privacyLink" [class.active]="doc === 'privacy'">{{ documentAudience }} Privacy Notice</a>
-      <app-theme-toggle label="Site appearance" />
-    </nav>
-  </header>
+  <app-public-site-header (sectionChange)="navigatePublic($event)" />
 
   <article class="legal-body">
     @if (doc === 'terms') {
@@ -99,6 +89,6 @@
       }
     }
 
-    <p class="back-row"><a routerLink="/">&larr; Back to home</a></p>
   </article>
+  <app-public-site-footer />
 </main>

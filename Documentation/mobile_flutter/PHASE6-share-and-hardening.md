@@ -6,7 +6,7 @@ Covers the last slice of the Flutter migration. Companion to
 
 ## `lib/shared/charts/branded_share.dart`
 
-**What it does.** Exports a chart as a PNG carrying the CoachFlow Studio header (logo mark,
+**What it does.** Exports a chart as a PNG carrying the RepRoot header (logo mark,
 wordmark, tagline, chart title, context line) and a footer, then opens the Android share
 sheet.
 

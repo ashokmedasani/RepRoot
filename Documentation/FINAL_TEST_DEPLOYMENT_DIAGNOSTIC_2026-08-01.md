@@ -1,4 +1,4 @@
-# RepRoot Studio Final Test Deployment Diagnostic
+# RepRoot Final Test Deployment Diagnostic
 
 Date: 2026-08-01  
 Scope: Angular website and Django backend only  
@@ -27,7 +27,7 @@ The application can be redeployed for user testing if payment mutations remain d
 - Angular production build: **PASS**.
 - Python syntax compilation for `backend/accounts`, `backend/config`, and `backend/admin_portal`: **PASS**.
 - Public browser smoke checks at `http://localhost:4300/`, `/_studio-home`, and `/portal`: **PASS** with the expected headings, links, and page metadata.
-- Responsive checks at a 390 x 844 mobile viewport: **PASS** for the RepRoot homepage and Studio portal, with no horizontal overflow.
+- Responsive checks at a 390 x 844 mobile viewport: **PASS** for the RepRoot homepage and portal, with no horizontal overflow.
 - Browser console check on the audited public pages: **PASS** with no warnings or errors.
 - `git diff --check`: no whitespace errors; only line-ending conversion notices.
 - Focused source scan excluding real environment files, dependencies, generated output, media, and Git metadata: no AWS access-key, Google API-key, Stripe secret-key, Razorpay secret-key, or private-key signature detected.
@@ -117,7 +117,7 @@ The documentation directory contains 280 files. Of those:
 
 - 245 files are source-code mirror documents under `Documentation/backend/` and `Documentation/frontend/`.
 - 105 documents contain legacy `trainer` naming.
-- Many mirrored frontend paths describe components that no longer exist at those locations after the professional/studio restructure.
+- Many mirrored frontend paths describe components that no longer exist at those locations after the professional/workspace restructure.
 
 ### Strong archive/regeneration candidates
 

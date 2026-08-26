@@ -12,7 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_tokens.dart';
 
 /// Exports a chart as a branded PNG — the chart composited under a RepRoot
-/// Studio header (logo mark + wordmark + chart title) and a footer strip — and
+/// RepRoot header (logo mark + wordmark + chart title) and a footer strip — and
 /// hands it to the Android share sheet.
 ///
 /// Flutter equivalent of mobile/src/app/shared/branded-share.service.ts. That

@@ -15,7 +15,7 @@ import 'professional_format.dart';
 /// Manual client creation — pick a group, fill in that group's configured
 /// registration form, then optionally email the temporary credentials; shows
 /// the generated password on success.
-/// Replica of frontend/src/app/pages/studio/professional/professional-manual-client-create.
+/// Replica of frontend/src/app/pages/workspace/professional/professional-manual-client-create.
 class ProfessionalClientCreatePage extends ConsumerStatefulWidget {
   const ProfessionalClientCreatePage({super.key});
 

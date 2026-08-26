@@ -180,9 +180,7 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'no-reply@reproot.local')
-SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', '').strip()
-# STUDIO-HIDDEN 2026-08-17: default was 'studio.support@rep-root.com'.
-STUDIO_SUPPORT_EMAIL = os.environ.get('STUDIO_SUPPORT_EMAIL', 'support@rep-root.com').strip()
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@rep-root.com').strip()
 ERROR_ALERT_EMAIL = os.environ.get('ERROR_ALERT_EMAIL', SUPPORT_EMAIL).strip()
 MEETING_FROM_EMAIL = os.environ.get('MEETING_FROM_EMAIL', DEFAULT_FROM_EMAIL).strip()
 

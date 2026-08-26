@@ -36,7 +36,7 @@ class SignupEmailPolicyTests(SimpleTestCase):
 
 class PublicLeadFormLinkTests(SimpleTestCase):
   @override_settings(REPROOT_FRONTEND_URL='https://rep-root.com/')
-  def test_link_uses_canonical_studio_origin_without_request_origin(self):
+  def test_link_uses_canonical_origin_without_request_origin(self):
     self.assertEqual(
       get_public_form_link(None, 'professional-intake'),
       'https://rep-root.com/public/forms/professional-intake',
