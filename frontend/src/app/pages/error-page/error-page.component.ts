@@ -8,7 +8,7 @@ const DEFAULT_ERROR: AppErrorViewModel = {
   status: 500,
   eyebrow: 'Unexpected error',
   title: 'Something went wrong',
-  message: 'The page could not be displayed. Try again or return to a safe page.',
+  message: 'The page could not be displayed. Your account data has not been changed.',
   canRetry: true,
   sourceUrl: '/'
 };
@@ -52,8 +52,32 @@ export class ErrorPageComponent implements OnInit {
     void this.router.navigateByUrl(this.safeStartUrl());
   }
 
-  get statusLabel(): string {
-    return this.error.status === 0 ? 'Offline' : String(this.error.status);
+  /** The one action most likely to get this user moving again. When the
+   *  failure is transient (offline, 5xx) that is retrying; when it is not
+   *  (403, 404) retrying would just fail again, so we send them somewhere
+   *  that works instead. */
+  get primaryActionLabel(): string {
+    return this.error.canRetry ? 'Try again' : 'Go to your dashboard';
+  }
+
+  get secondaryActionLabel(): string {
+    return this.error.canRetry ? 'Go to your dashboard' : 'Go back';
+  }
+
+  runPrimaryAction(): void {
+    if (this.error.canRetry) {
+      this.retry();
+      return;
+    }
+    this.goToSafeStart();
+  }
+
+  runSecondaryAction(): void {
+    if (this.error.canRetry) {
+      this.goToSafeStart();
+      return;
+    }
+    this.goBack();
   }
 
   private safeStartUrl(): string {

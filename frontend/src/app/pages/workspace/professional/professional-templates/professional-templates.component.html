@@ -1,0 +1,126 @@
+<app-professional-page-shell
+  title="Tracking Templates"
+  eyebrow="Professional workspace"
+  subtitle="One set of templates for all your groups. Assign any template to any client."
+  activeSection="templates"
+  titleId="templates-title"
+>
+  @if (hasFreeSlot) {
+    <a page-actions routerLink="/professional/templates/create" class="primary-action" data-tour="create-template">+ Create Template</a>
+  } @else {
+    <span page-actions class="slots-full-note">All {{ maxTemplates }} template slots are used</span>
+  }
+
+  @if (message) {
+    <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+  }
+
+  @if (isLoading) {
+    <section class="panel">
+      <app-skeleton variant="row" [count]="5" label="Loading your templates"></app-skeleton>
+    </section>
+  } @else {
+    <section class="panel slots-panel" data-tour="template-slots" aria-label="Template slots">
+      <div>
+        <h2>Template Slots</h2>
+        <p>Templates are professional-level: every group and client can use the same {{ maxTemplates }} templates.</p>
+      </div>
+      <div class="slots-indicator">
+        <strong>{{ slotsUsed }} / {{ maxTemplates }}</strong>
+        <span>slots used</span>
+      </div>
+    </section>
+
+    <section class="panel" data-tour="standard-templates" aria-labelledby="standard-templates-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="standard-templates-title">Standard Templates</h2>
+          <p>Ready-made templates from RepRoot. Adopt one and customize it instead of starting from scratch.</p>
+        </div>
+      </div>
+
+      <div class="template-grid">
+        @for (standard of standardTemplates; track standard.key) {
+          <article class="template-card" [class.green]="standard.accent === 'green'" [class.blue]="standard.accent === 'blue'" [class.orange]="standard.accent === 'orange'">
+            <div class="template-card-head">
+              <div>
+                <h3>{{ standard.name }}</h3>
+                <p>{{ cadenceLabel(standard.cadence) }}</p>
+              </div>
+              <span>{{ standard.fields.length }} fields</span>
+            </div>
+            <p class="template-purpose">{{ standard.purpose }}</p>
+            <ul class="field-preview">
+              @for (field of standard.fields; track field.key || field.label) {
+                <li>{{ field.label }}</li>
+              }
+            </ul>
+            @if (standard.adopted) {
+              <span class="adopted-pill">Added to your templates</span>
+            } @else {
+              <button type="button" class="secondary-action" [disabled]="!hasFreeSlot || isSaving" (click)="adoptStandard(standard)">
+                {{ hasFreeSlot ? 'Adopt Template' : 'No free slots' }}
+              </button>
+            }
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="panel" data-tour="my-templates" aria-labelledby="my-templates-title">
+      <div class="section-heading">
+        <div>
+          <h2 id="my-templates-title">My Templates <app-info-hint label="About reordering templates">Drag a row by its <strong>⠿</strong> handle to change the order. The order matters: if you ever go over your plan's allowance, the templates lowest in this list are the ones that lock first.</app-info-hint></h2>
+        </div>
+      </div>
+      <div class="template-list" cdkDropList (cdkDropListDropped)="dropTemplate($event)">
+        @for (template of orderedActiveTemplates(); track template.id) {
+          <div class="template-row" cdkDrag [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
+            <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
+            <span class="row-name">{{ template.name }}</span>
+            <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
+            <span class="row-meta">{{ template.fields.length }} fields</span>
+            <span class="row-meta">{{ assignedLabel(template.assigned_count) }}</span>
+            @if (template.purpose) {
+              <span class="row-purpose">{{ template.purpose }}</span>
+            }
+            <div class="row-actions">
+              <a [routerLink]="['/professional/templates', template.id, 'edit']" class="secondary-action compact">Edit</a>
+              <button type="button" class="danger-action compact" (click)="deleteTemplate(template)">Delete</button>
+            </div>
+          </div>
+        } @empty {
+          <!-- Was styled as a `template-row`, so it read as a real (clickable)
+               template. It is a message, and it now carries the action. -->
+          <div class="list-empty">
+            <p><strong>No templates yet</strong></p>
+            <p>Adopt a standard template above, or create your own to start tracking client progress.</p>
+            <a routerLink="/professional/templates/create" class="primary-action compact">Create Template</a>
+          </div>
+        }
+      </div>
+
+      @if (lockedTemplatesList().length) {
+        <div class="template-list locked-list">
+          @for (template of lockedTemplatesList(); track template.id) {
+            <div class="template-row locked" [class.green]="template.accent === 'green'" [class.blue]="template.accent === 'blue'" [class.orange]="template.accent === 'orange'" [class.purple]="template.accent === 'purple'">
+              <span class="row-name">{{ template.name }}
+                <span class="lock-badge" title="Over your current plan's template limit. Upgrade or free a slot to unlock.">🔒 Locked</span>
+              </span>
+              <span class="row-pill">{{ cadenceLabel(template.cadence) }}</span>
+              <span class="row-meta">{{ template.fields.length }} fields</span>
+              <span class="row-meta">{{ assignedLabel(template.assigned_count) }}</span>
+              @if (template.purpose) {
+                <span class="row-purpose">{{ template.purpose }}</span>
+              }
+              <div class="row-actions">
+                <button type="button" class="secondary-action compact" disabled title="Locked templates can't be edited until they unlock">Edit</button>
+                <button type="button" class="danger-action compact" (click)="deleteTemplate(template)">Delete</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+</app-professional-page-shell>

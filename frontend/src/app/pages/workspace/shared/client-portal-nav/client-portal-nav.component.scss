@@ -1,0 +1,139 @@
+:host { display: block; min-width: 0; }
+
+.client-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100vh;
+  border-right: 1px solid var(--app-border);
+  padding: 1.5rem 1rem;
+  background: var(--app-card-bg-gradient);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--app-text);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--app-radius-md);
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(11, 125, 227, 0.25);
+}
+
+.brand-mark img { width: 100%; height: 100%; object-fit: contain; }
+
+.brand-rep { color: var(--app-text); }
+.brand-root { color: var(--app-primary); }
+
+nav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.nav-item,
+.sign-out {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-md);
+  padding: 0.7rem 0.85rem;
+  color: var(--app-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--app-transition-fast), color var(--app-transition-fast), transform var(--app-transition-fast);
+}
+
+.nav-item svg,
+.sign-out svg { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
+.nav-item:hover { background: var(--app-surface-soft); color: var(--app-text); transform: translateX(2px); }
+.nav-item.active { border-color: color-mix(in srgb, var(--app-primary) 12%, transparent); background: var(--app-primary-soft); color: var(--app-primary-strong); font-weight: 700; }
+
+.nav-badge {
+  min-width: 1.35rem;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 0.12rem 0.38rem;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.15rem;
+  text-align: center;
+}
+
+.sign-out {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  cursor: pointer;
+}
+.sign-out:hover { border-color: color-mix(in srgb, var(--app-muted) 35%, var(--app-border)); background: var(--app-surface-soft); color: var(--app-text); }
+
+@media (max-width: 900px) {
+  .client-sidebar {
+    position: sticky;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    min-width: 0;
+    gap: 1rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--app-border);
+    padding: 0.75rem 1.25rem;
+    // Opaque instead of glass. A backdrop-filter on persistent chrome forces the
+    // element onto its own compositor layer, which softens text at fractional
+    // device pixel ratios -- Windows laptops at 125%/150% scaling -- and makes
+    // the browser re-sample everything behind it on every scroll frame. Both were
+    // reported from testing: blurry, and clumsy to scroll. Modal backdrops keep
+    // their blur; they are transient and blurring the page behind them is the point.
+    background: var(--app-surface);
+  }
+  nav { flex-direction: row; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 0; scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+  .nav-item > span:not(.nav-badge), .sign-out span { display: none; }
+  .nav-item, .sign-out { padding: 0.65rem; }
+  .nav-item:hover { transform: none; }
+  .nav-item { position: relative; }
+  .nav-badge { position: absolute; top: .18rem; right: .12rem; min-width: 1.1rem; padding: .05rem .25rem; font-size: .58rem; line-height: .95rem; }
+}
+
+@media (max-width: 680px) {
+  .client-sidebar {
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  /* Icon-only brand so the nav strip keeps enough room on phones. */
+  .brand {
+    padding: 0.25rem;
+  }
+
+  .brand > span:not(.brand-mark) {
+    display: none;
+  }
+}

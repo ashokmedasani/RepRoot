@@ -1,0 +1,355 @@
+<app-professional-page-shell
+  title="Profile"
+  eyebrow="Professional profile"
+  subtitle="View the professional information clients can see and manage section visibility."
+  activeSection="profile"
+  titleId="professional-profile-title"
+>
+  <button page-actions type="button" class="ghost-action" (click)="togglePreview()">
+    {{ previewAsClient ? 'Exit preview' : 'Preview as Client' }}
+  </button>
+  <a page-actions routerLink="/professional/account-settings" class="secondary-action">Manage Profile</a>
+
+  @if (isLoading) {
+    <app-skeleton variant="card" [count]="3" label="Loading your profile"></app-skeleton>
+  } @else if (profile) {
+    <section class="profile-hero" data-tour="profile-preview" aria-label="Profile summary">
+      <div class="hero-content">
+        <div class="photo-frame hero-photo">
+          @if (profile.profile_photo_url) {
+            <img [src]="profile.profile_photo_url" alt="Professional profile photo">
+          } @else {
+            <div class="photo-placeholder">{{ fullName.slice(0, 1) }}</div>
+          }
+        </div>
+        <div class="hero-copy">
+          <h2>{{ fullName }}</h2>
+          <p class="headline">{{ profile.professional_headline || 'Add a headline in My Account' }}</p>
+          @if (location) {
+            <p class="muted">{{ location }}</p>
+          }
+        </div>
+      </div>
+    </section>
+
+    @if (previewAsClient) {
+      <p class="preview-banner">Client preview - showing only sections marked Public.</p>
+    }
+
+    <div class="read-grid">
+      <!-- Sections sit in their natural place in the DOM and are ordered
+           visually with CSS `order`. Emitting them through @ViewChild +
+           ngTemplateOutlet instead read each template during the same
+           change-detection pass that rendered the loop, when they are
+           still null: the grid came up empty and then threw
+           ExpressionChangedAfterItHasBeenChecked. -->
+      @if (showSection('about') && profile.about_me) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('about')"
+          [class.is-dragging]="draggingSection === 'about'"
+          [class.is-drop-target]="dropTargetSection === 'about'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('about')"
+          (dragover)="onSectionDragOver($event, 'about')"
+          (dragleave)="onSectionDragLeave('about')"
+          (drop)="dropSection($event, 'about')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card wide">
+          <div class="card-head">
+            <h3>About</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.about" (click)="setSectionVisibility('about', false)">Private</button>
+                <button type="button" [class.active]="visibility.about" (click)="setSectionVisibility('about', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.about_me }}</p>
+        </section>
+        </div>
+      }
+      @if (showSection('professional_summary') && profile.professional_type) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('professional_summary')"
+          [class.is-dragging]="draggingSection === 'professional_summary'"
+          [class.is-drop-target]="dropTargetSection === 'professional_summary'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('professional_summary')"
+          (dragover)="onSectionDragOver($event, 'professional_summary')"
+          (dragleave)="onSectionDragLeave('professional_summary')"
+          (drop)="dropSection($event, 'professional_summary')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Professional focus</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.professional_summary" (click)="setSectionVisibility('professional_summary', false)">Private</button>
+                <button type="button" [class.active]="visibility.professional_summary" (click)="setSectionVisibility('professional_summary', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.professional_type }}</p>
+        </section>
+        </div>
+      }
+      @if (showSection('experience') && profile.years_experience !== null) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('experience')"
+          [class.is-dragging]="draggingSection === 'experience'"
+          [class.is-drop-target]="dropTargetSection === 'experience'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('experience')"
+          (dragover)="onSectionDragOver($event, 'experience')"
+          (dragleave)="onSectionDragLeave('experience')"
+          (drop)="dropSection($event, 'experience')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Experience</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.experience" (click)="setSectionVisibility('experience', false)">Private</button>
+                <button type="button" [class.active]="visibility.experience" (click)="setSectionVisibility('experience', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.years_experience }} years of training experience</p>
+        </section>
+        </div>
+      }
+      @if (showSection('specializations') && profile.specializations) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('specializations')"
+          [class.is-dragging]="draggingSection === 'specializations'"
+          [class.is-drop-target]="dropTargetSection === 'specializations'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('specializations')"
+          (dragover)="onSectionDragOver($event, 'specializations')"
+          (dragleave)="onSectionDragLeave('specializations')"
+          (drop)="dropSection($event, 'specializations')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Specializations</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.specializations" (click)="setSectionVisibility('specializations', false)">Private</button>
+                <button type="button" [class.active]="visibility.specializations" (click)="setSectionVisibility('specializations', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.specializations }}</p>
+        </section>
+        </div>
+      }
+      @if (showSection('languages') && profile.languages_known) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('languages')"
+          [class.is-dragging]="draggingSection === 'languages'"
+          [class.is-drop-target]="dropTargetSection === 'languages'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('languages')"
+          (dragover)="onSectionDragOver($event, 'languages')"
+          (dragleave)="onSectionDragLeave('languages')"
+          (drop)="dropSection($event, 'languages')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Languages</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.languages" (click)="setSectionVisibility('languages', false)">Private</button>
+                <button type="button" [class.active]="visibility.languages" (click)="setSectionVisibility('languages', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.languages_known }}</p>
+        </section>
+        </div>
+      }
+      @if (showSection('training_style') && profile.training_style) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('training_style')"
+          [class.is-dragging]="draggingSection === 'training_style'"
+          [class.is-drop-target]="dropTargetSection === 'training_style'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('training_style')"
+          (dragover)="onSectionDragOver($event, 'training_style')"
+          (dragleave)="onSectionDragLeave('training_style')"
+          (drop)="dropSection($event, 'training_style')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Training style</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.training_style" (click)="setSectionVisibility('training_style', false)">Private</button>
+                <button type="button" [class.active]="visibility.training_style" (click)="setSectionVisibility('training_style', true)">Public</button>
+              </span>
+            }
+          </div>
+          <p>{{ profile.training_style }}</p>
+        </section>
+        </div>
+      }
+      @if (showSection('certification')) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('certification')"
+          [class.is-dragging]="draggingSection === 'certification'"
+          [class.is-drop-target]="dropTargetSection === 'certification'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('certification')"
+          (dragover)="onSectionDragOver($event, 'certification')"
+          (dragleave)="onSectionDragLeave('certification')"
+          (drop)="dropSection($event, 'certification')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card">
+          <div class="card-head">
+            <h3>Certification</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.certification" (click)="setSectionVisibility('certification', false)">Private</button>
+                <button type="button" [class.active]="visibility.certification" (click)="setSectionVisibility('certification', true)">Public</button>
+              </span>
+            }
+          </div>
+          <dl>
+            <div><dt>Name</dt><dd>{{ profile.certification_name || 'Not set' }}</dd></div>
+            <div><dt>Issued by</dt><dd>{{ profile.certification_issued_by || 'Not set' }}</dd></div>
+            <div><dt>Year</dt><dd>{{ profile.certification_year || 'Not set' }}</dd></div>
+          </dl>
+          @if (profile.certification_file_url) {
+            <a [href]="profile.certification_file_url" target="_blank" rel="noreferrer" class="doc-link">View certificate</a>
+          }
+        </section>
+        </div>
+      }
+      @if (showSection('images') && (certificateImages.length || otherImages.length)) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('images')"
+          [class.is-dragging]="draggingSection === 'images'"
+          [class.is-drop-target]="dropTargetSection === 'images'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('images')"
+          (dragover)="onSectionDragOver($event, 'images')"
+          (dragleave)="onSectionDragLeave('images')"
+          (drop)="dropSection($event, 'images')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card wide">
+          <div class="card-head">
+            <h3>Certificates</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.images" (click)="setSectionVisibility('images', false)">Private</button>
+                <button type="button" [class.active]="visibility.images" (click)="setSectionVisibility('images', true)">Public</button>
+              </span>
+            }
+          </div>
+          <div class="portfolio-row">
+            @for (image of certificateImages; track image.url) {
+              <figure class="portfolio-card">
+                <img [src]="image.url" [alt]="image.title || 'Certificate'">
+                <figcaption><strong>{{ image.title }}</strong></figcaption>
+              </figure>
+            }
+          </div>
+        </section>
+        <section class="read-card wide">
+          <div class="card-head">
+            <h3>Other Images</h3>
+          </div>
+          <div class="portfolio-row">
+            @for (image of otherImages; track image.url) {
+              <figure class="portfolio-card">
+                <img [src]="image.url" [alt]="image.title || 'Profile image'">
+                <figcaption><strong>{{ image.title }}</strong></figcaption>
+              </figure>
+            }
+          </div>
+        </section>
+        </div>
+      }
+      @if (showSection('links') && links.length) {
+        <div
+          class="section-slot"
+          [style.order]="sectionPosition('links')"
+          [class.is-dragging]="draggingSection === 'links'"
+          [class.is-drop-target]="dropTargetSection === 'links'"
+          [attr.draggable]="previewAsClient ? null : true"
+          (dragstart)="startSectionDrag('links')"
+          (dragover)="onSectionDragOver($event, 'links')"
+          (dragleave)="onSectionDragLeave('links')"
+          (drop)="dropSection($event, 'links')"
+          (dragend)="endSectionDrag()"
+        >
+          @if (!previewAsClient) {
+            <span class="section-drag-handle" title="Drag to reorder this section" aria-hidden="true">&#10495;</span>
+          }
+        <section class="read-card wide">
+          <div class="card-head">
+            <h3>Links</h3>
+            @if (!previewAsClient) {
+              <span class="visibility-toggle">
+                <button type="button" [class.active]="!visibility.links" (click)="setSectionVisibility('links', false)">Private</button>
+                <button type="button" [class.active]="visibility.links" (click)="setSectionVisibility('links', true)">Public</button>
+              </span>
+            }
+          </div>
+          <div class="link-row">
+            @for (link of links; track link.label) {
+              <a [href]="link.url" target="_blank" rel="noreferrer">{{ link.label }}</a>
+            }
+          </div>
+        </section>
+        </div>
+      }
+    </div>
+
+    @if (message) {
+      <p class="message error-message" role="status">{{ message }}</p>
+    }
+  } @else if (message) {
+    <p class="message error-message">{{ message }}</p>
+  }
+</app-professional-page-shell>

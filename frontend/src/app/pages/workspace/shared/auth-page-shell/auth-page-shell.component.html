@@ -1,0 +1,19 @@
+<main class="auth-page">
+  <app-public-site-header />
+
+  @if (actionLinkText) {
+    <div class="auth-context-action">
+      @if (actionLabel) { <span>{{ actionLabel }}</span> }
+      <a [routerLink]="actionLink">{{ actionLinkText }}</a>
+    </div>
+  }
+
+  <section class="auth-card" [class.auth-card--wide]="wide" [attr.aria-labelledby]="titleId">
+    <p class="eyebrow">{{ eyebrow }}</p>
+    <h1 [id]="titleId">{{ title }}</h1>
+    @if (subtitle) { <p class="auth-subtitle">{{ subtitle }}</p> }
+    <ng-content></ng-content>
+  </section>
+
+  <app-public-site-footer variant="access" />
+</main>

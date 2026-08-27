@@ -7,6 +7,7 @@ from .models import (
   SupportIncidentMessage, TemplateAssignment, TrackingEntry,
 )
 from .notifications import notify_admin, notify_client, notify_professional
+from .support_emails import send_public_support_reply
 from . import web_routes
 
 
@@ -29,7 +30,7 @@ def group_registration_submitted(sender, instance, created, **kwargs):
       event_type='group_registration.submitted',
       event_key=f'group-registration:{instance.pk}:submitted',
       title='New group registration',
-      body=f'{instance.first_name} {instance.last_name} submitted the {instance.group.name} registration form.',
+      body=f'{instance.first_name} {instance.last_name} submitted the {instance.group.name} Client Information Form.',
       action_url=web_routes.PROFESSIONAL_FORMS_GROUPS,
       payload={'group_id': instance.group_id, 'registration_submission_id': instance.pk, 'reference_id': instance.reference_id},
       requires_action=True,
@@ -125,7 +126,9 @@ def support_message_created(sender, instance, created, **kwargs):
     args = dict(category='support', event_type='support.reply', event_key=f'support-message:{instance.pk}', title=f'Support replied to {incident.incident_id}', body=instance.body[:240], action_url='/professional/account-settings', payload={'incident_id': incident.incident_id})
     if incident.reporter_role == SupportIncident.ROLE_PROFESSIONAL:
       notify_professional(incident.reporter_professional, **args)
-    else:
+    elif incident.reporter_role == SupportIncident.ROLE_CLIENT:
       notify_client(incident.reporter_client, **args)
+    elif incident.reporter_role == SupportIncident.ROLE_PUBLIC:
+      send_public_support_reply(incident, instance.body)
   elif instance.author_type == SupportIncidentMessage.AUTHOR_USER:
     notify_admin(scope='support', category='support', event_type='support.user_reply', event_key=f'admin:support-message:{instance.pk}', title=f'New reply on {incident.incident_id}', body=instance.body[:240], payload={'incident_id': incident.incident_id}, requires_action=True)

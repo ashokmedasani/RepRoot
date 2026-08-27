@@ -33,7 +33,7 @@ One: `0025_professionalprofile_google_linked_at_and_more.py`, adding `google_sub
 ## Test cases completed
 
 - Backend: all new/changed logic covered by `accounts/tests.py` — Google auth (new/returning/linking/unverified-email), photo removal, group registration seeding + decline, availability overlap + copy, payment-notification unread/mark-read/mark-all/cross-system-sync (7 new tests specifically for priority 11). All run green against an in-memory SQLite DB this session; spot-re-ran `ProfessionalLifecycleTests`, `WorkflowRefinementTests`, `ProfessionalGoogleAuthTests`, `ProfessionalAvailabilityWindowTests` as a regression pass after all edits — no failures.
-- One pre-existing, unrelated failing test: `test_professional_data_usage_counts_owned_client_content` (expects `'Starter Free'`, gets `'Free'`) — not touched by anything in this pass, flagged in an earlier checkpoint too.
+- One historical test failure used a now-obsolete internal plan label. That observation is retained only as test history and must not be treated as current plan policy; see `Documentation/PLAN_AND_BILLING_DRAFT.md`.
 - Frontend: `tsc --noEmit` run clean after every batch of edits (10+ times this session, most recently at the very end).
 - Live verification: ran the actual local app through a browser against the local backend (after the migration fix above) and visually confirmed, at desktop width: dashboard KPIs, Pending Users tab, Payments tab unread badges, availability copy-schedule, Private Notes full-width textarea, payment-request validation + single Add-button, Plan & Billing (Data usage button, collapsed Membership dropdown, currency formatting, no manual currency toggle), Integrated Payments "Coming soon", and the single-lead-form layout preserved.
 

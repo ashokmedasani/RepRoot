@@ -1,3 +1,19 @@
+@if (!isOnline) {
+  <div class="offline-banner" role="status" aria-live="polite">
+    You are offline. Saved pages remain available, but new changes need an internet connection.
+  </div>
+}
+
+@if (isNavigating) {
+  <div class="route-progress" role="progressbar" aria-label="Loading page">
+    <span></span>
+  </div>
+}
+
 <router-outlet />
 <app-confirmation-dialog />
-<app-cookie-consent />
+<!-- Mounted here, not inside the page shell. The shell is rebuilt on every
+     navigation, so a tour hosted there was destroyed and recreated in the
+     middle of any step that crossed pages -- taking its timers and its
+     router subscription with it. -->
+<app-guide-overlay />

@@ -1,11 +1,13 @@
 """Shared constants for the Client Payments module.
 
 Client Payments tracks money professionals collect from their own clients.
-It is fully separate from RepRoot Studio Billing (billing.py), which handles
+It is fully separate from RepRoot Billing (billing.py), which handles
 professionals paying RepRoot for their subscription tier.
 """
 
 from decimal import Decimal
+
+from .upload_limits import IMAGE_MAX_BYTES, PDF_MAX_BYTES
 
 # Currencies a professional can pick for reporting or attach to a request.
 # ISO 4217 alpha-3 codes only.
@@ -36,8 +38,12 @@ CATEGORY_REQUIRED_CLIENT_FIELDS = {
   'other': [],
 }
 
-PAYMENT_PROOF_MAX_BYTES = 5 * 1024 * 1024
-PAYMENT_QR_MAX_BYTES = 2 * 1024 * 1024
+# Payment uploads follow the same product-wide ceilings as every other upload
+# (see upload_limits.py). A proof can be a PDF receipt or a photo, so it is
+# sized by what the bytes actually turn out to be rather than by one number.
+PAYMENT_PROOF_MAX_BYTES = PDF_MAX_BYTES
+PAYMENT_PROOF_IMAGE_MAX_BYTES = IMAGE_MAX_BYTES
+PAYMENT_QR_MAX_BYTES = IMAGE_MAX_BYTES
 
 PAYMENT_QR_CONTENT_TYPES = frozenset({'image/png', 'image/jpeg', 'image/webp'})
 PAYMENT_PROOF_CONTENT_TYPES = frozenset({'image/png', 'image/jpeg', 'image/webp', 'application/pdf'})

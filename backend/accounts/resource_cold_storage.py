@@ -18,6 +18,8 @@ handles relocating to a distinct "cold" key prefix, which is what an
 external lifecycle rule (or a future storage-class migration) would target.
 """
 
+import logging
+
 from django.core.files.base import ContentFile
 
 from .models import ProfessionalResource
@@ -26,6 +28,7 @@ COLD_PREFIX = 'professional-resources-cold/'
 HOT_PREFIX = 'professional-resources/'
 
 HEAVY_RESOURCE_TYPES = {ProfessionalResource.TYPE_PDF, ProfessionalResource.TYPE_IMAGE}
+logger = logging.getLogger(__name__)
 
 
 def _relocate(resource, old_prefix, new_prefix) -> bool:
@@ -63,6 +66,10 @@ def _relocate(resource, old_prefix, new_prefix) -> bool:
   # riding along with -- worst case the file just stays in its current tier
   # until the next sync call retries it.
   except Exception:
+    logger.exception(
+      'Resource storage relocation failed',
+      extra={'resource_id': resource.pk, 'source_key': old_name, 'target_prefix': new_prefix},
+    )
     return False
 
   resource.file.name = saved_name

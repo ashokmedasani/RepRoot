@@ -27,7 +27,39 @@ export class GlobalAppErrorHandler implements ErrorHandler {
 
   private reportToAdminConsole(error: unknown): void {
     const err = error instanceof Error ? error : undefined;
-    const message = err?.message || String(error) || 'Unknown client-side error';
-    this.errorReport.report(message, { stackTrace: err?.stack ?? '', level: 'fatal' });
+    const message = this.describeError(error);
+    this.errorReport.report(message, {
+      stackTrace: err?.stack ?? '',
+      level: 'fatal',
+      context: {
+        category: 'ui_exception',
+        error_type: err?.name || this.valueType(error)
+      }
+    });
+  }
+
+  private describeError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message || error.name || 'Browser exception';
+    }
+    if (typeof error === 'string') {
+      return error || 'Browser exception';
+    }
+    if (error && typeof error === 'object') {
+      const candidate = error as Record<string, unknown>;
+      for (const key of ['message', 'detail', 'reason']) {
+        if (typeof candidate[key] === 'string' && candidate[key]) {
+          return candidate[key] as string;
+        }
+      }
+    }
+    return 'Unidentified browser exception';
+  }
+
+  private valueType(error: unknown): string {
+    if (error === null) {
+      return 'null';
+    }
+    return Array.isArray(error) ? 'array' : typeof error;
   }
 }

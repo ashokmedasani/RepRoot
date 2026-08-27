@@ -1,41 +1,51 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
+import { PublicSiteFooterComponent } from '@shared/public-site-footer/public-site-footer.component';
+import { PublicSiteHeaderComponent } from '@shared/public-site-header/public-site-header.component';
 
-/** Terms & Conditions and Privacy Policy selected by route data `doc`. */
+/** Terms and Conditions and Privacy Policy selected by route data `doc`. */
 @Component({
   selector: 'app-legal',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, PublicSiteHeaderComponent, PublicSiteFooterComponent],
   templateUrl: './legal.component.html',
   styleUrl: './legal.component.scss'
 })
 export class LegalPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly authApi = inject(ProfessionalAuthApiService);
 
   readonly doc = (this.route.snapshot.data['doc'] as 'terms' | 'privacy') || 'terms';
   readonly audience = (this.route.snapshot.data['audience'] as 'platform' | 'professional' | 'client') || 'platform';
   lastUpdated = '';
   legalVersion = '';
-  readonly supportEmail = this.audience === 'platform' ? 'support@rep-root.com' : 'studio.support@rep-root.com';
+  readonly supportEmail = 'support@rep-root.com';
   readonly termsLink = this.audience === 'platform' ? '/terms' : `/terms/${this.audience}`;
   readonly privacyLink = this.audience === 'platform' ? '/privacy' : `/privacy/${this.audience}`;
-  readonly brandLabel = this.audience === 'platform' ? 'RepRoot' : 'RepRoot Studio';
+  readonly brandLabel = 'RepRoot';
   readonly documentAudience = this.audience === 'professional' ? 'Professional' : this.audience === 'client' ? 'Client' : 'Platform';
+
+  navigatePublic(section: string): void {
+    void this.router.navigate(['/'], {
+      queryParams: section === 'overview' ? {} : { section }
+    });
+  }
 
   ngOnInit(): void {
     this.authApi.getLegalConfiguration().subscribe({
       next: (configuration) => {
         const role = this.audience === 'client' ? configuration.client : configuration.professional;
         this.legalVersion = role.version?.trim() || 'Current published version';
-        this.lastUpdated = configuration.effective_date?.trim()
-          ? this.formatEffectiveDate(configuration.effective_date)
-          : 'Effective date temporarily unavailable';
+        const publishedDate = configuration.last_updated_date?.trim() || configuration.effective_date?.trim();
+        this.lastUpdated = publishedDate
+          ? this.formatEffectiveDate(publishedDate)
+          : 'Last-updated date temporarily unavailable';
       },
       error: () => {
         this.legalVersion = 'Current published version';
-        this.lastUpdated = 'Effective date temporarily unavailable';
+        this.lastUpdated = 'Last-updated date temporarily unavailable';
       }
     });
   }

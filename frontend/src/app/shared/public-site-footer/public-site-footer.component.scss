@@ -6,4 +6,5 @@ nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .8rem 1.2r
 nav a { color: var(--app-muted); font-size: .82rem; font-weight: 700; text-decoration: none; }
 nav a:hover, nav a:focus-visible { color: var(--app-primary-strong); outline: none; }
 .copyright { grid-column: 1 / -1; }
-@media (max-width: 700px) { footer { grid-template-columns: 1fr; } nav { justify-content: flex-start; } }
+@media (max-width: 700px) { footer { grid-template-columns:1fr;gap:1rem;width:calc(100% - 1.5rem);margin-top:2.5rem;padding:1.5rem 0 2rem; } nav { justify-content:flex-start;gap:.7rem 1rem; } }
+@media (max-width: 420px) { nav { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); } nav a { min-height:2.25rem;display:flex;align-items:center; } }

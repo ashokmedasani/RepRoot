@@ -1,0 +1,176 @@
+<main class="public-form-page">
+  <header class="public-topbar">
+    <a routerLink="/">RepRoot</a>
+  </header>
+
+  <section class="public-form-shell">
+    @if (isLoading) {
+      <p class="message">Loading form...</p>
+    } @else if (form && !referenceId) {
+      <form class="public-form" (ngSubmit)="submitForm()">
+        <header>
+          <p class="eyebrow">{{ form.professional_name }}</p>
+          <h1>{{ form.title }}</h1>
+        </header>
+
+        @for (field of form.fields; track field.key || field.label) {
+          <label>
+            <span class="field-label">{{ field.label }} @if (field.required) { <span class="required">*</span> }</span>
+            @if (field.field_type === 'long_text') {
+              <textarea
+                rows="4"
+                [required]="field.required"
+                [placeholder]="field.placeholder"
+                [(ngModel)]="answers[field.key || field.label]"
+                [name]="field.key || field.label"
+              ></textarea>
+            } @else if (field.field_type === 'phone') {
+              <div class="compound-input phone-input">
+                <select [(ngModel)]="answers[(field.key || field.label) + '_country_code']" [name]="(field.key || field.label) + 'CountryCode'">
+                  @for (country of countryDialCodes; track country.isoCode) {
+                    <option [value]="country.dialCode">{{ country.name }} {{ country.dialCode }}</option>
+                  }
+                </select>
+                <input
+                  type="tel"
+                  [required]="field.required"
+                  [placeholder]="field.placeholder || 'Phone number'"
+                  [(ngModel)]="answers[field.key || field.label]"
+                  [name]="field.key || field.label"
+                >
+              </div>
+            } @else if (field.field_type === 'dropdown') {
+              <select
+                [required]="field.required"
+                [(ngModel)]="answers[field.key || field.label]"
+                [name]="field.key || field.label"
+              >
+                <option value="">{{ field.placeholder || 'Select an option' }}</option>
+                @for (option of field.options || []; track option) {
+                  <option [value]="option">{{ option }}</option>
+                }
+              </select>
+            } @else if (field.field_type === 'checkbox') {
+              <div class="option-list">
+                @for (option of field.options?.length ? field.options : ['Yes']; track option) {
+                  <label>
+                    <input
+                      type="checkbox"
+                      [checked]="checkboxSelected(field, option)"
+                      (change)="toggleCheckbox(field, option, $any($event.target).checked)"
+                      [name]="(field.key || field.label) + option"
+                    >
+                    {{ option }}
+                  </label>
+                }
+              </div>
+            } @else if (field.field_type === 'radio' || field.field_type === 'yes_no') {
+              <div class="option-list">
+                @for (option of field.options?.length ? field.options : ['Yes', 'No']; track option) {
+                  <label>
+                    <input type="radio" [value]="option" [required]="field.required" [(ngModel)]="answers[field.key || field.label]" [name]="field.key || field.label">
+                    {{ option }}
+                  </label>
+                }
+              </div>
+            } @else if (field.field_type === 'location') {
+              <div class="compound-input location-input">
+                <select
+                  [required]="field.required"
+                  [(ngModel)]="answers[field.key || field.label]"
+                  [name]="field.key || field.label"
+                >
+                  <option value="">Country</option>
+                  @for (country of countries; track country.isoCode) {
+                    <option [value]="country.isoCode">{{ country.name }}</option>
+                  }
+                </select>
+                <select [(ngModel)]="answers[(field.key || field.label) + '_state']" [name]="(field.key || field.label) + 'State'">
+                  <option value="">State / Region</option>
+                  @for (state of statesFor(answers[field.key || field.label]); track state) {
+                    <option [value]="state">{{ state }}</option>
+                  }
+                </select>
+              </div>
+            } @else if (field.field_type === 'address') {
+              <textarea
+                rows="3"
+                [required]="field.required"
+                [placeholder]="field.placeholder || 'Street, city, postal code'"
+                [(ngModel)]="answers[field.key || field.label]"
+                [name]="field.key || field.label"
+              ></textarea>
+            } @else {
+              <input
+                [type]="fieldInputType(field)"
+                [required]="field.required"
+                [placeholder]="field.placeholder"
+                [(ngModel)]="answers[field.key || field.label]"
+                [name]="field.key || field.label"
+              >
+            }
+            @if (field.help_text) {
+              <span class="field-help">{{ field.help_text }}</span>
+            }
+          </label>
+        }
+
+        <button type="submit" class="primary-action" [disabled]="isSubmitting">
+          {{ isSubmitting ? 'Submitting...' : 'Submit form' }}
+        </button>
+      </form>
+    } @else if (referenceId) {
+      <section class="success-panel">
+        <p class="eyebrow">Submitted</p>
+        <h1>Your form has been submitted successfully.</h1>
+        <p>
+          Your reference ID is <strong>{{ referenceId }}</strong>. Please save this for future communication.
+          A copy has been sent to your email.
+        </p>
+
+        @if (form?.meeting_offer?.enabled) {
+          <section class="meeting-offer" aria-labelledby="meeting-offer-title">
+            <p class="eyebrow">Optional next step</p>
+            <h2 id="meeting-offer-title">Request {{ form?.meeting_offer?.title }}</h2>
+            <p>Choose an available time. This is a request only—the professional must accept it before an invitation is sent.</p>
+
+            @if (meetingRequested) {
+              <div class="meeting-confirmation">
+                <strong>Request sent</strong>
+                <span>{{ meetingMessage }}</span>
+              </div>
+            } @else if (isLoadingSlots) {
+              <p>Loading available times...</p>
+            } @else if (meetingSlots.length) {
+              <div class="slot-grid">
+                @for (slot of meetingSlots; track slot.start) {
+                  <button type="button" class="slot-button" [class.selected]="selectedMeetingSlot === slot.start" (click)="selectedMeetingSlot = slot.start">
+                    {{ slot.start | date: 'EEE, MMM d · h:mm a' }}
+                  </button>
+                }
+              </div>
+              <label>
+                <span class="field-label">Mobile number (optional backup contact)</span>
+                <input type="tel" [(ngModel)]="meetingMobile" name="meetingMobile" placeholder="Include country code">
+              </label>
+              <p class="contact-note">Meeting updates will be sent to the email submitted with this form.</p>
+              <button type="button" class="primary-action" [disabled]="!selectedMeetingSlot || isRequestingMeeting" (click)="requestMeeting()">
+                {{ isRequestingMeeting ? 'Sending request...' : 'Request selected time' }}
+              </button>
+            } @else {
+              <p>No introductory times are currently available. Your form is safely submitted and the professional can contact you directly.</p>
+            }
+
+            @if (meetingMessage && !meetingRequested) {
+              <p class="message error-message">{{ meetingMessage }}</p>
+            }
+          </section>
+        }
+      </section>
+    }
+
+    @if (message) {
+      <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    }
+  </section>
+</main>

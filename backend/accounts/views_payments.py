@@ -1,7 +1,7 @@
 """Client Payments views.
 
 Money professionals collect FROM their clients — completely separate from
-RepRoot Studio Billing (professionals paying RepRoot, see billing.py).
+RepRoot Billing (professionals paying RepRoot, see billing.py).
 Kept in its own module so the main views.py doesn't keep growing.
 """
 
@@ -57,12 +57,19 @@ from .serializers import (
 
 class PaymentsUnavailable(APIException):
   status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-  default_detail = 'Payments are locked during the testing period.'
+  default_detail = 'Payment tracking is temporarily unavailable.'
   default_code = 'payments_locked'
 
 
 class APIView(DRFAPIView):
   """Read access remains available while every payment-data mutation is locked.
+
+  Gated on REPROOT_MANUAL_PAYMENTS_ENABLED, not REPROOT_PAYMENTS_ENABLED. Every
+  view in this module is manual payment tracking between a professional and
+  their own clients -- there is no payment provider anywhere in this file.
+  Subscription billing is a different thing entirely and is guarded separately
+  in views.py, so restricting plan changes no longer has the side effect of
+  freezing this workspace.
 
   Notification read/clear actions opt out below because they change only a
   recipient's inbox state, not payment or financial records.
@@ -74,7 +81,7 @@ class APIView(DRFAPIView):
     super().initial(request, *args, **kwargs)
     if (
       request.method not in permissions.SAFE_METHODS
-      and not settings.REPROOT_PAYMENTS_ENABLED
+      and not settings.REPROOT_MANUAL_PAYMENTS_ENABLED
       and not self.allow_locked_mutations
     ):
       raise PaymentsUnavailable()
@@ -164,10 +171,14 @@ class ProfessionalPaymentSettingsView(APIView):
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
     payload = ProfessionalPaymentSettingsSerializer(settings_row).data
     # Manual payment tracking and the client's own payment history are core
-    # Studio features. The gateway flag only controls provider-backed payment
+    # RepRoot features. The gateway flag only controls provider-backed payment
     # mutations; it must not hide the existing payment workspace.
     payload['payment_tracking_enabled'] = True
     payload['client_payment_history_enabled'] = True
+    # Whether this screen can save at all. Sent with the GET so the page can
+    # disable its controls up front rather than letting a professional confirm
+    # a permanent currency lock and only then be refused.
+    payload['payments_enabled'] = settings.REPROOT_MANUAL_PAYMENTS_ENABLED
     return Response(
       {
         'settings': payload,
@@ -176,11 +187,11 @@ class ProfessionalPaymentSettingsView(APIView):
     )
 
   def put(self, request):
-    if not settings.REPROOT_PAYMENTS_ENABLED:
-      return Response(
-        {'message': 'Payments are not available yet.'},
-        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-      )
+    # No separate check here: the base class already refuses every mutation in
+    # this module when manual payments are switched off. This used to consult
+    # REPROOT_PAYMENTS_ENABLED, which is the subscription-billing switch, so
+    # locking a reporting currency was impossible whenever plan changes were
+    # restricted -- two unrelated things behind one flag.
     settings_row, _ = ProfessionalPaymentSettings.objects.get_or_create(professional=request.user)
     serializer = ProfessionalPaymentSettingsSerializer(settings_row, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)

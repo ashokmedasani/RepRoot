@@ -123,10 +123,17 @@ class ProfessionalProfile(models.Model):
   LIFECYCLE_OVER_QUOTA_GRACE = 'over_quota_grace'
   LIFECYCLE_FROZEN = 'frozen'
   LIFECYCLE_RECYCLED = 'recycled'
+  # Deletion requested, cooling-off period running. The professional can still
+  # sign in -- doing so cancels the deletion -- but clients cannot, because
+  # ClientLoginSerializer requires the professional to be LIFECYCLE_ACTIVE.
+  # This state must never set is_locked, or _reject_login_if_locked would shut
+  # the professional out of the very account it is offering to give back.
+  LIFECYCLE_PENDING_DELETION = 'pending_deletion'
   LIFECYCLE_STATUS_CHOICES = [
     (LIFECYCLE_ACTIVE, 'Active'),
     (LIFECYCLE_OVER_QUOTA_GRACE, 'Over quota grace'),
     (LIFECYCLE_FROZEN, 'Frozen'),
+    (LIFECYCLE_PENDING_DELETION, 'Deletion pending'),
     (LIFECYCLE_RECYCLED, 'Recycle Bin'),
   ]
 
@@ -200,6 +207,22 @@ class ProfessionalProfile(models.Model):
   recycled_at = models.DateTimeField(null=True, blank=True, db_index=True)
   recycle_expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
   recycled_by_reference = models.CharField(max_length=24, blank=True)
+  deletion_requested_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  # When the cooling-off period lapses. Indexed because a daily sweep filters on it.
+  deletion_hold_ends_at = models.DateTimeField(null=True, blank=True, db_index=True)
+  # What the professional was shown and agreed to at the moment they confirmed:
+  # client/resource/form counts. Kept so the admin record reflects what they
+  # actually consented to losing, not a recount taken later.
+  deletion_impact_snapshot = models.JSONField(default=dict, blank=True)
+  # Sign-in identity changes are rate limited to one per cooldown window. Null
+  # means never changed, which is why the FIRST change is always allowed --
+  # someone who typo'd at signup should not wait a month to correct it.
+  username_changed_at = models.DateTimeField(null=True, blank=True)
+  email_changed_at = models.DateTimeField(null=True, blank=True)
+  # An email change is not applied until the NEW address proves it can receive
+  # mail, so the address sits here until the code is confirmed.
+  pending_email = models.EmailField(blank=True)
+  pending_email_requested_at = models.DateTimeField(null=True, blank=True)
   profile_setup_completed = models.BooleanField(default=False)
   profile_photo = models.FileField(upload_to='professional-profiles/photos/', blank=True)
   middle_name = models.CharField(max_length=150, blank=True)
@@ -229,6 +252,11 @@ class ProfessionalProfile(models.Model):
   profile_images = models.JSONField(default=list, blank=True)
   profile_links = models.JSONField(default=list, blank=True)
   profile_visibility = models.JSONField(default=dict, blank=True)
+  # The order sections appear in on the public profile, as a list of the same
+  # keys used by profile_visibility. Empty means "the built-in order"; unknown
+  # or missing keys are tolerated so adding a section later cannot strand an
+  # existing professional on a stale list.
+  profile_section_order = models.JSONField(default=list, blank=True)
   terms_accepted = models.BooleanField(default=False)
   privacy_policy_accepted = models.BooleanField(default=False)
   terms_accepted_at = models.DateTimeField(null=True, blank=True)
@@ -247,6 +275,52 @@ class ProfessionalProfile(models.Model):
 
   def __str__(self) -> str:
     return f'{self.user.get_full_name()} ({self.user.username})'
+
+
+class ProfessionalProfileImage(models.Model):
+  """One picture in a professional's public gallery.
+
+  Previously these lived in `ProfessionalProfile.profile_images`, a JSONField
+  holding `{category, title, url}` dicts where `url` was a base64 `data:` URL.
+  That meant a 4 MB photo was stored as ~5.4 MB of text inside a database row,
+  every profile save re-uploaded every image the professional already had, one
+  oversized picture failed the entire profile save including its text fields,
+  and none of it was counted as file storage against the plan quota.
+
+  The API shape is deliberately unchanged -- `profile_images` still serializes
+  to `[{category, title, url}]` -- so the Angular profile page, the public
+  client-facing profile and the Flutter app all keep working. Only `url` is
+  different: a real media URL instead of an inline blob.
+  """
+
+  CATEGORY_CERTIFICATES = 'Certificates'
+  CATEGORY_TRANSFORMATION = 'Transformation Photos'
+  CATEGORY_ACHIEVEMENTS = 'Achievements'
+  CATEGORY_PHYSIQUE = 'Body Physique'
+  CATEGORY_OTHER = 'Other Images'
+  CATEGORY_CHOICES = [
+    (CATEGORY_CERTIFICATES, CATEGORY_CERTIFICATES),
+    (CATEGORY_TRANSFORMATION, CATEGORY_TRANSFORMATION),
+    (CATEGORY_ACHIEVEMENTS, CATEGORY_ACHIEVEMENTS),
+    (CATEGORY_PHYSIQUE, CATEGORY_PHYSIQUE),
+    (CATEGORY_OTHER, CATEGORY_OTHER),
+  ]
+
+  profile = models.ForeignKey(ProfessionalProfile, on_delete=models.CASCADE, related_name='images')
+  category = models.CharField(max_length=40, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
+  title = models.CharField(max_length=180, blank=True)
+  image = models.FileField(upload_to='professional-profiles/gallery/')
+  # Explicit ordering so the professional controls what a client sees first.
+  position = models.PositiveSmallIntegerField(default=0)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+    db_table = 'professional_profile_images'
+    ordering = ['position', 'id']
+
+  def __str__(self) -> str:
+    return f'{self.title or self.image.name} ({self.category})'
 
 
 class BillingWebhookEvent(models.Model):
@@ -326,7 +400,7 @@ class ClientRegistrationForm(models.Model):
     db_table = 'client_registration_forms'
 
   def __str__(self) -> str:
-    return f'{self.group.name} client registration form'
+    return f'{self.group.name} Client Information Form'
 
   def save(self, *args, **kwargs):
     if not self.public_slug:
@@ -618,10 +692,19 @@ def support_incident_reference():
   return f'INC-{uuid.uuid4().hex[:10].upper()}'
 
 
+def public_support_incident_reference():
+  return f'RRNS{timezone.localtime():%m%d%y}{uuid.uuid4().hex[:6].upper()}'
+
+
 class SupportIncident(models.Model):
   ROLE_PROFESSIONAL = 'professional'
   ROLE_CLIENT = 'client'
-  ROLE_CHOICES = [(ROLE_PROFESSIONAL, 'Professional'), (ROLE_CLIENT, 'Client')]
+  ROLE_PUBLIC = 'public'
+  ROLE_CHOICES = [
+    (ROLE_PROFESSIONAL, 'Professional'),
+    (ROLE_CLIENT, 'Client'),
+    (ROLE_PUBLIC, 'Public website'),
+  ]
 
   CATEGORY_FEEDBACK = 'feedback'
   CATEGORY_BUG = 'bug_report'
@@ -669,6 +752,19 @@ class SupportIncident(models.Model):
     (PRIORITY_URGENT, 'Urgent'),
   ]
 
+  EMAIL_NOT_REQUESTED = 'not_requested'
+  EMAIL_PENDING = 'pending'
+  EMAIL_SENT = 'sent'
+  EMAIL_FAILED = 'failed'
+  EMAIL_SKIPPED = 'skipped'
+  EMAIL_DELIVERY_CHOICES = [
+    (EMAIL_NOT_REQUESTED, 'Not requested'),
+    (EMAIL_PENDING, 'Pending'),
+    (EMAIL_SENT, 'Sent'),
+    (EMAIL_FAILED, 'Failed'),
+    (EMAIL_SKIPPED, 'Skipped'),
+  ]
+
   incident_id = models.CharField(max_length=24, unique=True, default=support_incident_reference, editable=False, db_index=True)
   reporter_role = models.CharField(max_length=12, choices=ROLE_CHOICES, db_index=True)
   reporter_professional = models.ForeignKey(
@@ -693,6 +789,14 @@ class SupportIncident(models.Model):
     settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_support_incidents'
   )
   resolution_note = models.TextField(blank=True)
+  support_email_status = models.CharField(
+    max_length=20, choices=EMAIL_DELIVERY_CHOICES, default=EMAIL_NOT_REQUESTED
+  )
+  acknowledgement_email_status = models.CharField(
+    max_length=20, choices=EMAIL_DELIVERY_CHOICES, default=EMAIL_NOT_REQUESTED
+  )
+  email_delivery_error = models.CharField(max_length=500, blank=True)
+  email_delivery_updated_at = models.DateTimeField(null=True, blank=True)
   closed_at = models.DateTimeField(null=True, blank=True)
   created_at = models.DateTimeField(auto_now_add=True, db_index=True)
   updated_at = models.DateTimeField(auto_now=True)
@@ -1166,7 +1270,7 @@ class RecycledProfessionalAccount(models.Model):
 # Client Payments
 #
 # Money professionals collect FROM their clients. Fully separate from RepRoot
-# Studio Billing (professionals paying RepRoot for their subscription tier).
+# RepRoot billing (professionals paying for their subscription tier).
 # For manual payment methods RepRoot never receives, holds, or transfers the
 # money - these models only track what the professional and client report.
 # ---------------------------------------------------------------------------

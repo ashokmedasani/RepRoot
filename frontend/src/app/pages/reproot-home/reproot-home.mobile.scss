@@ -1,0 +1,73 @@
+@media (max-width: 900px) {
+  .story-shell { width: calc(100% - 1rem); padding-top: .35rem; }
+  .story-viewport { scroll-padding-inline: 0; }
+  .story-track { gap: 0; padding: 0; }
+  .story-scene { grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.4rem; flex-basis: 100%; min-height: max(42rem, calc(100svh - 8rem)); padding: 1.6rem; background: linear-gradient(165deg, var(--app-surface), color-mix(in srgb, var(--app-primary-soft) 38%, var(--app-surface))); }
+  .scene-copy { max-width: 40rem; }
+  .scene-copy h1, .scene-copy h2 { font-size: clamp(2rem, 6.5vw, 2.8rem); }
+  .scene-actions { gap: .6rem; }
+  .workspace-preview { min-height: 20rem; }
+  .feature-preview { min-height: 20rem; grid-template-columns: 10rem 1fr; }
+  .scene-why { grid-template-columns: 1fr; }
+  .audience-strip { grid-column: 1; justify-content: flex-start; }
+  .story-controls p { display: none; }
+  .contact-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+
+@media (max-width: 640px) {
+  .story-shell { width: calc(100% - .75rem); }
+  .story-viewport { border-radius: .7rem; }
+  .story-track { gap: 0; padding: 0; }
+  .story-scene { flex-basis: 100%; min-height: max(42rem, calc(100svh - 7rem)); gap: 1rem; padding: 1.3rem 1.15rem 4.5rem; }
+  .scene-copy h1, .scene-copy h2 { margin-top: .35rem; font-size: clamp(1.8rem, 8vw, 2.25rem); line-height: 1.04; }
+  .scene-copy > p:not(.scene-label) { font-size: .84rem; line-height: 1.5; }
+  .scene-actions { align-items: stretch; }
+  .scene-actions .primary-action { width: 100%; }
+  .quick-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+  .quick-answers div { padding: .15rem 0 .15rem .7rem; }
+  .workspace-preview { grid-template-columns: 2.3rem minmax(0, 1fr); min-height: 16rem; }
+  .preview-sidebar { padding: .65rem .4rem; }
+  .preview-content { gap: .55rem; padding: .7rem; }
+  .metric-row { grid-template-columns: repeat(2, 1fr); }
+  .metric-row span:last-child, .preview-panels section:first-child, .preview-footer { display: none; }
+  .preview-panels { grid-template-columns: 1fr; }
+  .preview-panels section { min-height: 6rem; }
+  .feature-tabs { margin-top: 1rem; flex-wrap: nowrap; overflow-x: auto; padding-bottom: .25rem; scrollbar-width: none; }
+  .feature-tabs::-webkit-scrollbar { display: none; }
+  .feature-tabs button { flex: 0 0 auto; }
+  .feature-preview { min-height: 21rem; grid-template-columns: 1fr; }
+  .feature-nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--app-border); padding: .75rem; scrollbar-width: none; }
+  .feature-nav::-webkit-scrollbar { display: none; }
+  .feature-nav b, .feature-nav span { flex: 0 0 auto; margin: 0; }
+  .feature-detail { padding: 1.15rem; }
+  .client-preview article { min-height: 5.1rem; padding: .85rem; }
+  .why-grid { gap: .55rem; }
+  .why-grid article { min-height: 7rem; padding: .85rem; }
+  .audience-strip { justify-content: flex-start; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; padding-bottom: .3rem; scrollbar-width: thin; }
+  .audience-strip span { flex: 0 0 auto; }
+  .pricing-panel, .contact-panel { width: calc(100% - 1rem); margin-top: 2.5rem; }
+  .pricing-inner, .contact-layout, .contact-success { padding: 1.15rem; }
+  .price-grid, .contact-form { grid-template-columns: 1fr; }
+  .contact-form label, .contact-form .primary-action, .form-message { grid-column: 1; }
+}
+
+@media (max-width: 420px) {
+  .story-scene { padding-inline: .9rem; }
+  .scene-copy h1, .scene-copy h2 { font-size: clamp(1.65rem, 9vw, 2rem); }
+  .quick-answers, .why-grid { grid-template-columns: 1fr; }
+  .metric-row { grid-template-columns: 1fr; }
+  .metric-row span:nth-child(n + 3) { display: none; }
+  .feature-tabs { margin-inline: -.15rem; }
+  .feature-detail { padding: .9rem; }
+  .client-preview { gap: .55rem; }
+  .client-preview article { min-height: auto; }
+  .story-controls { padding-inline: .4rem; }
+  .pricing-inner, .contact-layout, .contact-success { padding: .9rem; }
+}
+
+@media (max-width: 420px) and (prefers-reduced-motion: reduce) {
+  .story-viewport { overflow: visible; }
+  .story-track { display: grid; width: auto; }
+  .story-scene { width: auto; min-height: auto; scroll-snap-align: none; }
+  .story-controls { display: none; }
+}

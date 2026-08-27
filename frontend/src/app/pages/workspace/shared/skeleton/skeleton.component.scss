@@ -1,0 +1,115 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 100%;
+}
+
+.skeleton-group-inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--app-radius-sm);
+  // Sits between surface and border so the placeholder is visible on both the
+  // page background and inside a card, in light and dark themes alike.
+  background: color-mix(in srgb, var(--app-border) 55%, var(--app-surface));
+}
+
+// The sweep. A pseudo-element rather than an animated background-position, so
+// the paint stays on the compositor and a page full of these does not thrash
+// the main thread on the low-end devices most likely to be on a weak network.
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--app-surface) 85%, transparent),
+    transparent
+  );
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-text {
+  height: 0.85rem;
+  border-radius: var(--app-radius-xs);
+}
+
+.skeleton-title {
+  width: 45%;
+  height: 1.6rem;
+  border-radius: var(--app-radius-sm);
+}
+
+.skeleton-block {
+  height: 9rem;
+  border-radius: var(--app-radius-md);
+}
+
+.skeleton-avatar {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+}
+
+.skeleton-w-35 { width: 35%; }
+.skeleton-w-45 { width: 45%; }
+.skeleton-w-60 { width: 60%; }
+.skeleton-w-70 { width: 70%; }
+.skeleton-w-85 { width: 85%; }
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 0;
+}
+
+.skeleton-row-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: var(--app-panel-padding, 1.25rem);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-panel-radius, var(--app-radius-lg));
+  background: var(--app-surface);
+}
+
+// An animated placeholder that persists for the whole of a slow load is
+// exactly the kind of motion that triggers migraine and vestibular symptoms.
+// Keep the shape, drop the movement.
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+    transform: none;
+    background: none;
+  }
+
+  .skeleton {
+    background: color-mix(in srgb, var(--app-border) 40%, var(--app-surface));
+  }
+}

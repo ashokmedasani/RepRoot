@@ -1,4 +1,4 @@
-# RepRoot Studio — Full Diagnostic Report
+# RepRoot — Full Diagnostic Report
 **Date:** 2026-07-30
 **Scope:** Django backend, Angular frontend, Flutter mobile app (spot-checked). Read-only investigation — nothing in this report has been fixed yet unless explicitly marked "already fixed."
 

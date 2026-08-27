@@ -277,7 +277,7 @@ class GroupImportConfirmView(APIView):
     registration_form_required = registration_form is None or registration_form.is_mandatory
 
     if registration_form_required and (registration_form is None or not registration_form.is_active):
-      return Response({'message': 'This group needs an active client registration form.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'This group needs an active Client Information Form.'}, status=status.HTTP_400_BAD_REQUEST)
 
     client_limit = plan_limit(request.user, 'clients')
     current_count = ClientAccess.objects.filter(professional=request.user, is_active=True).count()

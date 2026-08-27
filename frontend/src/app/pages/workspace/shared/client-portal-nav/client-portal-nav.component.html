@@ -1,0 +1,52 @@
+<aside class="client-sidebar" aria-label="Client navigation">
+  <a class="brand" routerLink="/client/dashboard">
+    <span class="brand-mark" aria-hidden="true">
+      <img src="/brand/reproot/mark.png" alt="">
+    </span>
+    <span><span class="brand-rep">Rep</span><span class="brand-root">Root</span></span>
+  </a>
+
+  <nav>
+    <a routerLink="/client/dashboard" class="nav-item" [class.active]="activeSection === 'dashboard'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>
+      </svg>
+      <span>Dashboard</span>
+    </a>
+    <a routerLink="/client/profile" [queryParams]="{ tab: 'templates' }" class="nav-item" [class.active]="activeSection === 'templates'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2.5M16 4V2.5M7.5 13.5h3M7.5 17h3M13.5 13.5h3"/>
+      </svg>
+      <span>Templates</span>
+    </a>
+    <a routerLink="/client/meetings" class="nav-item" [class.active]="activeSection === 'meetings'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/>
+      </svg>
+      <span>Meetings and Reminders</span>
+    </a>
+    <a routerLink="/client/profile" [queryParams]="{ tab: 'professional', professionalTab: 'profile' }" class="nav-item" [class.active]="activeSection === 'professional-profile'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.6 3.7-5.5 7-5.5s6.1 1.9 7 5.5"/>
+      </svg>
+      <span>Professional</span>
+      @if (unreadMessages + unreadPayments > 0) {
+        <span class="nav-badge" [attr.aria-label]="(unreadMessages + unreadPayments) + ' updates'">{{ combinedBadgeLabel() }}</span>
+      }
+    </a>
+    <a routerLink="/client/settings" class="nav-item" [class.active]="activeSection === 'settings'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+
+  <button type="button" class="sign-out" (click)="signOut()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 7l-5 5 5 5M5 12h11"/>
+    </svg>
+    <span>Sign Out</span>
+  </button>
+</aside>

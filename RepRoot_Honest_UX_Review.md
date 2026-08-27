@@ -1,4 +1,4 @@
-# RepRoot Studio — Honest UX Review
+# RepRoot — Honest UX Review
 *A full walkthrough of the app, page by page, done the way a critic would do it: use the thing, notice what snags, say so plainly.*
 
 Tested live against your local dev servers (frontend :4300, backend :8000) using a fresh professional account and two fresh client accounts.
@@ -45,7 +45,7 @@ This is the most common real problem in the app, and I hit it in two unrelated p
 
 **10. The "Actions" tab ordering, specifically (your original complaint).** Top to bottom it's currently: Reset Password → Disable Portal Access → Suspend Account → Reset Client → Delete Account. The severity ordering (mild → destructive) is actually reasonable in principle, but there's no visual grouping to signal the jump — the three mild blue buttons flow directly into an orange destructive box with no section break, and (per #4/#5 above) "Reset Client" is dangerously close in name and position to "Reset Password." My honest read: the ordering isn't the real problem, the *lack of grouping and the confusing pair of names* is. I'd add a subtle divider or heading ("Access controls" / "Irreversible actions") and rename "Reset Client" so it can't be mistaken for the password action above it.
 
-**11. Marketing page CTA labels don't match.** "Launch RepRoot Studio" in the nav and hero vs. "Launch Studio" further down — same button, same destination, different text.
+**11. Marketing page CTA labels don't match.** "Launch RepRoot" in the nav and hero vs. "Launch RepRoot" further down — same button, same destination, different text.
 
 **12. Workspace picker avatar mismatch.** At `/portal`, the "Professional" card shows the letter "T" instead of "P." Small, but it's the first thing a returning user sees.
 

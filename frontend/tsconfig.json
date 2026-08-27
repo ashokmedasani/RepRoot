@@ -5,7 +5,7 @@
     "paths": {
       "@core/*": ["src/app/core/*"],
       "@shared/*": ["src/app/shared/*"],
-      "@studio-shared/*": ["src/app/pages/studio/shared/*"],
+      "@workspace-shared/*": ["src/app/pages/workspace/shared/*"],
       "@admin-shared/*": ["src/app/pages/admin/shared/*"]
     },
     "outDir": "./dist/out-tsc",

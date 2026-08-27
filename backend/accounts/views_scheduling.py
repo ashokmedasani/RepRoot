@@ -12,6 +12,7 @@ on a client's Schedule tab in the frontend, but they're distinct models here.
 """
 
 from datetime import date, timedelta
+import logging
 from uuid import UUID
 
 from django.conf import settings
@@ -39,6 +40,8 @@ from .models import (
   ScheduledMeeting,
   ScheduledMeetingGuest,
 )
+
+logger = logging.getLogger(__name__)
 from .google_calendar import (
   GoogleCalendarError,
   cancel_google_event,
@@ -264,11 +267,14 @@ class PublicLeadMeetingRequestView(APIView):
         attendees=[(lead_form.professional.get_full_name() or lead_form.professional.username, lead_form.professional.email)],
         extra_body=(
           f'{submission.first_name} {submission.last_name} requested {start_at.isoformat()} '
-          f'for form {submission.reference_id}. Sign in to RepRoot Studio to accept or decline it.'
+          f'for form {submission.reference_id}. Sign in to RepRoot to accept or decline it.'
         ),
       )
     except Exception:
-      pass  # Notification best-effort; the request itself is already saved and visible in Studio.
+      logger.exception(
+        'Lead meeting request email failed',
+        extra={'meeting_request_id': meeting_request.id, 'lead_submission_id': submission.id},
+      )  # Notification is best-effort; the saved request remains visible in RepRoot.
 
     return Response(
       {'request': LeadMeetingRequestSerializer(meeting_request).data, 'message': 'Your preferred time was sent to the professional for approval.'},
@@ -870,7 +876,10 @@ class ScheduledMeetingCancelView(APIView):
           cancelled=True,
         )
       except Exception:
-        pass  # Best-effort; the cancellation itself is already saved.
+        logger.exception(
+          'Meeting cancellation email failed',
+          extra={'meeting_id': meeting.id, 'professional_id': request.user.id},
+        )  # Notification is best-effort; the cancellation itself is already saved.
     else:
       guest_clients = [guest.client for guest in meeting.guests.all()]
 

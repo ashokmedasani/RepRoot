@@ -4,7 +4,10 @@
 
 Returns logical database bytes, uploaded-file bytes, total bytes, the configured storage quota, and usage percentage. Authentication timestamps are excluded, and the configurable 15-minute cache keeps normal navigation from changing the indicator.
 
-The quota comes from `COACHFLOW_PLAN_LIMITS['trainer_storage_bytes']`; no quota is embedded in frontend code.
+The quota comes from the backend plan catalogue and the account's canonical
+plan identifier; no quota is embedded in frontend code. Current commercial
+limits are defined in `Documentation/PLAN_AND_BILLING_DRAFT.md` until the
+approved implementation pass is completed.
 
 ## Purpose
 

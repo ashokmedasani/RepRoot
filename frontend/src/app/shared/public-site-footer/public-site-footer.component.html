@@ -1,8 +1,16 @@
 <footer>
-  <div class="footer-brand"><strong>{{ brand === 'studio' ? 'RepRoot Studio' : 'RepRoot' }}</strong><p>{{ brand === 'studio' ? 'A professional-client workflow platform and a product of RepRoot.' : 'Practical technology for clearer, more manageable workflows.' }}</p></div>
+  <div class="footer-brand"><strong>RepRoot</strong><p>Professional-client relationship management.</p></div>
   <nav aria-label="Footer navigation">
-    @if (brand === 'studio') { <a [href]="publicSite.parentUrl">RepRoot</a><a routerLink="/portal">Launch Studio</a> } @else { <a [href]="publicSite.studioUrl">RepRoot Studio</a> }
-    <a routerLink="/privacy">Privacy</a><a routerLink="/terms">Terms</a><a routerLink="/cookies">Cookies</a><a [href]="'mailto:' + supportEmail">Contact</a>
+    @if (variant === 'access') {
+      <a routerLink="/">RepRoot</a>
+      <a routerLink="/" [queryParams]="{ section: 'contact' }">Help and Support</a>
+      <a routerLink="/terms/professional" target="_blank">Professional Terms</a>
+      <a routerLink="/privacy/professional" target="_blank">Professional Privacy</a>
+      <a routerLink="/terms/client" target="_blank">Client Terms</a>
+      <a routerLink="/privacy/client" target="_blank">Client Privacy</a>
+    } @else {
+      <a routerLink="/faq">FAQ</a><a routerLink="/privacy">Privacy</a><a routerLink="/terms">Terms</a>
+    }
   </nav>
-  <p class="copyright">&copy; {{ year }} RepRoot. @if (brand === 'studio') { RepRoot Studio is a product of RepRoot. }</p>
+  <p class="copyright">&copy; {{ year }} RepRoot.</p>
 </footer>

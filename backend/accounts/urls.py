@@ -4,6 +4,18 @@ from .views_notifications import (
   ClientNotificationPreferencesView, ClientNotificationsView,
   ProfessionalNotificationPreferencesView, ProfessionalNotificationsView,
 )
+from .public_contact import PublicContactView
+
+from .professional_deletion_views import (
+  ProfessionalDeletionCancelView, ProfessionalDeletionOverviewView, ProfessionalDeletionRequestView,
+)
+
+from .signin_details_views import (
+  ProfessionalEmailChangeCancelView, ProfessionalEmailChangeConfirmView,
+  ProfessionalEmailChangeRequestView, ProfessionalSigninDetailsView,
+  ProfessionalUsernameChangeView,
+)
+
 
 from .group_import import GroupImportConfirmView, GroupImportPreviewView
 
@@ -172,6 +184,7 @@ from .views_scheduling import (
 )
 
 urlpatterns = [
+  path('public/contact/', PublicContactView.as_view(), name='public-contact'),
   path('legal/configuration/', LegalConfigurationView.as_view(), name='legal-configuration'),
   path('professional/notifications/', ProfessionalNotificationsView.as_view(), name='professional-notifications'),
   path('professional/notification-preferences/', ProfessionalNotificationPreferencesView.as_view(), name='professional-notification-preferences'),
@@ -186,6 +199,14 @@ urlpatterns = [
   path('professional/signup/', ProfessionalSignupView.as_view(), name='professional-signup'),
   path('professional/login/', ProfessionalLoginView.as_view(), name='professional-login'),
   path('professional/auth/google/', ProfessionalGoogleAuthView.as_view(), name='professional-google-auth'),
+  path('professional/account/signin-details/', ProfessionalSigninDetailsView.as_view(), name='professional-signin-details'),
+  path('professional/account/signin-details/username/', ProfessionalUsernameChangeView.as_view(), name='professional-username-change'),
+  path('professional/account/signin-details/email/', ProfessionalEmailChangeRequestView.as_view(), name='professional-email-change'),
+  path('professional/account/signin-details/email/confirm/', ProfessionalEmailChangeConfirmView.as_view(), name='professional-email-change-confirm'),
+  path('professional/account/signin-details/email/cancel/', ProfessionalEmailChangeCancelView.as_view(), name='professional-email-change-cancel'),
+  path('professional/account/deletion/', ProfessionalDeletionOverviewView.as_view(), name='professional-deletion-overview'),
+  path('professional/account/deletion/request/', ProfessionalDeletionRequestView.as_view(), name='professional-deletion-request'),
+  path('professional/account/deletion/cancel/', ProfessionalDeletionCancelView.as_view(), name='professional-deletion-cancel'),
   path('client/professional-lookup/', ClientProfessionalLookupView.as_view(), name='client-professional-lookup'),
   path('client/professional-directory/', ProfessionalDirectoryView.as_view(), name='client-professional-directory'),
   path('client/login/', ClientLoginView.as_view(), name='client-login'),

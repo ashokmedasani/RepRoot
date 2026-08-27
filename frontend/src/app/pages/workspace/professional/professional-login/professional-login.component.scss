@@ -1,0 +1,93 @@
+.auth-form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+label > span {
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+}
+
+.field-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+input {
+  width: 100%;
+}
+
+.primary-action {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.required {
+  color: #d92d20;
+  font-weight: 700;
+}
+
+.forgot-link {
+  width: fit-content;
+  color: var(--app-primary-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: -0.25rem;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.form-message {
+  margin: 0;
+  border-radius: var(--app-radius-md);
+  padding: 0.85rem 1.1rem;
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 15%, transparent);
+}
+
+.top-message {
+  margin-bottom: 1.25rem;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--app-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--app-border, rgba(0, 0, 0, 0.1));
+}
+
+// Failure has to look different from progress. `.form-message` carries the
+// brand-blue "working on it" styling, and a wrong password used to render in
+// exactly that, indistinguishable from "Verifying professional login...".
+.form-message.error-message {
+  background: color-mix(in srgb, #d92d20 10%, var(--app-surface));
+  color: #d92d20;
+  border-color: color-mix(in srgb, #d92d20 20%, transparent);
+}

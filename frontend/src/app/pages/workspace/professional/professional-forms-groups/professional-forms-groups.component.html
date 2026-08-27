@@ -1,0 +1,417 @@
+<app-professional-page-shell
+  title="Forms and Groups"
+  eyebrow="Professional workspace"
+  subtitle="Build lead forms, review enquiries, and organize active clients into groups."
+  activeSection="forms-groups"
+  titleId="forms-title"
+>
+  <button page-actions type="button" class="ghost-action" (click)="loadOverview()">Refresh</button>
+  @if (overview?.groups?.length) {
+    <a page-actions routerLink="/professional/clients/add" class="primary-action">Add Client</a>
+  }
+
+    @if (message) {
+      <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+    }
+
+    @if (isLoading) {
+      <section class="panel">
+        <p>Loading Forms and Groups...</p>
+      </section>
+    } @else if (overview) {
+      <nav class="workspace-tabs" aria-label="Forms and groups sections">
+        <button
+          type="button"
+          class="workspace-tab"
+          data-tour="tab-forms"
+          [class.active]="activeWorkspaceTab === 'forms'"
+          [attr.aria-selected]="activeWorkspaceTab === 'forms'"
+          (click)="setWorkspaceTab('forms')"
+        >
+          <span>Lead Forms</span>
+          <small>{{ overview.lead_forms.length }} of {{ overview.max_lead_forms }} used</small>
+        </button>
+        <button
+          type="button"
+          class="workspace-tab"
+          data-tour="tab-groups"
+          [class.active]="activeWorkspaceTab === 'groups'"
+          [attr.aria-selected]="activeWorkspaceTab === 'groups'"
+          (click)="setWorkspaceTab('groups')"
+        >
+          <span>Client Groups</span>
+          <small>{{ overview.groups.length }} managed group{{ overview.groups.length === 1 ? '' : 's' }}</small>
+        </button>
+      </nav>
+
+      @if (activeWorkspaceTab === 'forms') {
+      @if (overview.lead_forms.length) {
+        <div class="lead-form-toolbar">
+          <label class="lead-form-select">
+            <span>Viewing form</span>
+            <select
+              aria-label="Select lead form"
+              [ngModel]="selectedLeadFormId"
+              (ngModelChange)="selectLeadForm($event)"
+              name="selectedLeadForm"
+            >
+              @for (form of overview.lead_forms; track form.id) {
+                <option [ngValue]="form.id">{{ form.title }} ({{ form.is_active ? 'Active' : 'Disabled' }})</option>
+              }
+            </select>
+          </label>
+          <div class="workspace-actions">
+            <span>{{ overview.lead_forms.length }} / {{ overview.max_lead_forms }} forms used</span>
+            <a routerLink="/professional/forms/create" [queryParams]="{ new: 1 }" class="primary-action">Create Form</a>
+          </div>
+        </div>
+      }
+      @if (!overview.has_lead_form) {
+        <section class="empty-state" aria-labelledby="empty-form-title">
+          <h2 id="empty-form-title">You haven't created a form yet.</h2>
+          <p>Please create your professional lead form to view Forms and Groups.</p>
+          <div class="setup-note">
+            <p>Next, you'll set up:</p>
+            <ol>
+              <li>Public lead form</li>
+              <li>Minimum one group</li>
+              <li>Client creation form for that group</li>
+            </ol>
+          </div>
+          <a routerLink="/professional/forms/create" class="primary-action">Create Form</a>
+        </section>
+      } @else {
+        <section class="panel lead-panel" aria-labelledby="lead-form-title">
+          <div class="lead-form-header">
+            <div>
+              <p class="eyebrow">Public enquiry form</p>
+              <h2 id="lead-form-title">{{ selectedLeadForm?.title }}</h2>
+              <p>{{ selectedLeadForm?.is_active ? 'People with the link can submit this form.' : 'The public form is unavailable until you enable it.' }}</p>
+            </div>
+            <label class="switch-control">
+              <input
+                type="checkbox"
+                [checked]="selectedLeadForm?.is_active"
+                [disabled]="isSaving"
+                (change)="toggleLeadFormActive($event)"
+              >
+              <span class="switch-track" aria-hidden="true"><span></span></span>
+              <span class="switch-state">{{ selectedLeadForm?.is_active ? 'Enabled' : 'Disabled' }}</span>
+            </label>
+          </div>
+
+          @if (selectedLeadForm?.is_active) {
+            <div class="lead-main">
+              <div class="form-link-box" data-tour="lead-form-link">
+                <span>Public Form Link</span>
+                <div>
+                  <a [href]="selectedLeadForm?.public_link" target="_blank" rel="noreferrer">{{ selectedLeadForm?.public_link }}</a>
+                  <button type="button" class="ghost-action" (click)="copyPublicLink()">Copy Link</button>
+                </div>
+              </div>
+
+              <!-- These read from the same filtered source as the tab badges
+                   below. Reading raw overview lengths here meant the card said
+                   "Pending 12" directly above a tab reading "Pending (9)". -->
+              <div class="stats-grid">
+                <div class="stat-card total-stat">
+                  <span>Total Requests</span>
+                  <strong>{{ submissionCount('pending') + submissionCount('approved') + submissionCount('deleted') }}</strong>
+                </div>
+                <div class="stat-card pending-stat">
+                  <span>Pending</span>
+                  <strong>{{ submissionCount('pending') }}</strong>
+                </div>
+                <div class="stat-card approved-stat">
+                  <span>Approved</span>
+                  <strong>{{ submissionCount('approved') }}</strong>
+                </div>
+                <div class="stat-card deleted-stat">
+                  <span>Deleted</span>
+                  <strong>{{ submissionCount('deleted') }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <aside class="fields-card">
+              <div class="fields-header">
+                <h3>Form Fields</h3>
+                <span>3 required</span>
+              </div>
+              <ul>
+                <li>First Name (Required)</li>
+                <li>Last Name (Required)</li>
+                <li>Email Address (Required)</li>
+              </ul>
+              @if ((selectedLeadForm?.fields?.length || 0) > 3) {
+                <p>{{ (selectedLeadForm?.fields?.length || 0) - 3 }} more fields</p>
+              }
+            </aside>
+
+            <a routerLink="/professional/forms/create" [queryParams]="{ formId: selectedLeadForm?.id }" class="secondary-action edit-form-action">Edit Form</a>
+
+            <div class="meeting-settings-summary nested-meeting-settings" aria-labelledby="meeting-settings-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">After form submission</p>
+                  <h2 id="meeting-settings-title" data-tour="meeting-settings">Introductory Meeting Settings</h2>
+                  @if (selectedLeadForm?.introductory_meeting_enabled) {
+                    <p>Applicants can request <strong>{{ selectedLeadForm?.introductory_meeting_title }}</strong>. Every request requires your approval.</p>
+                  } @else {
+                    <p>Applicants currently submit the form without receiving an introductory-meeting option.</p>
+                  }
+                </div>
+                <label class="switch-control">
+                  <input
+                    type="checkbox"
+                    [checked]="selectedLeadForm?.introductory_meeting_enabled"
+                    [disabled]="isSaving"
+                    (change)="toggleIntroMeetingEnabled($event)"
+                  >
+                  <span class="switch-track" aria-hidden="true"><span></span></span>
+                  <span class="switch-state">{{ selectedLeadForm?.introductory_meeting_enabled ? 'Enabled' : 'Disabled' }}</span>
+                </label>
+              </div>
+
+              @if (selectedLeadForm?.introductory_meeting_enabled) {
+                @if (meetingRequests.length) {
+                  <div class="lead-meeting-preview" aria-labelledby="meeting-requests-title">
+                    <div class="preview-heading">
+                      <div>
+                        <h3 id="meeting-requests-title">Meeting requests</h3>
+                        <span>Lead-form requests only. Accepting creates the calendar invitation.</span>
+                      </div>
+                      <span class="status-pill">{{ meetingRequests.length }} total</span>
+                    </div>
+                    <div class="meeting-request-list">
+                      @for (request of meetingRequests; track request.id) {
+                        <article class="meeting-request-row" [class.resolved]="request.status !== 'pending'">
+                          <div><strong>{{ request.applicant_name }}</strong><span>{{ request.requested_start | date: 'EEE, MMM d, y · h:mm a' }}</span><small>{{ request.reference_id }} · {{ request.contact_email }}</small></div>
+                          <span class="status-pill">{{ request.status }}</span>
+                          @if (request.status === 'pending') {
+                            <div class="meeting-request-actions">
+                              <button type="button" class="primary-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'accept')">Accept and send invite</button>
+                              <button type="button" class="ghost-action danger-action" [disabled]="isSaving" (click)="reviewMeetingRequest(request, 'decline')">Decline</button>
+                            </div>
+                          }
+                        </article>
+                      }
+                    </div>
+                  </div>
+                }
+                <div class="meeting-rule-grid">
+                  <div><span>Duration</span><strong>{{ selectedLeadForm?.introductory_meeting_duration_minutes }} minutes</strong></div>
+                  <div><span>Minimum notice</span><strong>{{ selectedLeadForm?.introductory_meeting_min_notice_hours }} hours</strong></div>
+                  <div><span>Booking window</span><strong>{{ selectedLeadForm?.introductory_meeting_max_advance_days }} days</strong></div>
+                  <div><span>Buffer</span><strong>{{ selectedLeadForm?.introductory_meeting_buffer_minutes }} minutes</strong></div>
+                </div>
+
+                <div class="lead-meeting-preview">
+                  <div class="preview-heading">
+                    <h3>Next introductory meetings</h3>
+                    <span>Lead-form meetings only · next 5</span>
+                  </div>
+                  @for (meeting of upcomingLeadMeetings; track meeting.id) {
+                    <article class="preview-meeting-row">
+                      <div><strong>{{ meeting.applicant_name }}</strong><small>Lead-form introductory meeting · {{ meeting.reference_id }}</small></div>
+                      <time>{{ meeting.requested_start | date: 'EEE, MMM d · h:mm a' }}</time>
+                      @if (meeting.meeting_url) { <a [href]="meeting.meeting_url" target="_blank" rel="noopener noreferrer" class="ghost-action">Open meeting</a> }
+                    </article>
+                  } @empty {
+                    <p class="empty-note">No upcoming introductory meetings.</p>
+                  }
+                </div>
+
+                @if (overdueLeadMeetings.length) {
+                  <div class="overdue-meetings">
+                    <div class="preview-heading">
+                      <h3>Overdue follow-up</h3>
+                      <span>Send an apology, update, or rescheduling message by email.</span>
+                    </div>
+                    @for (meeting of overdueLeadMeetings; track meeting.id) {
+                      <article class="overdue-meeting-row">
+                        <div><strong>{{ meeting.applicant_name }}</strong><small>{{ meeting.requested_start | date: 'medium' }} · {{ meeting.contact_email }}</small></div>
+                        <textarea rows="2" [(ngModel)]="followupDrafts[meeting.id]" [name]="'followup-' + meeting.id" placeholder="Sorry we missed our meeting. Please reply with a suitable time so we can reschedule."></textarea>
+                        <button type="button" class="secondary-action" [disabled]="isSaving || !followupDrafts[meeting.id]?.trim()" (click)="sendMeetingFollowup(meeting)">Send email</button>
+                      </article>
+                    }
+                  </div>
+                }
+              }
+
+              <a routerLink="/professional/forms/create" [queryParams]="{ step: 'meeting', formId: selectedLeadForm?.id }" class="secondary-action meeting-settings-action">
+                {{ selectedLeadForm?.introductory_meeting_enabled ? 'Edit meeting settings' : 'Set up introductory meetings' }}
+              </a>
+            </div>
+          }
+        </section>
+
+        <section class="panel requests-panel" data-tour="form-requests" aria-labelledby="requests-title">
+          <div class="section-heading">
+            <h2 id="requests-title">Form Requests</h2>
+            <label class="month-filter">
+              <span>Filter by Month</span>
+              <select [(ngModel)]="monthFilter" name="monthFilter">
+                <option value="">All time</option>
+                @for (month of monthOptions; track month.value) {
+                  <option [value]="month.value">{{ month.label }}</option>
+                }
+                @if (olderThanSixMonthsCount() > 0) {
+                  <option value="older">Older than 6 months ({{ olderThanSixMonthsCount() }})</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="request-tabs" role="group" aria-label="Submission status">
+            <button type="button" [class.active]="selectedSubmissionView === 'pending'" (click)="setSubmissionView('pending')">
+              Pending ({{ submissionCount('pending') }})
+            </button>
+            <button type="button" [class.active]="selectedSubmissionView === 'approved'" (click)="setSubmissionView('approved')">
+              Approved ({{ submissionCount('approved') }})
+            </button>
+            <button type="button" [class.active]="selectedSubmissionView === 'deleted'" (click)="setSubmissionView('deleted')">
+              Deleted ({{ submissionCount('deleted') }})
+            </button>
+          </div>
+
+          <app-fixed-height-list [visibleRows]="6">
+            <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Applicant Name</th>
+                  <th>Email</th>
+                  <th>Submitted On</th>
+                  <th>{{ selectedSubmissionView === 'approved' ? 'Approved On' : selectedSubmissionView === 'deleted' ? 'Deleted On' : 'Waiting' }}</th>
+                  <th>Reference ID</th>
+                  <th>Group</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (submission of activeSubmissions; track submission.id; let index = $index) {
+                  <tr>
+                    <td>{{ index + 1 }}</td>
+                    <td>{{ submission.applicant_name }}</td>
+                    <td>{{ submission.email }}</td>
+                    <td>{{ submission.submitted_at | date: 'medium' }}</td>
+                    <!-- `converted_at` and `deleted_at` were already on every
+                         record and never rendered, so on the Approved tab there
+                         was no way to see when something was approved. -->
+                    <td class="outcome-cell">
+                      @if (selectedSubmissionView === 'approved') {
+                        {{ submission.converted_at ? (submission.converted_at | date: 'medium') : '—' }}
+                      } @else if (selectedSubmissionView === 'deleted') {
+                        {{ submission.deleted_at ? (submission.deleted_at | date: 'medium') : '—' }}
+                      } @else {
+                        <span class="waiting-for">{{ waitingFor(submission) }}</span>
+                      }
+                    </td>
+                    <td>{{ submission.reference_id }}</td>
+                    <td>
+                      <span [class.not-assigned]="!submission.client_access">{{ groupNameFor(submission) }}</span>
+                    </td>
+                    <td class="action-cell">
+                      @if (submission.client_access) {
+                        <a [routerLink]="['/professional/clients', submission.client_access.id]" class="icon-action">View Profile</a>
+                      } @else {
+                        <a [routerLink]="['/professional/forms-groups/requests', submission.id]" class="icon-action" title="View details">View</a>
+                      }
+                      @if (selectedSubmissionView === 'pending') {
+                        <button type="button" class="icon-action danger-action" [disabled]="isSaving" title="Delete request" (click)="deletePending(submission)">Delete</button>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="8">
+                      <div class="table-empty">
+                        @if (monthFilter) {
+                          <p>No {{ selectedSubmissionView }} requests in the selected period.</p>
+                          <button type="button" class="ghost-action compact" (click)="monthFilter = ''">Show all time</button>
+                        } @else {
+                          <p>No {{ selectedSubmissionView }} requests yet.</p>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            </div>
+          </app-fixed-height-list>
+        </section>
+        }
+      }
+
+      @if (activeWorkspaceTab === 'groups') {
+        <section class="panel groups-panel" data-tour="groups" aria-labelledby="groups-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="groups-title">Groups ({{ overview.groups.length }} / {{ overview.max_groups }}) <app-info-hint label="About reordering groups">Drag a group by its <strong>⠿</strong> handle to change the order. The order matters: if you ever go over your plan's allowance, the groups lowest in this list are the ones that lock first.</app-info-hint></h2>
+            </div>
+            <a routerLink="/professional/groups/create" class="primary-action group-create-action">Create Group</a>
+          </div>
+          <div class="group-list" cdkDropList (cdkDropListDropped)="dropGroup($event)">
+            @for (group of orderedActiveGroups(); track group.id) {
+              <article class="group-row" cdkDrag>
+                <div class="group-summary">
+                  <span class="drag-handle" cdkDragHandle title="Drag to reorder">⠿</span>
+                  <span class="group-caret">&rsaquo;</span>
+                  <div>
+                    <h3>{{ group.name }}</h3>
+                    <p>{{ group.description || 'No description added yet.' }}</p>
+                  </div>
+                  <span class="status-pill">Active</span>
+                </div>
+                <div class="group-actions">
+                  <span>{{ group.has_registration_form ? 'Client Information Form ready' : 'Client Information Form needed' }}</span>
+                  <a [routerLink]="['/professional/groups', group.id]" class="ghost-action">Open group</a>
+                  <a [routerLink]="['/professional/groups', group.id, 'client-form', 'create']" class="secondary-action">Edit form</a>
+                </div>
+              </article>
+            } @empty {
+              <article class="group-row">
+                <div>
+                  <h3>No groups yet</h3>
+                  <p>Groups are how you organise clients and share a Client Information Form with them.</p>
+                  <a routerLink="/professional/groups/create" class="primary-action compact">Create Group</a>
+                </div>
+              </article>
+            }
+          </div>
+
+          @if (lockedGroupsList().length) {
+            <div class="locked-section-heading">
+              <span class="locked-divider"></span>
+              <h3>Locked Groups</h3>
+              <span class="locked-divider"></span>
+            </div>
+            <div class="group-list locked-list">
+              @for (group of lockedGroupsList(); track group.id) {
+                <article class="group-row locked">
+                  <div class="group-summary">
+                    <span class="group-caret">&rsaquo;</span>
+                    <div>
+                      <h3>{{ group.name }}
+                        <span class="lock-badge" title="Over your current plan's group limit. Clients in this group lose portal access (their data is kept) until it unlocks.">🔒 Locked</span>
+                      </h3>
+                      <p>{{ group.description || 'No description added yet.' }}</p>
+                    </div>
+                    <span class="status-pill">Locked</span>
+                  </div>
+                  <div class="group-actions">
+                    <span>{{ group.has_registration_form ? 'Client Information Form ready' : 'Client Information Form needed' }}</span>
+                    <button type="button" class="ghost-action" disabled title="This group is locked. Upgrade or free a slot to reopen it.">Open group</button>
+                    <button type="button" class="secondary-action" disabled title="This group is locked. Upgrade or free a slot to edit its form.">Edit form</button>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      }
+    }
+</app-professional-page-shell>

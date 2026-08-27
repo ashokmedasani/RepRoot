@@ -1,0 +1,97 @@
+<app-client-page-shell
+  title="Dashboard"
+  eyebrow="Client dashboard"
+  subtitle="Your entries, assigned templates, schedules, and progress in one place."
+  activeSection="dashboard"
+>
+  <a page-actions routerLink="/client/profile" [queryParams]="{ tab: 'templates' }" class="primary-action">Open Templates</a>
+
+  @if (message) { <p class="message error-message">{{ message }}</p> }
+  @if (isLoading) {
+    <section class="dashboard-panel" aria-busy="true">
+      <app-skeleton variant="card" [count]="4" label="Loading your dashboard"></app-skeleton>
+      <app-skeleton variant="block"></app-skeleton>
+    </section>
+  } @else if (dashboard) {
+    <section class="kpi-grid" aria-label="Client dashboard metrics">
+      <article class="streak"><span>Current Check-in Streak</span><strong>{{ summary.current_streak }} days</strong><small>Consecutive active days</small></article>
+      <article class="consistency"><span>30-Day Consistency</span><strong>{{ summary.consistency_percent }}%</strong><small>{{ summary.active_days_last_30 }} of the last 30 days</small></article>
+      <article class="checkins"><span>Recent Check-ins</span><strong>{{ summary.entries_last_30_days }}</strong><small>{{ summary.entries_this_week }} submitted this week</small></article>
+      <article class="templates"><span>Active Templates</span><strong>{{ summary.active_templates }}</strong><small>{{ summary.total_entries }} lifetime entries</small></article>
+      <article class="completed"><span>Schedules Completed</span><strong>{{ summary.completed_schedules_last_30 }}</strong><small>During the last 30 days</small></article>
+    </section>
+
+    <section class="dashboard-panel focus-strip" [class.attention]="summary.overdue || summary.due_24_hours">
+      <div><span>Next focus</span><strong>{{ summary.overdue ? summary.overdue + ' overdue' : summary.due_24_hours ? summary.due_24_hours + ' due within 24 hours' : 'You are up to date' }}</strong></div>
+      <div><span>Last check-in</span><strong>{{ summary.last_entry_date ? (summary.last_entry_date | date: 'mediumDate') : 'No entries yet' }}</strong></div>
+      <a routerLink="/client/profile" [queryParams]="{ tab: 'templates' }" class="primary-action">Record a Check-in</a>
+    </section>
+
+    <section class="dashboard-panel meetings-panel">
+      <header>
+        <div><h2>Meetings and Reminders</h2><p>Meeting requests, confirmed sessions, and professional reminders in one place.</p></div>
+        <a routerLink="/client/meetings" class="ghost-action">Open All</a>
+      </header>
+      <div class="dashboard-meeting-list">
+        @for (meeting of pendingMeetingRequests; track meeting.id) {
+          <a class="dashboard-meeting pending" routerLink="/client/meetings">
+            <div><strong>{{ meeting.title }}</strong><span>{{ meeting.start_at | date: 'EEE, MMM d, y, h:mm a' }}</span></div>
+            <span class="meeting-state pending">Waiting for professional approval</span>
+          </a>
+        }
+        @for (meeting of upcomingMeetings; track meeting.id) {
+          <a class="dashboard-meeting" routerLink="/client/meetings">
+            <div><strong>{{ meeting.title }}</strong><span>{{ meeting.start_at | date: 'EEE, MMM d, y, h:mm a' }}</span></div>
+            <span class="meeting-state">Confirmed</span>
+          </a>
+        }
+        @if (!pendingMeetingRequests.length && !upcomingMeetings.length) {
+          <p class="empty-state">No pending or upcoming meetings.</p>
+        }
+      </div>
+    </section>
+
+    <section class="dashboard-panel schedules-panel" aria-label="Reminder preview">
+      <header>
+        <div><h3>Reminder preview</h3><p>Overdue reminders are separated from upcoming activities.</p></div>
+        <div class="schedule-summary">
+          @if (summary.overdue) { <span class="overdue-count">{{ summary.overdue }} overdue</span> }
+          <span>{{ schedules.length }} pending</span>
+        </div>
+      </header>
+      <app-fixed-height-list [visibleRows]="6">
+        <div class="schedule-list">
+          @for (schedule of schedules; track schedule.id; let rowIndex = $index) {
+            @if (showScheduleGroupHeader(schedule, rowIndex)) {
+              <div class="schedule-group" [class.overdue-group]="isOverdue(schedule)">
+                <strong>{{ isOverdue(schedule) ? 'Overdue schedules' : 'Upcoming schedules' }}</strong>
+                <span>{{ scheduleGroupCount(schedule) }}</span>
+              </div>
+            }
+            <article [class.overdue]="isOverdue(schedule)" [class.due-soon]="isDueSoon(schedule)">
+              <div class="schedule-main"><strong>{{ schedule.title }}</strong><span>Professional-scheduled activity</span></div>
+              <time>{{ schedule.date | date: 'mediumDate' }}</time>
+              <span>{{ schedule.time || 'Time not set' }}</span>
+              <span class="status-pill" [class.overdue]="isOverdue(schedule)">{{ isOverdue(schedule) ? 'Overdue' : schedule.status }}</span>
+              <a routerLink="/client/meetings" class="ghost-action">Open Details</a>
+            </article>
+          } @empty { <p class="empty-state">No upcoming schedules.</p> }
+        </div>
+      </app-fixed-height-list>
+    </section>
+
+    <section class="analytics-section">
+      <header><div><h2>Template Analytics</h2><p>Graphs appear only for fields with submitted data.</p></div></header>
+      @for (group of templateGraphGroups; track group.template.id) {
+        <section class="template-graph-group">
+          <h3>{{ group.template.name }}</h3>
+          <div class="graph-stack">
+            @for (chart of group.charts; track chart.title) { <app-chart-renderer [spec]="chart" /> }
+          </div>
+        </section>
+      } @empty {
+        <div class="dashboard-panel empty-state"><p>Submit template entries to see analytics here.</p></div>
+      }
+    </section>
+  }
+</app-client-page-shell>

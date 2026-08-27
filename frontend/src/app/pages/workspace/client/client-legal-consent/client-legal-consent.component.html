@@ -1,0 +1,32 @@
+<main class="consent-page">
+  <header class="consent-topbar">
+    <a routerLink="/portal" class="brand">
+      <span class="brand__mark"><img src="/brand/reproot/mark.png" alt=""></span>
+      <span><span class="brand__rep">Rep</span><span class="brand__root">Root</span></span>
+    </a>
+    <span class="secure-note">Client access</span>
+  </header>
+  <section class="consent-card">
+    <p class="eyebrow">First-time client review</p>
+    <h1>Review how RepRoot works</h1>
+    <p class="intro">Before entering the client portal, review the documents that apply specifically to clients.</p>
+    @if (legalEffectiveDate) { <p class="intro">Last updated: {{ legalEffectiveDate }}</p> }
+
+    <div class="relationship-note">
+      <strong>Your professional manages your coaching relationship.</strong>
+      <span>RepRoot provides the software. Your professional decides what information and activities to request.</span>
+    </div>
+
+    <div class="document-links">
+      <a routerLink="/terms/client" target="_blank"><strong>Client Terms and Conditions</strong><span>Responsibilities, professional relationship, payments, and safety.</span></a>
+      <a routerLink="/privacy/client" target="_blank"><strong>Client Privacy Notice</strong><span>What RepRoot processes, what your professional controls, and your choices.</span></a>
+    </div>
+
+    <label><input type="checkbox" [(ngModel)]="acceptedLegalDocuments"> <span>I have reviewed and accept the Client Terms and Conditions and Client Privacy Notice.</span></label>
+
+    @if (message) { <p class="error">{{ message }}</p> }
+    <button type="button" (click)="submit()" [disabled]="submitting || !acceptedLegalDocuments">
+      {{ submitting ? 'Saving...' : 'Accept and Continue' }}
+    </button>
+  </section>
+</main>

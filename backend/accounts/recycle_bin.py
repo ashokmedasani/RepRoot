@@ -1,5 +1,5 @@
 """
-Recycle bin for RepRoot Studio — scoped narrow on purpose.
+Recycle bin for RepRoot — scoped narrow on purpose.
 
 Only three things go through soft_delete_*() instead of a raw .delete():
   - chat messages that carry an image (the text itself is cheap to lose)

@@ -3,3 +3,58 @@
   min-height: 100vh;
   background: var(--app-bg);
 }
+
+.offline-banner {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  left: 50%;
+  width: min(680px, calc(100% - 24px));
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border: 1px solid #f59e0b;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: #fff7ed;
+  color: #7c2d12;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.route-progress {
+  position: fixed;
+  z-index: 9999;
+  inset: 0 0 auto;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--brand-primary, #2563eb) 18%, transparent);
+}
+
+.route-progress span {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand-primary, #2563eb);
+  animation: route-loading 1s ease-in-out infinite;
+}
+
+@keyframes route-loading {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(365%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-progress span {
+    width: 100%;
+    animation: none;
+  }
+}

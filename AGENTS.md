@@ -87,3 +87,23 @@ missing and must never use a real credential as a source-code fallback.
   secret-bearing generated log is included.
 - Support, meeting, SMTP, calendar, payment, storage, and database production
   values are always entered manually by the user after code delivery.
+
+## Deprecated / Unused Documentation
+
+- `_deprecated_docs/` at the repo root holds planning documents that were
+  written across past sessions, do not reflect the real, current code, and
+  have caused agents to give the user contradictory or stale information.
+  They are queued for deletion.
+- Never read anything under `_deprecated_docs/` as current product behavior,
+  architecture, or a source of truth — not plan limits, not feature status,
+  not "what's already built." Each file there carries its own deprecation
+  banner explaining specifically what in it is wrong or stale.
+- If a task requires knowing real plan/billing limits, current feature
+  status, or any fact that a stale doc might tempt you to answer from,
+  verify it directly from the real source (e.g. `backend/config/settings.py`
+  for plan tiers, the actual frontend/backend code for feature status) —
+  never from a markdown planning doc, deprecated or not, unless the user
+  explicitly confirms it still reflects reality.
+- When the user asks for new planning docs on a topic that already has a
+  deprecated one, treat it as a fresh discussion — do not assume continuity
+  with the old, superseded plan.

@@ -1,0 +1,55 @@
+<app-professional-page-shell
+  title="Create your first group"
+  eyebrow="Step 2"
+  subtitle="Create the group that will organize clients, forms, and assigned templates."
+  activeSection="forms-groups"
+  titleId="group-create-title"
+>
+    <a page-actions class="secondary-action" routerLink="/professional/forms-groups">&larr; Back to Forms and Client Groups</a>
+
+    @if (isLoading) {
+      <p class="message">Loading group setup...</p>
+    } @else {
+      <section class="group-card intro-card">
+        <h2>Groups help you organize clients</h2>
+        <p>Groups help you separate clients under this form based on goals, categories, or training plans.</p>
+        <div class="examples" aria-label="Group examples">
+          <span>Bulk</span>
+          <span>Weight Loss</span>
+          <span>Mobility</span>
+          <span>Strength</span>
+          <span>General Fitness</span>
+        </div>
+      </section>
+
+      <section class="group-card">
+        <label>
+          <span class="field-label">Group Name</span>
+          <input type="text" [(ngModel)]="groupName" name="groupName">
+        </label>
+        <label>
+          <span class="field-label">Group Description optional</span>
+          <textarea rows="4" [(ngModel)]="groupDescription" name="groupDescription"></textarea>
+        </label>
+      </section>
+
+      <section class="group-card notice-card" role="note">
+        <h3>Next step is required</h3>
+        <p>
+          When you create this group, a simple client creation form is set up automatically with five
+          recommended fitness fields. You will be taken straight to it to review or customize before
+          you assign clients to this group.
+        </p>
+      </section>
+
+      @if (message) {
+        <p class="message" [class.error-message]="messageType === 'error'">{{ message }}</p>
+      }
+
+      <div class="action-bar">
+        <button type="button" class="primary-action" [disabled]="isSaving" (click)="createGroup()">
+          {{ isSaving ? 'Creating...' : 'Create group and continue' }}
+        </button>
+      </div>
+    }
+</app-professional-page-shell>

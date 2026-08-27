@@ -134,6 +134,11 @@ def calculate_professional_data_usage(professional) -> dict:
       profile.transformation_photo,
       profile.training_photo,
     ]
+    # Gallery pictures are real files now, so they count as file storage. While
+    # they were base64 strings inside `profile_images` they were counted as
+    # database bytes by `model_to_dict(profile)` above -- inflated by ~33% and
+    # attributed to the wrong bucket.
+    profile_files.extend(image.image for image in profile.images.all())
 
   # Plan-limit lock system: a group/lead-form/template/resource/category that
   # is currently locked (over the plan's count limit) is already hidden and

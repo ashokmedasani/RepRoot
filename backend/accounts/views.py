@@ -106,6 +106,7 @@ from .serializers import (
   ProfessionalLoginSerializer,
   ProfessionalPasswordChangeSerializer,
   ProfessionalProfileSerializer,
+  normalize_profile_section_order,
   normalize_profile_visibility,
   ProfessionalProfileStatusSerializer,
   ProfessionalResourceSerializer,
@@ -120,6 +121,7 @@ from .data_retention import visible_client_data_cutoff
 from .data_usage import bust_professional_data_usage_cache, calculate_professional_data_usage
 from .email_utils import send_mail_background
 from .email_verification import OtpCooldownError, send_email_otp, verify_email_otp
+from .support_emails import notify_support_team, send_professional_welcome_email
 from .standard_templates import STANDARD_TEMPLATES, get_standard_template
 from .plan_limits import plan_limit, professional_plan
 
@@ -227,7 +229,10 @@ def build_professional_account_snapshot(user):
       'instagram_url': profile.instagram_url,
       'youtube_url': profile.youtube_url,
       'website_url': profile.website_url,
-      'profile_images': profile.profile_images,
+      'profile_images': [
+        {'id': row.pk, 'category': row.category, 'title': row.title, 'file': row.image.name}
+        for row in profile.images.all()
+      ] or profile.profile_images,
       'profile_links': profile.profile_links,
       'terms_accepted': profile.terms_accepted,
       'privacy_policy_accepted': profile.privacy_policy_accepted,
@@ -252,7 +257,34 @@ def build_public_professional_profile(user, request=None):
 
     return request.build_absolute_uri(file_field.url) if request else file_field.url
 
-  public_images = list(profile.profile_images or []) if visibility.get('images') else []
+  # Gallery pictures now live in their own table (ProfessionalProfileImage).
+  # The legacy JSONField is still read as a fallback so a profile whose images
+  # have not been converted yet -- or whose entries the data migration skipped
+  # because they were already plain URLs -- does not go blank for clients.
+  public_images = []
+  if visibility.get('images'):
+    public_images = [
+      {'category': row.category, 'title': row.title, 'url': file_url(row.image)}
+      for row in profile.images.all()
+      if row.image
+    ]
+
+    # Merged, not replaced: the data migration leaves entries that were already
+    # plain URLs in the JSON field, and dropping them the moment one picture was
+    # converted would quietly remove them from the client-facing profile.
+    seen = {(image['category'], image['title']) for image in public_images}
+    for entry in (profile.profile_images or []):
+      if not isinstance(entry, dict):
+        continue
+      url = str(entry.get('url') or '').strip()
+      if not url or url.startswith('data:'):
+        continue
+      key = (str(entry.get('category') or ''), str(entry.get('title') or ''))
+      if key in seen:
+        continue
+      seen.add(key)
+      public_images.append({'category': key[0], 'title': key[1], 'url': url})
+
   if visibility.get('images'):
     legacy_images = [
       ('Transformation Photos', 'Transformation photo', profile.transformation_photo),
@@ -339,6 +371,27 @@ def _username_suggestions(base: str, limit: int = 3) -> list[str]:
   return [candidate for candidate in candidates if candidate.lower() not in taken_lower][:limit]
 
 
+def _professional_code_suggestions(base: str, limit: int = 3) -> list[str]:
+  """Return short, available variations when a professional code is taken."""
+  normalized = ''.join(character for character in str(base).lower() if character.isalnum() or character in '-_')
+  normalized = normalized[:26] or 'professional'
+  candidates = []
+  for suffix in random.sample(range(1, 100), 8):
+    candidate = f'{normalized[:32 - len(str(suffix))]}{suffix}'
+    if candidate not in candidates:
+      candidates.append(candidate)
+
+  taken_query = Q()
+  for candidate in candidates:
+    taken_query |= Q(professional_id__iexact=candidate)
+  taken_lower = {
+    value.lower()
+    for value in ProfessionalProfile.objects.filter(taken_query).values_list('professional_id', flat=True)
+    if value
+  }
+  return [candidate for candidate in candidates if candidate.lower() not in taken_lower][:limit]
+
+
 class UsernameAvailabilityView(APIView):
   permission_classes = [permissions.AllowAny]
   throttle_classes = [ScopedRateThrottle]
@@ -387,19 +440,79 @@ class ProfessionalCodeAvailabilityView(APIView):
         'professional_code': code,
         'available': is_available,
         'message': 'Professional code is available.' if is_available else 'Professional code is already taken.',
+        'suggestions': [] if is_available else _professional_code_suggestions(code),
       }
     )
+
+
+# Typed confirmation for a professional-code change, enforced here and not only
+# in the UI. Changing this code signs every existing client out of the only
+# credentials they have, and nothing about a single "Save" click conveyed that.
+CODE_CHANGE_CONFIRMATION = 'APPROVED'
+
+
+def notify_clients_of_code_change(professional, old_code, new_code):
+  """Tell every client with portal access what their sign-in code is now.
+
+  This is the whole reason the change is dangerous: clients sign in with the
+  professional's code plus their own username, and they have no way of learning
+  that it changed. Leaving them to find out by failing to log in is what makes
+  this destructive; sending the mail is what makes it merely disruptive.
+  """
+  recipients = (
+    ClientAccess.objects.filter(professional=professional, has_portal_access=True)
+    .exclude(email='')
+    .values_list('email', 'first_name')
+  )
+
+  sent = 0
+  for email, first_name in recipients:
+    greeting = f'Hi {first_name},' if first_name else 'Hi,'
+    send_mail_background(
+      subject='Your RepRoot sign-in code has changed',
+      message=(
+        f'{greeting}\n\n'
+        f'The professional code you use to sign in has changed.\n\n'
+        f'Previous code: {old_code}\n'
+        f'New code: {new_code}\n\n'
+        f'Your username and password are unchanged - only the code is different. '
+        f'Use the new code the next time you sign in.'
+      ),
+      from_email=None,
+      recipient_list=[email],
+      fail_silently=False,
+    )
+    sent += 1
+
+  return sent
 
 
 class ProfessionalCodeUpdateView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def get(self, request):
-    return Response({'professional_code': request.user.professional_profile.professional_id or ''})
+    """The current code plus what changing it would affect, so the UI can show
+    the consequence before asking for a decision rather than after."""
+    profile = request.user.professional_profile
+    clients = ClientAccess.objects.filter(professional=request.user)
+
+    return Response(
+      {
+        'professional_code': profile.professional_id or '',
+        'impact': {
+          'clients_total': clients.count(),
+          'clients_with_access': clients.filter(has_portal_access=True).count(),
+          'clients_contactable': clients.filter(has_portal_access=True).exclude(email='').count(),
+        },
+        'confirmation_phrase': CODE_CHANGE_CONFIRMATION,
+      }
+    )
 
   def put(self, request):
     profile = request.user.professional_profile
     code = str(request.data.get('professional_code', '')).strip().lower()
+    confirmation = str(request.data.get('confirmation', '')).strip().upper()
+    notify_clients = bool(request.data.get('notify_clients', True))
 
     if len(code) < 4 or len(code) > 32:
       return Response({'message': 'Professional code must be 4 to 32 characters.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -410,13 +523,40 @@ class ProfessionalCodeUpdateView(APIView):
         status=status.HTTP_400_BAD_REQUEST,
       )
 
+    previous_code = profile.professional_id or ''
+
+    if code == previous_code.lower():
+      return Response({'message': 'That is already your professional code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Checked server-side on purpose: the staged UI can be bypassed by calling
+    # the endpoint directly, and this is a destructive, client-facing change.
+    if confirmation != CODE_CHANGE_CONFIRMATION:
+      return Response(
+        {'message': f'Type {CODE_CHANGE_CONFIRMATION} to confirm this change.'},
+        status=status.HTTP_400_BAD_REQUEST,
+      )
+
     if ProfessionalProfile.objects.filter(professional_id__iexact=code).exclude(pk=profile.pk).exists():
       return Response({'message': 'Professional code is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
     profile.professional_id = code
     profile.save(update_fields=['professional_id', 'updated_at'])
 
-    return Response({'professional_code': profile.professional_id, 'message': 'Professional code saved.'})
+    notified = 0
+    if notify_clients and previous_code:
+      notified = notify_clients_of_code_change(request.user, previous_code, code)
+
+    message = 'Professional code saved.'
+    if notified:
+      message = f'Professional code saved. {notified} client{"s" if notified != 1 else ""} emailed the new code.'
+
+    return Response(
+      {
+        'professional_code': profile.professional_id,
+        'clients_notified': notified,
+        'message': message,
+      }
+    )
 
 
 class EmailAvailabilityView(APIView):
@@ -507,6 +647,7 @@ class ProfessionalSignupView(APIView):
     serializer = ProfessionalSignupSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.save()
+    send_professional_welcome_email(user)
     token = issue_professional_token(user)
 
     return Response(
@@ -557,6 +698,8 @@ class ProfessionalGoogleAuthView(APIView):
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
     created = serializer.validated_data['created']
+    if created:
+      send_professional_welcome_email(user)
     token = issue_professional_token(user)
 
     return Response(
@@ -713,6 +856,7 @@ class LegalConfigurationView(APIView):
 
   def get(self, request):
     return Response({
+      'last_updated_date': settings.REPROOT_LEGAL_LAST_UPDATED_DATE,
       'effective_date': settings.REPROOT_LEGAL_EFFECTIVE_DATE,
       'professional': {
         'version': settings.REPROOT_PROFESSIONAL_LEGAL_VERSION,
@@ -896,15 +1040,18 @@ class ProfessionalBillingStatusView(APIView):
         # no-charge test-mode shortcut happens to be on. Those are separate
         # things: test mode can be off in production with Razorpay fully
         # configured, or (in a dev sandbox) on with no real keys at all.
-        'billing_configured': razorpay_billing.is_configured() or settings.REPROOT_BILLING_TEST_MODE,
-        'test_mode': settings.REPROOT_BILLING_TEST_MODE,
+        'billing_configured': razorpay_billing.is_configured(),
+        'payments_enabled': settings.REPROOT_PAYMENTS_ENABLED,
+        'test_mode': settings.REPROOT_PAYMENTS_ENABLED and settings.REPROOT_BILLING_TEST_MODE,
         'billing_currency': 'INR' if is_india else 'USD',
         'billing_region': 'India' if is_india else 'International',
         'support_email': settings.SUPPORT_EMAIL,
         # A tier is offered once Razorpay is genuinely configured for it, or
         # test mode is on (which applies the tier directly with no charge).
         'available_upgrades': {
-          tier: (razorpay_billing.is_configured() or settings.REPROOT_BILLING_TEST_MODE)
+          tier: settings.REPROOT_PAYMENTS_ENABLED and (
+            razorpay_billing.is_configured() or settings.REPROOT_BILLING_TEST_MODE
+          )
           for tier in razorpay_billing.PLAN_PRICES
         },
         'catalog': razorpay_billing.public_catalog(),
@@ -922,6 +1069,12 @@ class ProfessionalBillingCheckoutView(APIView):
   throttle_scope = 'payments'
 
   def post(self, request):
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      return Response(
+        {'message': 'Subscription payments are not available yet.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+      )
+
     target_tier = str(request.data.get('target_tier', '')).strip().lower()
     allowed_tiers = tuple(razorpay_billing.PLAN_PRICES)
     if target_tier not in allowed_tiers:
@@ -953,12 +1106,6 @@ class ProfessionalBillingCheckoutView(APIView):
         'test_mode': True,
         'message': f'Plan updated to {professional_plan(request.user)["name"]} for testing.',
       })
-
-    if not settings.REPROOT_PAYMENTS_ENABLED:
-      return Response(
-        {'message': 'Subscription payments are not available yet.'},
-        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-      )
 
     profile_country = str(profile.country or '').strip().lower()
     currency = 'INR' if profile_country in ('india', 'in', 'ind') else 'USD'
@@ -1003,6 +1150,12 @@ class ProfessionalBillingCancelView(APIView):
     return Response(subscription_cancellation.downgrade_assessment(request.user, target_tier_code))
 
   def post(self, request):
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      return Response(
+        {'message': 'Subscription payments are not available yet.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+      )
+
     profile = request.user.professional_profile
     if profile.plan_tier in (ProfessionalProfile.PLAN_STARTER_FREE, ProfessionalProfile.PLAN_STARTER):
       return Response({'message': 'This professional is already on the Free plan.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1070,6 +1223,12 @@ class ProfessionalBillingPortalView(APIView):
   permission_classes = [ProfessionalAccessPermission]
 
   def post(self, request):
+    if not settings.REPROOT_PAYMENTS_ENABLED:
+      return Response(
+        {'message': 'Subscription payments are not available yet.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+      )
+
     if settings.REPROOT_BILLING_PROVIDER == 'razorpay':
       if not settings.RAZORPAY_PERSONAL_LINK:
         return Response({'message': 'Billing support link is not configured yet.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1094,6 +1253,8 @@ class ProfessionalBillingPortalView(APIView):
 def razorpay_webhook(request):
   if request.method != 'POST':
     return HttpResponse(status=405)
+  if not settings.REPROOT_PAYMENTS_ENABLED:
+    return HttpResponse(status=503)
   if not settings.RAZORPAY_WEBHOOK_SECRET:
     return HttpResponse(status=503)
   signature = request.META.get('HTTP_X_RAZORPAY_SIGNATURE', '')
@@ -1185,6 +1346,9 @@ def stripe_webhook(request):
   """
   if request.method != 'POST':
     return HttpResponse(status=405)
+
+  if not settings.REPROOT_PAYMENTS_ENABLED:
+    return HttpResponse(status=503)
 
   if not settings.STRIPE_WEBHOOK_SECRET:
     return HttpResponse(status=503)
@@ -1365,16 +1529,39 @@ class ProfessionalProfileVisibilityView(APIView):
 
   def put(self, request):
     profile = request.user.professional_profile
-    visibility = request.data.get('visibility', {})
+    updated_fields = ['updated_at']
+    message = 'Profile visibility updated.'
 
-    if not isinstance(visibility, dict):
-      return Response({'message': 'visibility must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
+    # Visibility and section order share this endpoint: they are two halves of
+    # "how this profile is presented", and the page changes one or the other
+    # from the same screen. Either may be omitted.
+    if 'visibility' in request.data:
+      visibility = request.data.get('visibility') or {}
 
-    profile.profile_visibility = normalize_profile_visibility(visibility)
-    profile.save(update_fields=['profile_visibility', 'updated_at'])
+      if not isinstance(visibility, dict):
+        return Response({'message': 'visibility must be an object.'}, status=status.HTTP_400_BAD_REQUEST)
+
+      profile.profile_visibility = normalize_profile_visibility(visibility)
+      updated_fields.append('profile_visibility')
+
+    if 'section_order' in request.data:
+      section_order = request.data.get('section_order') or []
+
+      if not isinstance(section_order, list):
+        return Response({'message': 'section_order must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+      profile.profile_section_order = normalize_profile_section_order(section_order)
+      updated_fields.append('profile_section_order')
+      message = 'Profile updated.'
+
+    profile.save(update_fields=updated_fields)
 
     return Response(
-      {'profile_visibility': profile.profile_visibility, 'message': 'Profile visibility updated.'}
+      {
+        'profile_visibility': normalize_profile_visibility(profile.profile_visibility),
+        'profile_section_order': normalize_profile_section_order(profile.profile_section_order),
+        'message': message,
+      }
     )
 
 
@@ -1669,7 +1856,7 @@ class ClientRegistrationFormView(APIView):
     return Response(
       {
         'registration_form': ClientRegistrationFormSerializer(serializer.instance).data,
-        'message': 'Client registration form saved successfully.',
+        'message': 'Client Information Form saved successfully.',
       },
       status=status.HTTP_201_CREATED if registration_form is None else status.HTTP_200_OK,
     )
@@ -1783,7 +1970,7 @@ class ClientAccessCreateView(APIView):
     registration_form = getattr(group, 'client_registration_form', None)
 
     if registration_form is None:
-      return Response({'message': 'Create client registration form for this group first.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'Create the Client Information Form for this group first.'}, status=status.HTTP_400_BAD_REQUEST)
 
     registration_answers = serializer.validated_data.get('registration_answers', {})
     registration_answers['first_name'] = submission.first_name
@@ -1868,7 +2055,7 @@ class ManualClientAccessCreateView(APIView):
     registration_form_required = registration_form is None or registration_form.is_mandatory
 
     if registration_form_required and (registration_form is None or not registration_form.is_active):
-      return Response({'message': 'This group needs an active client registration form.'}, status=status.HTTP_400_BAD_REQUEST)
+      return Response({'message': 'This group needs an active Client Information Form.'}, status=status.HTTP_400_BAD_REQUEST)
 
     answers = dict(serializer.validated_data.get('registration_answers') or {})
     registration_submission = None
@@ -4212,25 +4399,7 @@ def _support_reporter_identity(role, reporter):
 
 
 def _notify_support_team(incident):
-  if not settings.SUPPORT_EMAIL:
-    return
-  send_mail_background(
-    subject=f'[{incident.incident_id}] {incident.subject}',
-    message=(
-      f'New RepRoot support request\n\n'
-      f'Reference: {incident.incident_id}\n'
-      f'Reporter: {incident.reporter_name}\n'
-      f'Reporter email: {incident.reporter_email}\n'
-      f'Category: {incident.get_category_display()}\n'
-      f'Priority: {incident.get_priority_display()}\n'
-      f'Platform: {incident.platform}\n\n'
-      f'{incident.description}\n\n'
-      f'Open the RepRoot admin support queue to respond.'
-    ),
-    from_email=settings.DEFAULT_FROM_EMAIL,
-    recipient_list=[settings.SUPPORT_EMAIL],
-    fail_silently=False,
-  )
+  notify_support_team(incident)
 
 
 def _support_incident_list(request, role, reporter):

@@ -1,0 +1,75 @@
+# Local HTTPS for LAN device testing (phones, tablets, other browsers).
+#
+# Why this exists: flutter_secure_storage on web encrypts through WebCrypto
+# (crypto.subtle), and browsers only expose that in a *secure context* —
+# HTTPS, or localhost/127.0.0.1. On a plain-http LAN origin like
+# http://192.168.4.68:8080 it is undefined, so the login hangs forever before
+# any request is sent. Serving over HTTPS restores it.
+#
+# Everything is served from ONE origin on purpose:
+#   * no mixed-content blocking (an https page cannot call an http API)
+#   * no CORS at all — the app and API share an origin
+#   * one certificate to trust on the phone instead of two
+#
+# Run from this folder, in a terminal with Administrator rights (binding 443
+# and installing the local CA both require elevation):
+#
+#     caddy run
+#
+# Replace the IP below if `ipconfig` shows a different IPv4 address.
+
+192.168.4.68 {
+	# Caddy's own local CA. It signs a cert for this IP and, with admin
+	# rights, installs the root into the Windows trust store so the laptop
+	# trusts it silently. The phone will still show a one-time warning —
+	# tap through it, or install the root CA on the phone to remove it
+	# (see the notes at the bottom of this file).
+	tls internal
+
+	# --- Django ---
+	# The API, plus the paths Django owns. /api/* must come first: these
+	# handle blocks are matched in order, and the catch-all below would
+	# otherwise swallow everything.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /admin/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /media/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /static/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# --- Flutter web app ---
+	# Catch-all: anything not claimed above is the app itself.
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Caddy sets X-Forwarded-Proto automatically, which is exactly what
+	# settings.py reads via SECURE_PROXY_SSL_HEADER — so Django correctly
+	# sees these as HTTPS requests without any extra configuration.
+}
+
+# ---------------------------------------------------------------------------
+# Removing the certificate warning on the phone (optional)
+#
+# `tls internal` signs with a CA that only your laptop trusts, so other
+# devices show a warning. Clicking through it is enough for testing — the
+# origin still counts as secure and crypto.subtle appears. To remove the
+# warning entirely:
+#
+#   1. Find Caddy's root CA on this machine:
+#      %AppData%\Local\caddy\pki\authorities\local\root.crt
+#   2. Copy it to the phone (email, USB, cloud drive).
+#   3. Android: Settings > Security > More security settings >
+#      Encryption & credentials > Install a certificate > CA certificate.
+#      iOS: open the file, install the profile, then enable it under
+#      Settings > General > About > Certificate Trust Settings.
+#
+# Alternative: `mkcert` produces a cert from a CA you install once and reuse.
+# Swap `tls internal` for `tls cert.pem key.pem` if you go that route.
+# ---------------------------------------------------------------------------

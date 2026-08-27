@@ -1,0 +1,33 @@
+<div class="client-app-shell">
+  <app-client-portal-nav [activeSection]="activeSection" />
+
+  <main class="shell-main">
+    <section
+      class="client-workspace"
+      [style.--client-shell-max-width]="maxWidth"
+      [attr.aria-labelledby]="titleId"
+    >
+      <header class="client-page-header">
+        <div>
+          @if (eyebrow) { <p class="eyebrow">{{ eyebrow }}</p> }
+          <h1 [id]="titleId">{{ title }}</h1>
+          @if (subtitle) { <p class="page-subtitle">{{ subtitle }}</p> }
+        </div>
+        <div class="page-actions">
+          <div class="notification-menu">
+            <button type="button" class="notification-bell" (click)="toggleNotifications()" aria-label="Notifications">🔔 @if (unreadNotifications > 0) { <span>{{ badgeLabel(unreadNotifications) }}</span> }</button>
+            @if (notificationsOpen) {
+              <section class="notification-panel" [class.empty]="notifications.length === 0"><header><strong>Notifications</strong></header>
+                <div class="notification-list">@for (item of notifications; track item.id) { <button type="button" class="notification-row" [class.unread]="!item.is_read" (click)="openNotification(item)"><span class="notification-meta"><i [attr.data-category]="item.category"></i><b>{{ item.category }}</b><time>{{ item.created_at | date: 'MMM d, h:mm a' }}</time></span><strong>{{ item.title }}</strong><small>Open details →</small></button> } @empty { <p>No notifications yet.</p> }</div>
+                <footer class="notification-actions"><button type="button" (click)="clearNotifications()" [disabled]="notifications.length === 0">Clear All</button><button type="button" (click)="markAllNotificationsRead()" [disabled]="unreadNotifications === 0">Mark as Read</button></footer>
+              </section>
+            }
+          </div>
+          <ng-content select="[page-actions]"></ng-content>
+        </div>
+      </header>
+
+      <ng-content></ng-content>
+    </section>
+  </main>
+</div>

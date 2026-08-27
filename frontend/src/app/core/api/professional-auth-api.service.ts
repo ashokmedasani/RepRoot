@@ -96,7 +96,49 @@ export interface ProfessionalProfileStatusResponse {
   current_legal_document_version: string;
 }
 
+export interface SigninDetails {
+  username: string;
+  email: string;
+  cooldown_days: number;
+  username_changed_at: string | null;
+  email_changed_at: string | null;
+  can_change_username: boolean;
+  can_change_email: boolean;
+  username_available_at: string | null;
+  email_available_at: string | null;
+  pending_email: string;
+}
+
+export interface DeletionImpact {
+  clients: number;
+  client_groups: number;
+  lead_forms: number;
+  resources: number;
+  templates: number;
+  tracking_entries: number;
+  messages: number;
+}
+
+export interface ProfessionalDeletionState {
+  lifecycle_status: string;
+  is_deletion_pending: boolean;
+  deletion_requested_at: string | null;
+  deletion_hold_ends_at: string | null;
+  hold_days: number;
+  recycle_days: number;
+  impact: DeletionImpact;
+  message?: string;
+}
+
+export interface DeletionRequestPayload {
+  mode: 'hold' | 'immediate';
+  confirm_intent: string;
+  acknowledged_impact: boolean;
+  confirm_immediate?: string;
+}
+
 export interface LegalConfigurationResponse {
+  last_updated_date: string;
   effective_date: string;
   professional: { version: string };
   client: { version: string };
@@ -231,6 +273,7 @@ export interface ProfessionalBillingStatus {
   downgrade_assessment: DowngradeAssessment;
   has_billing_account: boolean;
   billing_configured: boolean;
+  payments_enabled: boolean;
   // True while real Stripe pricing isn't wired up for every tier yet —
   // "Update plan" applies the chosen tier directly with no charge so the
   // rest of the lifecycle can be tested end-to-end.
@@ -320,9 +363,30 @@ export interface ProfessionalProfile {
   profile_images: ProfessionalProfileImage[];
   profile_links: ProfessionalProfileLink[];
   profile_visibility: ProfessionalProfileVisibility;
+  /** Order the profile sections appear in. Empty means the built-in order. */
+  profile_section_order?: string[];
+}
+
+export interface ProfessionalCodeState {
+  professional_code: string;
+  impact: {
+    clients_total: number;
+    clients_with_access: number;
+    clients_contactable: number;
+  };
+  confirmation_phrase: string;
+}
+
+export interface ProfilePresentationResponse {
+  profile_visibility: ProfessionalProfileVisibility;
+  profile_section_order: string[];
+  message: string;
 }
 
 export interface ProfessionalProfileImage {
+  /** Present for every image stored server-side. Absent only for a picture the
+   *  professional has just chosen in the editor and not yet saved. */
+  id?: number;
   category: string;
   title: string;
   url: string;
@@ -377,26 +441,49 @@ export class ProfessionalAuthApiService {
     return this.http.post<EmailAvailabilityResponse>(`${this.apiBaseUrl}/professional/check-email/`, { email });
   }
 
-  checkProfessionalCode(professionalCode: string): Observable<{ available: boolean; message: string }> {
-    return this.http.post<{ available: boolean; message: string }>(`${this.apiBaseUrl}/professional/check-professional-code/`, {
+  checkProfessionalCode(professionalCode: string): Observable<{ available: boolean; message: string; suggestions: string[] }> {
+    return this.http.post<{ available: boolean; message: string; suggestions: string[] }>(`${this.apiBaseUrl}/professional/check-professional-code/`, {
       professional_code: professionalCode
     });
   }
 
-  updateProfessionalCode(professionalCode: string): Observable<{ professional_code: string; message: string }> {
-    return this.http.put<{ professional_code: string; message: string }>(
+  /** Current code plus what changing it would affect, so the consequence can be
+   *  shown before the decision rather than after it. */
+  getProfessionalCodeState(): Observable<ProfessionalCodeState> {
+    return this.http.get<ProfessionalCodeState>(
       `${this.apiBaseUrl}/professional/account/professional-code/`,
-      { professional_code: professionalCode },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  updateProfessionalCode(
+    professionalCode: string,
+    confirmation: string,
+    notifyClients: boolean
+  ): Observable<{ professional_code: string; clients_notified: number; message: string }> {
+    return this.http.put<{ professional_code: string; clients_notified: number; message: string }>(
+      `${this.apiBaseUrl}/professional/account/professional-code/`,
+      { professional_code: professionalCode, confirmation, notify_clients: notifyClients },
       { headers: this.getAuthHeaders() }
     );
   }
 
   updateProfileVisibility(
     visibility: ProfessionalProfileVisibility
-  ): Observable<{ profile_visibility: ProfessionalProfileVisibility; message: string }> {
-    return this.http.put<{ profile_visibility: ProfessionalProfileVisibility; message: string }>(
+  ): Observable<ProfilePresentationResponse> {
+    return this.http.put<ProfilePresentationResponse>(
       `${this.apiBaseUrl}/professional/profile/visibility/`,
       { visibility },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /** Same endpoint: visibility and order are two halves of how the profile is
+   *  presented, and the Profile page changes both from one screen. */
+  updateProfileSectionOrder(sectionOrder: string[]): Observable<ProfilePresentationResponse> {
+    return this.http.put<ProfilePresentationResponse>(
+      `${this.apiBaseUrl}/professional/profile/visibility/`,
+      { section_order: sectionOrder },
       { headers: this.getAuthHeaders() }
     );
   }
@@ -461,6 +548,68 @@ export class ProfessionalAuthApiService {
     return this.http.get<ProfessionalProfileStatusResponse>(`${this.apiBaseUrl}/professional/profile/status/`, {
       headers: this.getAuthHeaders()
     });
+  }
+
+  getSigninDetails(): Observable<SigninDetails> {
+    return this.http.get<SigninDetails>(`${this.apiBaseUrl}/professional/account/signin-details/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  changeUsername(username: string): Observable<SigninDetails> {
+    return this.http.post<SigninDetails>(
+      `${this.apiBaseUrl}/professional/account/signin-details/username/`,
+      { username },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /** Starts an email change. The address is not applied until confirmEmailChange. */
+  requestEmailChange(email: string): Observable<SigninDetails> {
+    return this.http.post<SigninDetails>(
+      `${this.apiBaseUrl}/professional/account/signin-details/email/`,
+      { email },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  confirmEmailChange(code: string): Observable<SigninDetails> {
+    return this.http.post<SigninDetails>(
+      `${this.apiBaseUrl}/professional/account/signin-details/email/confirm/`,
+      { code },
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  cancelEmailChange(): Observable<SigninDetails> {
+    return this.http.post<SigninDetails>(
+      `${this.apiBaseUrl}/professional/account/signin-details/email/cancel/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  /** Live counts of everything a deletion would remove, plus any pending state. */
+  getDeletionOverview(): Observable<ProfessionalDeletionState> {
+    return this.http.get<ProfessionalDeletionState>(`${this.apiBaseUrl}/professional/account/deletion/`, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  requestAccountDeletion(payload: DeletionRequestPayload): Observable<ProfessionalDeletionState> {
+    return this.http.post<ProfessionalDeletionState>(
+      `${this.apiBaseUrl}/professional/account/deletion/request/`,
+      payload,
+      { headers: this.getAuthHeaders() }
+    );
+  }
+
+  cancelAccountDeletion(): Observable<ProfessionalDeletionState> {
+    return this.http.post<ProfessionalDeletionState>(
+      `${this.apiBaseUrl}/professional/account/deletion/cancel/`,
+      {},
+      { headers: this.getAuthHeaders() }
+    );
   }
 
   getLegalConfiguration(): Observable<LegalConfigurationResponse> {
