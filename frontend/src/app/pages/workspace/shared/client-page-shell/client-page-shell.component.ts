@@ -41,11 +41,9 @@ export class ClientPageShellComponent implements OnInit, OnDestroy {
     this.notificationsOpen = false;
     const requestId = item.category === 'payments' ? String(item.payload?.['request_id'] || '') : '';
     const destination = requestId ? `/client/payments/requests/${requestId}` : item.action_url;
+    if (destination) void this.router.navigateByUrl(destination);
     this.clientApi.markNotificationRead(item.id).subscribe({
-      next: () => {
-        this.loadNotifications();
-        if (destination) void this.router.navigateByUrl(destination);
-      },
+      next: () => this.loadNotifications(),
       error: () => this.loadNotifications()
     });
   }
