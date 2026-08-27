@@ -772,6 +772,10 @@ app-chat-panel {
 .ws-tabs {
   display: flex;
   gap: 0.4rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-pill);
   padding: 0.3rem;
@@ -779,8 +783,14 @@ app-chat-panel {
   box-shadow: var(--app-shadow-sm);
 }
 
+.ws-tabs::-webkit-scrollbar {
+  display: none;
+}
+
 .ws-tabs button {
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: 7.5rem;
+  scroll-snap-align: start;
   border: 0;
   border-radius: var(--app-radius-pill);
   padding: 0.6rem 1.1rem;
@@ -1151,11 +1161,14 @@ app-chat-panel {
 @media (max-width: 760px) {
   .identity-top,
   .assign-row,
-  .activity-grid,
   .change-head,
   .change-row,
   dl {
     grid-template-columns: 1fr;
+  }
+
+  .activity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .change-head {

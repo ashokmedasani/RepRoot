@@ -25,6 +25,10 @@ h2 {
 
 .settings-menu {
   display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   flex-wrap: wrap;
   gap: 0.3rem;
   border: 1px solid var(--app-border);
@@ -842,7 +846,14 @@ input {
   .settings-menu {
     flex-wrap: nowrap;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
+  }
+
+  .settings-tab,
+  .settings-more {
+    scroll-snap-align: start;
   }
 
   .settings-menu::-webkit-scrollbar {

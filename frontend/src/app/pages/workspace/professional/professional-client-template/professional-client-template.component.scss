@@ -9,10 +9,18 @@
 .detail-tabs {
   display: flex;
   gap: 1.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--app-border);
 }
 
+.detail-tabs::-webkit-scrollbar {
+  display: none;
+}
+
 .detail-tabs button {
+  flex: 0 0 auto;
   border: 0;
   border-bottom: 2px solid transparent;
   padding: 0.5rem 0.2rem 0.75rem;
@@ -125,6 +133,10 @@
 .range-tabs {
   display: inline-flex;
   gap: 0.25rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-pill);
   padding: 0.25rem;
@@ -132,7 +144,12 @@
   box-shadow: var(--app-shadow-sm);
 }
 
+.range-tabs::-webkit-scrollbar {
+  display: none;
+}
+
 .range-tabs button {
+  flex: 0 0 auto;
   border: 0;
   border-radius: var(--app-radius-pill);
   padding: 0.4rem 0.85rem;

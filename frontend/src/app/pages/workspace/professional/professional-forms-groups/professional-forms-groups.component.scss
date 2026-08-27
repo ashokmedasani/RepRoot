@@ -296,8 +296,21 @@ h3 {
   .workspace-tabs {
     display: flex;
     width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
   }
-  .workspace-tab { flex: 1; align-items: flex-start; flex-direction: column; }
+
+  .workspace-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .workspace-tab {
+    flex: 0 0 auto;
+    min-width: 9.5rem;
+    scroll-snap-align: start;
+  }
 }
 
 .switch-control input {
@@ -367,9 +380,15 @@ h3 {
 
 .request-tabs {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   gap: 0.55rem;
   margin-bottom: 1rem;
+}
+
+.request-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .request-tabs button {
@@ -665,9 +684,12 @@ textarea {
 
 @media (max-width: 980px) {
   .lead-panel,
-.stats-grid,
 .meeting-rule-grid {
     grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .edit-form-action {
@@ -690,8 +712,7 @@ textarea {
     flex-direction: column;
   }
 
-  .form-link-box div,
-  .stats-grid {
+  .form-link-box div {
     grid-template-columns: 1fr;
   }
 }
@@ -747,11 +768,53 @@ textarea {
   }
 
   .lead-form-select {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
     max-width: none;
   }
 
   .workspace-actions {
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 620px) {
+  .lead-form-toolbar {
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .lead-form-select span,
+  .workspace-actions span {
+    font-size: 0.7rem;
+  }
+
+  .lead-form-select select {
+    padding: 0.52rem 0.65rem;
+    font-size: 0.84rem;
+  }
+
+  .table-wrap table {
+    min-width: 37rem;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    padding: 0.65rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  .table-wrap th:nth-child(1),
+  .table-wrap td:nth-child(1),
+  .table-wrap th:nth-child(3),
+  .table-wrap td:nth-child(3),
+  .table-wrap th:nth-child(6),
+  .table-wrap td:nth-child(6),
+  .table-wrap th:nth-child(7),
+  .table-wrap td:nth-child(7) {
+    display: none;
   }
 }
 

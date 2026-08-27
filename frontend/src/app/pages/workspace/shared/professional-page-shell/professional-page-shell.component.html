@@ -103,6 +103,97 @@
     </svg>
   </button>
 
+  @if (mobileNavigationMenu) {
+    <button
+      type="button"
+      class="mobile-nav-backdrop"
+      aria-label="Close navigation menu"
+      (click)="closeMobileNavigation()"
+    ></button>
+
+    <section class="mobile-nav-sheet" [attr.aria-label]="mobileNavigationMenu === 'manage' ? 'Manage navigation' : 'More navigation'">
+      <header>
+        <div>
+          <span>{{ mobileNavigationMenu === 'manage' ? 'Manage' : 'More' }}</span>
+          <small>{{ mobileNavigationMenu === 'manage' ? 'Build and organize your workspace' : 'Account, preferences, and support' }}</small>
+        </div>
+        <button type="button" aria-label="Close navigation menu" (click)="closeMobileNavigation()">×</button>
+      </header>
+
+      @if (mobileNavigationMenu === 'manage') {
+        <div class="mobile-sheet-links mobile-sheet-links-manage">
+          <a routerLink="/professional/forms-groups" [class.active]="activeSection === 'forms-groups'" (click)="closeMobileNavigation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+            <span><strong>Forms and Groups</strong><small>Intake, enquiries, and client groups</small></span>
+          </a>
+          <a routerLink="/professional/templates" [class.active]="activeSection === 'templates'" (click)="closeMobileNavigation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2.5M16 4V2.5M7.5 13.5h3M7.5 17h3M13.5 13.5h3"/></svg>
+            <span><strong>Templates</strong><small>Create and assign recurring work</small></span>
+          </a>
+          <a routerLink="/professional/resource" [class.active]="activeSection === 'resource'" (click)="closeMobileNavigation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13M9 7h6"/></svg>
+            <span><strong>Resources</strong><small>Reusable files and information</small></span>
+          </a>
+        </div>
+      } @else {
+        <div class="mobile-sheet-links mobile-sheet-links-more">
+          <a routerLink="/professional/profile" [class.active]="activeSection === 'profile'" (click)="closeMobileNavigation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.6 3.7-5.5 7-5.5s6.1 1.9 7 5.5"/></svg>
+            <span><strong>Profile</strong><small>Public professional information</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'my-account' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">A</span><span><strong>My Account</strong><small>Identity and professional details</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'security' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">S</span><span><strong>Security</strong><small>Password and sign-in details</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'billing' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">P</span><span><strong>Plan and Billing</strong><small>Plan, usage limits, and membership</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'payments' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">₹</span><span><strong>Payment Settings</strong><small>Client payment methods and records</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'storage' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">D</span><span><strong>Data Usage</strong><small>Storage and recycle bin</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'appearance' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">◐</span><span><strong>Appearance</strong><small>Light, dark, or system theme</small></span>
+          </a>
+          <a routerLink="/professional/account-settings" [queryParams]="{ section: 'support' }" (click)="closeMobileNavigation()">
+            <span class="sheet-icon">?</span><span><strong>Support and Legal</strong><small>Help, policies, and account information</small></span>
+          </a>
+          <button type="button" class="mobile-sheet-signout" [disabled]="isSigningOut" (click)="signOut()">
+            <span class="sheet-icon">↪</span><span><strong>{{ isSigningOut ? 'Signing out...' : 'Sign Out' }}</strong><small>Return to RepRoot access</small></span>
+          </button>
+        </div>
+      }
+    </section>
+  }
+
+  <nav class="mobile-bottom-nav" aria-label="Professional mobile navigation">
+    <a routerLink="/professional/dashboard" [class.active]="activeSection === 'dashboard'" (click)="closeMobileNavigation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <button type="button" [class.active]="isManageActive || mobileNavigationMenu === 'manage'" [attr.aria-expanded]="mobileNavigationMenu === 'manage'" (click)="toggleMobileNavigation('manage')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span>Manage</span>
+    </button>
+    <a routerLink="/professional/clients" [class.active]="activeSection === 'clients'" (click)="closeMobileNavigation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c.7-3.2 3-5 5.5-5s4.8 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.6"/><path d="M16 14.6c2.3.2 4 1.8 4.5 4.4"/></svg>
+      <span>Clients</span>
+      @if (unreadMessages > 0) { <i class="mobile-nav-badge">{{ badgeLabel(unreadMessages) }}</i> }
+    </a>
+    <a routerLink="/professional/schedule" [class.active]="activeSection === 'schedule'" (click)="closeMobileNavigation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v3M16 3v3"/><circle cx="8.5" cy="14" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.1" fill="currentColor" stroke="none"/></svg>
+      <span>Schedule</span>
+    </a>
+    <button type="button" [class.active]="isMoreActive || mobileNavigationMenu === 'more'" [attr.aria-expanded]="mobileNavigationMenu === 'more'" (click)="toggleMobileNavigation('more')">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>
+      <span>More</span>
+    </button>
+  </nav>
+
   <main class="shell-main">
     <section
       class="professional-workspace"

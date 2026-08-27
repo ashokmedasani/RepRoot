@@ -1,8 +1,9 @@
 import { DatePipe, KeyValuePipe, SlicePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, HostListener, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import {
   DowngradeAssessment,
@@ -66,6 +67,7 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly confirmation = inject(ConfirmationDialogService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly guide = inject(GuideService);
 
   readonly appVersion = '1.0.0';
@@ -547,21 +549,32 @@ export class ProfessionalAccountSettingsComponent implements OnInit {
     this.loadDeletionState();
     this.loadSigninDetails();
 
-    const sectionParam = this.route.snapshot.queryParamMap.get('section') as SettingsSection | null;
-    if (sectionParam && this.menu.some((item) => item.id === sectionParam)) {
-      this.activeSection = sectionParam;
-    }
+    // The mobile More sheet links directly to individual settings sections.
+    // Angular reuses this component while only query parameters change, so a
+    // snapshot would leave the old section visible until the page was reloaded.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const sectionParam = params.get('section') as SettingsSection | null;
+        if (sectionParam && this.menu.some((item) => item.id === sectionParam) && sectionParam !== this.activeSection) {
+          void this.selectSection(sectionParam);
+        }
 
-    const billingParam = this.route.snapshot.queryParamMap.get('billing');
-    if (billingParam === 'success') {
-      this.activeSection = 'billing';
-      this.billingActionMessageType = 'success';
-      this.billingActionMessage = 'Payment received — this can take a few seconds to reflect below while Stripe confirms it.';
-    } else if (billingParam === 'cancelled') {
-      this.activeSection = 'billing';
-      this.billingActionMessageType = 'error';
-      this.billingActionMessage = 'Checkout was cancelled — no charge was made.';
-    }
+        const billingParam = params.get('billing');
+        if (billingParam === 'success') {
+          if (this.activeSection !== 'billing') {
+            void this.selectSection('billing');
+          }
+          this.billingActionMessageType = 'success';
+          this.billingActionMessage = 'Payment received — this can take a few seconds to reflect below while Stripe confirms it.';
+        } else if (billingParam === 'cancelled') {
+          if (this.activeSection !== 'billing') {
+            void this.selectSection('billing');
+          }
+          this.billingActionMessageType = 'error';
+          this.billingActionMessage = 'Checkout was cancelled — no charge was made.';
+        }
+      });
   }
 
   async selectSection(id: SettingsSection): Promise<void> {

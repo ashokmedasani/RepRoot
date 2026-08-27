@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, Input, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, HostListener, Input, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { ActivityNotification, ProfessionalAuthApiService } from '@core/api/professional-auth-api.service';
@@ -7,6 +7,7 @@ import { ChatApiService } from '@core/api/chat-api.service';
 import { GuideService } from '@core/guide/guide.service';
 
 type ProfessionalSection = 'dashboard' | 'profile' | 'forms-groups' | 'templates' | 'clients' | 'schedule' | 'resource' | 'settings';
+type MobileNavigationMenu = 'manage' | 'more';
 
 @Component({
   selector: 'app-professional-page-shell',
@@ -38,6 +39,7 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   unreadNotifications = 0;
   notifications: ActivityNotification[] = [];
   notificationsOpen = false;
+  mobileNavigationMenu: MobileNavigationMenu | null = null;
   private unreadPoll: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
@@ -109,6 +111,28 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
     );
   }
 
+  get isManageActive(): boolean {
+    return this.activeSection === 'forms-groups' || this.activeSection === 'templates' || this.activeSection === 'resource';
+  }
+
+  get isMoreActive(): boolean {
+    return this.activeSection === 'profile' || this.activeSection === 'settings';
+  }
+
+  toggleMobileNavigation(menu: MobileNavigationMenu): void {
+    this.notificationsOpen = false;
+    this.mobileNavigationMenu = this.mobileNavigationMenu === menu ? null : menu;
+  }
+
+  closeMobileNavigation(): void {
+    this.mobileNavigationMenu = null;
+  }
+
+  @HostListener('document:keydown.escape')
+  closeMobileNavigationOnEscape(): void {
+    this.closeMobileNavigation();
+  }
+
   markAllNotificationsRead(): void {
     this.notifications = this.notifications.map((item) => ({ ...item, is_read: true }));
     this.unreadNotifications = 0;
@@ -129,6 +153,7 @@ export class ProfessionalPageShellComponent implements OnInit, OnDestroy {
   }
 
   signOut(): void {
+    this.closeMobileNavigation();
     this.isSigningOut = true;
     this.professionalAuthApi.logout().subscribe({
       next: () => this.clearAndRedirect(),

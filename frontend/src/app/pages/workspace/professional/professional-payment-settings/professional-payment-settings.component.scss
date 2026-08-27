@@ -4,12 +4,21 @@
 
 .payment-sections {
   display: flex;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
   gap: 0.4rem;
   margin-bottom: 1.25rem;
 }
 
+.payment-sections::-webkit-scrollbar {
+  display: none;
+}
+
 .section-pill {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-pill);
   padding: 0.45rem 0.9rem;

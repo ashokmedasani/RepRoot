@@ -202,9 +202,72 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 900px) {
-  .summary-band,
+  .summary-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .filters {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .summary-band {
+    gap: 0.6rem;
+    padding: 0.75rem;
+  }
+
+  .summary-band article {
+    padding: 0.75rem;
+  }
+
+  .summary-band strong {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .filters {
+    gap: 0.55rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .table-wrap table {
+    min-width: 34rem;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    padding: 0.62rem 0.65rem;
+    font-size: 0.76rem;
+  }
+
+  .table-wrap th:nth-child(1),
+  .table-wrap td:nth-child(1),
+  .table-wrap th:nth-child(3),
+  .table-wrap td:nth-child(3),
+  .table-wrap th:nth-child(5),
+  .table-wrap td:nth-child(5),
+  .table-wrap th:nth-child(6),
+  .table-wrap td:nth-child(6),
+  .table-wrap th:nth-child(8),
+  .table-wrap td:nth-child(8) {
+    display: none;
+  }
+
+  .client-name {
+    gap: 0.4rem;
+  }
+
+  .avatar {
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: 0.68rem;
+  }
+
+  .status-pill {
+    padding: 0.16rem 0.42rem;
+    font-size: 0.7rem;
   }
 }
 
