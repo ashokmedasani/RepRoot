@@ -931,11 +931,37 @@ app-chat-panel {
 }
 
 @media (max-width: 620px) {
+  .ws-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.22rem;
+    overflow: visible;
+    padding: 0.25rem;
+  }
+
+  .ws-tabs button {
+    min-width: 0;
+    padding: 0.48rem 0.3rem;
+    border-radius: var(--app-radius-md);
+    font-size: 0.72rem;
+  }
+
   .sched-row,
   .client-info-grid,
   .info-form-grid,
   .info-add-row {
     grid-template-columns: 1fr;
+  }
+
+  .sched-row {
+    gap: 0.55rem;
+    padding: 0.68rem;
+  }
+
+  .sched-side {
+    width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 

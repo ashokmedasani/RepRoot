@@ -37,7 +37,9 @@ export class RepRootHomeComponent implements OnInit, AfterViewInit {
   hasInteracted = false;
   isDragging = false;
   private dragStartX = 0;
+  private dragStartY = 0;
   private dragStartScrollLeft = 0;
+  private dragAxis: 'pending' | 'horizontal' | 'vertical' = 'pending';
   private viewReady = false;
   private pendingSupportScroll = false;
 
@@ -127,37 +129,57 @@ export class RepRootHomeComponent implements OnInit, AfterViewInit {
   }
 
   onStoryWheel(event: WheelEvent): void {
-    // Never convert a vertical wheel gesture into horizontal story movement.
-    // That trapped users inside the first and middle scenes and prevented the
-    // document from scrolling to pricing, support, and the footer. Native
-    // horizontal trackpad gestures still scroll this overflow container.
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-      this.hasInteracted = true;
+    if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+      // A horizontal overflow element can consume a vertical wheel/trackpad
+      // gesture even though it cannot scroll vertically. Forward that gesture
+      // to the document so the story never traps the visitor.
+      event.preventDefault();
+      window.scrollBy({ top: event.deltaY, left: 0, behavior: 'auto' });
+      return;
     }
+    this.hasInteracted = true;
   }
 
   onPointerDown(event: PointerEvent): void {
-    if (event.pointerType === 'touch') return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('button, a, input, select, textarea, label, summary')) return;
     const viewport = this.storyViewport?.nativeElement;
     if (!viewport) return;
-    this.isDragging = true;
-    this.hasInteracted = true;
     this.dragStartX = event.clientX;
+    this.dragStartY = event.clientY;
     this.dragStartScrollLeft = viewport.scrollLeft;
-    viewport.setPointerCapture(event.pointerId);
+    this.dragAxis = event.pointerType === 'touch' ? 'pending' : 'horizontal';
+    this.isDragging = event.pointerType !== 'touch';
+    if (this.isDragging) {
+      this.hasInteracted = true;
+      viewport.setPointerCapture(event.pointerId);
+    }
   }
 
   onPointerMove(event: PointerEvent): void {
-    if (!this.isDragging) return;
     const viewport = this.storyViewport?.nativeElement;
-    if (viewport) viewport.scrollLeft = this.dragStartScrollLeft - (event.clientX - this.dragStartX);
+    if (!viewport || this.dragAxis === 'vertical') return;
+    const deltaX = event.clientX - this.dragStartX;
+    const deltaY = event.clientY - this.dragStartY;
+    if (this.dragAxis === 'pending') {
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 7) return;
+      if (Math.abs(deltaY) >= Math.abs(deltaX)) {
+        this.dragAxis = 'vertical';
+        return;
+      }
+      this.dragAxis = 'horizontal';
+      this.isDragging = true;
+      this.hasInteracted = true;
+      viewport.setPointerCapture(event.pointerId);
+    }
+    if (this.dragAxis === 'horizontal') {
+      viewport.scrollLeft = this.dragStartScrollLeft - deltaX;
+    }
   }
 
   onPointerUp(event: PointerEvent): void {
-    if (!this.isDragging) return;
     this.isDragging = false;
+    this.dragAxis = 'pending';
     const viewport = this.storyViewport?.nativeElement;
     if (viewport?.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
   }

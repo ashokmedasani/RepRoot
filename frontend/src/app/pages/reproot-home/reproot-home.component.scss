@@ -53,9 +53,13 @@
 .preview-footer { grid-template-columns: repeat(4, 1fr); color: var(--app-muted); font-size: .72rem; text-align: center; }
 .feature-tabs { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1.5rem; }
 .feature-tabs button { position: relative; z-index: 5; border: 1px solid var(--app-primary); border-radius: .4rem; padding: .55rem .75rem; background: transparent; color: var(--app-primary-strong); font: inherit; font-size: .78rem; font-weight: 800; text-transform: capitalize; cursor: pointer; touch-action: manipulation; transition:background .18s ease,color .18s ease,transform .18s ease; }
-.feature-tabs button:hover,.feature-tabs button:focus-visible { background:var(--app-primary);color:#fff;outline:none;transform:translateY(-1px); }
+.feature-tabs button:focus-visible { background:var(--app-primary);color:#fff;outline:none;transform:translateY(-1px); }
 .feature-tabs button.active { border-color:var(--app-primary);background:var(--app-primary);color:#fff;box-shadow:0 .5rem 1.15rem color-mix(in srgb,var(--app-primary) 24%,transparent); }
-.feature-tabs button.active:hover,.feature-tabs button.active:focus-visible { background:var(--app-primary);color:#fff; }
+.feature-tabs button.active:focus-visible { background:var(--app-primary);color:#fff; }
+@media (hover: hover) {
+  .feature-tabs button:hover { background:var(--app-primary);color:#fff;outline:none;transform:translateY(-1px); }
+  .feature-tabs button.active:hover { background:var(--app-primary);color:#fff; }
+}
 .slide-signin { margin-top:1.15rem; }
 .feature-preview { display: grid; min-height: 23rem; grid-template-columns: 11rem 1fr; overflow: hidden; border: 1px solid color-mix(in srgb, var(--app-primary) 22%, var(--app-border)); border-radius: .7rem; background: var(--app-surface); box-shadow: 0 1.45rem 3.3rem color-mix(in srgb, #1e3a8a 14%, transparent), 0 .2rem .7rem color-mix(in srgb, var(--app-text) 7%, transparent); }
 .feature-nav { display: grid; align-content: start; gap: .35rem; border-right: 1px solid var(--app-border); padding: 1.25rem; background: var(--app-primary-soft); }

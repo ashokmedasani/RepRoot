@@ -407,6 +407,31 @@ dd {
 }
 
 @media (max-width: 760px) {
+  .group-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+    overflow: visible;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-lg);
+    padding: 0.25rem;
+  }
+
+  .group-tabs button {
+    min-width: 0;
+    padding: 0.48rem 0.35rem;
+    border: 0;
+    border-radius: var(--app-radius-md);
+    font-size: 0.7rem;
+    line-height: 1.25;
+  }
+
+  .group-tabs button.active {
+    border: 0;
+    background: var(--app-primary);
+    color: #fff;
+  }
+
   .summary-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -416,6 +441,56 @@ dd {
 .field-groups,
 .filters {
     grid-template-columns: 1fr;
+  }
+
+  .table-wrap {
+    max-height: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  th,
+  td {
+    padding: 0.55rem 0.4rem;
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+  }
+
+  th:nth-child(1),
+  td:nth-child(1),
+  th:nth-child(3),
+  td:nth-child(3),
+  th:nth-child(4),
+  td:nth-child(4),
+  th:nth-child(6),
+  td:nth-child(6) {
+    display: none;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 48%;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5) {
+    width: 27%;
+  }
+
+  th:nth-child(7),
+  td:nth-child(7) {
+    width: 25%;
+  }
+
+  .avatar {
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 0.7rem;
   }
 }
 

@@ -844,11 +844,10 @@ input {
 
 @media (max-width: 760px) {
   .settings-menu {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding: 0.3rem;
   }
 
   .settings-tab,
@@ -856,8 +855,14 @@ input {
     scroll-snap-align: start;
   }
 
-  .settings-menu::-webkit-scrollbar {
-    display: none;
+  .settings-tab,
+  .settings-more {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.35rem;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.76rem;
+    white-space: normal;
   }
 
   .password-form,

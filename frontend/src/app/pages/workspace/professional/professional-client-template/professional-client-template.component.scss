@@ -179,6 +179,37 @@
 // A 16rem minimum overflows any viewport narrower than that, and there was no
 // media query to catch it.
 @media (max-width: 620px) {
+  .detail-panel {
+    gap: 0.85rem;
+  }
+
+  .detail-tabs,
+  .range-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem;
+    overflow: visible;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-lg);
+    padding: 0.25rem;
+  }
+
+  .detail-tabs button,
+  .range-tabs button {
+    min-width: 0;
+    padding: 0.45rem 0.3rem;
+    border: 0;
+    border-radius: var(--app-radius-md);
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .detail-tabs button.active {
+    border: 0;
+    background: var(--app-primary);
+    color: #fff;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }

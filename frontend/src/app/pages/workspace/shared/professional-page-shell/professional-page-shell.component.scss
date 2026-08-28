@@ -362,6 +362,7 @@ button:disabled {
 
 @media (max-width: 900px) {
   .app-shell {
+    display: block;
     grid-template-columns: minmax(0, 1fr);
     height: auto;
     min-height: 100dvh;
@@ -387,9 +388,12 @@ button:disabled {
   .shell-main {
     width: 100%;
     min-width: 0;
+    min-height: auto;
     overflow-x: clip;
-    overflow-y: auto;
+    overflow-y: visible;
+    overscroll-behavior-y: auto;
     padding-bottom: calc(4.65rem + env(safe-area-inset-bottom));
+    touch-action: pan-y pinch-zoom;
   }
 
   .professional-workspace {

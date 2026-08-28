@@ -515,8 +515,8 @@ a.checklist-item:focus-visible {
   .attention-kpi {
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    min-height: 6.2rem;
-    padding: 0.75rem;
+    min-height: 5.25rem;
+    padding: 0.65rem;
   }
 
   .attention-kpi strong,
@@ -837,21 +837,28 @@ a.checklist-item:focus-visible {
 
 @media (max-width: 620px) {
   .dash-tabs {
-    flex-direction: row;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-  }
-
-  .dash-tabs::-webkit-scrollbar {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.2rem;
+    margin-bottom: 0.75rem;
+    padding: 0.22rem;
+    border-radius: var(--app-radius-lg);
   }
 
   .dash-tab {
-    flex: 0 0 auto;
-    min-width: 7.5rem;
-    scroll-snap-align: start;
+    min-width: 0;
+    gap: 0.25rem;
+    padding: 0.52rem 0.3rem;
+    border-radius: var(--app-radius-md);
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .tab-badge {
+    min-width: 1.05rem;
+    height: 1.05rem;
+    padding-inline: 0.22rem;
+    font-size: 0.58rem;
   }
 
   .payment-unlock-card {
