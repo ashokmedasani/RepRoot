@@ -23,7 +23,8 @@ class ProfessionalPaymentsPage extends ConsumerStatefulWidget {
       _ProfessionalPaymentsPageState();
 }
 
-class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsPage> {
+class _ProfessionalPaymentsPageState
+    extends ConsumerState<ProfessionalPaymentsPage> {
   PaymentSettingsRecord? _settings;
   List<String> _currencyOptions = [];
   List<ManualPaymentMethodRecord> _methods = [];
@@ -43,7 +44,10 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _message = ''; });
+    setState(() {
+      _loading = true;
+      _message = '';
+    });
     try {
       final api = ref.read(paymentsApiProvider);
       final settings = await api.getPaymentSettings();
@@ -59,22 +63,40 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
       _loadRevenue();
       _loadReconciliation();
     } catch (_) {
-      if (mounted) setState(() { _message = 'Could not load payment settings.'; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _message = 'Could not load payment settings.';
+          _loading = false;
+        });
+      }
     }
   }
 
   Future<void> _loadRevenue() async {
     try {
-      final revenue = await ref.read(paymentsApiProvider).getRevenueSummary(_revenuePeriod);
+      final revenue = await ref
+          .read(paymentsApiProvider)
+          .getRevenueSummary(_revenuePeriod);
       if (mounted) setState(() => _revenue = revenue);
-    } catch (_) {/* revenue is optional; the rest of the page still works */}
+    } catch (_) {
+      /* revenue is optional; the rest of the page still works */
+    }
   }
 
   Future<void> _loadReconciliation() async {
     try {
-      final recon = await ref.read(paymentsApiProvider).getPaymentReconciliation();
+      final recon = await ref
+          .read(paymentsApiProvider)
+          .getPaymentReconciliation();
       if (mounted) setState(() => _reconciliation = recon);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not load payment reconciliation: $error');
+      if (mounted && _message.isEmpty) {
+        setState(
+          () => _message = 'Payment reconciliation is temporarily unavailable.',
+        );
+      }
+    }
   }
 
   Future<void> _updateSettings({
@@ -85,7 +107,9 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
     if (_savingSettings) return;
     setState(() => _savingSettings = true);
     try {
-      final response = await ref.read(paymentsApiProvider).updatePaymentSettings(
+      final response = await ref
+          .read(paymentsApiProvider)
+          .updatePaymentSettings(
             paymentTrackingEnabled: trackingEnabled,
             reportingCurrency: currency,
             clientPaymentHistoryEnabled: historyEnabled,
@@ -97,7 +121,9 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
         });
       }
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update settings.');
+      _toast(
+        error is ApiException ? error.message : 'Could not update settings.',
+      );
     }
     if (mounted) setState(() => _savingSettings = false);
   }
@@ -118,15 +144,22 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
 
   Future<void> _toggleMethodStatus(ManualPaymentMethodRecord method) async {
     try {
-      final updated = await ref.read(paymentsApiProvider).setPaymentMethodStatus(
+      final updated = await ref
+          .read(paymentsApiProvider)
+          .setPaymentMethodStatus(
             method.id,
             method.isActive ? 'inactive' : 'active',
           );
       if (!mounted) return;
-      setState(() =>
-          _methods = _methods.map((m) => m.id == method.id ? updated : m).toList());
+      setState(
+        () => _methods = _methods
+            .map((m) => m.id == method.id ? updated : m)
+            .toList(),
+      );
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update the method.');
+      _toast(
+        error is ApiException ? error.message : 'Could not update the method.',
+      );
     }
   }
 
@@ -137,7 +170,10 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
         title: Text('Delete ${method.name}?'),
         content: const Text('Clients will no longer see this payment method.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -152,9 +188,15 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
     if (confirmed != true) return;
     try {
       await ref.read(paymentsApiProvider).deletePaymentMethod(method.id);
-      if (mounted) setState(() => _methods = _methods.where((m) => m.id != method.id).toList());
+      if (mounted) {
+        setState(
+          () => _methods = _methods.where((m) => m.id != method.id).toList(),
+        );
+      }
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not delete the method.');
+      _toast(
+        error is ApiException ? error.message : 'Could not delete the method.',
+      );
     }
   }
 
@@ -166,7 +208,9 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payments'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalManage)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalManage),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addOrEditMethod(),
@@ -174,13 +218,17 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
         label: const Text('Method'),
       ),
       body: _loading
-          ? const PagePad(children: [SkeletonBox(height: 120), SkeletonBox(height: 120)])
+          ? const PagePad(
+              children: [SkeletonBox(height: 120), SkeletonBox(height: 120)],
+            )
           : PagePad(
               onRefresh: _load,
               children: [
-                if (_message.isNotEmpty) ErrorNote(message: _message, onRetry: _load),
+                if (_message.isNotEmpty)
+                  ErrorNote(message: _message, onRetry: _load),
 
-                if (_revenue != null && (_settings?.paymentTrackingEnabled ?? false)) ...[
+                if (_revenue != null &&
+                    (_settings?.paymentTrackingEnabled ?? false)) ...[
                   AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,13 +260,15 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                             Expanded(
                               child: _MiniStat(
                                 label: 'This period',
-                                value: '${_revenue!.reportingCurrency} ${_revenue!.totalRevenue}',
+                                value:
+                                    '${_revenue!.reportingCurrency} ${_revenue!.totalRevenue}',
                               ),
                             ),
                             Expanded(
                               child: _MiniStat(
                                 label: 'This month',
-                                value: '${_revenue!.reportingCurrency} ${_revenue!.thisMonthTotal}',
+                                value:
+                                    '${_revenue!.reportingCurrency} ${_revenue!.thisMonthTotal}',
                               ),
                             ),
                           ],
@@ -226,14 +276,25 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                         if (_revenue!.recentTransactions.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.sm),
                           Text('Recent', style: context.text.labelMedium),
-                          for (final txn in _revenue!.recentTransactions.take(5))
+                          for (final txn in _revenue!.recentTransactions.take(
+                            5,
+                          ))
                             Padding(
-                              padding: const EdgeInsets.only(top: AppSpacing.xs),
+                              padding: const EdgeInsets.only(
+                                top: AppSpacing.xs,
+                              ),
                               child: Row(
                                 children: [
-                                  Expanded(child: Text(txn.clientName, style: context.text.bodySmall)),
-                                  Text('${txn.currency} ${txn.amount}',
-                                      style: context.text.bodySmall),
+                                  Expanded(
+                                    child: Text(
+                                      txn.clientName,
+                                      style: context.text.bodySmall,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${txn.currency} ${txn.amount}',
+                                    style: context.text.bodySmall,
+                                  ),
                                 ],
                               ),
                             ),
@@ -253,17 +314,22 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         title: const Text('Payment tracking'),
-                        subtitle: const Text('Show the revenue dashboard and summaries'),
+                        subtitle: const Text(
+                          'Show the revenue dashboard and summaries',
+                        ),
                         value: settings?.paymentTrackingEnabled ?? false,
                         onChanged: _savingSettings
                             ? null
-                            : (value) => _updateSettings(trackingEnabled: value),
+                            : (value) =>
+                                  _updateSettings(trackingEnabled: value),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         title: const Text('Client payment history'),
-                        subtitle: const Text('Let clients see their own payment records'),
+                        subtitle: const Text(
+                          'Let clients see their own payment records',
+                        ),
                         value: settings?.clientPaymentHistoryEnabled ?? false,
                         onChanged: _savingSettings
                             ? null
@@ -271,11 +337,16 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       DropdownButtonFormField<String>(
-                        initialValue: (settings != null &&
-                                _currencyOptions.contains(settings.reportingCurrency))
+                        initialValue:
+                            (settings != null &&
+                                _currencyOptions.contains(
+                                  settings.reportingCurrency,
+                                ))
                             ? settings.reportingCurrency
                             : null,
-                        decoration: const InputDecoration(labelText: 'Reporting currency'),
+                        decoration: const InputDecoration(
+                          labelText: 'Reporting currency',
+                        ),
                         items: [
                           for (final c in _currencyOptions)
                             DropdownMenuItem(value: c, child: Text(c)),
@@ -283,7 +354,9 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                         onChanged: _savingSettings
                             ? null
                             : (value) {
-                                if (value != null) _updateSettings(currency: value);
+                                if (value != null) {
+                                  _updateSettings(currency: value);
+                                }
                               },
                       ),
                     ],
@@ -299,7 +372,8 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                   const EmptyState(
                     compact: false,
                     icon: Icons.account_balance_wallet_outlined,
-                    message: 'No payment methods yet.\nAdd one so clients know how to pay you.',
+                    message:
+                        'No payment methods yet.\nAdd one so clients know how to pay you.',
                   )
                 else
                   for (final method in _methods)
@@ -313,9 +387,14 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(method.name, style: context.text.titleSmall),
                                   Text(
-                                    ManualPaymentCategory.label(method.category),
+                                    method.name,
+                                    style: context.text.titleSmall,
+                                  ),
+                                  Text(
+                                    ManualPaymentCategory.label(
+                                      method.category,
+                                    ),
                                     style: context.text.bodySmall,
                                   ),
                                 ],
@@ -361,15 +440,19 @@ class _ProfessionalPaymentsPageState extends ConsumerState<ProfessionalPaymentsP
                                     style: context.text.bodySmall,
                                   ),
                                 ),
-                                Text('${req.requestedCurrency} ${req.requestedAmount}',
-                                    style: context.text.bodySmall),
+                                Text(
+                                  '${req.requestedCurrency} ${req.requestedAmount}',
+                                  style: context.text.bodySmall,
+                                ),
                               ],
                             ),
                           ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Open a client\'s Payments to log these against a record.',
-                          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.tokens.muted,
+                          ),
                         ),
                       ],
                     ),
@@ -392,7 +475,10 @@ class _MiniStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: context.text.bodySmall?.copyWith(color: context.tokens.muted)),
+        Text(
+          label,
+          style: context.text.bodySmall?.copyWith(color: context.tokens.muted),
+        ),
         Text(value, style: context.text.titleMedium),
       ],
     );
@@ -423,7 +509,9 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
     super.initState();
     final existing = widget.existing;
     _name = TextEditingController(text: existing?.name ?? '');
-    _instructions = TextEditingController(text: existing?.clientInstructions ?? '');
+    _instructions = TextEditingController(
+      text: existing?.clientInstructions ?? '',
+    );
     _category = existing?.category ?? 'upi';
     _fields = TextEditingController(
       text: (existing?.clientVisibleFields.entries ?? [])
@@ -445,7 +533,10 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
       setState(() => _error = 'Give the method a name.');
       return;
     }
-    setState(() { _saving = true; _error = ''; });
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
     // Parse "key: value" lines into the client-visible fields map.
     final fields = <String, String>{};
     for (final line in _fields.text.split('\n')) {
@@ -477,7 +568,9 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = error is ApiException ? error.message : 'Could not save the method.';
+          _error = error is ApiException
+              ? error.message
+              : 'Could not save the method.';
         });
       }
     }
@@ -498,13 +591,17 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.existing == null ? 'Add payment method' : 'Edit payment method',
+              widget.existing == null
+                  ? 'Add payment method'
+                  : 'Edit payment method',
               style: context.text.titleMedium,
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Name (e.g. My UPI)'),
+              decoration: const InputDecoration(
+                labelText: 'Name (e.g. My UPI)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             DropdownButtonFormField<String>(
@@ -512,7 +609,10 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
               decoration: const InputDecoration(labelText: 'Type'),
               items: [
                 for (final c in ManualPaymentCategory.all)
-                  DropdownMenuItem(value: c, child: Text(ManualPaymentCategory.label(c))),
+                  DropdownMenuItem(
+                    value: c,
+                    child: Text(ManualPaymentCategory.label(c)),
+                  ),
               ],
               onChanged: (value) => setState(() => _category = value ?? 'upi'),
             ),
@@ -523,14 +623,17 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
               maxLines: 5,
               decoration: const InputDecoration(
                 labelText: 'Details clients see',
-                helperText: 'One per line, "Label: value" (e.g. UPI ID: me@bank)',
+                helperText:
+                    'One per line, "Label: value" (e.g. UPI ID: me@bank)',
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _instructions,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Instructions (optional)'),
+              decoration: const InputDecoration(
+                labelText: 'Instructions (optional)',
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             OutlinedButton.icon(
@@ -543,7 +646,11 @@ class _MethodSheetState extends ConsumerState<_MethodSheet> {
                 if (picked != null) setState(() => _qrFile = picked);
               },
               icon: const Icon(Icons.qr_code_2, size: 18),
-              label: Text(_qrFile == null ? 'Attach QR code (optional)' : 'QR code selected'),
+              label: Text(
+                _qrFile == null
+                    ? 'Attach QR code (optional)'
+                    : 'QR code selected',
+              ),
             ),
             if (_error.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.sm),

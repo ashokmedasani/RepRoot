@@ -37,3 +37,18 @@ deployment-artifacts/
 
 # JetBrains project config — local IDE state, not shared source.
 .idea/
+
+# Local migration/recovery material and superseded planning files. These may
+# contain account or database data and must never be committed or deployed.
+_backup_pre_fixes/
+_deprecated_docs/
+_to_delete/
+backup_*.sql
+backend/demo-accounts.md
+backend-src.tgz
+reproot-*.tgz
+reproot-backend-*.zip
+
+# Local Flutter launch configuration. Dart defines are supplied manually by
+# each developer or deployment environment and can contain private values.
+mobile_flutter/dart_defines.json

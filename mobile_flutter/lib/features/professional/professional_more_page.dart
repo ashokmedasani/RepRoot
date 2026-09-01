@@ -73,7 +73,9 @@ class _ProfessionalMorePageState extends ConsumerState<ProfessionalMorePage> {
     // Best effort: a failed server logout must still clear the local session.
     try {
       await api.logout();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Server sign-out failed; clearing the local session: $error');
+    }
     await api.clearSession();
     if (mounted) context.go(Routes.roleChooser);
   }

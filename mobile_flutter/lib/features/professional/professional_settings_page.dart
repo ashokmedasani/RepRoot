@@ -19,10 +19,12 @@ class ProfessionalSettingsPage extends ConsumerStatefulWidget {
   const ProfessionalSettingsPage({super.key});
 
   @override
-  ConsumerState<ProfessionalSettingsPage> createState() => _ProfessionalSettingsPageState();
+  ConsumerState<ProfessionalSettingsPage> createState() =>
+      _ProfessionalSettingsPageState();
 }
 
-class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsPage> {
+class _ProfessionalSettingsPageState
+    extends ConsumerState<ProfessionalSettingsPage> {
   final _professionalCode = TextEditingController();
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
@@ -58,6 +60,7 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
 
   Future<void> _load() async {
     final api = ref.read(professionalAuthApiProvider);
+    var partialLoadFailed = false;
     try {
       final profile = await api.getProfile();
       if (!mounted) return;
@@ -68,19 +71,34 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
             : profile.professionalCode;
         _originalCode = _professionalCode.text;
       });
-    } catch (_) {/* the account card just shows blanks */}
+    } catch (error) {
+      debugPrint('Could not load professional profile: $error');
+      partialLoadFailed = true;
+    }
     try {
       final usage = await api.getDataUsage();
       if (mounted) setState(() => _usage = usage);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not load professional data usage: $error');
+      partialLoadFailed = true;
+    }
     try {
       final billing = await api.getBillingStatus();
       if (mounted) setState(() => _billing = billing);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not load professional billing status: $error');
+      partialLoadFailed = true;
+    }
     try {
       final bin = await api.getRecycleBin();
       if (mounted) setState(() => _recycleBin = bin);
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Could not load professional recycle bin: $error');
+      partialLoadFailed = true;
+    }
+    if (partialLoadFailed) {
+      _toast('Some account details could not be loaded. Pull down to retry.');
+    }
   }
 
   void _toast(String text) {
@@ -96,7 +114,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     if (_billingBusy) return;
     setState(() => _billingBusy = true);
     try {
-      final url = await ref.read(professionalAuthApiProvider).createBillingCheckout(
+      final url = await ref
+          .read(professionalAuthApiProvider)
+          .createBillingCheckout(
             tier,
             billingCycle: billingCycle,
             currency: currency,
@@ -106,10 +126,14 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
       } else {
         _toast('Plan updated.');
       }
-      final billing = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      final billing = await ref
+          .read(professionalAuthApiProvider)
+          .getBillingStatus();
       if (mounted) setState(() => _billing = billing);
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not update the plan.');
+      _toast(
+        error is ApiException ? error.message : 'Could not update the plan.',
+      );
     }
     if (mounted) setState(() => _billingBusy = false);
   }
@@ -130,10 +154,17 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                 decoration: const InputDecoration(labelText: 'Billing period'),
                 items: const [
                   DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                  DropdownMenuItem(value: 'six_months', child: Text('6 Months · pay for 5')),
-                  DropdownMenuItem(value: 'yearly', child: Text('Yearly · pay for 10')),
+                  DropdownMenuItem(
+                    value: 'six_months',
+                    child: Text('6 Months · pay for 5'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'yearly',
+                    child: Text('Yearly · pay for 10'),
+                  ),
                 ],
-                onChanged: (value) => setDialogState(() => cycle = value ?? cycle),
+                onChanged: (value) =>
+                    setDialogState(() => cycle = value ?? cycle),
               ),
               const SizedBox(height: AppSpacing.sm),
               Align(
@@ -146,8 +177,14 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
             ],
           ),
           actions: [
-            TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => context.pop(true), child: const Text('Continue to checkout')),
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => context.pop(true),
+              child: const Text('Continue to checkout'),
+            ),
           ],
         ),
       ),
@@ -156,6 +193,7 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
       await _changePlan(tier, billingCycle: cycle, currency: currency);
     }
   }
+
   Future<void> _cancelPlan() async {
     final billing = _billing;
     if (billing == null) return;
@@ -182,9 +220,13 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     for (final entry in billing.downgradeLocks.entries) {
       final lockedCount = (entry.value['locked_count'] as num?)?.toInt() ?? 0;
       if (lockedCount == 0) continue;
-      final names = (entry.value['locked_names'] as List<dynamic>? ?? []).take(5).join(', ');
+      final names = (entry.value['locked_names'] as List<dynamic>? ?? [])
+          .take(5)
+          .join(', ');
       final label = labels[entry.key] ?? entry.key;
-      lockLines.add('$lockedCount $label${lockedCount == 1 ? '' : 's'} would lock ($names)');
+      lockLines.add(
+        '$lockedCount $label${lockedCount == 1 ? '' : 's'} would lock ($names)',
+      );
     }
     if (billing.categoryCascadeResourceCount > 0) {
       lockLines.add(
@@ -196,7 +238,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
           .take(5)
           .map((c) => '${c['client_name']} (${c['group_name']})')
           .join(', ');
-      lockLines.add('${billing.clientsLosingAccess.length} client(s) would lose portal access until you upgrade again: $names');
+      lockLines.add(
+        '${billing.clientsLosingAccess.length} client(s) would lose portal access until you upgrade again: $names',
+      );
     }
 
     final confirmed = await showDialog<bool>(
@@ -207,7 +251,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Paid access remains active until expiry, then the account moves to Free. Nothing is ever deleted.'),
+            const Text(
+              'Paid access remains active until expiry, then the account moves to Free. Nothing is ever deleted.',
+            ),
             for (final line in lockLines) ...[
               const SizedBox(height: AppSpacing.sm),
               Text(line),
@@ -215,7 +261,10 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
           ],
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Keep plan')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Keep plan'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -229,32 +278,51 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     );
     if (confirmed != true) return;
     try {
-      final message = await ref.read(professionalAuthApiProvider).cancelBillingPlan();
+      final message = await ref
+          .read(professionalAuthApiProvider)
+          .cancelBillingPlan();
       _toast(message.isNotEmpty ? message : 'Cancellation scheduled.');
-      final refreshed = await ref.read(professionalAuthApiProvider).getBillingStatus();
+      final refreshed = await ref
+          .read(professionalAuthApiProvider)
+          .getBillingStatus();
       if (mounted) setState(() => _billing = refreshed);
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not cancel the plan.');
+      _toast(
+        error is ApiException ? error.message : 'Could not cancel the plan.',
+      );
     }
   }
 
   Future<void> _openBillingPortal() async {
     try {
-      final url = await ref.read(professionalAuthApiProvider).createBillingPortal();
+      final url = await ref
+          .read(professionalAuthApiProvider)
+          .createBillingPortal();
       if (url.isNotEmpty) {
         await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } else {
         _toast('Billing portal is not available yet.');
       }
     } catch (error) {
-      _toast(error is ApiException ? error.message : 'Could not open billing portal.');
+      _toast(
+        error is ApiException
+            ? error.message
+            : 'Could not open billing portal.',
+      );
     }
   }
 
   Future<void> _restoreBinItem(RecycleBinItem item) async {
     try {
-      await ref.read(professionalAuthApiProvider).restoreRecycleBinItem(item.id);
-      if (mounted) setState(() => _recycleBin = _recycleBin.where((i) => i.id != item.id).toList());
+      await ref
+          .read(professionalAuthApiProvider)
+          .restoreRecycleBinItem(item.id);
+      if (mounted) {
+        setState(
+          () =>
+              _recycleBin = _recycleBin.where((i) => i.id != item.id).toList(),
+        );
+      }
       _toast('Restored.');
     } catch (error) {
       _toast(error is ApiException ? error.message : 'Could not restore.');
@@ -268,7 +336,10 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
         title: Text('Delete "${item.title}" forever?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => context.pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => context.pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => context.pop(true),
             style: FilledButton.styleFrom(
@@ -282,8 +353,15 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     );
     if (confirmed != true) return;
     try {
-      await ref.read(professionalAuthApiProvider).deleteRecycleBinItemPermanently(item.id);
-      if (mounted) setState(() => _recycleBin = _recycleBin.where((i) => i.id != item.id).toList());
+      await ref
+          .read(professionalAuthApiProvider)
+          .deleteRecycleBinItemPermanently(item.id);
+      if (mounted) {
+        setState(
+          () =>
+              _recycleBin = _recycleBin.where((i) => i.id != item.id).toList(),
+        );
+      }
     } catch (error) {
       _toast(error is ApiException ? error.message : 'Could not delete.');
     }
@@ -335,7 +413,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
       _passwordMessage = '';
     });
     try {
-      final message = await ref.read(professionalAuthApiProvider).changePassword(
+      final message = await ref
+          .read(professionalAuthApiProvider)
+          .changePassword(
             _currentPassword.text,
             _newPassword.text,
             _confirmPassword.text,
@@ -367,7 +447,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
-        leading: BackButton(onPressed: () => context.go(Routes.professionalMore)),
+        leading: BackButton(
+          onPressed: () => context.go(Routes.professionalMore),
+        ),
       ),
       body: PagePad(
         onRefresh: _load,
@@ -391,14 +473,19 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
               children: [
                 _KvList(
                   rows: [
-                    ('Plan', _usage?.planName.isNotEmpty ?? false ? _usage!.planName : '—'),
+                    (
+                      'Plan',
+                      _usage?.planName.isNotEmpty ?? false
+                          ? _usage!.planName
+                          : '—',
+                    ),
                     ('Storage used', '$_usagePercent%'),
                     if ((_usage?.usageLabel ?? '').isNotEmpty)
                       ('Capacity', titleCase(_usage!.usageLabel)),
                     (
                       'Records',
                       '${_usage?.recordCount ?? 0}'
-                          '${_usage != null && _usage!.totalBytes > 0 ? ' · ${formatBytes(_usage!.totalBytes)}' : ''}'
+                          '${_usage != null && _usage!.totalBytes > 0 ? ' · ${formatBytes(_usage!.totalBytes)}' : ''}',
                     ),
                   ],
                 ),
@@ -412,8 +499,8 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     color: _usage?.isDanger ?? false
                         ? context.colors.error
                         : _usage?.isWarning ?? false
-                            ? tokens.accent
-                            : context.colors.primary,
+                        ? tokens.accent
+                        : context.colors.primary,
                   ),
                 ),
                 if (_usage?.isLocked ?? false) ...[
@@ -422,13 +509,17 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     _usage!.lockReason.isNotEmpty
                         ? _usage!.lockReason
                         : 'Uploads are paused — you are over your storage quota.',
-                    style: context.text.bodySmall?.copyWith(color: context.colors.error),
+                    style: context.text.bodySmall?.copyWith(
+                      color: context.colors.error,
+                    ),
                   ),
                 ] else if (_usage?.gracePeriodEndsAt != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Grace period ends ${shortDate(_usage!.gracePeriodEndsAt!)}.',
-                    style: context.text.bodySmall?.copyWith(color: tokens.accent),
+                    style: context.text.bodySmall?.copyWith(
+                      color: tokens.accent,
+                    ),
                   ),
                 ],
               ],
@@ -444,18 +535,36 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                 children: [
                   _KvList(
                     rows: [
-                      ('Current plan', _billing!.planName.isNotEmpty ? _billing!.planName : '—'),
+                      (
+                        'Current plan',
+                        _billing!.planName.isNotEmpty
+                            ? _billing!.planName
+                            : '—',
+                      ),
                       if (_billing!.planRenewsAt != null)
-                        ('Expires / renews', shortDate(_billing!.planRenewsAt!)),
+                        (
+                          'Expires / renews',
+                          shortDate(_billing!.planRenewsAt!),
+                        ),
                       if (_billing!.cancellationEffectiveAt != null)
-                        ('Cancellation effective', shortDate(_billing!.cancellationEffectiveAt!)),
-                      ('Free storage usage', '${_billing!.freeStoragePercent}%'),
+                        (
+                          'Cancellation effective',
+                          shortDate(_billing!.cancellationEffectiveAt!),
+                        ),
+                      (
+                        'Free storage usage',
+                        '${_billing!.freeStoragePercent}%',
+                      ),
                     ],
                   ),
                   if (_billing!.testMode) ...[
                     const SizedBox(height: AppSpacing.xs),
-                    Text('Test mode — plan changes apply instantly with no charge.',
-                        style: context.text.bodySmall?.copyWith(color: tokens.muted)),
+                    Text(
+                      'Test mode — plan changes apply instantly with no charge.',
+                      style: context.text.bodySmall?.copyWith(
+                        color: tokens.muted,
+                      ),
+                    ),
                   ],
                   const SizedBox(height: AppSpacing.sm),
                   for (final tier in _billing!.upgradeTiers)
@@ -464,8 +573,12 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                       child: SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _billingBusy ? null : () => _choosePlan(tier),
-                          child: Text('Switch to ${ProfessionalUpgradeTier.label(tier)}'),
+                          onPressed: _billingBusy
+                              ? null
+                              : () => _choosePlan(tier),
+                          child: Text(
+                            'Switch to ${ProfessionalUpgradeTier.label(tier)}',
+                          ),
                         ),
                       ),
                     ),
@@ -480,10 +593,13 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                         ),
                       if (_billing!.planCode != 'starter_free' &&
                           _billing!.planCode != 'starter') ...[
-                        if (_billing!.billingConfigured) const SizedBox(width: AppSpacing.sm),
+                        if (_billing!.billingConfigured)
+                          const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: _billing!.cancellationEffectiveAt == null ? _cancelPlan : null,
+                            onPressed: _billing!.cancellationEffectiveAt == null
+                                ? _cancelPlan
+                                : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: context.colors.error,
                             ),
@@ -519,7 +635,11 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                         style: context.text.bodySmall,
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: AppSize.iconRow, color: tokens.muted),
+                    Icon(
+                      Icons.chevron_right,
+                      size: AppSize.iconRow,
+                      color: tokens.muted,
+                    ),
                   ],
                 ),
               ),
@@ -541,8 +661,12 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item.title.isNotEmpty ? item.title : item.categoryLabel,
-                                    style: context.text.bodyMedium),
+                                Text(
+                                  item.title.isNotEmpty
+                                      ? item.title
+                                      : item.categoryLabel,
+                                  style: context.text.bodyMedium,
+                                ),
                                 Text(
                                   '${item.categoryLabel} · ${item.daysRemaining}d left',
                                   style: context.text.bodySmall,
@@ -617,7 +741,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     child: Text(
                       _codeMessage,
                       style: context.text.bodySmall?.copyWith(
-                        color: _codeError ? context.colors.error : tokens.success,
+                        color: _codeError
+                            ? context.colors.error
+                            : tokens.success,
                       ),
                     ),
                   ),
@@ -647,8 +773,9 @@ class _ProfessionalSettingsPageState extends ConsumerState<ProfessionalSettingsP
                     child: Text(
                       _passwordMessage,
                       style: context.text.bodySmall?.copyWith(
-                        color:
-                            _passwordError ? context.colors.error : tokens.success,
+                        color: _passwordError
+                            ? context.colors.error
+                            : tokens.success,
                       ),
                     ),
                   ),

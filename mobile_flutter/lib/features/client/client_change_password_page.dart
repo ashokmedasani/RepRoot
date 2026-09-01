@@ -49,8 +49,12 @@ class _ClientChangePasswordPageState
       _next.text == _confirm.text;
 
   String _validate() {
-    if (_current.text.isEmpty) return 'Enter the password your professional gave you.';
-    if (_next.text.length < 8) return 'New password must be at least 8 characters.';
+    if (_current.text.isEmpty) {
+      return 'Enter the password your professional gave you.';
+    }
+    if (_next.text.length < 8) {
+      return 'New password must be at least 8 characters.';
+    }
     if (_next.text == _current.text) {
       return 'Choose a different password from the temporary one.';
     }
@@ -97,7 +101,9 @@ class _ClientChangePasswordPageState
     final api = ref.read(clientApiProvider);
     try {
       await api.logout();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Server sign-out failed; clearing the local session: $error');
+    }
     await api.clearSession();
     if (mounted) context.go(Routes.roleChooser);
   }

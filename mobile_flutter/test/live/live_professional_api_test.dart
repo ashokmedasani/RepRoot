@@ -1,7 +1,7 @@
 import 'package:reproot/core/api/api_client.dart';
 import 'package:reproot/core/api/chat_api.dart';
 import 'package:reproot/core/api/forms_groups_api.dart';
-import 'package:reproot/core/api/references_api.dart';
+import 'package:reproot/core/api/resources_api.dart';
 import 'package:reproot/core/api/templates_api.dart';
 import 'package:reproot/core/api/professional_auth_api.dart';
 import 'package:reproot/core/session/session_store.dart';
@@ -11,7 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Live read-only smoke test for the four API services ported in Phase 3
-/// (forms-groups, templates, references, chat), plus the graph engine wired to
+/// (forms-groups, templates, resources, chat), plus the graph engine wired to
 /// real entry data.
 ///
 /// Read-only by design: it never creates, updates, or deletes anything in the
@@ -28,7 +28,7 @@ void main() {
       late SessionStore session;
       late FormsGroupsApi formsGroups;
       late TemplatesApi templates;
-      late ReferencesApi references;
+      late ResourcesApi resources;
       late ChatApi chat;
 
       setUpAll(() async {
@@ -44,7 +44,7 @@ void main() {
 
         formsGroups = FormsGroupsApi(dio);
         templates = TemplatesApi(dio);
-        references = ReferencesApi(dio);
+        resources = ResourcesApi(dio);
         chat = ChatApi(dio);
       });
 
@@ -88,16 +88,16 @@ void main() {
         expect(standards.first.fields, isNotEmpty);
       });
 
-      test('references and categories parse', () async {
-        final categories = await references.getCategories();
-        final list = await references.getReferences();
+      test('resources and categories parse', () async {
+        final categories = await resources.getCategories();
+        final list = await resources.getResources();
 
         expect(list.usage.used, greaterThanOrEqualTo(0));
         for (final category in categories) {
           expect(category.name, isNotEmpty);
         }
-        for (final reference in list.references) {
-          expect(reference.title, isNotEmpty);
+        for (final resource in list.resources) {
+          expect(resource.title, isNotEmpty);
         }
       });
 
@@ -138,7 +138,9 @@ void main() {
           return;
         }
 
-        final detail = await formsGroups.getClientProfile(users.clients.first.id);
+        final detail = await formsGroups.getClientProfile(
+          users.clients.first.id,
+        );
         expect(detail.client.id, users.clients.first.id);
         expect(detail.group.id, greaterThan(0));
       });
@@ -163,7 +165,9 @@ void main() {
           return;
         }
 
-        final template = await templates.getTemplate(assignments.first.templateId);
+        final template = await templates.getTemplate(
+          assignments.first.templateId,
+        );
         final fields = template.fields.map((f) => f.toFieldLike()).toList();
         final entryLikes = entries
             .where((e) => e.template == template.id)
@@ -181,7 +185,11 @@ void main() {
         for (final chart in charts) {
           expect(chart.title, isNotEmpty);
           if (chart.kind != ChartKind.ring && chart.kind != ChartKind.summary) {
-            expect(chart.data, isNotEmpty, reason: '${chart.kind} needs points');
+            expect(
+              chart.data,
+              isNotEmpty,
+              reason: '${chart.kind} needs points',
+            );
           }
         }
 
@@ -193,7 +201,9 @@ void main() {
         }
       });
     },
-    skip: _live ? false : 'live backend test — run with --dart-define=LIVE=true',
+    skip: _live
+        ? false
+        : 'live backend test — run with --dart-define=LIVE=true',
   );
 }
 

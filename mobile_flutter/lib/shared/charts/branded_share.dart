@@ -12,7 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_tokens.dart';
 
 /// Exports a chart as a branded PNG — the chart composited under a RepRoot
-/// Studio header (logo mark + wordmark + chart title) and a footer strip — and
+/// header (logo mark + wordmark + chart title) and a footer strip — and
 /// hands it to the Android share sheet.
 ///
 /// Flutter equivalent of mobile/src/app/shared/branded-share.service.ts. That
@@ -59,7 +59,8 @@ class BrandedShare {
     required Brightness brightness,
   }) async {
     final boundary =
-        boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+        boundaryKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
     if (boundary == null) return false;
 
     final ui.Image chart = await boundary.toImage(pixelRatio: _exportScale);
@@ -85,7 +86,7 @@ class BrandedShare {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'image/png')],
-        title: '$title — RepRoot Studio',
+        title: '$title — RepRoot',
         text: subtitle.isEmpty ? title : '$title · $subtitle',
       ),
     );
@@ -119,7 +120,9 @@ class BrandedShare {
     // whole canvas up at the end so every number below reads as a real size.
     final chartWidth = chart.width / _exportScale;
     final chartHeight = chart.height / _exportScale;
-    final contentWidth = chartWidth < _minContentWidth ? _minContentWidth : chartWidth;
+    final contentWidth = chartWidth < _minContentWidth
+        ? _minContentWidth
+        : chartWidth;
     final width = contentWidth + _pad * 2;
     final height = _headerHeight + chartHeight + _footerHeight;
 
@@ -127,17 +130,14 @@ class BrandedShare {
     final canvas = Canvas(recorder);
     canvas.scale(_exportScale);
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, width, height),
-      Paint()..color = bg,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, width, height), Paint()..color = bg);
 
     _drawMark(canvas, const Offset(_pad, _pad), primary);
 
     const brandX = _pad + _markSize + 12;
     _drawText(
       canvas,
-      'RepRoot Studio',
+      'RepRoot',
       const Offset(brandX, _pad + 2),
       TextStyle(color: text, fontSize: 15, fontWeight: FontWeight.w800),
     );
@@ -246,11 +246,14 @@ class BrandedShare {
     double? maxWidth,
   }) {
     TextPainter(
-      text: TextSpan(text: text, style: style.copyWith(fontFamily: 'Roboto')),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-      ellipsis: '…',
-    )
+        text: TextSpan(
+          text: text,
+          style: style.copyWith(fontFamily: 'Roboto'),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )
       ..layout(maxWidth: maxWidth ?? double.infinity)
       ..paint(canvas, offset);
   }
